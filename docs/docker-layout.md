@@ -68,6 +68,7 @@ Fijar el layout real de contenedores, red, mounts, `docroot` y permisos para la 
         wp-content/
         wp-config.php
   shared/
+    config/
     uploads/
     mu-plugins/
 ```
@@ -90,17 +91,20 @@ Fijar el layout real de contenedores, red, mounts, `docroot` y permisos para la 
 
 ### `fe-live`
 - `/tank/data/wp-root/live/current/public` -> `/var/www/html/live`
+- `/tank/data/wp-root/shared/config` -> `/var/www/shared/config:ro`
 - Opcional: `/tank/data/wp-root/shared/uploads` -> `/var/www/html/live/wp-content/uploads`
 - Opcional: `/tank/data/wp-root/shared/mu-plugins` -> `/var/www/html/live/wp-content/mu-plugins`
 
 ### `fe-archive`
 - `/tank/data/wp-root/archive/current/public` -> `/var/www/html/archive`
+- `/tank/data/wp-root/shared/config` -> `/var/www/shared/config:ro`
 - Opcional: `/tank/data/wp-root/shared/uploads` -> `/var/www/html/archive/wp-content/uploads`
 - Opcional: `/tank/data/wp-root/shared/mu-plugins` -> `/var/www/html/archive/wp-content/mu-plugins`
 
 ### `be-admin`
 - `/tank/data/wp-root/admin-live/current/public` -> `/var/www/html/admin-live`
 - `/tank/data/wp-root/admin-archive/current/public` -> `/var/www/html/admin-archive`
+- `/tank/data/wp-root/shared/config` -> `/var/www/shared/config:ro`
 - Opcional: `/tank/data/wp-root/shared/uploads` -> `/var/www/html/admin-live/wp-content/uploads`
 - Opcional: `/tank/data/wp-root/shared/uploads` -> `/var/www/html/admin-archive/wp-content/uploads`
 

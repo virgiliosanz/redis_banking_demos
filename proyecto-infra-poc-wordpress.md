@@ -4,7 +4,7 @@
 Convertir la documentacion inicial en una especificacion coherente de una POC WordPress segmentada en `live`, `archive` y `admin`.
 
 ## Estado
-- Fase actual: `Fase 2` completada, `Fase 3` lista para arrancar.
+- Fase actual: `Fase 3` completada, `Fase 4` lista para arrancar.
 - Estado: en curso.
 
 ## Decisiones acordadas
@@ -58,14 +58,16 @@ Convertir la documentacion inicial en una especificacion coherente de una POC Wo
 - El backend administrativo debe ser pasivo: toda la decision pertenece al balanceador y al `docroot` enviado por FastCGI.
 - La POC ya necesita una configuracion concreta del balanceador; el pseudocodigo deja demasiados huecos en un sistema con `live`, `archive` y `admin`.
 - Para que `LB-Nginx` pueda servir estaticos y resolver `SCRIPT_FILENAME`, el layout de mounts y `docroot` tiene que definirse antes de tocar WordPress.
+- El backend administrativo queda mucho mas limpio cuando cada contexto tiene su propio `wp-config.php` y el contenedor no hace autodeteccion.
 
 ## Siguiente fase propuesta
-- Definir la configuracion de cada instancia WordPress.
-- Cerrar como `BE-Admin` carga `admin-live` y `admin-archive`.
-- Definir variables de entorno, parametros comunes y degradacion con `Elastic`.
+- Definir observabilidad, healthchecks y logs minimos.
+- Definir pruebas de humo de routing y disponibilidad.
+- Traducir lo ya acordado a chequeos operativos.
 
 ## Plan operativo
 - Plan detallado en `tasks/infra-poc-wordpress-plan.md`.
 - La `Fase 1` queda cerrada con `docs/lb-nginx-routing.md`.
 - La `Fase 2` queda cerrada con `docs/docker-layout.md`.
-- La siguiente fase activa es la configuracion WordPress por contexto.
+- La `Fase 3` queda cerrada con `docs/wordpress-contexts.md`.
+- La siguiente fase activa es observabilidad y operacion.

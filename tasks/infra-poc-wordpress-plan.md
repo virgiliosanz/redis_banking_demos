@@ -8,8 +8,8 @@ Desglosar la POC en fases ejecutables, con dependencias claras y criterios de ci
 - Documento de proyecto: `proyecto-infra-poc-wordpress.md`
 
 ## Estado global
-- Fase actual recomendada: `Fase 3`
-- Prioridad actual: cerrar configuracion WordPress por contexto
+- Fase actual recomendada: `Fase 4`
+- Prioridad actual: cerrar observabilidad y operacion
 
 ## Fase 0. Base documental
 ### Objetivo
@@ -89,7 +89,7 @@ Definir el layout real de los contenedores PHP y sus `docroot`.
 Dejar definidas las instancias WordPress de `live`, `archive` y admin.
 
 ### Estado
-- Siguiente fase activa
+- Completada
 
 ### Tareas
 - Definir configuracion de conexion a `DB-Live`.
@@ -103,9 +103,16 @@ Dejar definidas las instancias WordPress de `live`, `archive` y admin.
 - No existe logica de particion anual dentro de WordPress.
 - El admin funciona para `live` y `archive` solo por `host` y `docroot`.
 
+### Entregables
+- `docs/wordpress-contexts.md`
+- `tasks/fase-3-wordpress-contexts.md`
+
 ## Fase 4. Observabilidad y operacion
 ### Objetivo
 Dejar la POC operable y diagnosticable.
+
+### Estado
+- Siguiente fase activa
 
 ### Tareas
 - Definir healthchecks por contenedor.
@@ -142,4 +149,4 @@ Documentar que faltaria para considerar este diseno apto para un entorno serio.
 - `Fase 5` depende de todas las anteriores.
 
 ## Siguiente accion recomendada
-- Ejecutar `Fase 3`: definir configuracion WordPress por contexto.
+- Ejecutar `Fase 4`: definir observabilidad, healthchecks y pruebas de humo.
