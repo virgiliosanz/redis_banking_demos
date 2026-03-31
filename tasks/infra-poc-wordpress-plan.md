@@ -50,7 +50,7 @@ Definir la configuracion concreta de `LB-Nginx` para que el sistema enrute corre
 - `archive.nuevecuatrouno.com/wp-admin`
 - `nuevecuatrouno.com/2019/...`
 - `nuevecuatrouno.com/actualidad/...`
-- `archive.nuevecuatrouno.com/...`
+- `archive.nuevecuatrouno.com/...` no admin
 
 ### Riesgos a vigilar
 - Resolver mal la prioridad de reglas.

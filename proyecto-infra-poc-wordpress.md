@@ -18,6 +18,7 @@ Convertir la documentacion inicial en una especificacion coherente de una POC Wo
 - La separacion `live/archive` se decide por dominio y por URL.
 - Si el primer segmento de la ruta es `2015` a `2023`, la peticion se enruta a `FE-Archive`.
 - El resto del trafico va a `FE-Live`.
+- `archive.nuevecuatrouno.com` queda reservado al admin de `archive`, no al frontend publico.
 - Es una POC de baja carga: `2-3` usuarios simultaneos como maximo.
 - No se contemplan backups en esta fase.
 - Elasticsearch no se considera critico en esta fase.
@@ -59,6 +60,7 @@ Convertir la documentacion inicial en una especificacion coherente de una POC Wo
 - La POC ya necesita una configuracion concreta del balanceador; el pseudocodigo deja demasiados huecos en un sistema con `live`, `archive` y `admin`.
 - Para que `LB-Nginx` pueda servir estaticos y resolver `SCRIPT_FILENAME`, el layout de mounts y `docroot` tiene que definirse antes de tocar WordPress.
 - El backend administrativo queda mucho mas limpio cuando cada contexto tiene su propio `wp-config.php` y el contenedor no hace autodeteccion.
+- Reservar `archive.nuevecuatrouno.com` solo para el admin elimina la ambigüedad de host canonico en el frontend historico.
 
 ## Siguiente fase propuesta
 - Definir observabilidad, healthchecks y logs minimos.

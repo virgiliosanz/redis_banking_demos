@@ -19,7 +19,7 @@ Esta documentacion describe una POC funcional, no un diseno de produccion. Se ac
 | :--- | :--- | :--- | :--- | :--- |
 | `LB-Nginx` | 1 | 2 GB | `10.0.0.10` | Entrada publica, TLS, enrutado y FastCGI |
 | `FE-Live` | 1 | 2 GB | `10.0.0.11` | `php-fpm` para trafico vivo |
-| `FE-Archive` | 1 | 2 GB | `10.0.0.12` | `php-fpm` para trafico historico |
+| `FE-Archive` | 1 | 2 GB | `10.0.0.12` | `php-fpm` para contenido historico publico |
 | `BE-Admin` | 1 | 2 GB | `10.0.0.13` | `php-fpm` administrativo con dos `docroot`: `live` y `archive` |
 | `DB-Live` | 1 | 4 GB | `10.0.0.20` | MySQL de contenido vivo |
 | `DB-Archive` | 1 | 4 GB | `10.0.0.21` | MySQL de contenido historico |
@@ -34,10 +34,11 @@ Esta documentacion describe una POC funcional, no un diseno de produccion. Se ac
 
 ### 4.2 Regla principal por dominio y ruta
 - `nuevecuatrouno.com` sirve trafico general.
-- `archive.nuevecuatrouno.com` sirve trafico historico.
+- `archive.nuevecuatrouno.com` se reserva para el admin del contexto `archive`.
 - Cualquier peticion a `/wp-admin`, login, `admin-ajax.php` o REST de administracion se enruta a `BE-Admin`.
 - Si el primer segmento del path es uno de `2015`, `2016`, `2017`, `2018`, `2019`, `2020`, `2021`, `2022` o `2023`, la peticion se enruta a `FE-Archive`.
 - Cualquier otra peticion se enruta a `FE-Live`.
+- El contenido historico publico sigue sirviendose bajo `nuevecuatrouno.com`, no bajo `archive.nuevecuatrouno.com`.
 
 ### 4.3 Mecanismo tecnico
 - `LB-Nginx` habla `FastCGI` con `php-fpm`.
@@ -137,13 +138,13 @@ Esta documentacion describe una POC funcional, no un diseno de produccion. Se ac
 | Host `nuevecuatrouno.com` y path `/wp-json/*` administrativo | `BE-Admin` | `DB-Live` | Solo rutas de administracion |
 | Host `nuevecuatrouno.com` y path `/wp-admin/admin-ajax.php` | `BE-Admin` | `DB-Live` | Trafico administrativo |
 | Host `archive.nuevecuatrouno.com` y path administrativo | `BE-Admin` | `DB-Archive` | `docroot` admin `archive` |
-| Host `archive.nuevecuatrouno.com` | `FE-Archive` | `DB-Archive` | Dominio dedicado |
+| Host `archive.nuevecuatrouno.com` y path no administrativo | `LB-Nginx` | n/a | Redireccion o bloqueo; no sirve frontend publico |
 | Primer segmento del path entre `2015` y `2023` | `FE-Archive` | `DB-Archive` | Regla por URL |
 | Cualquier otro caso | `FE-Live` | `DB-Live` | Regla por defecto |
 
 ### 11.1 Orden de evaluacion
 - Primero se evalua si la peticion es administrativa.
-- Despues se evalua el host `archive.nuevecuatrouno.com`.
+- Despues se evalua si el host `archive.nuevecuatrouno.com` esta fuera del admin para redirigirlo o bloquearlo.
 - Despues se evalua el primer segmento del path.
 - Si no coincide nada anterior, la peticion va a `FE-Live`.
 
@@ -151,7 +152,7 @@ Esta documentacion describe una POC funcional, no un diseno de produccion. Se ac
 - `https://nuevecuatrouno.com/wp-admin/` -> `BE-Admin`
 - `https://nuevecuatrouno.com/wp-login.php` -> `BE-Admin`
 - `https://archive.nuevecuatrouno.com/wp-admin/` -> `BE-Admin`
-- `https://archive.nuevecuatrouno.com/2018/10/mi-articulo/` -> `FE-Archive`
+- `https://archive.nuevecuatrouno.com/2018/10/mi-articulo/` -> redireccion o bloqueo en `LB-Nginx`
 - `https://nuevecuatrouno.com/2019/05/otro-articulo/` -> `FE-Archive`
 - `https://nuevecuatrouno.com/actualidad/noticia/` -> `FE-Live`
 

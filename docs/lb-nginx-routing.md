@@ -22,7 +22,7 @@ Dejar una configuracion concreta de `LB-Nginx` para enrutar `live`, `archive` y 
 | :--- | :--- | :--- |
 | `nuevecuatrouno.com/wp-admin` | `be_admin` | `/var/www/html/admin-live` |
 | `archive.nuevecuatrouno.com/wp-admin` | `be_admin` | `/var/www/html/admin-archive` |
-| `archive.nuevecuatrouno.com/*` | `fe_archive` | `/var/www/html/archive` |
+| `archive.nuevecuatrouno.com/*` no admin | sin upstream | redireccion o bloqueo |
 | `/2015..2023/*` | `fe_archive` | `/var/www/html/archive` |
 | resto | `fe_live` | `/var/www/html/live` |
 
@@ -64,6 +64,11 @@ map $uri $is_admin_path {
     =/wp-login.php 1;
     =/wp-admin/admin-ajax.php 1;
     ~^/wp-json(/|$) 1;
+}
+
+map "$host|$is_admin_path" $archive_host_public_block {
+    default 0;
+    "archive.nuevecuatrouno.com|0" 1;
 }
 
 map "$is_admin_path|$host_context|$path_context" $site_context {
@@ -128,6 +133,10 @@ server {
         return 200 "ok\n";
     }
 
+    if ($archive_host_public_block) {
+        return 301 https://nuevecuatrouno.com$request_uri;
+    }
+
     location = /favicon.ico {
         access_log off;
         log_not_found off;
@@ -176,6 +185,15 @@ server {
 
 ## Observaciones tecnicas
 
+### `archive.nuevecuatrouno.com`
+Este host queda reservado al admin del contexto `archive`.
+
+Cualquier trafico no administrativo en ese host debe:
+- redirigirse a `https://nuevecuatrouno.com$request_uri`
+- o bloquearse con `404/403` si prefieres un contrato mas estricto
+
+Para la POC, recomiendo redireccion a dominio principal.
+
 ### `/wp-json/`
 En esta POC se enruta todo `/wp-json/` a `BE-Admin` para no romper el admin moderno de WordPress, incluido Gutenberg y llamadas autenticadas.
 
@@ -206,7 +224,7 @@ Conviene ampliar `access_log` con un formato que incluya:
 - `https://nuevecuatrouno.com/wp-admin/` debe usar `be_admin` + `/var/www/html/admin-live`
 - `https://archive.nuevecuatrouno.com/wp-admin/` debe usar `be_admin` + `/var/www/html/admin-archive`
 - `https://nuevecuatrouno.com/2019/05/noticia/` debe usar `fe_archive` + `/var/www/html/archive`
-- `https://archive.nuevecuatrouno.com/cultura/post/` debe usar `fe_archive` + `/var/www/html/archive`
+- `https://archive.nuevecuatrouno.com/cultura/post/` debe redirigir a `https://nuevecuatrouno.com/cultura/post/`
 - `https://nuevecuatrouno.com/actualidad/post/` debe usar `fe_live` + `/var/www/html/live`
 
 ## Resultado esperado de la fase

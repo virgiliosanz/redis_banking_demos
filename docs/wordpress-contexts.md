@@ -13,7 +13,7 @@ Definir como se configuran las instancias WordPress de `live`, `archive`, `admin
 | Contexto | Backend PHP | Host principal | Base de datos | Elastic |
 | :--- | :--- | :--- | :--- | :--- |
 | `live` | `fe-live` | `nuevecuatrouno.com` | `db-live` | `elastic:9200` |
-| `archive` | `fe-archive` | `archive.nuevecuatrouno.com` y rutas anuales | `db-archive` | `elastic:9200` |
+| `archive` | `fe-archive` | rutas anuales bajo `nuevecuatrouno.com` | `db-archive` | `elastic:9200` |
 | `admin-live` | `be-admin` | `nuevecuatrouno.com` en rutas admin | `db-live` | `elastic:9200` |
 | `admin-archive` | `be-admin` | `archive.nuevecuatrouno.com` en rutas admin | `db-archive` | `elastic:9200` |
 
@@ -80,9 +80,9 @@ El patron es el mismo para el resto de contextos, cambiando host, DB y parametro
 - `DB_HOST=db-archive:3306`
 - `DB_NAME=n9_archive`
 - `DB_USER=wp_archive`
-- No fijar `WP_HOME` y `WP_SITEURL` a un unico host si la misma instancia debe servir tanto `archive.nuevecuatrouno.com` como rutas anuales bajo `nuevecuatrouno.com`
-- Resolver `home` y `siteurl` de forma compatible con el `HTTP_HOST` preservado por `LB-Nginx`, o aceptar un unico host canonico y documentar sus redirecciones
-- Este es el unico punto donde hay tension real entre "WordPress normal" y "doble entrada por host"
+- `WP_HOME=https://nuevecuatrouno.com`
+- `WP_SITEURL=https://nuevecuatrouno.com`
+- La seleccion de contenido historico la hace `LB-Nginx` por ruta; WordPress `archive` sigue viendo el host principal
 
 ### `admin-live`
 - `DB_HOST=db-live:3306`
@@ -138,23 +138,16 @@ Este fichero puede centralizar:
 - inferir contexto por URL
 - reimplementar reglas del balanceador
 
-## Tension funcional de `archive`
+## Politica de host para `archive`
 
-### Problema
-- La misma instancia `archive` se quiere servir desde `archive.nuevecuatrouno.com`
-- y tambien desde rutas anuales bajo `nuevecuatrouno.com`
+### Decision cerrada
+- `archive.nuevecuatrouno.com` no expone frontend publico de archivo.
+- Ese host queda reservado al admin del contexto `archive`.
+- El frontend publico historico se sirve bajo `nuevecuatrouno.com` cuando la ruta anual cae en `FE-Archive`.
 
-Un WordPress con `WP_HOME` y `WP_SITEURL` fijos suele tender a canonizar un solo host.
-
-### Conclusion pragmatica
-- Esto no rompe la arquitectura, pero si obliga a cerrar una politica de host canonico.
-- Para la POC hay dos opciones validas:
-- opcion A: `archive.nuevecuatrouno.com` es el host canonico y se aceptan redirecciones desde el dominio principal
-- opcion B: el contexto `archive` resuelve `home` y `siteurl` en funcion del `HTTP_HOST` preservado por `LB-Nginx`
-
-### Recomendacion
-- Si quieres demostrar ambas entradas sin pelearte con redirecciones, la opcion B es la mas util en POC.
-- Si quieres el WordPress mas estandar posible, la opcion A es la mas limpia pero contradice el objetivo de servir tambien rutas anuales en el dominio principal sin redireccion.
+### Consecuencia
+- Desaparece la tension de `WP_HOME` y `WP_SITEURL` para el frontend `archive`.
+- `admin-archive` puede seguir usando `archive.nuevecuatrouno.com` como host administrativo dedicado.
 
 ## Carga de `BE-Admin`
 
