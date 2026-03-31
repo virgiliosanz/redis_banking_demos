@@ -8,8 +8,8 @@ Desglosar la POC en fases ejecutables, con dependencias claras y criterios de ci
 - Documento de proyecto: `proyecto-infra-poc-wordpress.md`
 
 ## Estado global
-- Fase actual recomendada: `Fase 2`
-- Prioridad actual: cerrar layout de contenedores y `docroot`
+- Fase actual recomendada: `Fase 3`
+- Prioridad actual: cerrar configuracion WordPress por contexto
 
 ## Fase 0. Base documental
 ### Objetivo
@@ -66,7 +66,7 @@ Definir la configuracion concreta de `LB-Nginx` para que el sistema enrute corre
 Definir el layout real de los contenedores PHP y sus `docroot`.
 
 ### Estado
-- Siguiente fase activa
+- Completada
 
 ### Tareas
 - Confirmar estructura fisica de `live`, `archive`, `admin-live` y `admin-archive`.
@@ -80,9 +80,16 @@ Definir el layout real de los contenedores PHP y sus `docroot`.
 - Cada backend tiene un `docroot` inequívoco.
 - La relacion entre contenedor, `docroot` y base de datos queda cerrada.
 
+### Entregables
+- `docs/docker-layout.md`
+- `tasks/fase-2-docker-layout.md`
+
 ## Fase 3. Configuracion WordPress
 ### Objetivo
 Dejar definidas las instancias WordPress de `live`, `archive` y admin.
+
+### Estado
+- Siguiente fase activa
 
 ### Tareas
 - Definir configuracion de conexion a `DB-Live`.
@@ -135,4 +142,4 @@ Documentar que faltaria para considerar este diseno apto para un entorno serio.
 - `Fase 5` depende de todas las anteriores.
 
 ## Siguiente accion recomendada
-- Ejecutar `Fase 2`: definir layout de contenedores, bind mounts y `docroot`.
+- Ejecutar `Fase 3`: definir configuracion WordPress por contexto.
