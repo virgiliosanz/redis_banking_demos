@@ -8,8 +8,8 @@ Desglosar la POC en fases ejecutables, con dependencias claras y criterios de ci
 - Documento de proyecto: `proyecto-infra-poc-wordpress.md`
 
 ## Estado global
-- Fase actual recomendada: `Fase 4`
-- Prioridad actual: cerrar observabilidad y operacion
+- Fase actual recomendada: `Fase 5`
+- Prioridad actual: cerrar criterios de paso a produccion
 
 ## Fase 0. Base documental
 ### Objetivo
@@ -112,7 +112,7 @@ Dejar definidas las instancias WordPress de `live`, `archive` y admin.
 Dejar la POC operable y diagnosticable.
 
 ### Estado
-- Siguiente fase activa
+- Completada
 
 ### Tareas
 - Definir healthchecks por contenedor.
@@ -125,9 +125,16 @@ Dejar la POC operable y diagnosticable.
 - Existe una lista minima de chequeos operativos.
 - Los fallos de routing y de servicios se pueden detectar rapido.
 
+### Entregables
+- `docs/observability-and-operations.md`
+- `tasks/fase-4-observability-and-operations.md`
+
 ## Fase 5. Criterios de paso a produccion
 ### Objetivo
 Documentar que faltaria para considerar este diseno apto para un entorno serio.
+
+### Estado
+- Siguiente fase activa
 
 ### Tareas
 - Definir estrategia de backups y restore.
@@ -149,4 +156,4 @@ Documentar que faltaria para considerar este diseno apto para un entorno serio.
 - `Fase 5` depende de todas las anteriores.
 
 ## Siguiente accion recomendada
-- Ejecutar `Fase 4`: definir observabilidad, healthchecks y pruebas de humo.
+- Ejecutar `Fase 5`: documentar huecos entre la POC y un entorno apto para produccion.

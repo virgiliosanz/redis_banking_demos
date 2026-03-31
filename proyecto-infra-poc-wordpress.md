@@ -4,7 +4,7 @@
 Convertir la documentacion inicial en una especificacion coherente de una POC WordPress segmentada en `live`, `archive` y `admin`.
 
 ## Estado
-- Fase actual: `Fase 3` completada, `Fase 4` lista para arrancar.
+- Fase actual: `Fase 4` completada, `Fase 5` lista para arrancar.
 - Estado: en curso.
 
 ## Decisiones acordadas
@@ -61,15 +61,17 @@ Convertir la documentacion inicial en una especificacion coherente de una POC Wo
 - Para que `LB-Nginx` pueda servir estaticos y resolver `SCRIPT_FILENAME`, el layout de mounts y `docroot` tiene que definirse antes de tocar WordPress.
 - El backend administrativo queda mucho mas limpio cuando cada contexto tiene su propio `wp-config.php` y el contenedor no hace autodeteccion.
 - Reservar `archive.nuevecuatrouno.com` solo para el admin elimina la ambigüedad de host canonico en el frontend historico.
+- Una POC sin checks de salud y smoke tests se vuelve opaca muy rapido, incluso con poca carga.
 
 ## Siguiente fase propuesta
-- Definir observabilidad, healthchecks y logs minimos.
-- Definir pruebas de humo de routing y disponibilidad.
-- Traducir lo ya acordado a chequeos operativos.
+- Documentar que falta para produccion.
+- Cerrar checklist de endurecimiento, despliegue y recuperacion.
+- Separar claramente shortcuts de POC frente a requisitos serios.
 
 ## Plan operativo
 - Plan detallado en `tasks/infra-poc-wordpress-plan.md`.
 - La `Fase 1` queda cerrada con `docs/lb-nginx-routing.md`.
 - La `Fase 2` queda cerrada con `docs/docker-layout.md`.
 - La `Fase 3` queda cerrada con `docs/wordpress-contexts.md`.
-- La siguiente fase activa es observabilidad y operacion.
+- La `Fase 4` queda cerrada con `docs/observability-and-operations.md`.
+- La siguiente fase activa es criterios de paso a produccion.
