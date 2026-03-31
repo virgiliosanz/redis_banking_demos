@@ -1,20 +1,37 @@
 # Infraestructura WordPress POC (Docker)
 
 ## 1. Objetivo
-Prueba de concepto de una infraestructura WordPress segmentada por tipo de tráfico y antiguedad del contenido.
+Definir de forma unificada la arquitectura, decisiones, fases ejecutadas, operacion minima y criterios de paso a produccion de una POC WordPress segmentada en `live`, `archive` y `admin`.
 
-Esta documentacion describe una POC funcional, no un diseno de produccion. Se aceptan atajos deliberados siempre que queden explicitos.
+Este documento sustituye al resto de documentos tecnicos y al documento de proyecto anterior. La POC queda descrita aqui de forma integral.
 
-## 2. Alcance y Premisas
+## 2. Estado del proyecto
+
+### Estado global
+- Proyecto documental cerrado.
+- Fases `0` a `5` completadas.
+- Siguiente iteracion recomendada: implementacion real o generacion de plantillas de despliegue.
+
+### Lecciones aprendidas
+- La regla de particion pertenece al balanceador, no a WordPress.
+- `BE-Admin` debe ser un backend pasivo con dos `docroot`.
+- Sin una matriz clara de prioridad en el balanceador, el diseno queda ambiguo.
+- El layout de mounts y `docroot` debe definirse antes de aterrizar WordPress.
+- Cada contexto necesita su propio `wp-config.php`.
+- Reservar `archive.nuevecuatrouno.com` solo para admin elimina la ambigüedad de host canonico del frontend historico.
+- Una POC sin checks de salud y smoke tests se vuelve opaca muy rapido.
+- El salto a produccion es sobre todo operativo: secretos, backups, despliegue, recuperacion y capacidad.
+
+## 3. Alcance y premisas
 - Plataforma base: `docker`.
-- Carga esperada de la POC: `2-3` usuarios concurrentes como maximo.
+- Carga esperada en la POC: `2-3` usuarios concurrentes como maximo.
 - No se disena para `100k usuarios/dia`.
-- No habra alta disponibilidad.
+- No habra alta disponibilidad en esta fase.
 - No habra backups en esta fase.
 - Elasticsearch no es un componente critico en la POC.
 - El objetivo es validar topologia, enrutado y separacion funcional.
 
-## 3. Componentes
+## 4. Componentes
 | Componente | CPU | RAM | Red interna | Funcion |
 | :--- | :--- | :--- | :--- | :--- |
 | `LB-Nginx` | 1 | 2 GB | `10.0.0.10` | Entrada publica, TLS, enrutado y FastCGI |
@@ -26,29 +43,142 @@ Esta documentacion describe una POC funcional, no un diseno de produccion. Se ac
 | `Elastic` | 1 | 4 GB | `10.0.0.30` | Busqueda comun no critica |
 | `Cron-Master` | 1 | 2 GB | `10.0.0.40` | `WP-CLI` y tareas programadas |
 
-## 4. Enrutado Funcional
+## 5. Enrutado funcional
 
-### 4.1 Entrada publica
+### Entrada publica
 - Solo `LB-Nginx` expone `80/443`.
 - El host expone SSH por su puerto configurado.
 
-### 4.2 Regla principal por dominio y ruta
+### Reglas principales
 - `nuevecuatrouno.com` sirve trafico general.
 - `archive.nuevecuatrouno.com` se reserva para el admin del contexto `archive`.
 - Cualquier peticion a `/wp-admin`, login, `admin-ajax.php` o REST de administracion se enruta a `BE-Admin`.
-- Si el primer segmento del path es uno de `2015`, `2016`, `2017`, `2018`, `2019`, `2020`, `2021`, `2022` o `2023`, la peticion se enruta a `FE-Archive`.
+- Si el primer segmento del path es `2015`, `2016`, `2017`, `2018`, `2019`, `2020`, `2021`, `2022` o `2023`, la peticion se enruta a `FE-Archive`.
 - Cualquier otra peticion se enruta a `FE-Live`.
 - El contenido historico publico sigue sirviendose bajo `nuevecuatrouno.com`, no bajo `archive.nuevecuatrouno.com`.
 
-### 4.3 Mecanismo tecnico
-- `LB-Nginx` habla `FastCGI` con `php-fpm`.
-- La seleccion del backend se hace en el balanceador segun dominio y URL.
-- La regla anual solo existe en `LB-Nginx`.
-- Los WordPress de `FE-Live` y `FE-Archive` son instancias normales y no contienen logica especifica de particion por anos.
-- La peticion FastCGI interna fija el `docroot` y el contexto necesarios para que cada `php-fpm` use su configuracion correspondiente.
-- `BE-Admin` no decide nada por si mismo: sirve `live` o `archive` segun el `docroot` que le llega desde `LB-Nginx`.
+### Orden de evaluacion
+1. Trafico administrativo.
+2. Host `archive.nuevecuatrouno.com` fuera del admin para redireccion o bloqueo.
+3. Primer segmento anual del path.
+4. Regla por defecto hacia `FE-Live`.
 
-## 5. Flujos de Red Internos
+### Matriz resumida
+| Condicion | Backend | Base de datos esperada | Notas |
+| :--- | :--- | :--- | :--- |
+| Host `nuevecuatrouno.com` y path `/wp-admin` | `BE-Admin` | `DB-Live` | `docroot` admin `live` |
+| Host `nuevecuatrouno.com` y path `/wp-login.php` | `BE-Admin` | `DB-Live` | Login de `live` |
+| Host `nuevecuatrouno.com` y path `/wp-json/*` administrativo | `BE-Admin` | `DB-Live` | Solo rutas de administracion |
+| Host `archive.nuevecuatrouno.com` y path administrativo | `BE-Admin` | `DB-Archive` | `docroot` admin `archive` |
+| Host `archive.nuevecuatrouno.com` y path no administrativo | `LB-Nginx` | n/a | Redireccion o bloqueo |
+| Primer segmento del path entre `2015` y `2023` | `FE-Archive` | `DB-Archive` | Regla por URL |
+| Cualquier otro caso | `FE-Live` | `DB-Live` | Regla por defecto |
+
+### Ejemplos
+- `https://nuevecuatrouno.com/wp-admin/` -> `BE-Admin`
+- `https://archive.nuevecuatrouno.com/wp-admin/` -> `BE-Admin`
+- `https://nuevecuatrouno.com/2019/05/otro-articulo/` -> `FE-Archive`
+- `https://nuevecuatrouno.com/actualidad/noticia/` -> `FE-Live`
+- `https://archive.nuevecuatrouno.com/2018/10/mi-articulo/` -> redireccion o bloqueo en `LB-Nginx`
+
+## 6. Contrato FastCGI y balanceador
+
+### Principios
+- `LB-Nginx` es el unico punto de entrada HTTP.
+- Los contenedores PHP no exponen HTTP publico, solo `php-fpm`.
+- El balanceador decide el backend antes de ejecutar `fastcgi_pass`.
+- Cada backend recibe el `docroot` y el contexto FastCGI que le corresponde.
+
+### Variables FastCGI obligatorias
+- `SCRIPT_FILENAME` debe resolver contra el `docroot` del backend seleccionado.
+- `DOCUMENT_ROOT` debe coincidir con el `docroot` activo.
+- `HTTP_HOST` debe preservarse.
+- `REQUEST_URI` debe preservarse integra.
+- `SERVER_NAME` debe reflejar el host solicitado.
+- `HTTPS` debe marcarse cuando la entrada publica sea TLS.
+
+### Upstreams
+```nginx
+upstream fe_live {
+    server fe-live:9000;
+    keepalive 16;
+}
+
+upstream fe_archive {
+    server fe-archive:9000;
+    keepalive 16;
+}
+
+upstream be_admin {
+    server be-admin:9000;
+    keepalive 16;
+}
+```
+
+### Maps de decision
+```nginx
+map $host $host_context {
+    default live;
+    archive.nuevecuatrouno.com archive;
+}
+
+map $uri $path_context {
+    default live;
+    ~^/(2015|2016|2017|2018|2019|2020|2021|2022|2023)(/|$) archive;
+}
+
+map $uri $is_admin_path {
+    default 0;
+    ~^/wp-admin(/|$) 1;
+    =/wp-login.php 1;
+    =/wp-admin/admin-ajax.php 1;
+    ~^/wp-json(/|$) 1;
+}
+
+map "$host|$is_admin_path" $archive_host_public_block {
+    default 0;
+    "archive.nuevecuatrouno.com|0" 1;
+}
+
+map "$is_admin_path|$host_context|$path_context" $site_context {
+    default live;
+    "1|live|live" live;
+    "1|live|archive" live;
+    "1|archive|live" archive;
+    "1|archive|archive" archive;
+    "0|live|live" live;
+    "0|live|archive" archive;
+    "0|archive|live" archive;
+    "0|archive|archive" archive;
+}
+
+map "$is_admin_path|$site_context" $php_upstream {
+    default fe_live;
+    "0|live" fe_live;
+    "0|archive" fe_archive;
+    "1|live" be_admin;
+    "1|archive" be_admin;
+}
+
+map "$is_admin_path|$site_context" $site_docroot {
+    default /var/www/html/live;
+    "0|live" /var/www/html/live;
+    "0|archive" /var/www/html/archive;
+    "1|live" /var/www/html/admin-live;
+    "1|archive" /var/www/html/admin-archive;
+}
+```
+
+### Host `archive.nuevecuatrouno.com`
+- Queda reservado al admin del contexto `archive`.
+- El trafico no administrativo debe redirigirse a `https://nuevecuatrouno.com$request_uri` o bloquearse con `404/403`.
+- Para la POC se recomienda redireccion.
+
+### `/wp-json/`
+- En esta POC se enruta todo `/wp-json/` a `BE-Admin` para no romper el admin moderno de WordPress.
+- Si mas adelante hay REST publico intensivo, esta regla debera refinarse.
+
+## 7. Red y flujos internos
 - `LB-Nginx -> FE-Live` por FastCGI.
 - `LB-Nginx -> FE-Archive` por FastCGI.
 - `LB-Nginx -> BE-Admin` por FastCGI.
@@ -56,183 +186,281 @@ Esta documentacion describe una POC funcional, no un diseno de produccion. Se ac
 - `FE-Archive -> DB-Archive` por `3306`.
 - `FE-Live -> Elastic` por `9200`.
 - `FE-Archive -> Elastic` por `9200`.
-- `BE-Admin -> DB-Live` cuando el `docroot` administrativo activo sea `live`.
-- `BE-Admin -> DB-Archive` cuando el `docroot` administrativo activo sea `archive`.
+- `BE-Admin -> DB-Live` cuando el `docroot` activo sea `live`.
+- `BE-Admin -> DB-Archive` cuando el `docroot` activo sea `archive`.
 - `BE-Admin -> Elastic` cuando aplique.
 - `Cron-Master -> DB-Live` y `DB-Archive`.
 - `Cron-Master -> Elastic` cuando aplique.
 
-## 6. Seguridad y Exposicion
-- La restriccion documentada se refiere a exposicion desde red externa, no a trafico saliente general.
-- Bases de datos y servicios internos no exponen puertos a Internet.
-- Solo `LB-Nginx` recibe trafico HTTP/HTTPS desde fuera.
-- `BE-Admin`, bases de datos, Elastic y `Cron-Master` quedan en red interna.
+## 8. Layout Docker y almacenamiento
 
-## 7. Datos y Almacenamiento
-- Host path compartido: `/tank/data/wp-root`.
-- Punto de montaje en contenedores FE/BE: `/var/www/html`.
-- Usuario esperado: `www-data` (`UID/GID 33`).
+### Red Docker propuesta
+- Nombre recomendado: `wp-poc-net`
+- Tipo: `bridge`
+- Resolucion DNS interna por nombre de servicio Docker
 
-### 7.1 Shortcut deliberado de la POC
-- Se usa almacenamiento compartido simple mediante bind mount.
-- No se introduce una capa adicional de storage distribuido.
-- Este enfoque prioriza simplicidad sobre aislamiento, resiliencia o escalabilidad.
+### Hostnames internos esperados
+- `lb-nginx`
+- `fe-live`
+- `fe-archive`
+- `be-admin`
+- `db-live`
+- `db-archive`
+- `elastic`
+- `cron-master`
 
-## 8. Criterio de Datos
-- `FE-Live` trabaja contra `DB-Live`.
-- `FE-Archive` trabaja contra `DB-Archive`.
-- La separacion funcional no la resuelve WordPress de forma automatica: la impone `LB-Nginx` y la configuracion del backend seleccionado.
-- La regla de anos no se replica dentro de WordPress ni en los backends PHP.
-- Elasticsearch se usa como servicio comun de busqueda para ambos frontends.
-- `BE-Admin` usa un unico contenedor PHP administrativo, pero con dos `docroot` separados: uno para `live` y otro para `archive`.
+### Host path base
+- `/tank/data/wp-root`
 
-## 9. Monitorizacion Propuesta para la POC
+### Estructura recomendada
+```text
+/tank/data/wp-root/
+  live/
+    current/
+      public/
+        wp-content/
+        wp-config.php
+  archive/
+    current/
+      public/
+        wp-content/
+        wp-config.php
+  admin-live/
+    current/
+      public/
+        wp-content/
+        wp-config.php
+  admin-archive/
+    current/
+      public/
+        wp-content/
+        wp-config.php
+  shared/
+    config/
+    uploads/
+    mu-plugins/
+```
 
-### 9.1 LB-Nginx
-- Disponibilidad del proceso.
-- Tasa de `5xx`.
-- Latencia hacia upstreams FastCGI.
-- Fallos de conexion FastCGI.
+### Mounts clave
+- `lb-nginx` monta `live`, `archive`, `admin-live` y `admin-archive` en solo lectura bajo `/var/www/html/...`
+- `fe-live` monta `/tank/data/wp-root/live/current/public` -> `/var/www/html/live`
+- `fe-archive` monta `/tank/data/wp-root/archive/current/public` -> `/var/www/html/archive`
+- `be-admin` monta `admin-live` y `admin-archive`
+- `fe-live`, `fe-archive` y `be-admin` montan `/tank/data/wp-root/shared/config` -> `/var/www/shared/config:ro`
+- `cron-master` monta cada contexto bajo `/srv/wp/...`
+- `db-live` recomendado: `/tank/data/mysql/live` -> `/var/lib/mysql`
+- `db-archive` recomendado: `/tank/data/mysql/archive` -> `/var/lib/mysql`
+- `elastic` recomendado: `/tank/data/elasticsearch` -> `/usr/share/elasticsearch/data`
 
-### 9.2 FE-Live, FE-Archive y BE-Admin
-- Disponibilidad de `php-fpm`.
-- Saturacion de workers.
-- Memoria consumida.
-- Tiempo de respuesta medio.
+### Docroots efectivos
+| Servicio | Docroot efectivo |
+| :--- | :--- |
+| `fe-live` | `/var/www/html/live` |
+| `fe-archive` | `/var/www/html/archive` |
+| `be-admin` contexto `live` | `/var/www/html/admin-live` |
+| `be-admin` contexto `archive` | `/var/www/html/admin-archive` |
 
-### 9.3 DB-Live y DB-Archive
-- Disponibilidad de MySQL.
-- Numero de conexiones.
-- `Threads_running`.
-- Slow queries.
-- Crecimiento basico del tamano de datos.
+### Permisos
+- Usuario esperado dentro de contenedores PHP: `www-data`
+- UID/GID objetivo: `33:33`
+- `lb-nginx` monta contenido en solo lectura
+- La escritura debe limitarse a `wp-content/uploads` y caches temporales imprescindibles
+- Debe evitarse escritura en core, plugins, temas y configuracion del balanceador
 
-### 9.4 Elastic
-- Disponibilidad del servicio.
-- Tiempo de respuesta.
-- Estado basico del nodo.
+## 9. Configuracion WordPress por contexto
 
-### 9.5 Cron-Master
-- Ultima ejecucion correcta.
-- Duracion de tareas.
-- Fallo/no fallo de jobs criticos.
+### Principios
+- WordPress no decide si una peticion es `live` o `archive`.
+- `LB-Nginx` decide el contexto y selecciona backend y `docroot`.
+- Cada `docroot` representa una instancia WordPress normal con su propia configuracion.
+- `BE-Admin` sigue siendo pasivo: carga `admin-live` o `admin-archive` por el `docroot` que recibe.
 
-### 9.6 Politica de alertas para la POC
-- `critical`: servicio caido, MySQL inaccesible, `php-fpm` sin capacidad de atender, Elastic caido.
-- `warning`: memoria alta sostenida, slow queries repetidas, incremento de `5xx`, latencia anomala.
-- En esta POC se prioriza alertar antes que reiniciar automaticamente por consumo alto de RAM.
+### Contextos resultantes
+| Contexto | Backend PHP | Host principal | Base de datos | Elastic |
+| :--- | :--- | :--- | :--- | :--- |
+| `live` | `fe-live` | `nuevecuatrouno.com` | `db-live` | `elastic:9200` |
+| `archive` | `fe-archive` | rutas anuales bajo `nuevecuatrouno.com` | `db-archive` | `elastic:9200` |
+| `admin-live` | `be-admin` | `nuevecuatrouno.com` en rutas admin | `db-live` | `elastic:9200` |
+| `admin-archive` | `be-admin` | `archive.nuevecuatrouno.com` en rutas admin | `db-archive` | `elastic:9200` |
 
-## 10. Limitaciones Asumidas
+### Regla base de configuracion
+- Cada contexto tiene su propio `wp-config.php`.
+- Se admite compartir codigo de WordPress y plugins, pero no el fichero de configuracion final.
+- Puede reutilizarse un fichero comun en `/var/www/shared/config/wp-common.php`.
+
+### Parametros comunes recomendados
+- `WP_ENVIRONMENT_TYPE=staging`
+- `DISALLOW_FILE_EDIT=true`
+- `AUTOMATIC_UPDATER_DISABLED=true`
+- `WP_DEBUG=false`
+- `WP_DEBUG_LOG=true`
+- `WP_DEBUG_DISPLAY=false`
+- `FORCE_SSL_ADMIN=true`
+- Claves y salts propios de cada entorno
+
+### Parametros por contexto
+- `live`: `DB_HOST=db-live:3306`, `DB_NAME=n9_live`, `DB_USER=wp_live`, `WP_HOME=https://nuevecuatrouno.com`, `WP_SITEURL=https://nuevecuatrouno.com`
+- `archive`: `DB_HOST=db-archive:3306`, `DB_NAME=n9_archive`, `DB_USER=wp_archive`, `WP_HOME=https://nuevecuatrouno.com`, `WP_SITEURL=https://nuevecuatrouno.com`
+- `admin-live`: `DB_HOST=db-live:3306`, `DB_NAME=n9_live`, `DB_USER=wp_live`, `WP_HOME=https://nuevecuatrouno.com`, `WP_SITEURL=https://nuevecuatrouno.com`
+- `admin-archive`: `DB_HOST=db-archive:3306`, `DB_NAME=n9_archive`, `DB_USER=wp_archive`, `WP_HOME=https://archive.nuevecuatrouno.com`, `WP_SITEURL=https://archive.nuevecuatrouno.com`
+
+### Variables de entorno recomendadas
+- `WP_DB_PASSWORD`
+- `WP_AUTH_KEY`
+- `WP_SECURE_AUTH_KEY`
+- `WP_LOGGED_IN_KEY`
+- `WP_NONCE_KEY`
+- `WP_AUTH_SALT`
+- `WP_SECURE_AUTH_SALT`
+- `WP_LOGGED_IN_SALT`
+- `WP_NONCE_SALT`
+- `WP_ENVIRONMENT_TYPE`
+- Opcionales: `ELASTICSEARCH_URL`, `WP_DISABLE_ELASTICSEARCH`, `WP_DEBUG_LOG_PATH`
+
+### Politica de host para `archive`
+- `archive.nuevecuatrouno.com` no expone frontend publico.
+- El frontend historico se sirve bajo `nuevecuatrouno.com` cuando la ruta anual cae en `FE-Archive`.
+- `admin-archive` usa `archive.nuevecuatrouno.com` como host administrativo dedicado.
+
+### Elasticsearch y degradacion
+- Elasticsearch es comun a ambos contextos.
+- Si `Elastic` no responde, WordPress no debe caer por completo.
+- La busqueda debe degradar a respuesta vacia controlada, fallback nativo o desactivacion temporal de feature.
+
+### Cron-Master
+- Debe ejecutar cada contexto con su `docroot` propio.
+- Ejemplos:
+```sh
+wp --path=/srv/wp/live option get home
+wp --path=/srv/wp/archive option get home
+wp --path=/srv/wp/admin-live plugin list
+wp --path=/srv/wp/admin-archive plugin list
+```
+
+## 10. Observabilidad y operacion
+
+### Healthchecks por contenedor
+- `lb-nginx`: `curl -fsS http://127.0.0.1/healthz`
+- `fe-live`, `fe-archive`, `be-admin`: `php-fpm` con `ping.path=/ping` y `pm.status_path=/status`
+- `db-live`, `db-archive`: `mysqladmin ping`
+- `elastic`: `curl -fsS http://127.0.0.1:9200/_cluster/health`
+- `cron-master`: proceso residente o marca de ultima ejecucion correcta
+
+### Logs minimos
+- `lb-nginx`: `access_log`, `error_log`
+- `php-fpm`: log de proceso y errores PHP
+- MySQL: error log y slow query log
+- Elastic: logs de aplicacion y arranque
+- `cron-master`: salida y errores de jobs
+
+### Campos recomendados en access log
+- `request_id`
+- `host`
+- `uri`
+- `status`
+- `request_time`
+- `upstream_response_time`
+- `php_upstream`
+- `site_context`
+
+### Senales minimas por servicio
+- `LB-Nginx`: `5xx`, tiempo medio, fallos a upstream, redirecciones inesperadas
+- `php-fpm`: workers activos/libres, lentitud, reinicios
+- MySQL: disponibilidad, `Threads_running`, conexiones, slow queries, espacio
+- Elastic: disponibilidad HTTP, tiempo de respuesta, estado del nodo
+- `cron-master`: exito/fallo, duracion, retrasos
+
+### Umbrales orientativos
+- `warning`: aumento sostenido de `5xx`, pocos workers libres, slow queries repetidas, Elastic lento, retraso puntual de jobs
+- `critical`: `LB-Nginx` caido, `php-fpm` no responde, DB inaccesible, `BE-Admin` caido, Elastic caido cuando rompe una feature clave, fallo repetido de jobs criticos
+
+### Politica operativa
+- Reinicios automaticos solo para procesos claramente caidos.
+- No usar reinicios agresivos por memoria como sustituto de diagnostico.
+- Antes de tocar aplicacion, aislar si el fallo es de routing, PHP, DB o Elastic.
+- Si se comparten logs fuera del host, filtrar IPs publicas y correos.
+
+### Smoke tests minimos
+- `GET https://nuevecuatrouno.com/wp-admin/` -> backend admin `live`
+- `GET https://archive.nuevecuatrouno.com/wp-admin/` -> backend admin `archive`
+- `GET https://nuevecuatrouno.com/2019/05/noticia/` -> `fe-archive`
+- `GET https://nuevecuatrouno.com/actualidad/post/` -> `fe-live`
+- `GET https://archive.nuevecuatrouno.com/cultura/post/` -> redireccion a `nuevecuatrouno.com`
+- `LB-Nginx` responde en `/healthz`
+- `php-fpm` responde `pong` en `live`, `archive` y `admin`
+- MySQL responde a `ping` en ambas DB
+- Elastic responde en `_cluster/health`
+
+## 11. Shortcuts aceptados de la POC
+- Sin alta disponibilidad.
 - Sin backups.
-- Sin HA.
-- Sin Redis ni cache avanzada especifica.
-- Sin endurecimiento completo de produccion.
-- Sin validacion de capacidad real para trafico masivo.
-- Elasticsearch como punto unico de fallo aceptado.
+- Sin storage distribuido: bind mount compartido.
+- Sin cache de produccion ni optimizacion para trafico alto.
+- Sin clustering de Elasticsearch.
+- Sin modelado de capacidad para carga real.
 
-## 11. Matriz de Enrutado de LB-Nginx
-| Condicion | Backend | Base de datos esperada | Notas |
-| :--- | :--- | :--- | :--- |
-| Host `nuevecuatrouno.com` y path `/wp-admin` | `BE-Admin` | `DB-Live` | `docroot` admin `live` |
-| Host `nuevecuatrouno.com` y path `/wp-login.php` | `BE-Admin` | `DB-Live` | Login de `live` |
-| Host `nuevecuatrouno.com` y path `/wp-json/*` administrativo | `BE-Admin` | `DB-Live` | Solo rutas de administracion |
-| Host `nuevecuatrouno.com` y path `/wp-admin/admin-ajax.php` | `BE-Admin` | `DB-Live` | Trafico administrativo |
-| Host `archive.nuevecuatrouno.com` y path administrativo | `BE-Admin` | `DB-Archive` | `docroot` admin `archive` |
-| Host `archive.nuevecuatrouno.com` y path no administrativo | `LB-Nginx` | n/a | Redireccion o bloqueo; no sirve frontend publico |
-| Primer segmento del path entre `2015` y `2023` | `FE-Archive` | `DB-Archive` | Regla por URL |
-| Cualquier otro caso | `FE-Live` | `DB-Live` | Regla por defecto |
+## 12. Riesgos aceptados en la POC
+- Punto unico de fallo en `LB-Nginx`.
+- Punto unico de fallo en `Elastic`.
+- Dependencia de almacenamiento compartido simple.
+- Falta de validacion de restauracion al no haber backups.
+- Topologia valida para demo o validacion tecnica, no para produccion.
 
-### 11.1 Orden de evaluacion
-- Primero se evalua si la peticion es administrativa.
-- Despues se evalua si el host `archive.nuevecuatrouno.com` esta fuera del admin para redirigirlo o bloquearlo.
-- Despues se evalua el primer segmento del path.
-- Si no coincide nada anterior, la peticion va a `FE-Live`.
+## 13. Criterios de paso a produccion
 
-### 11.2 Casos de ejemplo
-- `https://nuevecuatrouno.com/wp-admin/` -> `BE-Admin`
-- `https://nuevecuatrouno.com/wp-login.php` -> `BE-Admin`
-- `https://archive.nuevecuatrouno.com/wp-admin/` -> `BE-Admin`
-- `https://archive.nuevecuatrouno.com/2018/10/mi-articulo/` -> redireccion o bloqueo en `LB-Nginx`
-- `https://nuevecuatrouno.com/2019/05/otro-articulo/` -> `FE-Archive`
-- `https://nuevecuatrouno.com/actualidad/noticia/` -> `FE-Live`
+### Mapa de huecos
+| Area | Estado POC | Requisito de produccion |
+| :--- | :--- | :--- |
+| Backups | inexistentes | backups verificados y restore probado |
+| Secretos | variables simples | gestion de secretos fuera de repo y control de acceso |
+| Storage | bind mounts simples | estrategia de persistencia y recuperacion clara |
+| HA | inexistente | eliminar o mitigar puntos unicos de fallo |
+| Cache | no definida | estrategia de cache de pagina, objeto y opcode |
+| Seguridad admin | minima | control de acceso fuerte y superficie reducida |
+| Elastic | no critico, 1 nodo | politica degradada definida y operacion estable |
+| Despliegue | documental | pipeline reproducible y rollback |
+| Observabilidad | minima | alertas operativas y retencion de logs |
+| Capacidad | no modelada | pruebas de carga y tuning minimo |
 
-## 12. Contrato FastCGI para la POC
+### Requisitos por area
+- Backups y restore: backup de ambas DB, configuraciones, `uploads`, retencion documentada y restore probado.
+- Secretos: fuera del repositorio, rotacion documentada y separacion por contexto.
+- Seguridad: `wp-admin` endurecido con VPN, allowlist IP, SSO o Basic Auth; `xmlrpc.php` controlado; politica de plugins y temas; cabeceras de seguridad.
+- Persistencia: separar codigo, configuracion y datos mutables; limitar escritura; estrategia inmutable o versionada; ownership auditado.
+- Cache y rendimiento: cache de pagina y objeto, OPcache, tuning de `php-fpm`, indices y tuning de MySQL, pruebas de carga.
+- HA y recuperacion: decidir entre HA real o recuperacion rapida, con runbooks y tratamiento explicito de puntos unicos de fallo.
+- Despliegue reproducible: `docker compose` o IaC versionado, Nginx versionado, variables inyectadas de forma controlada, rollback.
+- Observabilidad real: healthchecks activos en el orquestador, alertas reales, retencion y rotacion de logs, correlacion por `request_id`.
+- Gobernanza WordPress: politica de plugins, propagacion de cambios entre contextos, diferencias controladas y migraciones de DB trazables.
 
-### 12.1 Principios
-- `LB-Nginx` es el unico punto de entrada HTTP.
-- Los contenedores PHP no exponen HTTP publico, solo `php-fpm`.
-- El balanceador decide el backend antes de ejecutar `fastcgi_pass`.
-- Cada backend recibe el `docroot` y el contexto FastCGI que le corresponde.
+### Checklist de promocion
+#### Bloqueantes
+- [ ] Backups y restore verificados
+- [ ] Secretos fuera del repo y gestionados
+- [ ] `wp-admin` endurecido
+- [ ] Despliegue reproducible
+- [ ] Runbook de recuperacion
+- [ ] Alertas reales conectadas
+- [ ] Smoke tests ejecutables
 
-### 12.2 Variables FastCGI a fijar
-- `SCRIPT_FILENAME` debe resolver contra el `docroot` del backend seleccionado.
-- `DOCUMENT_ROOT` debe coincidir con el `docroot` activo.
-- `HTTP_HOST` debe preservarse para que WordPress vea el host original.
-- `REQUEST_URI` debe preservarse integra.
-- `SERVER_NAME` debe reflejar el host solicitado.
-- `HTTPS` debe marcarse cuando la entrada publica sea TLS.
+#### Importantes
+- [ ] Cache definida
+- [ ] Tuning minimo de PHP y MySQL
+- [ ] Politica de plugins y actualizaciones
+- [ ] Rotacion de logs
+- [ ] Politica clara para Elastic degradado
 
-### 12.3 Docroots esperados
-- `FE-Live`: `docroot` de la instancia WordPress viva.
-- `FE-Archive`: `docroot` de la instancia WordPress historica.
-- `BE-Admin`: `docroot` administrativo `live` o `archive` segun el host y la ruta ya resueltos por `LB-Nginx`.
+#### Recomendables
+- [ ] HA parcial o estrategia de replica
+- [ ] Pruebas de carga
+- [ ] Dashboards operativos
 
-### 12.4 Estructura logica recomendada
-- `/var/www/html/live`
-- `/var/www/html/archive`
-- `/var/www/html/admin-live`
-- `/var/www/html/admin-archive`
+### Orden recomendado de evolucion
+1. Secretos, despliegue reproducible y hardening de admin.
+2. Backups y restore probado.
+3. Cache y tuning de rendimiento.
+4. Alertas reales y runbooks.
+5. HA o estrategia de recuperacion mas robusta.
 
-Esta estructura es una recomendacion de POC. Puede ajustarse si se mantiene la separacion funcional y el balanceador fija correctamente `DOCUMENT_ROOT` y `SCRIPT_FILENAME`.
-
-### 12.5 Esqueleto orientativo de configuracion
-```nginx
-map $request_uri $is_archive_path {
-    default 0;
-    ~^/(2015|2016|2017|2018|2019|2020|2021|2022|2023)(/|$) 1;
-}
-
-map $host $host_backend {
-    default fe_live;
-    archive.nuevecuatrouno.com fe_archive;
-}
-
-map $request_uri $is_admin_path {
-    default 0;
-    ~^/wp-admin(/|$) 1;
-    =/wp-login.php 1;
-    =/wp-admin/admin-ajax.php 1;
-}
-```
-
-```nginx
-location / {
-    include fastcgi_params;
-
-    if ($is_admin_path) {
-        fastcgi_pass be_admin:9000;
-    }
-
-    if ($host_backend = fe_archive) {
-        fastcgi_pass fe_archive:9000;
-    }
-
-    if ($is_archive_path) {
-        fastcgi_pass fe_archive:9000;
-    }
-
-    fastcgi_pass fe_live:9000;
-}
-```
-
-### 12.6 Nota tecnica importante
-- El bloque anterior es solo orientativo y no debe copiarse tal cual a produccion.
-- En la implementacion real conviene evitar `if` en `location` y resolver la seleccion del upstream con `map`, variables y bloques mas limpios.
-- Para esta POC, lo importante es dejar cerrado el contrato funcional: quien decide el backend, con que prioridad y que variables deben preservarse.
-- `BE-Admin` sigue el mismo principio: el contenedor no decide si sirve `live` o `archive`; recibe el `docroot` administrativo correcto desde el balanceador.
-
-## 13. Siguientes Pasos Recomendados
-- Bajar a detalle la configuracion final de `LB-Nginx` sin pseudocodigo.
-- Definir configuraciones separadas de WordPress para `live`, `archive` y `admin`.
-- Especificar que operaciones administrativas pueden tocar `DB-Live`, `DB-Archive` o ambas.
-- Documentar el comportamiento degradado cuando `Elastic` no este disponible.
+## 14. Cierre
+La POC ya esta suficientemente definida para implementarse y demostrarse. Para produccion, los huecos no estan en la arquitectura conceptual sino en la operacion real: seguridad, despliegue, recuperacion, persistencia y capacidad.

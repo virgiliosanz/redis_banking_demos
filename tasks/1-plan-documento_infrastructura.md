@@ -5,11 +5,11 @@ Desglosar la POC en fases ejecutables, con dependencias claras y criterios de ci
 
 ## Relacion con la documentacion
 - Documento de arquitectura: `docs/project.md`
-- Documento de proyecto: `proyecto-infra-poc-wordpress.md`
+- Documento de proyecto: integrado en `docs/project.md`
 
 ## Estado global
-- Fase actual recomendada: `Fase 5`
-- Prioridad actual: cerrar criterios de paso a produccion
+- Fase actual recomendada: cierre documental completado
+- Prioridad actual: decidir siguiente iteracion tecnica
 
 ## Fase 0. Base documental
 ### Objetivo
@@ -58,8 +58,27 @@ Definir la configuracion concreta de `LB-Nginx` para que el sistema enrute corre
 - Dejar WordPress dependiente de variables no preservadas por FastCGI.
 
 ### Entregables
-- `docs/lb-nginx-routing.md`
-- `tasks/fase-1-lb-nginx-routing.md`
+- Integrado en `docs/project.md`
+
+### Checklist de cierre ejecutado
+- [x] Upstreams `fe_live`, `fe_archive` y `be_admin`
+- [x] Routing por dominio `archive`
+- [x] Routing por path anual `2015-2023`
+- [x] Routing administrativo a `BE-Admin`
+- [x] Seleccion de `docroot` por contexto
+- [x] Variables FastCGI obligatorias
+- [x] Casos minimos de prueba definidos
+
+### Decisiones tomadas
+- Toda la logica de particion vive en `LB-Nginx`.
+- `BE-Admin` es pasivo y depende del `docroot` recibido.
+- En la POC todo `/wp-json/` se considera administrativo para no romper el admin de WordPress.
+- `LB-Nginx` debe ver el mismo arbol de contenido para servir estaticos y resolver scripts.
+
+### Riesgos pendientes
+- La regla global de `/wp-json/` puede ser demasiado amplia si luego hay REST publico intensivo.
+- El diseno sigue dependiendo de bind mounts compartidos.
+- Aun no esta traducido a `docker compose` ni a archivos de despliegue reales.
 
 ## Fase 2. Layout de contenedores y docroots
 ### Objetivo
@@ -81,8 +100,29 @@ Definir el layout real de los contenedores PHP y sus `docroot`.
 - La relacion entre contenedor, `docroot` y base de datos queda cerrada.
 
 ### Entregables
-- `docs/docker-layout.md`
-- `tasks/fase-2-docker-layout.md`
+- Integrado en `docs/project.md`
+
+### Checklist de cierre ejecutado
+- [x] Red Docker definida
+- [x] Hostnames internos definidos
+- [x] Servicios de la POC definidos
+- [x] Estructura base en host definida
+- [x] Bind mounts por servicio definidos
+- [x] `docroot` de `live`, `archive`, `admin-live` y `admin-archive`
+- [x] Permisos base de `www-data`
+- [x] Directorios de logs recomendados
+
+### Decisiones tomadas
+- Se mantiene una sola red Docker `bridge` para la POC.
+- `LB-Nginx` monta el contenido en solo lectura.
+- `fe-live`, `fe-archive` y `be-admin` son contenedores separados.
+- `be-admin` usa dos `docroot`.
+- Se aceptan bind mounts directos en host por simplicidad.
+
+### Riesgos pendientes
+- El layout aun no define secretos ni variables de entorno.
+- La comparticion de `uploads` y `mu-plugins` queda como opcion, no como decision cerrada.
+- Sigue faltando traducir esto a `docker compose`.
 
 ## Fase 3. Configuracion WordPress
 ### Objetivo
@@ -104,8 +144,28 @@ Dejar definidas las instancias WordPress de `live`, `archive` y admin.
 - El admin funciona para `live` y `archive` solo por `host` y `docroot`.
 
 ### Entregables
-- `docs/wordpress-contexts.md`
-- `tasks/fase-3-wordpress-contexts.md`
+- Integrado en `docs/project.md`
+
+### Checklist de cierre ejecutado
+- [x] `live` definido contra `db-live`
+- [x] `archive` definido contra `db-archive`
+- [x] `admin-live` definido contra `db-live`
+- [x] `admin-archive` definido contra `db-archive`
+- [x] Sin logica de particion anual dentro de WordPress
+- [x] `BE-Admin` resuelto por `docroot`
+- [x] Secretos fuera del repositorio
+- [x] `cron-master` con `path` explicito por contexto
+
+### Decisiones tomadas
+- Cada contexto tiene su propio `wp-config.php`.
+- Se admite un fichero comun compartido para ajustes no contextuales.
+- `BE-Admin` no hace autodeteccion del sitio.
+- `Elastic` no puede romper el bootstrap completo del sitio.
+
+### Riesgos pendientes
+- Aun no existe plantilla real de `docker compose` para inyectar estas variables.
+- Falta decidir si `uploads` sera compartido o separado entre contextos.
+- Faltan secretos y valores reales de despliegue.
 
 ## Fase 4. Observabilidad y operacion
 ### Objetivo
@@ -126,8 +186,27 @@ Dejar la POC operable y diagnosticable.
 - Los fallos de routing y de servicios se pueden detectar rapido.
 
 ### Entregables
-- `docs/observability-and-operations.md`
-- `tasks/fase-4-observability-and-operations.md`
+- Integrado en `docs/project.md`
+
+### Checklist de cierre ejecutado
+- [x] `LB-Nginx` con `/healthz`
+- [x] `php-fpm` con `ping` y `status`
+- [x] MySQL con `mysqladmin ping`
+- [x] Elastic con `_cluster/health`
+- [x] `cron-master` con criterio de ultima ejecucion
+- [x] logs minimos por servicio
+- [x] bateria minima de smoke tests
+
+### Decisiones tomadas
+- La POC no monta una plataforma completa de observabilidad.
+- Se priorizan checks que detecten rapido caidas y routing roto.
+- Elastic puede degradar funciones, pero no deberia tumbar el sitio entero.
+- Los reinicios automaticos no sustituyen al diagnostico.
+
+### Riesgos pendientes
+- Aun no existe implementacion real de healthchecks en `docker compose`.
+- Aun no existe formato final de logs ni rotacion configurada.
+- Faltan scripts reales de smoke tests.
 
 ## Fase 5. Criterios de paso a produccion
 ### Objetivo
@@ -149,8 +228,25 @@ Documentar que faltaria para considerar este diseno apto para un entorno serio.
 - Cada shortcut de la POC tiene su reemplazo propuesto.
 
 ### Entregables
-- `docs/production-readiness.md`
-- `tasks/fase-5-production-readiness.md`
+- Integrado en `docs/project.md`
+
+### Checklist de cierre ejecutado
+- [x] Backups y restore definidos como gap
+- [x] Secretos y seguridad definidos como gap
+- [x] Cache y rendimiento definidos como gap
+- [x] HA y recuperacion definidos como gap
+- [x] Despliegue reproducible definido como gap
+- [x] Observabilidad real definida como gap
+- [x] Checklist de promocion cerrado
+
+### Decisiones tomadas
+- La POC no pasa a produccion por inercia.
+- El mayor trabajo pendiente es operativo, no conceptual.
+- Los shortcuts de la POC ya tienen reemplazo objetivo o tratamiento propuesto.
+
+### Riesgos pendientes
+- Ninguno nuevo de arquitectura.
+- Quedan pendientes todas las implementaciones reales de produccion.
 
 ## Dependencias entre fases
 - `Fase 1` depende de `Fase 0`.
