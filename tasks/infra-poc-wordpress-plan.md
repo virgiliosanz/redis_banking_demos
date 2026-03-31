@@ -134,7 +134,7 @@ Dejar la POC operable y diagnosticable.
 Documentar que faltaria para considerar este diseno apto para un entorno serio.
 
 ### Estado
-- Siguiente fase activa
+- Completada
 
 ### Tareas
 - Definir estrategia de backups y restore.
@@ -148,6 +148,10 @@ Documentar que faltaria para considerar este diseno apto para un entorno serio.
 - Existe un checklist de huecos entre POC y produccion.
 - Cada shortcut de la POC tiene su reemplazo propuesto.
 
+### Entregables
+- `docs/production-readiness.md`
+- `tasks/fase-5-production-readiness.md`
+
 ## Dependencias entre fases
 - `Fase 1` depende de `Fase 0`.
 - `Fase 2` depende de `Fase 1`.
@@ -156,4 +160,4 @@ Documentar que faltaria para considerar este diseno apto para un entorno serio.
 - `Fase 5` depende de todas las anteriores.
 
 ## Siguiente accion recomendada
-- Ejecutar `Fase 5`: documentar huecos entre la POC y un entorno apto para produccion.
+- Cerrar el proyecto documental actual y decidir si la siguiente iteracion sera implementacion o plantillas de despliegue.

@@ -4,8 +4,8 @@
 Convertir la documentacion inicial en una especificacion coherente de una POC WordPress segmentada en `live`, `archive` y `admin`.
 
 ## Estado
-- Fase actual: `Fase 4` completada, `Fase 5` lista para arrancar.
-- Estado: en curso.
+- Fase actual: `Fase 5` completada.
+- Estado: documentacion base cerrada.
 
 ## Decisiones acordadas
 - La plataforma real sera `docker`.
@@ -62,11 +62,12 @@ Convertir la documentacion inicial en una especificacion coherente de una POC Wo
 - El backend administrativo queda mucho mas limpio cuando cada contexto tiene su propio `wp-config.php` y el contenedor no hace autodeteccion.
 - Reservar `archive.nuevecuatrouno.com` solo para el admin elimina la ambigüedad de host canonico en el frontend historico.
 - Una POC sin checks de salud y smoke tests se vuelve opaca muy rapido, incluso con poca carga.
+- El salto de POC a produccion no depende solo de mas infraestructura; depende sobre todo de disciplina operativa, backups, secretos, despliegue y recuperacion.
 
 ## Siguiente fase propuesta
-- Documentar que falta para produccion.
-- Cerrar checklist de endurecimiento, despliegue y recuperacion.
-- Separar claramente shortcuts de POC frente a requisitos serios.
+- Cerrar el proyecto documental actual.
+- Decidir si la siguiente iteracion sera implementacion real o generacion de plantillas de despliegue.
+- Si se continua, abrir un nuevo proyecto orientado a entrega tecnica.
 
 ## Plan operativo
 - Plan detallado en `tasks/infra-poc-wordpress-plan.md`.
@@ -74,4 +75,5 @@ Convertir la documentacion inicial en una especificacion coherente de una POC Wo
 - La `Fase 2` queda cerrada con `docs/docker-layout.md`.
 - La `Fase 3` queda cerrada con `docs/wordpress-contexts.md`.
 - La `Fase 4` queda cerrada con `docs/observability-and-operations.md`.
-- La siguiente fase activa es criterios de paso a produccion.
+- La `Fase 5` queda cerrada con `docs/production-readiness.md`.
+- El proyecto documental queda cerrado.
