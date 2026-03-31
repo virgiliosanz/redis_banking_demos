@@ -8,8 +8,8 @@ Desglosar la POC en fases ejecutables, con dependencias claras y criterios de ci
 - Documento de proyecto: `proyecto-infra-poc-wordpress.md`
 
 ## Estado global
-- Fase actual recomendada: `Fase 1`
-- Prioridad actual: cerrar implementacion del balanceador
+- Fase actual recomendada: `Fase 2`
+- Prioridad actual: cerrar layout de contenedores y `docroot`
 
 ## Fase 0. Base documental
 ### Objetivo
@@ -31,6 +31,9 @@ Dejar cerrada la POC a nivel de arquitectura funcional.
 ## Fase 1. Balanceador y routing
 ### Objetivo
 Definir la configuracion concreta de `LB-Nginx` para que el sistema enrute correctamente `live`, `archive` y `admin`.
+
+### Estado
+- Completada
 
 ### Tareas
 - Definir upstreams `fe_live`, `fe_archive` y `be_admin`.
@@ -54,9 +57,16 @@ Definir la configuracion concreta de `LB-Nginx` para que el sistema enrute corre
 - Mezclar `docroot` administrativo `live` y `archive`.
 - Dejar WordPress dependiente de variables no preservadas por FastCGI.
 
+### Entregables
+- `docs/lb-nginx-routing.md`
+- `tasks/fase-1-lb-nginx-routing.md`
+
 ## Fase 2. Layout de contenedores y docroots
 ### Objetivo
 Definir el layout real de los contenedores PHP y sus `docroot`.
+
+### Estado
+- Siguiente fase activa
 
 ### Tareas
 - Confirmar estructura fisica de `live`, `archive`, `admin-live` y `admin-archive`.
@@ -125,4 +135,4 @@ Documentar que faltaria para considerar este diseno apto para un entorno serio.
 - `Fase 5` depende de todas las anteriores.
 
 ## Siguiente accion recomendada
-- Ejecutar `Fase 1`: redactar la configuracion concreta de `LB-Nginx`.
+- Ejecutar `Fase 2`: definir layout de contenedores, bind mounts y `docroot`.
