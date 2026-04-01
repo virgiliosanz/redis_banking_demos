@@ -8,9 +8,18 @@ Este documento sustituye al resto de documentos tecnicos y al documento de proye
 ## 2. Estado del proyecto
 
 ### Estado global
-- Proyecto documental cerrado.
-- Fases `0` a `5` completadas.
-- Siguiente iteracion recomendada: implementacion real o generacion de plantillas de despliegue.
+- POC implementada y validada en laboratorio con `docker compose`.
+- Fases `1` a `6` completadas.
+- La topologia `live`, `archive` y `admin` ya arranca, enruta y pasa smoke tests.
+- Siguiente iteracion recomendada: introducir WordPress real y operacion minima sobre senales reales.
+
+### Artefactos implementados
+- `compose.yaml` operativo con `LB-Nginx`, `FE-Live`, `FE-Archive`, `BE-Admin`, `DB-Live`, `DB-Archive`, `Elastic` y `Cron-Master`.
+- Configuracion de `LB-Nginx` versionada en `nginx/lb/`.
+- Configuracion minima de `php-fpm` en `php/common/`.
+- Plantillas WordPress por contexto en `wordpress/templates/`.
+- Bootstrap local y smoke tests en `scripts/`.
+- Runbook, checklist y documentos auxiliares en `docs/`.
 
 ### Lecciones aprendidas
 - La regla de particion pertenece al balanceador, no a WordPress.
@@ -18,9 +27,11 @@ Este documento sustituye al resto de documentos tecnicos y al documento de proye
 - Sin una matriz clara de prioridad en el balanceador, el diseno queda ambiguo.
 - El layout de mounts y `docroot` debe definirse antes de aterrizar WordPress.
 - Cada contexto necesita su propio `wp-config.php`.
-- Reservar `archive.nuevecuatrouno.com` solo para admin elimina la ambigüedad de host canonico del frontend historico.
+- Reservar `archive.nuevecuatrouno.test` solo para admin elimina la ambigüedad de host canonico del frontend historico.
 - Una POC sin checks de salud y smoke tests se vuelve opaca muy rapido.
 - El salto a produccion es sobre todo operativo: secretos, backups, despliegue, recuperacion y capacidad.
+- En Docker, Nginx debe resolver dinamicamente los upstreams si los contenedores se recrean.
+- Para laboratorio, la rotacion minima de logs en el runtime Docker evita crecimiento opaco del host.
 
 ## 3. Alcance y premisas
 - Plataforma base: `docker`.
@@ -48,38 +59,39 @@ Este documento sustituye al resto de documentos tecnicos y al documento de proye
 ### Entrada publica
 - Solo `LB-Nginx` expone `80/443`.
 - El host expone SSH por su puerto configurado.
+- En esta POC local se usa `http` en `80`; `8443` queda reservado pero no hay TLS real completado.
 
 ### Reglas principales
-- `nuevecuatrouno.com` sirve trafico general.
-- `archive.nuevecuatrouno.com` se reserva para el admin del contexto `archive`.
+- `nuevecuatrouno.test` sirve trafico general.
+- `archive.nuevecuatrouno.test` se reserva para el admin del contexto `archive`.
 - Cualquier peticion a `/wp-admin`, login, `admin-ajax.php` o REST de administracion se enruta a `BE-Admin`.
 - Si el primer segmento del path es `2015`, `2016`, `2017`, `2018`, `2019`, `2020`, `2021`, `2022` o `2023`, la peticion se enruta a `FE-Archive`.
 - Cualquier otra peticion se enruta a `FE-Live`.
-- El contenido historico publico sigue sirviendose bajo `nuevecuatrouno.com`, no bajo `archive.nuevecuatrouno.com`.
+- El contenido historico publico sigue sirviendose bajo `nuevecuatrouno.test`, no bajo `archive.nuevecuatrouno.test`.
 
 ### Orden de evaluacion
 1. Trafico administrativo.
-2. Host `archive.nuevecuatrouno.com` fuera del admin para redireccion o bloqueo.
+2. Host `archive.nuevecuatrouno.test` fuera del admin para redireccion o bloqueo.
 3. Primer segmento anual del path.
 4. Regla por defecto hacia `FE-Live`.
 
 ### Matriz resumida
 | Condicion | Backend | Base de datos esperada | Notas |
 | :--- | :--- | :--- | :--- |
-| Host `nuevecuatrouno.com` y path `/wp-admin` | `BE-Admin` | `DB-Live` | `docroot` admin `live` |
-| Host `nuevecuatrouno.com` y path `/wp-login.php` | `BE-Admin` | `DB-Live` | Login de `live` |
-| Host `nuevecuatrouno.com` y path `/wp-json/*` administrativo | `BE-Admin` | `DB-Live` | Solo rutas de administracion |
-| Host `archive.nuevecuatrouno.com` y path administrativo | `BE-Admin` | `DB-Archive` | `docroot` admin `archive` |
-| Host `archive.nuevecuatrouno.com` y path no administrativo | `LB-Nginx` | n/a | Redireccion o bloqueo |
+| Host `nuevecuatrouno.test` y path `/wp-admin` | `BE-Admin` | `DB-Live` | `docroot` admin `live` |
+| Host `nuevecuatrouno.test` y path `/wp-login.php` | `BE-Admin` | `DB-Live` | Login de `live` |
+| Host `nuevecuatrouno.test` y path `/wp-json/*` administrativo | `BE-Admin` | `DB-Live` | Solo rutas de administracion |
+| Host `archive.nuevecuatrouno.test` y path administrativo | `BE-Admin` | `DB-Archive` | `docroot` admin `archive` |
+| Host `archive.nuevecuatrouno.test` y path no administrativo | `LB-Nginx` | n/a | Redireccion o bloqueo |
 | Primer segmento del path entre `2015` y `2023` | `FE-Archive` | `DB-Archive` | Regla por URL |
 | Cualquier otro caso | `FE-Live` | `DB-Live` | Regla por defecto |
 
 ### Ejemplos
-- `https://nuevecuatrouno.com/wp-admin/` -> `BE-Admin`
-- `https://archive.nuevecuatrouno.com/wp-admin/` -> `BE-Admin`
-- `https://nuevecuatrouno.com/2019/05/otro-articulo/` -> `FE-Archive`
-- `https://nuevecuatrouno.com/actualidad/noticia/` -> `FE-Live`
-- `https://archive.nuevecuatrouno.com/2018/10/mi-articulo/` -> redireccion o bloqueo en `LB-Nginx`
+- `https://nuevecuatrouno.test/wp-admin/` -> `BE-Admin`
+- `https://archive.nuevecuatrouno.test/wp-admin/` -> `BE-Admin`
+- `https://nuevecuatrouno.test/2019/05/otro-articulo/` -> `FE-Archive`
+- `https://nuevecuatrouno.test/actualidad/noticia/` -> `FE-Live`
+- `https://archive.nuevecuatrouno.test/2018/10/mi-articulo/` -> redireccion o bloqueo en `LB-Nginx`
 
 ## 6. Contrato FastCGI y balanceador
 
@@ -100,17 +112,20 @@ Este documento sustituye al resto de documentos tecnicos y al documento de proye
 ### Upstreams
 ```nginx
 upstream fe_live {
-    server fe-live:9000;
+    zone fe_live 64k;
+    server fe-live:9000 resolve;
     keepalive 16;
 }
 
 upstream fe_archive {
-    server fe-archive:9000;
+    zone fe_archive 64k;
+    server fe-archive:9000 resolve;
     keepalive 16;
 }
 
 upstream be_admin {
-    server be-admin:9000;
+    zone be_admin 64k;
+    server be-admin:9000 resolve;
     keepalive 16;
 }
 ```
@@ -119,7 +134,7 @@ upstream be_admin {
 ```nginx
 map $host $host_context {
     default live;
-    archive.nuevecuatrouno.com archive;
+    archive.nuevecuatrouno.test archive;
 }
 
 map $uri $path_context {
@@ -137,7 +152,7 @@ map $uri $is_admin_path {
 
 map "$host|$is_admin_path" $archive_host_public_block {
     default 0;
-    "archive.nuevecuatrouno.com|0" 1;
+    "archive.nuevecuatrouno.test|0" 1;
 }
 
 map "$is_admin_path|$host_context|$path_context" $site_context {
@@ -169,9 +184,9 @@ map "$is_admin_path|$site_context" $site_docroot {
 }
 ```
 
-### Host `archive.nuevecuatrouno.com`
+### Host `archive.nuevecuatrouno.test`
 - Queda reservado al admin del contexto `archive`.
-- El trafico no administrativo debe redirigirse a `https://nuevecuatrouno.com$request_uri` o bloquearse con `404/403`.
+- El trafico no administrativo debe redirigirse a `https://nuevecuatrouno.test$request_uri` o bloquearse con `404/403`.
 - Para la POC se recomienda redireccion.
 
 ### `/wp-json/`
@@ -278,10 +293,10 @@ map "$is_admin_path|$site_context" $site_docroot {
 ### Contextos resultantes
 | Contexto | Backend PHP | Host principal | Base de datos | Elastic |
 | :--- | :--- | :--- | :--- | :--- |
-| `live` | `fe-live` | `nuevecuatrouno.com` | `db-live` | `elastic:9200` |
-| `archive` | `fe-archive` | rutas anuales bajo `nuevecuatrouno.com` | `db-archive` | `elastic:9200` |
-| `admin-live` | `be-admin` | `nuevecuatrouno.com` en rutas admin | `db-live` | `elastic:9200` |
-| `admin-archive` | `be-admin` | `archive.nuevecuatrouno.com` en rutas admin | `db-archive` | `elastic:9200` |
+| `live` | `fe-live` | `nuevecuatrouno.test` | `db-live` | `elastic:9200` |
+| `archive` | `fe-archive` | rutas anuales bajo `nuevecuatrouno.test` | `db-archive` | `elastic:9200` |
+| `admin-live` | `be-admin` | `nuevecuatrouno.test` en rutas admin | `db-live` | `elastic:9200` |
+| `admin-archive` | `be-admin` | `archive.nuevecuatrouno.test` en rutas admin | `db-archive` | `elastic:9200` |
 
 ### Regla base de configuracion
 - Cada contexto tiene su propio `wp-config.php`.
@@ -299,10 +314,10 @@ map "$is_admin_path|$site_context" $site_docroot {
 - Claves y salts propios de cada entorno
 
 ### Parametros por contexto
-- `live`: `DB_HOST=db-live:3306`, `DB_NAME=n9_live`, `DB_USER=wp_live`, `WP_HOME=https://nuevecuatrouno.com`, `WP_SITEURL=https://nuevecuatrouno.com`
-- `archive`: `DB_HOST=db-archive:3306`, `DB_NAME=n9_archive`, `DB_USER=wp_archive`, `WP_HOME=https://nuevecuatrouno.com`, `WP_SITEURL=https://nuevecuatrouno.com`
-- `admin-live`: `DB_HOST=db-live:3306`, `DB_NAME=n9_live`, `DB_USER=wp_live`, `WP_HOME=https://nuevecuatrouno.com`, `WP_SITEURL=https://nuevecuatrouno.com`
-- `admin-archive`: `DB_HOST=db-archive:3306`, `DB_NAME=n9_archive`, `DB_USER=wp_archive`, `WP_HOME=https://archive.nuevecuatrouno.com`, `WP_SITEURL=https://archive.nuevecuatrouno.com`
+- `live`: `DB_HOST=db-live:3306`, `DB_NAME=n9_live`, `DB_USER=wp_live`, `WP_HOME=https://nuevecuatrouno.test`, `WP_SITEURL=https://nuevecuatrouno.test`
+- `archive`: `DB_HOST=db-archive:3306`, `DB_NAME=n9_archive`, `DB_USER=wp_archive`, `WP_HOME=https://nuevecuatrouno.test`, `WP_SITEURL=https://nuevecuatrouno.test`
+- `admin-live`: `DB_HOST=db-live:3306`, `DB_NAME=n9_live`, `DB_USER=wp_live`, `WP_HOME=https://nuevecuatrouno.test`, `WP_SITEURL=https://nuevecuatrouno.test`
+- `admin-archive`: `DB_HOST=db-archive:3306`, `DB_NAME=n9_archive`, `DB_USER=wp_archive`, `WP_HOME=https://archive.nuevecuatrouno.test`, `WP_SITEURL=https://archive.nuevecuatrouno.test`
 
 ### Variables de entorno recomendadas
 - `WP_DB_PASSWORD`
@@ -318,9 +333,9 @@ map "$is_admin_path|$site_context" $site_docroot {
 - Opcionales: `ELASTICSEARCH_URL`, `WP_DISABLE_ELASTICSEARCH`, `WP_DEBUG_LOG_PATH`
 
 ### Politica de host para `archive`
-- `archive.nuevecuatrouno.com` no expone frontend publico.
-- El frontend historico se sirve bajo `nuevecuatrouno.com` cuando la ruta anual cae en `FE-Archive`.
-- `admin-archive` usa `archive.nuevecuatrouno.com` como host administrativo dedicado.
+- `archive.nuevecuatrouno.test` no expone frontend publico.
+- El frontend historico se sirve bajo `nuevecuatrouno.test` cuando la ruta anual cae en `FE-Archive`.
+- `admin-archive` usa `archive.nuevecuatrouno.test` como host administrativo dedicado.
 
 ### Elasticsearch y degradacion
 - Elasticsearch es comun a ambos contextos.
@@ -341,7 +356,7 @@ wp --path=/srv/wp/admin-archive plugin list
 
 ### Healthchecks por contenedor
 - `lb-nginx`: `curl -fsS http://127.0.0.1/healthz`
-- `fe-live`, `fe-archive`, `be-admin`: `php-fpm` con `ping.path=/ping` y `pm.status_path=/status`
+- `fe-live`, `fe-archive`, `be-admin`: comprobacion del puerto `9000`; `ping.path=/ping` y `pm.status_path=/status` quedan preparados para evolucion posterior
 - `db-live`, `db-archive`: `mysqladmin ping`
 - `elastic`: `curl -fsS http://127.0.0.1:9200/_cluster/health`
 - `cron-master`: proceso residente o marca de ultima ejecucion correcta
@@ -352,6 +367,7 @@ wp --path=/srv/wp/admin-archive plugin list
 - MySQL: error log y slow query log
 - Elastic: logs de aplicacion y arranque
 - `cron-master`: salida y errores de jobs
+- Runtime Docker con rotacion minima `json-file`, `max-size=10m`, `max-file=3`
 
 ### Campos recomendados en access log
 - `request_id`
@@ -381,15 +397,18 @@ wp --path=/srv/wp/admin-archive plugin list
 - Si se comparten logs fuera del host, filtrar IPs publicas y correos.
 
 ### Smoke tests minimos
-- `GET https://nuevecuatrouno.com/wp-admin/` -> backend admin `live`
-- `GET https://archive.nuevecuatrouno.com/wp-admin/` -> backend admin `archive`
-- `GET https://nuevecuatrouno.com/2019/05/noticia/` -> `fe-archive`
-- `GET https://nuevecuatrouno.com/actualidad/post/` -> `fe-live`
-- `GET https://archive.nuevecuatrouno.com/cultura/post/` -> redireccion a `nuevecuatrouno.com`
+- `GET http://nuevecuatrouno.test/wp-admin/` -> backend admin `live`
+- `GET http://archive.nuevecuatrouno.test/wp-admin/` -> backend admin `archive`
+- `GET http://nuevecuatrouno.test/2019/05/noticia/` -> `fe-archive`
+- `GET http://nuevecuatrouno.test/actualidad/post/` -> `fe-live`
+- `GET http://archive.nuevecuatrouno.test/cultura/post/` -> redireccion a `nuevecuatrouno.test`
 - `LB-Nginx` responde en `/healthz`
-- `php-fpm` responde `pong` en `live`, `archive` y `admin`
+- `php-fpm` responde en el puerto `9000` en `live`, `archive` y `admin`
 - MySQL responde a `ping` en ambas DB
 - Elastic responde en `_cluster/health`
+- `xmlrpc.php` bloqueado con `403`
+- `wp-config.php` no expuesto y responde `404`
+- Dotfiles y extensiones sensibles bloqueados
 
 ## 11. Shortcuts aceptados de la POC
 - Sin alta disponibilidad.
@@ -398,6 +417,8 @@ wp --path=/srv/wp/admin-archive plugin list
 - Sin cache de produccion ni optimizacion para trafico alto.
 - Sin clustering de Elasticsearch.
 - Sin modelado de capacidad para carga real.
+- Sin TLS real terminado en esta iteracion local.
+- Sin WordPress real: se validan routing y contexto con stubs PHP y `wp-config.php` generado.
 
 ## 12. Riesgos aceptados en la POC
 - Punto unico de fallo en `LB-Nginx`.
@@ -463,4 +484,4 @@ wp --path=/srv/wp/admin-archive plugin list
 5. HA o estrategia de recuperacion mas robusta.
 
 ## 14. Cierre
-La POC ya esta suficientemente definida para implementarse y demostrarse. Para produccion, los huecos no estan en la arquitectura conceptual sino en la operacion real: seguridad, despliegue, recuperacion, persistencia y capacidad.
+La POC ya no es solo documental: queda implementada, demostrable y verificable en laboratorio. Para produccion, los huecos no estan en la arquitectura conceptual sino en la operacion real: seguridad, despliegue, recuperacion, persistencia, WordPress real, observabilidad y capacidad.

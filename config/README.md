@@ -1,0 +1,19 @@
+# Configuracion y secretos
+
+Este directorio documenta convenciones de configuracion no sensible.
+
+## Regla
+- Los secretos no se guardan en el repositorio.
+- `.env.example` solo define nombres de recursos, puertos, rutas locales y versiones.
+- Los valores sensibles deben inyectarse externamente o mediante ficheros locales no versionados.
+- Para la POC local, Compose consume secretos desde `./.secrets/` y ese directorio queda ignorado por Git salvo sus ejemplos y README.
+
+## Tipos de valores esperados fuera del repo
+- Password de root de MySQL
+- Usuarios y passwords de WordPress
+- Claves y salts de WordPress
+- Certificados TLS
+
+## Bootstrap local
+- `scripts/bootstrap-local-secrets.sh` genera secretos locales de desarrollo bajo `./.secrets/`.
+- `scripts/bootstrap-wordpress-config.sh` genera `wp-config.php` y `wp-common.php` dentro de `./runtime/wp-root/`.

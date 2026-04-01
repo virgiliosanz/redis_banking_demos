@@ -1,0 +1,8 @@
+.DS_Store
+.env
+.env.local
+.env.*.local
+runtime/
+.secrets/*
+!.secrets/README.md
+!.secrets/*.example
