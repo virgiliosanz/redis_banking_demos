@@ -70,9 +70,9 @@ render_context() {
     NONCE_SALT_FILE "/run/project-secrets/wp-nonce-salt"
 }
 
-render_context "$RUNTIME_ROOT/live/current/public" "n9_live" "wp_live" "WP_LIVE_DB_PASSWORD" "/run/project-secrets/wp-live-db-password" "db-live:3306" "https://nuevecuatrouno.test" "https://nuevecuatrouno.test"
-render_context "$RUNTIME_ROOT/archive/current/public" "n9_archive" "wp_archive" "WP_ARCHIVE_DB_PASSWORD" "/run/project-secrets/wp-archive-db-password" "db-archive:3306" "https://nuevecuatrouno.test" "https://nuevecuatrouno.test"
-render_context "$RUNTIME_ROOT/admin-live/current/public" "n9_live" "wp_live" "WP_LIVE_DB_PASSWORD" "/run/project-secrets/wp-live-db-password" "db-live:3306" "https://nuevecuatrouno.test" "https://nuevecuatrouno.test"
-render_context "$RUNTIME_ROOT/admin-archive/current/public" "n9_archive" "wp_archive" "WP_ARCHIVE_DB_PASSWORD" "/run/project-secrets/wp-archive-db-password" "db-archive:3306" "https://archive.nuevecuatrouno.test" "https://archive.nuevecuatrouno.test"
+render_context "$RUNTIME_ROOT/live/current/public" "n9_live" "wp_live" "WP_LIVE_DB_PASSWORD" "/run/project-secrets/wp-live-db-password" "db-live:3306" "http://nuevecuatrouno.test" "http://nuevecuatrouno.test"
+render_context "$RUNTIME_ROOT/archive/current/public" "n9_archive" "wp_archive" "WP_ARCHIVE_DB_PASSWORD" "/run/project-secrets/wp-archive-db-password" "db-archive:3306" "http://nuevecuatrouno.test" "http://nuevecuatrouno.test"
+render_context "$RUNTIME_ROOT/admin-live/current/public" "n9_live" "wp_live" "WP_LIVE_DB_PASSWORD" "/run/project-secrets/wp-live-db-password" "db-live:3306" "http://nuevecuatrouno.test" "http://nuevecuatrouno.test"
+render_context "$RUNTIME_ROOT/admin-archive/current/public" "n9_archive" "wp_archive" "WP_ARCHIVE_DB_PASSWORD" "/run/project-secrets/wp-archive-db-password" "db-archive:3306" "http://archive.nuevecuatrouno.test" "http://archive.nuevecuatrouno.test"
 
 printf '%s\n' "wordpress config bootstrap created under $RUNTIME_ROOT"

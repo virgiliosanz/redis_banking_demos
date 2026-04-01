@@ -20,8 +20,12 @@ write_if_missing "$SECRETS_DIR/db-live-user-password" "n9-live-user-local-$(date
 write_if_missing "$SECRETS_DIR/db-archive-root-password" "n9-archive-root-local-$(date +%s)-$$"
 write_if_missing "$SECRETS_DIR/db-archive-user-password" "n9-archive-user-local-$(date +%s)-$$"
 
-write_if_missing "$SECRETS_DIR/wp-live-db-password" "n9-wp-live-db-local-$(date +%s)-$$"
-write_if_missing "$SECRETS_DIR/wp-archive-db-password" "n9-wp-archive-db-local-$(date +%s)-$$"
+cp "$SECRETS_DIR/db-live-user-password" "$SECRETS_DIR/wp-live-db-password"
+cp "$SECRETS_DIR/db-archive-user-password" "$SECRETS_DIR/wp-archive-db-password"
+chmod 600 "$SECRETS_DIR/wp-live-db-password" "$SECRETS_DIR/wp-archive-db-password"
+
+write_if_missing "$SECRETS_DIR/wp-live-admin-password" "n9-live-admin-local-$(date +%s)-$$"
+write_if_missing "$SECRETS_DIR/wp-archive-admin-password" "n9-archive-admin-local-$(date +%s)-$$"
 
 for key in \
   wp-auth-key \

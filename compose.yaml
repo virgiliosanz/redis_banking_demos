@@ -41,7 +41,10 @@ services:
           - lb-nginx
 
   fe-live:
-    image: ${PHP_FPM_IMAGE:-php:8.2.28-fpm-alpine}
+    build:
+      context: .
+      dockerfile: php/fpm/Dockerfile
+    image: ${PHP_FPM_IMAGE:-nuevecuatrouno-php-fpm:local}
     container_name: n9-fe-live
     restart: unless-stopped
     security_opt:
@@ -64,7 +67,10 @@ services:
           - fe-live
 
   fe-archive:
-    image: ${PHP_FPM_IMAGE:-php:8.2.28-fpm-alpine}
+    build:
+      context: .
+      dockerfile: php/fpm/Dockerfile
+    image: ${PHP_FPM_IMAGE:-nuevecuatrouno-php-fpm:local}
     container_name: n9-fe-archive
     restart: unless-stopped
     security_opt:
@@ -87,7 +93,10 @@ services:
           - fe-archive
 
   be-admin:
-    image: ${PHP_FPM_IMAGE:-php:8.2.28-fpm-alpine}
+    build:
+      context: .
+      dockerfile: php/fpm/Dockerfile
+    image: ${PHP_FPM_IMAGE:-nuevecuatrouno-php-fpm:local}
     container_name: n9-be-admin
     restart: unless-stopped
     security_opt:
@@ -193,7 +202,10 @@ services:
           - elastic
 
   cron-master:
-    image: ${PHP_CLI_IMAGE:-php:8.2.28-cli-alpine}
+    build:
+      context: .
+      dockerfile: php/cli/Dockerfile
+    image: ${PHP_CLI_IMAGE:-nuevecuatrouno-php-cli:local}
     container_name: n9-cron-master
     restart: unless-stopped
     security_opt:
