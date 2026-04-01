@@ -149,6 +149,9 @@ Definir de forma operativa que se comparte y que no entre `live`, `archive` y `a
 - El salto a persistencia compartida ha revelado otra necesidad de routing: las rutas estaticas de `uploads`, `themes`, `plugins` y `wp-includes` deben resolverse antes del fallback a WordPress para no convertir un asset existente en `404` aplicado.
 
 ### Fase 3. Cache por contexto
+#### Estado
+Completada
+
 #### Objetivo
 Definir una politica de cache coherente con el perfil `live` frente a `archive`.
 
@@ -167,6 +170,36 @@ Definir una politica de cache coherente con el perfil `live` frente a `archive`.
 - `live` y `archive` tienen reglas distintas y justificadas.
 - La cache editorial y administrativa no rompe el flujo de trabajo.
 - Queda claro que partes dependen de Cloudflare y cuales del origen.
+
+#### Arranque de fase
+- Definir primero la politica, antes de meter plugins de cache o comportamientos opacos dentro de WordPress.
+- Mantener `admin`, `login`, usuarios autenticados, `preview`, `search` y `POST` fuera de cualquier cache de pagina en origen.
+- Tratar `archive` como candidato a cache mucho mas agresiva que `live`, con headers y reglas distintas desde Nginx.
+- Separar desde el principio dos planos:
+  - cache en origen, pensada para proteger PHP
+  - cache en Cloudflare, pensada para absorcion y distribucion
+
+#### Decision tomada al arrancar
+- La POC no montara `cloudflared` ni simulara el edge de Cloudflare.
+- En esta fase se trabajara con politica de cache y cabeceras en origen; la cache edge de produccion queda documentada, no implementada.
+
+#### Progreso actual
+- Queda documentada la politica de cache en `docs/cache-policy-by-context.md`.
+- Nginx ya emite cabeceras distintas para `live`, `archive`, flujos bypass y assets estaticos.
+- `live` y `archive` tienen TTL distintos y visibles por cabecera.
+- Existe smoke especifico para validar politicas de cache y bypass.
+
+#### Decisiones tomadas
+- En esta iteracion no se activa `fastcgi_cache`, microcache ni plugin de page cache en origen.
+- La estrategia de esta fase se limita a definir cacheabilidad y cabeceras desde Nginx.
+- `live` usa una politica conservadora para contenido publico; `archive` usa una politica mucho mas agresiva.
+- Admin, login, usuarios autenticados, busquedas, previews y metodos no cacheables salen por `private, no-store`.
+- Los assets estaticos se resuelven con politica propia de cache y sin pasar por el fallback de WordPress.
+
+#### Lecciones aprendidas
+- Antes de introducir page cache real conviene cerrar bien la politica de bypass; si no, el riesgo de romper flujos editoriales es alto.
+- En esta arquitectura, las cabeceras de cache en origen ya aportan valor operativo aunque la cache edge de Cloudflare todavia no exista en la POC.
+- El host `archive` redirige todo el trafico publico al host canonico; eso incluye assets y debe reflejarse tambien en las pruebas de cache.
 
 ### Fase 4. Busqueda con Elasticsearch y ElasticPress
 #### Objetivo
