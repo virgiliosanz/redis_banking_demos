@@ -40,6 +40,19 @@ ensure_core_install() {
   fi
 }
 
+ensure_option() {
+  path="$1"
+  option_name="$2"
+  option_value="$3"
+
+  current_value="$(wp_exec option get "$option_name" --path="$path" 2>/dev/null || true)"
+  if [ "$current_value" = "$option_value" ]; then
+    return 0
+  fi
+
+  wp_exec option update "$option_name" "$option_value" --path="$path" >/dev/null
+}
+
 ensure_page() {
   path="$1"
   title="$2"
@@ -102,6 +115,11 @@ wait_for_service n9-cron-master
 
 ensure_core_install "/srv/wp/live" "$BASE_URL" "NueveCuatroUno Live" "n9liveadmin" "$live_admin_password" "live-admin@nuevecuatrouno.test"
 ensure_core_install "/srv/wp/archive" "$ARCHIVE_PUBLIC_URL" "NueveCuatroUno Archive" "n9archiveadmin" "$archive_admin_password" "archive-admin@nuevecuatrouno.test"
+
+ensure_option "/srv/wp/live" "permalink_structure" "/%postname%/"
+ensure_option "/srv/wp/archive" "permalink_structure" "/%year%/%monthnum%/%postname%/"
+wp_exec rewrite flush --hard --path="/srv/wp/live" >/dev/null
+wp_exec rewrite flush --hard --path="/srv/wp/archive" >/dev/null
 
 live_parent_id="$(ensure_page "/srv/wp/live" "Actualidad" "actualidad" 0 "Seccion actualidad live")"
 ensure_page "/srv/wp/live" "Post" "post" "$live_parent_id" "Live sample page"

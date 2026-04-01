@@ -17,11 +17,17 @@ docker compose exec -T elastic sh -lc "curl -fsS http://127.0.0.1:9200/_alias/$E
 printf '%s\n' "ok"
 
 echo "==> unified search returns archive content on live"
-archive_search="$(curl -fsSL "$BASE_URL/?s=Archive+sample+page")"
-printf '%s' "$archive_search" | grep -q "Noticia"
+archive_search="$(curl -fsSL "$BASE_URL/?s=Memoria+hemeroteca+2018")"
+printf '%s' "$archive_search" | grep -q "Memoria 2018"
 printf '%s\n' "ok"
 
 echo "==> unified search returns live content on live"
-live_search="$(curl -fsSL "$BASE_URL/?s=Live+sample+page")"
-printf '%s' "$live_search" | grep -q "Post"
+live_search="$(curl -fsSL "$BASE_URL/?s=Agenda+local+laboratorio")"
+printf '%s' "$live_search" | grep -q "Agenda local"
+printf '%s\n' "ok"
+
+echo "==> unified search returns mixed live and archive content"
+mixed_search="$(curl -fsSL "$BASE_URL/?s=rioja-laboratorio")"
+printf '%s' "$mixed_search" | grep -q "Cobertura live 2026"
+printf '%s' "$mixed_search" | grep -q "Memoria 2018"
 printf '%s\n' "ok"

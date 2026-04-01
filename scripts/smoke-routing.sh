@@ -18,7 +18,9 @@ run_case() {
 run_case "health live" "$BASE_URL/healthz" "ok"
 run_case "health archive" "$ARCHIVE_URL/healthz" "ok"
 run_case "front live" "$BASE_URL/actualidad/post/" "Live sample page"
+run_case "front live cultura" "$BASE_URL/cultura/agenda-local/" "Agenda local laboratorio"
 run_case "front archive" "$BASE_URL/2019/05/noticia/" "Archive sample page"
+run_case "front archive 2018" "$BASE_URL/2018/10/memoria-2018/" "Memoria hemeroteca 2018"
 run_case "admin live login" "$BASE_URL/wp-login.php" "user_login"
 run_case "admin archive login" "$ARCHIVE_URL/wp-login.php" "user_login"
 
