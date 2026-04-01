@@ -110,6 +110,9 @@ Sustituir los stubs PHP por una base WordPress real manteniendo el routing ya va
 - Un bootstrap de core reproducible no debe depender de copias ciegas ni de ejecuciones de red indefinidas; conviene cachear el tarball y sincronizar de forma determinista.
 
 ### Fase 2. Persistencia y contenido compartido
+#### Estado
+Completada
+
 #### Objetivo
 Definir de forma operativa que se comparte y que no entre `live`, `archive` y `admin`.
 
@@ -128,6 +131,22 @@ Definir de forma operativa que se comparte y que no entre `live`, `archive` y `a
 - `uploads` queda compartido de forma explicita.
 - La cache queda aislada por contexto.
 - No hay ambiguedad sobre que rutas son persistentes y cuales son descartables.
+
+#### Progreso actual
+- `uploads` y `mu-plugins` quedan montados desde `runtime/wp-root/shared/` sobre los cuatro contextos.
+- `wp-content/cache` queda montado desde `runtime/wp-root/<context>/var/cache/wp-content` con aislamiento explicito por contexto.
+- El bootstrap local ya prepara layout, mounts y un probe de persistencia para validacion rapida.
+- La documentacion operativa queda aterrizada en `docs/wordpress-persistence-layout.md`.
+
+#### Decisiones tomadas
+- `uploads` se comparte por bind mount directo, no por copia ni por sincronizacion entre docroots.
+- `mu-plugins` se trata como codigo comun compartido y controlado.
+- La cache de WordPress se aisla por contexto montando `wp-content/cache` a un directorio propio de cada contexto.
+- El bootstrap del core preserva `uploads`, `mu-plugins`, `cache`, `plugins`, `themes`, `languages` y `upgrade` para no destruir estado funcional al resincronizar el core.
+
+#### Lecciones aprendidas
+- Compartir datos entre contextos en Docker Compose debe resolverse con mounts explicitos; confiar en rutas hermanas fuera del bind mount principal no funciona dentro del contenedor.
+- El salto a persistencia compartida ha revelado otra necesidad de routing: las rutas estaticas de `uploads`, `themes`, `plugins` y `wp-includes` deben resolverse antes del fallback a WordPress para no convertir un asset existente en `404` aplicado.
 
 ### Fase 3. Cache por contexto
 #### Objetivo

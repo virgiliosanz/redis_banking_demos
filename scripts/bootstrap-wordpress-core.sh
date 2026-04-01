@@ -39,6 +39,12 @@ install_core() {
 
   rsync -a --delete \
     --exclude 'uploads/' \
+    --exclude 'mu-plugins/' \
+    --exclude 'cache/' \
+    --exclude 'plugins/' \
+    --exclude 'themes/' \
+    --exclude 'languages/' \
+    --exclude 'upgrade/' \
     "$EXTRACTED_PATH/wp-content/" "$target_dir/wp-content/"
 
   rm -f "$target_dir/wp-config-sample.php"
