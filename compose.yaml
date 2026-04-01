@@ -57,6 +57,10 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    environment:
+      EP_HOST: http://elastic:9200
+      ELASTICSEARCH_URL: http://elastic:9200
+      EP_SEARCH_ALIAS: n9-search-posts
     volumes:
       - ./php/common:/usr/local/etc/php-fpm.d/zzz-project:ro
       - ./.secrets:/run/project-secrets:ro
@@ -86,6 +90,10 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    environment:
+      EP_HOST: http://elastic:9200
+      ELASTICSEARCH_URL: http://elastic:9200
+      EP_SEARCH_ALIAS: n9-search-posts
     volumes:
       - ./php/common:/usr/local/etc/php-fpm.d/zzz-project:ro
       - ./.secrets:/run/project-secrets:ro
@@ -115,6 +123,10 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    environment:
+      EP_HOST: http://elastic:9200
+      ELASTICSEARCH_URL: http://elastic:9200
+      EP_SEARCH_ALIAS: n9-search-posts
     volumes:
       - ./php/common:/usr/local/etc/php-fpm.d/zzz-project:ro
       - ./.secrets:/run/project-secrets:ro
@@ -230,6 +242,10 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    environment:
+      EP_HOST: http://elastic:9200
+      ELASTICSEARCH_URL: http://elastic:9200
+      EP_SEARCH_ALIAS: n9-search-posts
     command: ["sh", "-c", "trap : TERM INT; sleep infinity & wait"]
     volumes:
       - ./.secrets:/run/project-secrets:ro

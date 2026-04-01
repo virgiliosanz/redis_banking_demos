@@ -30,6 +30,7 @@ define('DB_COLLATE', '');
 
 define('WP_HOME', '{{WP_HOME}}');
 define('WP_SITEURL', '{{WP_SITEURL}}');
+define('EP_INDEX_PREFIX', '{{EP_INDEX_PREFIX}}');
 
 define('AUTH_KEY', n9_secret('{{AUTH_KEY_ENV}}', '{{AUTH_KEY_FILE}}', 'change-me'));
 define('SECURE_AUTH_KEY', n9_secret('{{SECURE_AUTH_KEY_ENV}}', '{{SECURE_AUTH_KEY_FILE}}', 'change-me'));

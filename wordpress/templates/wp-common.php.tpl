@@ -21,6 +21,20 @@ if (($elasticsearchUrl = getenv('ELASTICSEARCH_URL')) !== false && $elasticsearc
     define('ELASTICSEARCH_URL', $elasticsearchUrl);
 }
 
+if (($epHost = getenv('EP_HOST')) !== false && $epHost !== '') {
+    define('EP_HOST', $epHost);
+} elseif (($elasticsearchUrl = getenv('ELASTICSEARCH_URL')) !== false && $elasticsearchUrl !== '') {
+    define('EP_HOST', $elasticsearchUrl);
+}
+
+if (($epIndexPrefix = getenv('EP_INDEX_PREFIX')) !== false && $epIndexPrefix !== '') {
+    define('EP_INDEX_PREFIX', $epIndexPrefix);
+}
+
+if (($epSearchAlias = getenv('EP_SEARCH_ALIAS')) !== false && $epSearchAlias !== '') {
+    define('EP_SEARCH_ALIAS', $epSearchAlias);
+}
+
 if (!defined('WP_DISABLE_ELASTICSEARCH')) {
     define('WP_DISABLE_ELASTICSEARCH', filter_var(getenv('WP_DISABLE_ELASTICSEARCH') ?: 'false', FILTER_VALIDATE_BOOLEAN));
 }

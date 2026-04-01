@@ -202,6 +202,9 @@ Definir una politica de cache coherente con el perfil `live` frente a `archive`.
 - El host `archive` redirige todo el trafico publico al host canonico; eso incluye assets y debe reflejarse tambien en las pruebas de cache.
 
 ### Fase 4. Busqueda con Elasticsearch y ElasticPress
+#### Estado
+Completada
+
 #### Objetivo
 Preparar la busqueda unificada sobre contenido `live` y `archive`.
 
@@ -220,6 +223,26 @@ Preparar la busqueda unificada sobre contenido `live` y `archive`.
 - La busqueda consulta contenido de `live` y `archive`.
 - Existe runbook minimo de reindexacion.
 - La caida de Elasticsearch no derriba el sitio entero.
+
+#### Progreso actual
+- ElasticPress queda instalado y activo en `live` y `archive`.
+- El codigo del plugin queda sincronizado tambien en `admin-live` y `admin-archive`.
+- `live` y `archive` indexan en indices distintos con prefijos propios.
+- La lectura de busqueda se hace mediante un alias comun `n9-search-posts`.
+- La busqueda desde `live` ya devuelve contenido de `archive`.
+
+#### Decisiones tomadas
+- No se usa un indice fisico unico compartido.
+- Se usan dos indices fisicos separados y un alias unificado de lectura.
+- `live` escribe con prefijo `n9-live`; `archive` escribe con prefijo `n9-archive`.
+- Un mu-plugin compartido redirige las queries de busqueda al alias de lectura.
+- El alias se considera el punto de lectura estable para la futura particion anual del contenido.
+
+#### Lecciones aprendidas
+- Como `live` y `archive` comparten `siteurl` publico en la POC, separar indices por prefijo no es opcional: es obligatorio para evitar colision de nombres.
+- La busqueda unificada debe resolverse en la capa de lectura; mezclar escrituras en un solo indice empeoraria reindexado, rollback y rollover anual.
+- La degradacion queda validada: con Elasticsearch caido, el sitio sigue respondiendo y la busqueda no rompe el front con errores 500.
+- El siguiente paso natural tras esta fase es formalizar el script anual de rollover de contenido entre `live` y `archive`.
 
 ### Fase 5. Cloudflare-aware origin y endurecimiento minimo real
 #### Objetivo
