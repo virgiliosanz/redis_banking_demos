@@ -37,8 +37,8 @@ Dejar la POC operable con un nivel minimo de defensa y con una frontera clara en
 - No hay backup verificado ni prueba de restauracion.
 
 ## 5. Gaps hacia produccion
-- Sustituir stubs PHP por core real de WordPress y contenido de prueba controlado.
-- Definir estrategia de persistencia para `uploads`, `mu-plugins` y contenido compartido.
+- Formalizar el script anual de rollover de contenido entre `live` y `archive`.
+- Sustituir secretos locales de laboratorio por un backend de secretos real.
 - Introducir observabilidad real: logs estructurados, slow query log, metrica y alertado.
 - Endurecer MySQL y Elasticsearch con configuracion especifica del entorno.
 - Definir politica de acceso administrativo y de exposicion publica del panel.
@@ -46,17 +46,16 @@ Dejar la POC operable con un nivel minimo de defensa y con una frontera clara en
 
 ## 6. Siguiente proyecto recomendado
 ### Opcion prioritaria
-`proyecto-wordpress-real-y-operacion-minima.md`
+`proyecto-rollover-anual-e-ia-ops-bootstrap.md`
 
 ### Objetivo
-Sustituir los stubs por WordPress real, definir persistencia minima y dejar una base valida para empezar la capa IA-Ops sobre señales reales.
+Formalizar la operacion anual `live -> archive` y dejar un contrato claro para que IA-Ops opere sobre una plataforma WordPress ya real, con busqueda unificada y señales utiles.
 
 ### Alcance propuesto
-- Core WordPress real en los cuatro contextos.
-- Datos semilla o fixtures controlados.
-- Logs utiles para diagnostico.
-- Politica minima de acceso admin.
-- Preparacion de fuentes para `IA-Ops Bootstrap`.
+- Script anual de rollover con `dry-run`, validacion y rollback.
+- Informe de ejecucion y validacion de conteos, URLs e indexacion.
+- Contrato minimo de logs, healthchecks y comandos de diagnostico para `IA-Ops Bootstrap`.
+- Integracion de observabilidad minima real: slow query log, logs estructurados y estados de backup.
 
 ## 7. Criterio de salida de esta POC
-La POC actual ya sirve para demostrar topologia, routing, segmentacion por contexto y operacion basica del stack. No sirve aun para validar funcionalidad real de WordPress ni para extraer conclusiones de rendimiento o seguridad de produccion.
+La POC actual ya sirve para demostrar topologia, routing, segmentacion por contexto, WordPress real, persistencia compartida, politica de cache, busqueda unificada y operacion basica del stack. No sirve aun para extraer conclusiones de rendimiento o seguridad de produccion.

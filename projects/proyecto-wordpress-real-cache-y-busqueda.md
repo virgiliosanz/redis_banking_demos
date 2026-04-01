@@ -285,6 +285,9 @@ Preparar el origen para quedar correctamente detras de Cloudflare.
 - El origen debe seguir teniendo hardening propio aunque el edge haga WAF, cache y control de acceso.
 
 ### Fase 6. Validacion funcional y salida a siguiente iteracion
+#### Estado
+Completada
+
 #### Objetivo
 Cerrar el proyecto con pruebas funcionales utiles y dejar lista la base para IA-Ops.
 
@@ -303,6 +306,23 @@ Cerrar el proyecto con pruebas funcionales utiles y dejar lista la base para IA-
 - La arquitectura deja de ser solo de infraestructura y pasa a ser aplicacion real operable.
 - Los huecos hacia produccion y hacia IA-Ops quedan explicitados.
 - El proyecto deja una base valida para el siguiente salto.
+
+#### Progreso actual
+- Existe una bateria de validacion funcional agregada en `scripts/smoke-functional.sh`.
+- La validacion cubre servicios, routing, persistencia, aislamiento de cache, politica de cache y busqueda.
+- La documentacion operativa queda actualizada para WordPress real y ElasticPress.
+- Queda definido el contrato minimo para `IA-Ops Bootstrap`.
+- Queda documentado el siguiente salto natural: rollover anual `live -> archive`.
+
+#### Decisiones tomadas
+- La validacion final se apoya en smoke tests reproducibles, no en comprobaciones manuales sueltas.
+- El siguiente proyecto recomendado no es mas infraestructura base, sino `proyecto-rollover-anual-e-ia-ops-bootstrap.md`.
+- El contrato para IA-Ops se documenta como interfaz de lectura, comandos permitidos y formato de salida, sin automatizar acciones destructivas.
+
+#### Lecciones aprendidas
+- Una POC WordPress deja de ser “solo de infraestructura” cuando ya puede validar WordPress real, persistencia, cache y busqueda con scripts reproducibles.
+- El siguiente riesgo operativo serio ya no esta en Docker o Nginx, sino en la operacion anual del contenido y en la calidad de las senales para diagnostico.
+- Actualizar la documentacion de cierre es tan importante como pasar los smoke tests; si no, el siguiente proyecto arranca sobre premisas viejas.
 
 ## 9. Riesgos conocidos
 - WordPress real introducira problemas que hoy no aparecen con stubs: permisos, writes, plugins, login y sesiones.

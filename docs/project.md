@@ -11,7 +11,7 @@ Este documento sustituye al resto de documentos tecnicos y al documento de proye
 - POC implementada y validada en laboratorio con `docker compose`.
 - Fases `1` a `6` completadas.
 - La topologia `live`, `archive` y `admin` ya arranca, enruta y pasa smoke tests.
-- Siguiente iteracion recomendada: introducir WordPress real y operacion minima sobre senales reales.
+- Siguiente iteracion recomendada: formalizar el rollover anual `live -> archive` y preparar `IA-Ops Bootstrap`.
 
 ### Artefactos implementados
 - `compose.yaml` operativo con `LB-Nginx`, `FE-Live`, `FE-Archive`, `BE-Admin`, `DB-Live`, `DB-Archive`, `Elastic` y `Cron-Master`.
@@ -338,7 +338,7 @@ map "$is_admin_path|$site_context" $site_docroot {
 - `admin-archive` usa `archive.nuevecuatrouno.test` como host administrativo dedicado.
 
 ### Elasticsearch y degradacion
-- Elasticsearch es comun a ambos contextos.
+- Elasticsearch es comun a ambos contextos, con indices separados y alias unificado de lectura para busqueda.
 - Si `Elastic` no responde, WordPress no debe caer por completo.
 - La busqueda debe degradar a respuesta vacia controlada, fallback nativo o desactivacion temporal de feature.
 
@@ -418,7 +418,7 @@ wp --path=/srv/wp/admin-archive plugin list
 - Sin clustering de Elasticsearch.
 - Sin modelado de capacidad para carga real.
 - Sin TLS real terminado en esta iteracion local.
-- Sin WordPress real: se validan routing y contexto con stubs PHP y `wp-config.php` generado.
+- Sin backend de secretos real, backup verificado ni observabilidad avanzada de produccion.
 
 ## 12. Riesgos aceptados en la POC
 - Punto unico de fallo en `LB-Nginx`.
@@ -484,4 +484,4 @@ wp --path=/srv/wp/admin-archive plugin list
 5. HA o estrategia de recuperacion mas robusta.
 
 ## 14. Cierre
-La POC ya no es solo documental: queda implementada, demostrable y verificable en laboratorio. Para produccion, los huecos no estan en la arquitectura conceptual sino en la operacion real: seguridad, despliegue, recuperacion, persistencia, WordPress real, observabilidad y capacidad.
+La POC ya no es solo documental: queda implementada, demostrable y verificable en laboratorio con WordPress real, persistencia compartida, politica de cache y busqueda unificada. Para produccion, los huecos no estan en la arquitectura conceptual sino en la operacion real: seguridad, despliegue, recuperacion, rollover anual, observabilidad y capacidad.

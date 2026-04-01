@@ -16,25 +16,21 @@ Describir el flujo minimo para levantar, verificar y revertir la POC WordPress D
 Desde la raiz del repositorio:
 
 ```sh
-./scripts/bootstrap-local-runtime.sh
-docker compose up -d
+./scripts/bootstrap-local-stack.sh
 ```
 
 Que hace el bootstrap:
 - Genera secretos locales no versionados en `./.secrets/`
-- Genera `wp-config.php` por contexto en `./runtime/wp-root/`
-- Genera `wp-common.php` compartido
-- Genera stubs PHP para validar routing sin core real de WordPress
+- Prepara layout compartido y aislado en `./runtime/wp-root/`
+- Genera `wp-config.php` por contexto y `wp-common.php` compartido
+- Levanta el stack Docker
+- Instala WordPress real en `live` y `archive`
+- Activa e indexa ElasticPress con alias de lectura unificado
 
 ## 4. Verificacion operativa
-### Verificacion de routing
+### Verificacion funcional completa
 ```sh
-./scripts/smoke-routing.sh
-```
-
-### Verificacion de servicios internos
-```sh
-./scripts/smoke-services.sh
+./scripts/smoke-functional.sh
 ```
 
 ### Comprobaciones manuales utiles
@@ -42,6 +38,7 @@ Que hace el bootstrap:
 curl -i http://nuevecuatrouno.test/healthz
 curl -i http://archive.nuevecuatrouno.test/healthz
 curl -i http://archive.nuevecuatrouno.test/2018/10/mi-articulo/
+curl -i "http://nuevecuatrouno.test/?s=Archive+sample+page"
 docker compose ps
 ```
 
@@ -53,6 +50,8 @@ docker compose ps
 - El admin `live` cae en `be-admin` con `admin-live`
 - El admin `archive` cae en `be-admin` con `admin-archive`
 - El host `archive` no admin redirige a `nuevecuatrouno.test`
+- La busqueda en `live` encuentra contenido de `live` y `archive`
+- `uploads` se comparte y la cache queda aislada por contexto
 
 ## 6. Rollback local
 ### Rollback de configuracion del repo
@@ -67,7 +66,7 @@ docker compose up -d --force-recreate
 Si solo quieres regenerar artefactos locales sin cambiar Git:
 
 ```sh
-./scripts/bootstrap-local-runtime.sh
+./scripts/bootstrap-local-stack.sh
 docker compose up -d --force-recreate
 ```
 
@@ -80,6 +79,7 @@ docker compose up -d
 ## 7. Notas operativas
 - `./.secrets/` no se versiona y es solo para esta POC local.
 - `./runtime/` es descartable y se puede regenerar con los scripts de bootstrap.
-- El stack actual usa stubs PHP para validar routing; aun no incluye core real de WordPress.
+- El stack actual usa WordPress real, no stubs PHP.
+- ElasticPress indexa `live` y `archive` por separado y consulta mediante el alias `n9-search-posts`.
 - `xmlrpc.php`, dotfiles y ficheros sensibles comunes quedan bloqueados por Nginx en esta fase.
 - La rotacion minima de logs Docker queda definida en `compose.yaml` con `max-size=10m` y `max-file=3`.

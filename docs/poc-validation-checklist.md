@@ -20,5 +20,6 @@
 - [x] `cron-master` healthy
 
 ## Observaciones
-- La validacion actual se hace sobre stubs PHP y configuracion WordPress generada.
-- El siguiente salto funcional requiere introducir core real de WordPress o contenido equivalente.
+- La validacion actual se hace sobre WordPress real en `live`, `archive`, `admin-live` y `admin-archive`.
+- La bateria funcional consolidada se ejecuta con `./scripts/smoke-functional.sh`.
+- La busqueda ya se valida sobre Elasticsearch con indices separados por contexto y alias de lectura unificado.
