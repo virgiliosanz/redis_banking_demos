@@ -245,6 +245,9 @@ Preparar la busqueda unificada sobre contenido `live` y `archive`.
 - El siguiente paso natural tras esta fase es formalizar el script anual de rollover de contenido entre `live` y `archive`.
 
 ### Fase 5. Cloudflare-aware origin y endurecimiento minimo real
+#### Estado
+Completada
+
 #### Objetivo
 Preparar el origen para quedar correctamente detras de Cloudflare.
 
@@ -263,6 +266,23 @@ Preparar el origen para quedar correctamente detras de Cloudflare.
 - No queda una falsa sensacion de proteccion solo por estar detras de Cloudflare.
 - El origen tiene una politica clara y documentada.
 - El acceso administrativo queda acotado.
+
+#### Progreso actual
+- Queda documentado el modelo correcto de produccion con Tunnel en `docs/origin-behind-cloudflare-tunnel.md`.
+- Queda una checklist separando responsabilidades de edge y origen en `docs/edge-origin-checklist.md`.
+- Nginx ya deja trazabilidad en logs para `CF-Connecting-IP`, `X-Forwarded-For`, `CF-Ray` y `realip_remote_addr`.
+- El repo incluye snippets de produccion para `real_ip` y cierre de origen, sin activarlos en la POC.
+
+#### Decisiones tomadas
+- La POC no monta `cloudflared` y no intenta simular el edge de Cloudflare.
+- En produccion, el origen no debe aceptar entrada publica directa.
+- Con Cloudflare Tunnel, el origen no debe confiar en rangos publicos de Cloudflare como si fueran clientes directos; debe confiar solo en el conector local o en una red privada controlada.
+- El hardening real del origen se deja preparado como configuracion de produccion separada, no activada dentro del laboratorio local.
+
+#### Lecciones aprendidas
+- “Estar detras de Cloudflare” no significa lo mismo que “estar detras de Cloudflare Tunnel”; la frontera de confianza cambia por completo.
+- En el modelo Tunnel, la seguridad real depende de topologia y red privada, no solo de cabeceras.
+- El origen debe seguir teniendo hardening propio aunque el edge haga WAF, cache y control de acceso.
 
 ### Fase 6. Validacion funcional y salida a siguiente iteracion
 #### Objetivo
