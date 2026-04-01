@@ -3,8 +3,8 @@
 ## Routing y salud
 - [x] `GET http://nuevecuatrouno.test/healthz`
 - [x] `GET http://archive.nuevecuatrouno.test/healthz`
-- [x] `GET http://nuevecuatrouno.test/actualidad/post/`
-- [x] `GET http://nuevecuatrouno.test/2019/05/noticia/`
+- [x] `GET http://nuevecuatrouno.test/2026/04/01/logrono-venera-la-imagen-del-cristo-del-santo-sepulcro-en-la-redonda/`
+- [x] `GET http://nuevecuatrouno.test/2019/05/15/logrono-activa-su-plan-de-barrios-con-inversiones-en-movilidad/`
 - [x] `GET http://nuevecuatrouno.test/wp-admin/`
 - [x] `GET http://archive.nuevecuatrouno.test/wp-admin/`
 - [x] `GET http://archive.nuevecuatrouno.test/2018/10/mi-articulo/` con `302`

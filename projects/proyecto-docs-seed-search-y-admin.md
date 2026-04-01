@@ -108,7 +108,7 @@ Poblar `live` y `archive` con contenido suficiente para probar routing, anios, t
 
 ### Fase 3. Buscador visible en frontend
 #### Estado
-Pendiente
+Completada
 
 #### Objetivo
 Añadir una UI minima de busqueda en frontend para validar ElasticPress sin depender solo de consultas manuales por query string.
@@ -126,9 +126,22 @@ Añadir una UI minima de busqueda en frontend para validar ElasticPress sin depe
 #### Criterios de cierre
 - Un usuario puede lanzar busquedas desde la interfaz sin conocer `/?s=...`.
 
+#### Progreso actual
+- Se anade un buscador visible en cabecera como `mu-plugin` compartido.
+- El formulario aparece tanto en home como en resultados de busqueda.
+- Los resultados mezclados de `live` y `archive` mantienen enlaces canonicos con fecha completa.
+
+#### Decisiones tomadas
+- La UI de busqueda se implementa como capa compartida y minima, sin reabrir el frente de tema o maquetacion.
+- La correccion de enlaces `?p=<id>` se hace en la capa de render de resultados ElasticPress, reutilizando el permalink indexado.
+
+#### Lecciones aprendidas
+- Para esta POC, un `mu-plugin` pequeño es una forma mas estable de introducir UI transversal que tocar el tema de bloque entero.
+- El problema de los enlaces de resultados no estaba en Elasticsearch ni en los permalinks del sitio, sino en el render del bloque de resultados mezclados.
+
 ### Fase 4. Estabilidad de admin y correccion de redirects
 #### Estado
-Pendiente
+Completada
 
 #### Objetivo
 Eliminar los bucles `302` en `wp-admin` y `wp-login.php`, dejando el plano administrativo navegable y estable.
@@ -147,6 +160,16 @@ Eliminar los bucles `302` en `wp-admin` y `wp-login.php`, dejando el plano admin
 #### Criterios de cierre
 - `wp-admin` y `wp-login.php` dejan de entrar en loops `302`.
 - El acceso admin funciona de forma estable en `nuevecuatrouno.test` y `archive.nuevecuatrouno.test`.
+
+#### Progreso actual
+- El loop de `302` en `/wp-admin/` queda corregido en el balanceador.
+- `wp-admin/` ya redirige a `wp-login.php` tanto en `live` como en `archive`.
+
+#### Decisiones tomadas
+- La correccion se hace en Nginx reescribiendo el caso exacto `/wp-admin/` hacia `wp-admin/index.php`, sin alterar el resto del manejo PHP.
+
+#### Lecciones aprendidas
+- El bug no estaba en cookies ni en credenciales, sino en como entraba el URI exacto `/wp-admin/` al front controller administrativo.
 
 ## 8. Riesgos a vigilar
 - El contenido semilla puede ocultar problemas reales si no cubre suficientes variantes de routing.

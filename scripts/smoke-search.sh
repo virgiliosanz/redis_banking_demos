@@ -17,17 +17,17 @@ docker compose exec -T elastic sh -lc "curl -fsS http://127.0.0.1:9200/_alias/$E
 printf '%s\n' "ok"
 
 echo "==> unified search returns archive content on live"
-archive_search="$(curl -fsSL "$BASE_URL/?s=Memoria+hemeroteca+2018")"
-printf '%s' "$archive_search" | grep -q "Memoria 2018"
+archive_search="$(curl -fsSL "$BASE_URL/?s=rioja+metropolitano")"
+printf '%s' "$archive_search" | grep -q "La vendimia abre una nueva etapa para el Rioja metropolitano"
 printf '%s\n' "ok"
 
 echo "==> unified search returns live content on live"
-live_search="$(curl -fsSL "$BASE_URL/?s=Agenda+local+laboratorio")"
-printf '%s' "$live_search" | grep -q "Agenda local"
+live_search="$(curl -fsSL "$BASE_URL/?s=Cristo+del+Santo+Sepulcro")"
+printf '%s' "$live_search" | grep -q "Logrono venera la imagen del Cristo del Santo Sepulcro en La Redonda"
 printf '%s\n' "ok"
 
 echo "==> unified search returns mixed live and archive content"
 mixed_search="$(curl -fsSL "$BASE_URL/?s=rioja-laboratorio")"
-printf '%s' "$mixed_search" | grep -q "Cobertura live 2026"
-printf '%s' "$mixed_search" | grep -q "Memoria 2018"
+printf '%s' "$mixed_search" | grep -q "Logrono venera la imagen del Cristo del Santo Sepulcro en La Redonda"
+printf '%s' "$mixed_search" | grep -q "La vendimia abre una nueva etapa para el Rioja metropolitano"
 printf '%s\n' "ok"

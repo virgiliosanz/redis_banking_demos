@@ -50,34 +50,39 @@ Que hace el bootstrap:
 curl -i http://nuevecuatrouno.test/healthz
 curl -i http://archive.nuevecuatrouno.test/healthz
 curl -i http://archive.nuevecuatrouno.test/2018/10/mi-articulo/
-curl -i "http://nuevecuatrouno.test/?s=Archive+sample+page"
+curl -i "http://nuevecuatrouno.test/?s=rioja-laboratorio"
 curl -I http://nuevecuatrouno.test/wp-admin/
 curl -I http://archive.nuevecuatrouno.test/wp-admin/
 docker compose ps
 ```
 
 ### Contenido inicial actual
-- `live`: pagina jerarquica en `http://nuevecuatrouno.test/actualidad/post/`
+- Contrato de URL para posts: `/%year%/%monthnum%/%day%/%postname%/`
 - `live`: `http://nuevecuatrouno.test/cultura/agenda-local/`
 - `live`: `http://nuevecuatrouno.test/servicios/contacto-redaccion/`
-- `archive`: `http://nuevecuatrouno.test/2019/05/noticia/`
-- `archive`: `http://nuevecuatrouno.test/2018/10/memoria-2018/`
-- `archive`: `http://nuevecuatrouno.test/2021/06/archivo-cultural-2021/`
+- `archive`: `http://nuevecuatrouno.test/2015/02/03/logrono-revive-la-noche-de-san-mateo-en-su-casco-antiguo/`
+- `archive`: `http://nuevecuatrouno.test/2019/05/15/logrono-activa-su-plan-de-barrios-con-inversiones-en-movilidad/`
+- `archive`: `http://nuevecuatrouno.test/2023/12/29/el-archivo-municipal-consolida-2023-como-ano-de-transicion-digital/`
+- `live`: `http://nuevecuatrouno.test/2024/04/11/logrono-impulsa-2024-con-nuevas-rutas-peatonales-y-comercio-abierto/`
+- `live`: `http://nuevecuatrouno.test/2025/09/19/la-programacion-cultural-de-2025-lleva-el-teatro-a-todos-los-barrios/`
+- `live`: `http://nuevecuatrouno.test/2026/04/01/logrono-venera-la-imagen-del-cristo-del-santo-sepulcro-en-la-redonda/`
 - Busqueda manual de referencia:
-  - `http://nuevecuatrouno.test/?s=Agenda+local+laboratorio`
-  - `http://nuevecuatrouno.test/?s=Memoria+hemeroteca+2018`
+  - `http://nuevecuatrouno.test/?s=Cristo+del+Santo+Sepulcro`
+  - `http://nuevecuatrouno.test/?s=rioja+metropolitano`
   - `http://nuevecuatrouno.test/?s=rioja-laboratorio`
+- El frontend publico ya muestra un buscador visible en cabecera para lanzar estas pruebas sin escribir la query a mano.
 
 ## 5. Resultado esperado
 - Todos los contenedores en estado `healthy`
 - `nuevecuatrouno.test/healthz` responde `200 ok`
 - `archive.nuevecuatrouno.test/healthz` responde `200 ok`
-- El frontend `archive` por anio cae en `fe-archive`
+- Los posts `2015-2023` caen en `fe-archive`
+- Los posts `2024+` caen en `fe-live`
 - El admin `live` cae en `be-admin` con `admin-live`
 - El admin `archive` cae en `be-admin` con `admin-archive`
 - `wp-admin/` redirige a `wp-login.php` sin loop de `302`
 - El host `archive` no admin redirige a `nuevecuatrouno.test`
-- La busqueda en `live` encuentra contenido de `live` y `archive`
+- La busqueda en `live` encuentra contenido de `live` y `archive` con enlaces canonicos, no `?p=<id>`
 - `uploads` se comparte y la cache queda aislada por contexto
 
 ## 6. Rollback local

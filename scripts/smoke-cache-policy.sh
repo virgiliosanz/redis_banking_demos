@@ -16,14 +16,14 @@ fetch_headers() {
 }
 
 echo "==> live public cache policy"
-live_headers="$(fetch_headers "$BASE_URL/actualidad/post/")"
+live_headers="$(fetch_headers "$BASE_URL/2026/04/01/logrono-venera-la-imagen-del-cristo-del-santo-sepulcro-en-la-redonda/")"
 assert_header "$live_headers" "Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=30"
 assert_header "$live_headers" "Surrogate-Control: max-age=300, stale-while-revalidate=30, stale-if-error=600"
 assert_header "$live_headers" "X-Origin-Cache-Policy: live-public"
 printf '%s\n' "ok"
 
 echo "==> archive public cache policy"
-archive_headers="$(fetch_headers "$BASE_URL/2019/05/noticia/")"
+archive_headers="$(fetch_headers "$BASE_URL/2019/05/15/logrono-activa-su-plan-de-barrios-con-inversiones-en-movilidad/")"
 assert_header "$archive_headers" "Cache-Control: public, max-age=300, s-maxage=86400, stale-while-revalidate=600"
 assert_header "$archive_headers" "Surrogate-Control: max-age=86400, stale-while-revalidate=600, stale-if-error=86400"
 assert_header "$archive_headers" "X-Origin-Cache-Policy: archive-public"
@@ -37,7 +37,7 @@ assert_header "$login_headers" "X-Origin-Cache-Policy: bypass"
 printf '%s\n' "ok"
 
 echo "==> cookie bypass policy"
-cookie_headers="$(curl -fsSI -H 'Cookie: wordpress_logged_in_fake=1' "$BASE_URL/actualidad/post/")"
+cookie_headers="$(curl -fsSI -H 'Cookie: wordpress_logged_in_fake=1' "$BASE_URL/2026/04/01/logrono-venera-la-imagen-del-cristo-del-santo-sepulcro-en-la-redonda/")"
 assert_header "$cookie_headers" "Cache-Control: private, no-store"
 assert_header "$cookie_headers" "Surrogate-Control: no-store"
 assert_header "$cookie_headers" "X-Origin-Cache-Policy: bypass"

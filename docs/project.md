@@ -89,8 +89,8 @@ Este documento sustituye al resto de documentos tecnicos y al documento de proye
 ### Ejemplos
 - `https://nuevecuatrouno.test/wp-admin/` -> `BE-Admin`
 - `https://archive.nuevecuatrouno.test/wp-admin/` -> `BE-Admin`
-- `https://nuevecuatrouno.test/2019/05/otro-articulo/` -> `FE-Archive`
-- `https://nuevecuatrouno.test/actualidad/noticia/` -> `FE-Live`
+- `https://nuevecuatrouno.test/2019/05/15/otro-articulo/` -> `FE-Archive`
+- `https://nuevecuatrouno.test/2026/04/01/noticia-actual/` -> `FE-Live`
 - `https://archive.nuevecuatrouno.test/2018/10/mi-articulo/` -> redireccion o bloqueo en `LB-Nginx`
 
 ## 6. Contrato FastCGI y balanceador
@@ -399,8 +399,8 @@ wp --path=/srv/wp/admin-archive plugin list
 ### Smoke tests minimos
 - `GET http://nuevecuatrouno.test/wp-admin/` -> backend admin `live`
 - `GET http://archive.nuevecuatrouno.test/wp-admin/` -> backend admin `archive`
-- `GET http://nuevecuatrouno.test/2019/05/noticia/` -> `fe-archive`
-- `GET http://nuevecuatrouno.test/actualidad/post/` -> `fe-live`
+- `GET http://nuevecuatrouno.test/2019/05/15/noticia-historica/` -> `fe-archive`
+- `GET http://nuevecuatrouno.test/2026/04/01/noticia-actual/` -> `fe-live`
 - `GET http://archive.nuevecuatrouno.test/cultura/post/` -> redireccion a `nuevecuatrouno.test`
 - `LB-Nginx` responde en `/healthz`
 - `php-fpm` responde en el puerto `9000` en `live`, `archive` y `admin`

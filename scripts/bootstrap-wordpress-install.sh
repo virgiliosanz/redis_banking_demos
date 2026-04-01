@@ -116,8 +116,8 @@ wait_for_service n9-cron-master
 ensure_core_install "/srv/wp/live" "$BASE_URL" "NueveCuatroUno Live" "n9liveadmin" "$live_admin_password" "live-admin@nuevecuatrouno.test"
 ensure_core_install "/srv/wp/archive" "$ARCHIVE_PUBLIC_URL" "NueveCuatroUno Archive" "n9archiveadmin" "$archive_admin_password" "archive-admin@nuevecuatrouno.test"
 
-ensure_option "/srv/wp/live" "permalink_structure" "/%postname%/"
-ensure_option "/srv/wp/archive" "permalink_structure" "/%year%/%monthnum%/%postname%/"
+ensure_option "/srv/wp/live" "permalink_structure" "/%year%/%monthnum%/%day%/%postname%/"
+ensure_option "/srv/wp/archive" "permalink_structure" "/%year%/%monthnum%/%day%/%postname%/"
 wp_exec rewrite flush --hard --path="/srv/wp/live" >/dev/null
 wp_exec rewrite flush --hard --path="/srv/wp/archive" >/dev/null
 
