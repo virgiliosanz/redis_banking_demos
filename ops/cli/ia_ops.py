@@ -14,6 +14,7 @@ from ..collectors import logs as logs_collector
 from ..collectors import runtime as runtime_collector
 from ..reporting import write_json_report, write_text_report
 from ..runtime.drift import build_drift_report
+from ..scheduling.cron import install_nightly_auditor_crontab, remove_nightly_auditor_crontab, render_nightly_auditor_block
 from ..util.jsonio import dumps_pretty
 from ..util.time import report_stamp, utc_timestamp
 
@@ -77,6 +78,31 @@ def cmd_report_drift(_: argparse.Namespace) -> int:
     settings = load_settings()
     report_file, _ = build_drift_report(settings)
     print(f"sync drift report written to {report_file}")
+    return 0
+
+
+def cmd_render_nightly_crontab(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    content = render_nightly_auditor_block(settings, project_root=project_root, python_bin=args.python_bin)
+    print(content, end="")
+    return 0
+
+
+def cmd_install_nightly_crontab(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    backup_file, crontab_file = install_nightly_auditor_crontab(settings, project_root=project_root, python_bin=args.python_bin)
+    print(f"nightly auditor cron installed from {crontab_file}")
+    print(f"previous crontab backed up to {backup_file}")
+    return 0
+
+
+def cmd_remove_nightly_crontab(_: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    crontab_file = remove_nightly_auditor_crontab(settings, project_root=project_root)
+    print(f"nightly auditor cron block removed using {crontab_file}")
     return 0
 
 
@@ -362,6 +388,7 @@ def cmd_run_sentry(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m ops.cli.ia_ops")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    python_bin_default = sys.executable or "python3"
 
     subparsers.add_parser("collect-host-health").set_defaults(func=cmd_collect_host)
     subparsers.add_parser("collect-cron-health").set_defaults(func=cmd_collect_cron)
@@ -380,6 +407,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     drift = subparsers.add_parser("report-live-archive-sync-drift")
     drift.set_defaults(func=cmd_report_drift)
+
+    render_cron = subparsers.add_parser("render-nightly-crontab")
+    render_cron.add_argument("--python-bin", default=python_bin_default)
+    render_cron.set_defaults(func=cmd_render_nightly_crontab)
+
+    install_cron = subparsers.add_parser("install-nightly-crontab")
+    install_cron.add_argument("--python-bin", default=python_bin_default)
+    install_cron.set_defaults(func=cmd_install_nightly_crontab)
+
+    remove_cron = subparsers.add_parser("remove-nightly-crontab")
+    remove_cron.set_defaults(func=cmd_remove_nightly_crontab)
 
     nightly = subparsers.add_parser("run-nightly-auditor")
     nightly.add_argument("--no-write-report", action="store_true")

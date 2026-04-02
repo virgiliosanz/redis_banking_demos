@@ -312,6 +312,9 @@ Pasar a Python los `collect-*`, el agregador nocturno y la generacion de informe
 - Mantener los wrappers shell como `exec` plano protege los runbooks sin arrastrar mas logica al shell.
 
 ### Fase 4. Programacion de flujos
+#### Estado
+Completada
+
 #### Objetivo
 Dejar el auditor nocturno programado y el flujo reactivo listo para disparo.
 
@@ -323,6 +326,50 @@ Dejar el auditor nocturno programado y el flujo reactivo listo para disparo.
 #### Criterios de cierre
 - Existe una programacion reproducible de `Nightly Auditor`.
 - El flujo reactivo tiene un mecanismo de disparo defendible.
+
+#### Progreso actual
+- Se crea una capa de scheduling reproducible en `ops/scheduling/cron.py` para renderizar, instalar y retirar un bloque gestionado de `crontab`.
+- El bloque baseline programa `Nightly Auditor` a las `02:00` hora local del host con:
+  - `IA_OPS_CONFIG_FILE` absoluto
+  - `cd` al repo
+  - salida persistente a `runtime/reports/ia-ops/nightly-auditor.cron.log`
+- Se expone la operacion via:
+  - `python3 -m ops.cli.ia_ops render-nightly-crontab`
+  - `python3 -m ops.cli.ia_ops install-nightly-crontab`
+  - `python3 -m ops.cli.ia_ops remove-nightly-crontab`
+  - `scripts/install-nightly-auditor-cron.sh`
+- Se actualiza `docs/poc-local-runbook.md` con el flujo operativo para imprimir, instalar y retirar el bloque gestionado.
+
+#### Decisiones tomadas
+- En laboratorio se usa `cron` como baseline porque ya existe en el host, no introduce una dependencia nueva y basta para el flujo nocturno.
+- `Sentry Agent` no se agenda por `cron`; sigue siendo manual o disparado por una capa reactiva futura.
+- `Monit` no se incorpora todavia al repo como dependencia obligatoria del laboratorio.
+- La recomendacion actual para el plano reactivo es:
+  - `cron` para `Nightly Auditor`
+  - `Sentry Agent` manual durante laboratorio
+  - decidir `Monit` solo si en el siguiente paso aporta una señal reactiva mejor que Docker healthchecks + logs + wrappers actuales
+
+#### Evaluacion de Monit
+- A favor:
+  - buen disparador simple para caidas de proceso o checks HTTP/puerto
+  - encaja si queremos lanzar `Sentry Agent` por servicio degradado sin meter una plataforma mayor
+- En contra en esta POC:
+  - el laboratorio ya dispone de healthchecks Docker y wrappers manuales suficientes
+  - introducir `Monit` ahora mete otra superficie de configuracion, logs y runbook sin ganar demasiado contexto
+  - no resuelve por si solo checks funcionales WordPress/ElasticPress ni drift `live/archive`
+- Conclusion:
+  - `Monit` queda como opcion razonable para la siguiente fase reactiva
+  - no es la baseline defendible del laboratorio; `cron` si lo es
+
+#### Validacion ejecutada
+- `python3 -m ops.cli.ia_ops render-nightly-crontab`: OK.
+- `python3 -m ops.cli.ia_ops run-nightly-auditor --no-write-report`: OK tras la capa de scheduling.
+- `scripts/install-nightly-auditor-cron.sh --print`: OK.
+- No se instala automaticamente el `crontab` real del usuario en esta fase; la validacion queda en render, wrapper y ejecucion del job.
+
+#### Lecciones aprendidas
+- El valor de esta fase no esta en “instalar cron”, sino en versionar el contrato del job y no depender de notas manuales.
+- Un bloque gestionado de `crontab` es suficiente para laboratorio y deja espacio para retirar o sustituir el scheduling sin tocar la logica IA-Ops.
 
 ### Fase 5. Canal real de alertas e incidentes
 #### Objetivo

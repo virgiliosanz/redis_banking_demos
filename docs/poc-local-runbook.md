@@ -44,6 +44,32 @@ Que hace el bootstrap:
 ./scripts/run-sentry-agent.sh --service elastic
 ```
 
+### Programacion local con cron
+Previsualizar el bloque gestionado:
+
+```sh
+./scripts/install-nightly-auditor-cron.sh --print
+```
+
+Instalarlo en el `crontab` del usuario actual:
+
+```sh
+./scripts/install-nightly-auditor-cron.sh
+```
+
+Eliminar solo el bloque gestionado del proyecto:
+
+```sh
+./scripts/install-nightly-auditor-cron.sh --remove
+```
+
+Notas:
+- el job queda programado a las `02:00` hora local del host
+- el bloque se instala con marcador gestionado `NUEVECUATROUNO_IA_OPS_NIGHTLY`
+- el `crontab` previo se respalda en `./runtime/reports/ia-ops/`
+- la salida del job se anexa en `./runtime/reports/ia-ops/nightly-auditor.cron.log`
+- en esta POC el flujo reactivo `Sentry Agent` sigue siendo manual; no se programa por `cron`
+
 ### URLs principales
 - Front `live`: `http://nuevecuatrouno.test/`
 - Front `archive` por host admin: `http://archive.nuevecuatrouno.test/`
@@ -146,6 +172,7 @@ docker compose up -d
 - ElasticPress indexa `live` y `archive` por separado y consulta mediante el alias `n9-search-posts`.
 - Los heartbeats de jobs criticos viven en `./runtime/heartbeats/`.
 - Los informes JSON y Markdown de IA-Ops viven en `./runtime/reports/ia-ops/`.
+- La programacion baseline de `Nightly Auditor` se resuelve con `cron`; `Monit` queda evaluado pero no es requisito del laboratorio.
 - `xmlrpc.php`, dotfiles y ficheros sensibles comunes quedan bloqueados por Nginx en esta fase.
 - La rotacion minima de logs Docker queda definida en `compose.yaml` con `max-size=10m` y `max-file=3`.
 - Este runbook centraliza la operacion manual de la POC; ya no hace falta una referencia rapida separada.

@@ -15,7 +15,9 @@ Indice documental vivo: `docs/README.md`.
 - El rollover anual `live -> archive` ya esta implementado y probado en laboratorio sobre `2024`.
 - Las syncs editorial y de plataforma ya mantienen la consistencia minima entre `live` y `archive`.
 - `IA-Ops Bootstrap` ya dispone de colectores read-only, `Nightly Auditor` y `Sentry Agent` minimos.
-- Siguiente iteracion recomendada: programar estos flujos en cron/Monit o integrarlos con el entorno real de operacion.
+- `Nightly Auditor` ya puede programarse de forma reproducible con `cron` mediante un bloque gestionado versionado en el repo.
+- `Monit` queda evaluado como opcion reactiva futura, no como requisito del laboratorio actual.
+- Siguiente iteracion recomendada: conectar la salida a un canal real de alertas/incidencias y decidir si el disparo reactivo merece `Monit` o una alternativa mas simple.
 
 ### Artefactos implementados
 - `compose.yaml` operativo con `LB-Nginx`, `FE-Live`, `FE-Archive`, `BE-Admin`, `DB-Live`, `DB-Archive`, `Elastic` y `Cron-Master`.
