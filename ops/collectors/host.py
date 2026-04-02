@@ -70,8 +70,6 @@ def _parse_linux_iostat(output: str) -> tuple[float, float, float, float]:
 
 def collect(settings: Settings) -> dict[str, object]:
     project_path = settings.project_root
-    if not project_path.exists():
-        project_path = Path.cwd()
 
     host_os = platform.system()
     logical_cpus = os.cpu_count() or 1

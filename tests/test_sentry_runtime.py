@@ -112,5 +112,25 @@ class SentryRuntimeTests(unittest.TestCase):
         self.assertIn("report: /tmp/sentry.md", telegram)
 
 
+    def test_diagnose_sentry_unknown_service_unhealthy(self) -> None:
+        diagnosis = diagnose_sentry_service("fe-live", _base_context(), container_health="unhealthy")
+        self.assertEqual(diagnosis.severity, "critical")
+        self.assertIn("fe-live no esta sano", diagnosis.summary)
+
+    def test_diagnose_sentry_unknown_service_healthy_no_logs(self) -> None:
+        diagnosis = diagnose_sentry_service("fe-live", _base_context(), container_health="healthy")
+        self.assertEqual(diagnosis.severity, "info")
+
+    def test_diagnose_sentry_unknown_service_with_logs(self) -> None:
+        diagnosis = diagnose_sentry_service("fe-live", _base_context(), container_health="healthy", service_logs="ERROR: something")
+        self.assertEqual(diagnosis.severity, "warning")
+
+    def test_diagnose_sentry_elastic_alias_missing(self) -> None:
+        context = _base_context()
+        context["elastic"]["alias"]["status"] = "critical"
+        diagnosis = diagnose_sentry_service("elastic", context, container_health="healthy")
+        self.assertEqual(diagnosis.severity, "critical")
+
+
 if __name__ == "__main__":
     unittest.main()

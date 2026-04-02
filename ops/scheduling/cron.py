@@ -126,10 +126,6 @@ def read_user_crontab() -> str:
     raise RuntimeError(f"Unable to read current crontab: {result.stderr or result.stdout}")
 
 
-def _strip_managed_block(content: str) -> str:
-    return _strip_named_block(content, block_name=MANAGED_BLOCK_NAME)
-
-
 def _strip_named_block(content: str, *, block_name: str) -> str:
     lines = content.splitlines()
     kept: list[str] = []
@@ -178,109 +174,85 @@ def _remove_user_crontab() -> None:
     raise RuntimeError(f"Unable to remove current crontab: {result.stderr or result.stdout}")
 
 
-def install_nightly_auditor_crontab(settings: Settings, *, project_root: Path, python_bin: str = "python3") -> tuple[Path, Path]:
-    current = read_user_crontab()
+def _resolve_report_root(settings: Settings, *, project_root: Path) -> Path:
     report_root = settings.get_path("REPORT_ROOT", "./runtime/reports/ia-ops")
     report_root = (project_root / report_root).resolve() if not report_root.is_absolute() else report_root
     ensure_directory(report_root)
+    return report_root
+
+
+def _install_managed_crontab(
+    settings: Settings,
+    *,
+    project_root: Path,
+    block_name: str,
+    managed_block: str,
+    file_prefix: str,
+) -> tuple[Path, Path]:
+    current = read_user_crontab()
+    report_root = _resolve_report_root(settings, project_root=project_root)
 
     backup_file = write_text_report(report_root, f"crontab-backup-{report_stamp()}.txt", current)
-    managed_block = render_nightly_auditor_block(settings, project_root=project_root, python_bin=python_bin)
-    updated = _strip_managed_block(current).rstrip()
+    updated = _strip_named_block(current, block_name=block_name).rstrip()
     if updated:
         updated = f"{updated}\n\n{managed_block}"
     else:
         updated = managed_block
 
-    crontab_file = report_root / f"crontab-install-{report_stamp()}.txt"
+    crontab_file = report_root / f"crontab-{file_prefix}-{report_stamp()}.txt"
     crontab_file.write_text(updated, encoding="utf-8")
     _install_crontab_file(crontab_file, project_root=project_root)
     return backup_file, crontab_file
+
+
+def _remove_managed_crontab(
+    settings: Settings,
+    *,
+    project_root: Path,
+    block_name: str,
+    file_prefix: str,
+) -> Path:
+    current = read_user_crontab()
+    updated = _strip_named_block(current, block_name=block_name)
+    report_root = _resolve_report_root(settings, project_root=project_root)
+
+    crontab_file = report_root / f"crontab-{file_prefix}-{report_stamp()}.txt"
+    crontab_file.write_text(updated, encoding="utf-8")
+    if updated.strip():
+        _install_crontab_file(crontab_file, project_root=project_root)
+    else:
+        _remove_user_crontab()
+    return crontab_file
+
+
+def install_nightly_auditor_crontab(settings: Settings, *, project_root: Path, python_bin: str = "python3") -> tuple[Path, Path]:
+    managed_block = render_nightly_auditor_block(settings, project_root=project_root, python_bin=python_bin)
+    return _install_managed_crontab(
+        settings, project_root=project_root, block_name=MANAGED_BLOCK_NAME, managed_block=managed_block, file_prefix="install",
+    )
 
 
 def install_reactive_watch_crontab(settings: Settings, *, project_root: Path, python_bin: str = "python3") -> tuple[Path, Path]:
-    current = read_user_crontab()
-    report_root = settings.get_path("REPORT_ROOT", "./runtime/reports/ia-ops")
-    report_root = (project_root / report_root).resolve() if not report_root.is_absolute() else report_root
-    ensure_directory(report_root)
-
-    backup_file = write_text_report(report_root, f"crontab-backup-{report_stamp()}.txt", current)
     managed_block = render_reactive_watch_block(settings, project_root=project_root, python_bin=python_bin)
-    updated = _strip_named_block(current, block_name=REACTIVE_MANAGED_BLOCK_NAME).rstrip()
-    if updated:
-        updated = f"{updated}\n\n{managed_block}"
-    else:
-        updated = managed_block
-
-    crontab_file = report_root / f"crontab-reactive-install-{report_stamp()}.txt"
-    crontab_file.write_text(updated, encoding="utf-8")
-    _install_crontab_file(crontab_file, project_root=project_root)
-    return backup_file, crontab_file
+    return _install_managed_crontab(
+        settings, project_root=project_root, block_name=REACTIVE_MANAGED_BLOCK_NAME, managed_block=managed_block, file_prefix="reactive-install",
+    )
 
 
 def install_sync_jobs_crontab(settings: Settings, *, project_root: Path, python_bin: str = "python3") -> tuple[Path, Path]:
-    current = read_user_crontab()
-    report_root = settings.get_path("REPORT_ROOT", "./runtime/reports/ia-ops")
-    report_root = (project_root / report_root).resolve() if not report_root.is_absolute() else report_root
-    ensure_directory(report_root)
-
-    backup_file = write_text_report(report_root, f"crontab-backup-{report_stamp()}.txt", current)
     managed_block = render_sync_jobs_block(settings, project_root=project_root, python_bin=python_bin)
-    updated = _strip_named_block(current, block_name=SYNC_MANAGED_BLOCK_NAME).rstrip()
-    if updated:
-        updated = f"{updated}\n\n{managed_block}"
-    else:
-        updated = managed_block
-
-    crontab_file = report_root / f"crontab-sync-install-{report_stamp()}.txt"
-    crontab_file.write_text(updated, encoding="utf-8")
-    _install_crontab_file(crontab_file, project_root=project_root)
-    return backup_file, crontab_file
+    return _install_managed_crontab(
+        settings, project_root=project_root, block_name=SYNC_MANAGED_BLOCK_NAME, managed_block=managed_block, file_prefix="sync-install",
+    )
 
 
 def remove_nightly_auditor_crontab(settings: Settings, *, project_root: Path) -> Path:
-    current = read_user_crontab()
-    updated = _strip_managed_block(current)
-    report_root = settings.get_path("REPORT_ROOT", "./runtime/reports/ia-ops")
-    report_root = (project_root / report_root).resolve() if not report_root.is_absolute() else report_root
-    ensure_directory(report_root)
-
-    crontab_file = report_root / f"crontab-remove-{report_stamp()}.txt"
-    crontab_file.write_text(updated, encoding="utf-8")
-    if updated.strip():
-        _install_crontab_file(crontab_file, project_root=project_root)
-    else:
-        _remove_user_crontab()
-    return crontab_file
+    return _remove_managed_crontab(settings, project_root=project_root, block_name=MANAGED_BLOCK_NAME, file_prefix="remove")
 
 
 def remove_reactive_watch_crontab(settings: Settings, *, project_root: Path) -> Path:
-    current = read_user_crontab()
-    updated = _strip_named_block(current, block_name=REACTIVE_MANAGED_BLOCK_NAME)
-    report_root = settings.get_path("REPORT_ROOT", "./runtime/reports/ia-ops")
-    report_root = (project_root / report_root).resolve() if not report_root.is_absolute() else report_root
-    ensure_directory(report_root)
-
-    crontab_file = report_root / f"crontab-reactive-remove-{report_stamp()}.txt"
-    crontab_file.write_text(updated, encoding="utf-8")
-    if updated.strip():
-        _install_crontab_file(crontab_file, project_root=project_root)
-    else:
-        _remove_user_crontab()
-    return crontab_file
+    return _remove_managed_crontab(settings, project_root=project_root, block_name=REACTIVE_MANAGED_BLOCK_NAME, file_prefix="reactive-remove")
 
 
 def remove_sync_jobs_crontab(settings: Settings, *, project_root: Path) -> Path:
-    current = read_user_crontab()
-    updated = _strip_named_block(current, block_name=SYNC_MANAGED_BLOCK_NAME)
-    report_root = settings.get_path("REPORT_ROOT", "./runtime/reports/ia-ops")
-    report_root = (project_root / report_root).resolve() if not report_root.is_absolute() else report_root
-    ensure_directory(report_root)
-
-    crontab_file = report_root / f"crontab-sync-remove-{report_stamp()}.txt"
-    crontab_file.write_text(updated, encoding="utf-8")
-    if updated.strip():
-        _install_crontab_file(crontab_file, project_root=project_root)
-    else:
-        _remove_user_crontab()
-    return crontab_file
+    return _remove_managed_crontab(settings, project_root=project_root, block_name=SYNC_MANAGED_BLOCK_NAME, file_prefix="sync-remove")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
 from ..collectors import logs as logs_collector
 from ..config import Settings
@@ -24,6 +25,32 @@ class SentryDiagnosis:
     actions: list[str]
     context: dict[str, object]
     service_logs: str
+
+
+@dataclass
+class _DiagnosisParams:
+    service: str
+    context: dict[str, object]
+    container_health: str
+    service_logs: str
+    summary_override: str | None
+    editorial_drift: str
+    platform_drift: str
+    drift_report_file: str
+    editorial_drift_summary: list[str]
+    platform_drift_summary: list[str]
+    editorial_drift_brief: str
+    platform_drift_brief: str
+
+
+@dataclass
+class _DiagnosisResult:
+    severity: str
+    summary: str
+    cause: str
+    evidence: list[str]
+    validations: list[str]
+    actions: list[str]
 
 
 def build_sentry_diagnosis(
@@ -71,136 +98,179 @@ def diagnose_sentry_service(
     platform_drift_brief: str = "sin diferencias de plataforma",
     generated_at: str | None = None,
 ) -> SentryDiagnosis:
-    host = context["host"]
-    runtime = context["runtime"]
-    app = context["app"]
-    mysql = context["mysql"]
-    elastic = context["elastic"]
-    cron = context["cron"]
+    params = _DiagnosisParams(
+        service=service,
+        context=context,
+        container_health=container_health,
+        service_logs=service_logs,
+        summary_override=summary_override,
+        editorial_drift=editorial_drift,
+        platform_drift=platform_drift,
+        drift_report_file=drift_report_file,
+        editorial_drift_summary=editorial_drift_summary or [],
+        platform_drift_summary=platform_drift_summary or [],
+        editorial_drift_brief=editorial_drift_brief,
+        platform_drift_brief=platform_drift_brief,
+    )
 
-    severity = "info"
-    summary = summary_override or "incidencia sin hallazgo concluyente"
-    cause = "sin causa probable cerrada con el contexto actual"
-    evidence = ["- servicio no asociado a contenedor Docker"] if service == "host" else [f"- health_status del servicio: {container_health}"]
-    validations: list[str] = []
-    actions: list[str] = []
-
-    if service_logs:
-        evidence.append("- logs acotados del servicio contienen coincidencias con el patron seleccionado")
-    editorial_drift_summary = editorial_drift_summary or []
-    platform_drift_summary = platform_drift_summary or []
-
-    if service == "host":
-        severity, summary, cause = _diagnose_host(host, summary_override)
-        evidence.extend(_host_evidence(host))
-        validations.extend(
-            [
-                "- confirmar memoria, disco, carga e iowait con una segunda lectura",
-                "- validar que Docker responde antes de diagnosticar incidencias de servicios",
-            ]
-        )
-        actions.append("- liberar presion local o recuperar Docker antes de continuar con diagnostico de plataforma")
-    elif service == "lb-nginx":
-        severity, summary, cause = _diagnose_lb_nginx(runtime, app, container_health, service_logs, summary_override)
-        evidence.extend(_lb_nginx_evidence(runtime, app))
-        validations.extend([
-            "- revisar request_id, host y php_upstream de las peticiones afectadas",
-            "- repetir smoke-routing y verificar /healthz en ambos hosts",
-        ])
-        actions.append("- inspeccionar logs recientes de lb-nginx y del upstream implicado")
-    elif service == "elastic":
-        severity, summary, cause = _diagnose_elastic(elastic, app, container_health, summary_override)
-        evidence.extend(_elastic_evidence(elastic, app))
-        validations.extend([
-            "- confirmar _cluster/health, indices live/archive y alias n9-search-posts",
-            "- repetir smoke-search para validar la capa publica",
-        ])
-        actions.append("- revisar el ultimo reindexado y republicar alias si falta")
-    elif service == "be-admin":
-        severity, summary, cause = _diagnose_be_admin(app, container_health, service_logs, summary_override)
-        evidence.extend(_be_admin_evidence(app))
-        validations.extend(
-            [
-                "- comprobar wp-login.php y wp-admin en live y archive",
-                "- revisar redirecciones y posibles loops en el flujo de admin",
-            ]
-        )
-        actions.append("- revisar logs de be-admin y repetir smokes de login/admin antes de seguir")
-    elif service == "cron-master":
-        severity, summary, cause = _diagnose_cron_master(
-            cron,
-            container_health,
-            service_logs,
-            summary_override,
-            editorial_drift=editorial_drift,
-            platform_drift=platform_drift,
-        )
-        evidence.extend(
-            _cron_evidence(
-                cron,
-                drift_report_file=drift_report_file,
-                editorial_drift=editorial_drift,
-                platform_drift=platform_drift,
-                editorial_drift_summary=editorial_drift_summary,
-                platform_drift_summary=platform_drift_summary,
-                editorial_drift_brief=editorial_drift_brief,
-                platform_drift_brief=platform_drift_brief,
-            )
-        )
-        validations.extend(
-            [
-                "- confirmar heartbeats de sync editorial, sync de plataforma y rollover",
-                "- revisar el drift report si hay divergencias entre live y archive",
-            ]
-        )
-        actions.append("- revisar los logs recientes y reejecutar manualmente solo el job afectado si procede")
-    elif service in {"db-live", "db-archive"}:
-        db_row = next(row for row in mysql["databases"] if row["service"] == service)
-        severity, summary, cause = _diagnose_database(service, db_row, container_health, summary_override)
-        evidence.extend(_database_evidence(db_row))
-        validations.extend(
-            [
-                f"- revisar processlist de {service} y confirmar si las queries largas son esperadas",
-                "- contrastar con slow query log y con plugins recientes que afecten a SEO o metadatos",
-            ]
-        )
-        actions.append("- documentar manualmente cualquier query candidata a `KILL`, pero no ejecutar corte automatico en esta fase")
-    else:
-        if container_health != "healthy":
-            severity = "critical"
-            summary = summary_override or f"{service} no esta sano"
-            cause = "contenedor degradado o caido"
-        elif service_logs:
-            severity = "warning"
-            summary = summary_override or f"{service} contiene errores recientes"
-            cause = "errores del servicio detectados en logs acotados"
+    handler = _SERVICE_HANDLERS.get(service)
+    if handler is None:
+        # db-live / db-archive share a handler
+        if service in {"db-live", "db-archive"}:
+            handler = _handle_database
         else:
-            summary = summary_override or f"{service} sano sin errores recientes"
-            cause = "sin evidencia actual de fallo en el servicio"
-        validations.append(f"- revisar healthcheck y logs recientes del servicio {service}")
-        actions.append("- repetir el smoke funcional relacionado con el servicio afectado")
+            handler = _handle_unknown
+
+    result = handler(params)
+
+    # Prepend common evidence
+    base_evidence: list[str] = (
+        ["- servicio no asociado a contenedor Docker"] if service == "host" else [f"- health_status del servicio: {container_health}"]
+    )
+    if service_logs:
+        base_evidence.append("- logs acotados del servicio contienen coincidencias con el patron seleccionado")
 
     risk = (
         "el servicio puede quedar caido o degradar rutas base del sitio"
-        if severity == "critical"
+        if result.severity == "critical"
         else "el problema puede escalar a degradacion visible si persiste"
-        if severity == "warning"
+        if result.severity == "warning"
         else "sin impacto inmediato confirmado"
     )
 
     return SentryDiagnosis(
         generated_at=generated_at or context.get("generated_at", utc_timestamp()),
         service=service,
-        severity=severity,
-        summary=summary,
-        cause=cause,
+        severity=result.severity,
+        summary=result.summary,
+        cause=result.cause,
         risk=risk,
-        evidence=evidence,
-        validations=validations,
-        actions=actions,
+        evidence=base_evidence + result.evidence,
+        validations=result.validations,
+        actions=result.actions,
         context=context,
         service_logs=service_logs,
     )
+
+
+# --- Service handlers: each returns a _DiagnosisResult ---
+
+
+def _handle_host(p: _DiagnosisParams) -> _DiagnosisResult:
+    host = p.context["host"]
+    severity, summary, cause = _diagnose_host(host, p.summary_override)
+    return _DiagnosisResult(
+        severity=severity, summary=summary, cause=cause,
+        evidence=_host_evidence(host),
+        validations=[
+            "- confirmar memoria, disco, carga e iowait con una segunda lectura",
+            "- validar que Docker responde antes de diagnosticar incidencias de servicios",
+        ],
+        actions=["- liberar presion local o recuperar Docker antes de continuar con diagnostico de plataforma"],
+    )
+
+
+def _handle_lb_nginx(p: _DiagnosisParams) -> _DiagnosisResult:
+    runtime, app = p.context["runtime"], p.context["app"]
+    severity, summary, cause = _diagnose_lb_nginx(runtime, app, p.container_health, p.service_logs, p.summary_override)
+    return _DiagnosisResult(
+        severity=severity, summary=summary, cause=cause,
+        evidence=_lb_nginx_evidence(runtime, app),
+        validations=[
+            "- revisar request_id, host y php_upstream de las peticiones afectadas",
+            "- repetir smoke-routing y verificar /healthz en ambos hosts",
+        ],
+        actions=["- inspeccionar logs recientes de lb-nginx y del upstream implicado"],
+    )
+
+
+def _handle_elastic(p: _DiagnosisParams) -> _DiagnosisResult:
+    elastic, app = p.context["elastic"], p.context["app"]
+    severity, summary, cause = _diagnose_elastic(elastic, app, p.container_health, p.summary_override)
+    return _DiagnosisResult(
+        severity=severity, summary=summary, cause=cause,
+        evidence=_elastic_evidence(elastic, app),
+        validations=[
+            "- confirmar _cluster/health, indices live/archive y alias n9-search-posts",
+            "- repetir smoke-search para validar la capa publica",
+        ],
+        actions=["- revisar el ultimo reindexado y republicar alias si falta"],
+    )
+
+
+def _handle_be_admin(p: _DiagnosisParams) -> _DiagnosisResult:
+    app = p.context["app"]
+    severity, summary, cause = _diagnose_be_admin(app, p.container_health, p.service_logs, p.summary_override)
+    return _DiagnosisResult(
+        severity=severity, summary=summary, cause=cause,
+        evidence=_be_admin_evidence(app),
+        validations=[
+            "- comprobar wp-login.php y wp-admin en live y archive",
+            "- revisar redirecciones y posibles loops en el flujo de admin",
+        ],
+        actions=["- revisar logs de be-admin y repetir smokes de login/admin antes de seguir"],
+    )
+
+
+def _handle_cron_master(p: _DiagnosisParams) -> _DiagnosisResult:
+    cron = p.context["cron"]
+    severity, summary, cause = _diagnose_cron_master(
+        cron, p.container_health, p.service_logs, p.summary_override,
+        editorial_drift=p.editorial_drift, platform_drift=p.platform_drift,
+    )
+    return _DiagnosisResult(
+        severity=severity, summary=summary, cause=cause,
+        evidence=_cron_evidence(
+            cron, drift_report_file=p.drift_report_file,
+            editorial_drift=p.editorial_drift, platform_drift=p.platform_drift,
+            editorial_drift_summary=p.editorial_drift_summary, platform_drift_summary=p.platform_drift_summary,
+            editorial_drift_brief=p.editorial_drift_brief, platform_drift_brief=p.platform_drift_brief,
+        ),
+        validations=[
+            "- confirmar heartbeats de sync editorial, sync de plataforma y rollover",
+            "- revisar el drift report si hay divergencias entre live y archive",
+        ],
+        actions=["- revisar los logs recientes y reejecutar manualmente solo el job afectado si procede"],
+    )
+
+
+def _handle_database(p: _DiagnosisParams) -> _DiagnosisResult:
+    mysql = p.context["mysql"]
+    db_row = next(row for row in mysql["databases"] if row["service"] == p.service)
+    severity, summary, cause = _diagnose_database(p.service, db_row, p.container_health, p.summary_override)
+    return _DiagnosisResult(
+        severity=severity, summary=summary, cause=cause,
+        evidence=_database_evidence(db_row),
+        validations=[
+            f"- revisar processlist de {p.service} y confirmar si las queries largas son esperadas",
+            "- contrastar con slow query log y con plugins recientes que afecten a SEO o metadatos",
+        ],
+        actions=["- documentar manualmente cualquier query candidata a `KILL`, pero no ejecutar corte automatico en esta fase"],
+    )
+
+
+def _handle_unknown(p: _DiagnosisParams) -> _DiagnosisResult:
+    if p.container_health != "healthy":
+        severity, summary, cause = "critical", p.summary_override or f"{p.service} no esta sano", "contenedor degradado o caido"
+    elif p.service_logs:
+        severity, summary, cause = "warning", p.summary_override or f"{p.service} contiene errores recientes", "errores del servicio detectados en logs acotados"
+    else:
+        severity, summary, cause = "info", p.summary_override or f"{p.service} sano sin errores recientes", "sin evidencia actual de fallo en el servicio"
+    return _DiagnosisResult(
+        severity=severity, summary=summary, cause=cause,
+        evidence=[],
+        validations=[f"- revisar healthcheck y logs recientes del servicio {p.service}"],
+        actions=["- repetir el smoke funcional relacionado con el servicio afectado"],
+    )
+
+
+_SERVICE_HANDLERS: dict[str, Callable[[_DiagnosisParams], _DiagnosisResult]] = {
+    "host": _handle_host,
+    "lb-nginx": _handle_lb_nginx,
+    "elastic": _handle_elastic,
+    "be-admin": _handle_be_admin,
+    "cron-master": _handle_cron_master,
+}
 
 
 def render_sentry_report(diagnosis: SentryDiagnosis) -> str:

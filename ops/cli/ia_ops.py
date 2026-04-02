@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from ..config import load_settings
+from ..util.process import run_command
 from ..collectors import host as host_collector
 from ..collectors import logs as logs_collector
 from ..context import collect_operational_context, load_drift_status
@@ -302,7 +303,11 @@ def cmd_run_reactive_watch(args: argparse.Namespace) -> int:
 
     try:
         evaluation = reactive_runtime.evaluate(settings)
-        incidents = [reactive_runtime.ReactiveIncident(**row) for row in evaluation["incidents"]]
+        _incident_fields = {"key", "service", "severity", "summary", "pattern"}
+        incidents = [
+            reactive_runtime.ReactiveIncident(**{k: v for k, v in row.items() if k in _incident_fields})
+            for row in evaluation["incidents"]
+        ]
         state = reactive_runtime.load_state(settings)
         now_epoch = None
         emitted: list[str] = []
@@ -347,8 +352,6 @@ def cmd_run_reactive_watch(args: argparse.Namespace) -> int:
 
 
 def subprocess_run_sentry(command: list[str]) -> bool:
-    from ..util.process import run_command
-
     result = run_command(command, check=False)
     if result.returncode != 0:
         print(result.stderr or result.stdout, file=sys.stderr, end="" if (result.stderr or result.stdout).endswith("\n") else "\n")

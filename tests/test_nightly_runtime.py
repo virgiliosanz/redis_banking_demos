@@ -109,5 +109,37 @@ class NightlyRuntimeTests(unittest.TestCase):
         self.assertIn("report: /tmp/nightly.md", telegram)
 
 
+    def test_assess_nightly_context_with_db_ping_failure(self) -> None:
+        context = _base_context()
+        context["mysql"]["databases"][0]["ping"]["status"] = "critical"
+
+        assessment = assess_nightly_context(
+            context,
+            drift_report_file="/tmp/drift.md",
+            editorial_drift="no",
+            platform_drift="no",
+        )
+
+        self.assertEqual(assessment.severity, "critical")
+        self.assertTrue(any("db-live" in risk for risk in assessment.risks))
+
+    def test_assess_nightly_context_with_multiple_smoke_failures(self) -> None:
+        context = _base_context()
+        context["app"]["checks"]["smoke_scripts"] = [
+            {"name": "routing", "status": "critical"},
+            {"name": "search", "status": "critical"},
+        ]
+
+        assessment = assess_nightly_context(
+            context,
+            drift_report_file="/tmp/drift.md",
+            editorial_drift="no",
+            platform_drift="no",
+        )
+
+        self.assertEqual(assessment.severity, "critical")
+        self.assertTrue(any("routing" in risk and "search" in risk for risk in assessment.risks))
+
+
 if __name__ == "__main__":
     unittest.main()

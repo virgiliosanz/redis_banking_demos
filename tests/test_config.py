@@ -44,5 +44,50 @@ class LoadSettingsTests(unittest.TestCase):
             self.assertEqual(settings.project_root, Path("./runtime"))
 
 
+    def test_load_settings_handles_malformed_lines(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config_file = Path(tmp) / "ia-ops.env"
+            config_file.write_text(
+                "\n".join(
+                    [
+                        "VALID_KEY=valid_value",
+                        "no_equals_sign",
+                        "",
+                        "   ",
+                        "# pure comment",
+                        "ANOTHER_KEY=",
+                        "KEY_WITH_EQUALS=value=with=equals",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            settings = load_settings(str(config_file))
+
+            self.assertEqual(settings.get("VALID_KEY"), "valid_value")
+            self.assertEqual(settings.get("ANOTHER_KEY"), "")
+            self.assertEqual(settings.get("KEY_WITH_EQUALS"), "value=with=equals")
+            self.assertIsNone(settings.get("no_equals_sign"))
+
+    def test_load_settings_raises_on_missing_explicit_path(self) -> None:
+        with self.assertRaises(FileNotFoundError):
+            load_settings("/nonexistent/path/to/config.env")
+
+    def test_settings_require_raises_on_missing_key(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config_file = Path(tmp) / "ia-ops.env"
+            config_file.write_text("KEY=value\n", encoding="utf-8")
+            settings = load_settings(str(config_file))
+            with self.assertRaises(KeyError):
+                settings.require("NONEXISTENT_KEY")
+
+    def test_settings_get_int_returns_default_on_empty(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config_file = Path(tmp) / "ia-ops.env"
+            config_file.write_text("EMPTY_KEY=\n", encoding="utf-8")
+            settings = load_settings(str(config_file))
+            self.assertEqual(settings.get_int("EMPTY_KEY", 42), 42)
+            self.assertEqual(settings.get_int("MISSING_KEY", 99), 99)
+
+
 if __name__ == "__main__":
     unittest.main()

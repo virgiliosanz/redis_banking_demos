@@ -5,8 +5,8 @@ import subprocess
 from pathlib import Path
 
 from ..config import Settings
-from ..runtime.heartbeats import write_heartbeat
 from ..services import compose_service_name, wait_for_service_keys
+from ..sync.common import write_sync_heartbeat
 from ..util.docker import compose_exec
 from ..util.process import run_command
 from ..util.time import report_stamp, utc_timestamp
@@ -79,7 +79,7 @@ def _copy_to_container(cwd: Path, local_file: Path, remote_file: str) -> None:
             stdin=handle,
             check=True,
         )
-        _ = completed
+
 
 
 def _reindex_site(cwd: Path, *, path: str, prefix: str, ep_host: str) -> None:
@@ -144,13 +144,6 @@ def _advance_cutover(cwd: Path, routing_config_file: Path, target_year: int) -> 
     compose_exec(compose_service_name("lb-nginx"), ["nginx", "-s", "reload"], cwd=cwd)
 
 
-def _write_rollover_heartbeat(settings: Settings) -> None:
-    heartbeat_dir = settings.get_path("CRON_HEARTBEAT_DIR", "./runtime/heartbeats")
-    heartbeat_dir = settings.project_root.resolve() / heartbeat_dir if not heartbeat_dir.is_absolute() else heartbeat_dir
-    job_name = settings.get("CRON_JOB_ROLLOVER", "rollover-content-year") or "rollover-content-year"
-    write_heartbeat(heartbeat_dir, job_name)
-
-
 def run(
     settings: Settings,
     *,
@@ -162,7 +155,8 @@ def run(
     if mode not in VALID_ROLLOVER_MODES:
         raise ValueError(f"Unsupported mode: {mode}")
 
-    current_year = int(run_command(["date", "+%Y"]).stdout.strip())
+    from datetime import datetime, timezone
+    current_year = datetime.now(timezone.utc).year
     if target_year >= current_year:
         raise RuntimeError(f"Target year must be earlier than current year ({current_year}).")
 
@@ -286,7 +280,7 @@ def run(
         live_index = _get_index_name(cwd, path="/srv/wp/live")
         archive_index = _get_index_name(cwd, path="/srv/wp/archive")
         _publish_read_alias(cwd, alias=ep_search_alias, live_index=live_index, archive_index=archive_index)
-        _write_rollover_heartbeat(settings)
+        write_sync_heartbeat(settings, "CRON_JOB_ROLLOVER", "rollover-content-year")
         execute_enabled = "yes"
 
     content = [
