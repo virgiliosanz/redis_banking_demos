@@ -66,6 +66,9 @@ ops/
 ## 8. Fases
 
 ### Fase 1. Contrato de migracion shell -> Python
+#### Estado
+Completada
+
 #### Objetivo
 Decidir que scripts se migran, en que orden y con que compatibilidad.
 
@@ -77,7 +80,125 @@ Decidir que scripts se migran, en que orden y con que compatibilidad.
 #### Criterios de cierre
 - Existe una matriz clara de migracion y una estructura base aprobada.
 
+#### Progreso actual
+- Se inventaria el arbol actual de `scripts/` y se clasifica por rol: bootstrap, smokes, colectores, reporting, sync y rollover.
+- Se valida que el repo no tiene aun `pyproject.toml` ni estructura Python previa, y que el baseline disponible es `python3 3.14.3`.
+- Se confirma que el problema no es el numero bruto de scripts, sino la concentracion de logica operativa compleja en shell: JSON, severidades, branching, heartbeats e informes.
+
+#### Matriz de migracion acordada
+
+##### Se quedan en shell
+- `scripts/bootstrap-local-runtime.sh`
+- `scripts/bootstrap-local-stack.sh`
+- `scripts/bootstrap-local-secrets.sh`
+- `scripts/bootstrap-wordpress-layout.sh`
+- `scripts/bootstrap-wordpress-config.sh`
+- `scripts/bootstrap-wordpress-core.sh`
+- `scripts/bootstrap-wordpress-install.sh`
+- `scripts/bootstrap-wordpress-seed.sh`
+- `scripts/bootstrap-elasticpress.sh`
+- `scripts/render-routing-cutover.sh`
+- `scripts/advance-routing-cutover.sh`
+- `scripts/write-heartbeat.sh`
+- `scripts/redact-sensitive.sh`
+- `scripts/smoke-routing.sh`
+- `scripts/smoke-services.sh`
+- `scripts/smoke-search.sh`
+- `scripts/smoke-cache-policy.sh`
+- `scripts/smoke-cache-isolation.sh`
+- `scripts/smoke-persistence.sh`
+- `scripts/smoke-rollover-year.sh`
+- `scripts/smoke-functional.sh`
+
+Motivo:
+- son wrappers lineales o pruebas operativas cortas
+- dependen de shell, `curl`, `docker compose` y `wp-cli` de forma directa
+- mantenerlos en shell reduce friccion en runbooks y depuracion local
+
+##### Migracion prioritaria a Python
+- `scripts/collect-host-health.sh`
+- `scripts/collect-runtime-health.sh`
+- `scripts/collect-app-health.sh`
+- `scripts/collect-elastic-health.sh`
+- `scripts/collect-cron-health.sh`
+- `scripts/collect-nightly-context.sh`
+- `scripts/run-nightly-auditor.sh`
+- `scripts/run-sentry-agent.sh`
+- `scripts/report-live-archive-sync-drift.sh`
+
+Motivo:
+- concentran parsing estructurado, severidades, agregacion y generacion de informes
+- son las piezas con mas retorno inmediato en reutilizacion y testabilidad
+
+##### Migracion posterior a Python
+- `scripts/sync-editorial-users.sh`
+- `scripts/sync-platform-config.sh`
+- `scripts/rollover-content-year.sh`
+
+Motivo:
+- son las piezas mas delicadas del plano operativo
+- tienen mas branching, riesgo funcional y dependencia de artefactos persistentes
+- conviene moverlas despues de tener utilidades Python comunes y reporting estable
+
+##### Se mantiene en PHP
+- `scripts/rollover-collect-year-summary.php`
+- `scripts/rollover-delete-source-posts.php`
+- `scripts/rollover-detect-archive-collisions.php`
+- `scripts/rollover-export-year.php`
+- `scripts/rollover-import-snapshot.php`
+- `scripts/sync-editorial-source-snapshot.php`
+- `scripts/sync-editorial-snapshot.php`
+- `scripts/sync-editorial-plan.php`
+- `scripts/sync-editorial-apply.php`
+- `scripts/sync-platform-source-snapshot.php`
+- `scripts/sync-platform-snapshot.php`
+- `scripts/sync-platform-plan.php`
+- `scripts/sync-platform-apply.php`
+
+Motivo:
+- viven pegados a `wp-cli eval-file` y al modelo de datos de WordPress
+- hoy su coste de migracion es mayor que su beneficio inmediato
+- la prioridad actual esta en sustituir shell complejo, no en rehacer la capa WordPress
+
+#### Estructura Python acordada
+```text
+ops/
+  __init__.py
+  cli/
+    __init__.py
+  collectors/
+    __init__.py
+  reporting/
+    __init__.py
+  runtime/
+    __init__.py
+  scheduling/
+    __init__.py
+  util/
+    __init__.py
+```
+
+#### Politica de dependencias acordada
+- Python estandar como base
+- se permite dependencia externa minima solo si reduce complejidad real y queda bien justificada
+- `jq` no debe seguir siendo requisito para la nueva capa Python
+- los wrappers shell existentes deben poder seguir invocando la nueva capa sin romper runbooks
+
+#### Decisiones tomadas
+- No se reescriben smokes ni bootstrap lineal en esta fase.
+- La primera migracion Python ataca IA-Ops y reporting, no rollover.
+- La nueva estructura Python vivira en el repo raiz bajo `ops/`, no como paquete separado todavia.
+- Los entrypoints shell existentes se mantienen como interfaz estable durante la migracion.
+
+#### Lecciones aprendidas
+- El umbral de complejidad ya se ha cruzado claramente en `collect-*`, `run-*` y `rollover-content-year.sh`.
+- La frontera correcta no es shell vs Python por lenguaje, sino wrappers finos vs logica operativa compleja.
+- Intentar migrar rollover antes de tener utilidades Python comunes aumentaria el riesgo sin aportar orden.
+
 ### Fase 2. Base Python y utilidades comunes
+#### Estado
+Pendiente
+
 #### Objetivo
 Crear el esqueleto Python comun para configuracion, subprocess, JSON, tiempo, heartbeats y reporting.
 
