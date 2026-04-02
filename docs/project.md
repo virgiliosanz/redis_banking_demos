@@ -65,14 +65,15 @@ Este documento sustituye al resto de documentos tecnicos y al documento de proye
 - `nuevecuatrouno.test` sirve trafico general.
 - `archive.nuevecuatrouno.test` se reserva para el admin del contexto `archive`.
 - Cualquier peticion a `/wp-admin`, login, `admin-ajax.php` o REST de administracion se enruta a `BE-Admin`.
-- Si el primer segmento del path es `2015`, `2016`, `2017`, `2018`, `2019`, `2020`, `2021`, `2022` o `2023`, la peticion se enruta a `FE-Archive`.
+- Si la URL del post cumple el patron `/%year%/%monthnum%/%day%/%postname%/` y el anio es `2015-2023`, la peticion se enruta a `FE-Archive`.
+- Si la URL del post cumple el patron `/%year%/%monthnum%/%day%/%postname%/` y el anio es `2024+`, la peticion se enruta a `FE-Live`.
 - Cualquier otra peticion se enruta a `FE-Live`.
 - El contenido historico publico sigue sirviendose bajo `nuevecuatrouno.test`, no bajo `archive.nuevecuatrouno.test`.
 
 ### Orden de evaluacion
 1. Trafico administrativo.
 2. Host `archive.nuevecuatrouno.test` fuera del admin para redireccion o bloqueo.
-3. Primer segmento anual del path.
+3. Patron anual fechado del path.
 4. Regla por defecto hacia `FE-Live`.
 
 ### Matriz resumida
@@ -83,7 +84,7 @@ Este documento sustituye al resto de documentos tecnicos y al documento de proye
 | Host `nuevecuatrouno.test` y path `/wp-json/*` administrativo | `BE-Admin` | `DB-Live` | Solo rutas de administracion |
 | Host `archive.nuevecuatrouno.test` y path administrativo | `BE-Admin` | `DB-Archive` | `docroot` admin `archive` |
 | Host `archive.nuevecuatrouno.test` y path no administrativo | `LB-Nginx` | n/a | Redireccion o bloqueo |
-| Primer segmento del path entre `2015` y `2023` | `FE-Archive` | `DB-Archive` | Regla por URL |
+| Path de post fechado con anio `2015-2023` | `FE-Archive` | `DB-Archive` | Regla por URL |
 | Cualquier otro caso | `FE-Live` | `DB-Live` | Regla por defecto |
 
 ### Ejemplos
@@ -139,7 +140,8 @@ map $host $host_context {
 
 map $uri $path_context {
     default live;
-    ~^/(2015|2016|2017|2018|2019|2020|2021|2022|2023)(/|$) archive;
+    ~^/(2015|2016|2017|2018|2019|2020|2021|2022|2023)/[0-1][0-9]/[0-3][0-9]/ archive;
+    ~^/(2024|2025|2026|2027|2028|2029)/[0-1][0-9]/[0-3][0-9]/ live;
 }
 
 map $uri $is_admin_path {

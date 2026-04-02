@@ -37,6 +37,9 @@ Mejorar la capacidad de prueba manual de la POC antes del siguiente proyecto may
 
 ## 7. Fases
 
+### Estado global
+Completado
+
 ### Fase 1. Documentacion operativa de uso local
 #### Estado
 Completada
@@ -59,11 +62,11 @@ Actualizar `docs/` para reflejar el uso real de la POC como entorno de laborator
 
 #### Progreso actual
 - `docs/poc-local-runbook.md` ya incorpora accesos admin, contenido inicial y pruebas manuales relevantes.
-- Se crea una referencia rapida en `docs/poc-manual-testing-reference.md` para URLs, credenciales y checks de laboratorio.
+- La referencia rapida queda absorbida dentro de `docs/poc-local-runbook.md` para centralizar la operacion manual en un unico documento.
 - La documentacion ya recoge el flujo correcto de admin tras corregir el bug de redirects en `/wp-admin/`.
 
 #### Decisiones tomadas
-- La referencia operativa corta vive fuera del documento de arquitectura principal para no mezclar diseño con uso diario del laboratorio.
+- El runbook local pasa a ser el punto unico de entrada para uso manual del laboratorio, y el documento de arquitectura queda como referencia de diseño y decisiones.
 - Las credenciales de admin se documentan como rutas a ficheros de secretos locales, no como valores literales en el repo.
 
 #### Lecciones aprendidas
@@ -180,3 +183,8 @@ Eliminar los bucles `302` en `wp-admin` y `wp-login.php`, dejando el plano admin
 - La POC queda lista para pruebas manuales realistas de frontend, busqueda y administracion.
 - La documentacion local permite repetir el flujo sin conocimiento previo del historial del repo.
 - El entorno queda preparado para abordar despues el rollover anual y el bootstrap IA-Ops con menos friccion.
+
+## 10. Cierre del proyecto
+- Se unifica la operacion manual en `docs/poc-local-runbook.md` y se elimina la duplicidad de referencias rapidas en `docs/`.
+- `docs/project.md` queda alineado con el contrato vigente de URLs fechadas `/%year%/%monthnum%/%day%/%postname%/`.
+- El proyecto se considera cerrado cuando el repo queda limpio, con commit final y tag `proyecto-docs-seed-search-y-admin`.

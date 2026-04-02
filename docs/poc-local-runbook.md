@@ -34,8 +34,13 @@ Que hace el bootstrap:
 ./scripts/smoke-functional.sh
 ```
 
-### Referencia rapida
-- Ver tambien `docs/poc-manual-testing-reference.md` para URLs, credenciales y comprobaciones manuales.
+### URLs principales
+- Front `live`: `http://nuevecuatrouno.test/`
+- Front `archive` por host admin: `http://archive.nuevecuatrouno.test/`
+- Admin `live`: `http://nuevecuatrouno.test/wp-admin/`
+- Admin `archive`: `http://archive.nuevecuatrouno.test/wp-admin/`
+- Login `live`: `http://nuevecuatrouno.test/wp-login.php`
+- Login `archive`: `http://archive.nuevecuatrouno.test/wp-login.php`
 
 ### Accesos administrativos de laboratorio
 - `live`: `http://nuevecuatrouno.test/wp-admin/`
@@ -53,24 +58,39 @@ curl -i http://archive.nuevecuatrouno.test/2018/10/mi-articulo/
 curl -i "http://nuevecuatrouno.test/?s=rioja-laboratorio"
 curl -I http://nuevecuatrouno.test/wp-admin/
 curl -I http://archive.nuevecuatrouno.test/wp-admin/
+curl -sD - "http://nuevecuatrouno.test/2019/05/15/logrono-activa-su-plan-de-barrios-con-inversiones-en-movilidad/" -o /dev/null | grep X-Origin-Cache-Policy
+curl -sD - "http://nuevecuatrouno.test/2026/04/01/logrono-venera-la-imagen-del-cristo-del-santo-sepulcro-en-la-redonda/" -o /dev/null | grep X-Origin-Cache-Policy
 docker compose ps
 ```
 
 ### Contenido inicial actual
 - Contrato de URL para posts: `/%year%/%monthnum%/%day%/%postname%/`
-- `live`: `http://nuevecuatrouno.test/cultura/agenda-local/`
-- `live`: `http://nuevecuatrouno.test/servicios/contacto-redaccion/`
 - `archive`: `http://nuevecuatrouno.test/2015/02/03/logrono-revive-la-noche-de-san-mateo-en-su-casco-antiguo/`
+- `archive`: `http://nuevecuatrouno.test/2016/07/14/el-ebro-marca-un-verano-de-contrastes-en-logrono/`
+- `archive`: `http://nuevecuatrouno.test/2017/09/09/las-cuadrillas-vuelven-a-llenar-de-musica-las-calles-del-centro/`
+- `archive`: `http://nuevecuatrouno.test/2018/10/21/la-vendimia-abre-una-nueva-etapa-para-el-rioja-metropolitano/`
 - `archive`: `http://nuevecuatrouno.test/2019/05/15/logrono-activa-su-plan-de-barrios-con-inversiones-en-movilidad/`
+- `archive`: `http://nuevecuatrouno.test/2020/08/27/el-comercio-local-resiste-un-verano-marcado-por-la-incertidumbre/`
+- `archive`: `http://nuevecuatrouno.test/2021/06/07/la-agenda-cultural-recupera-el-pulso-con-una-temporada-expandida/`
+- `archive`: `http://nuevecuatrouno.test/2022/11/18/la-redonda-cierra-un-ano-de-reformas-con-mas-actividad-vecinal/`
 - `archive`: `http://nuevecuatrouno.test/2023/12/29/el-archivo-municipal-consolida-2023-como-ano-de-transicion-digital/`
 - `live`: `http://nuevecuatrouno.test/2024/04/11/logrono-impulsa-2024-con-nuevas-rutas-peatonales-y-comercio-abierto/`
 - `live`: `http://nuevecuatrouno.test/2025/09/19/la-programacion-cultural-de-2025-lleva-el-teatro-a-todos-los-barrios/`
 - `live`: `http://nuevecuatrouno.test/2026/04/01/logrono-venera-la-imagen-del-cristo-del-santo-sepulcro-en-la-redonda/`
-- Busqueda manual de referencia:
-  - `http://nuevecuatrouno.test/?s=Cristo+del+Santo+Sepulcro`
-  - `http://nuevecuatrouno.test/?s=rioja+metropolitano`
-  - `http://nuevecuatrouno.test/?s=rioja-laboratorio`
-- El frontend publico ya muestra un buscador visible en cabecera para lanzar estas pruebas sin escribir la query a mano.
+
+### Busquedas manuales de referencia
+- El frontend publico ya muestra un buscador visible en cabecera.
+- `http://nuevecuatrouno.test/?s=Cristo+del+Santo+Sepulcro`
+- `http://nuevecuatrouno.test/?s=rioja+metropolitano`
+- `http://nuevecuatrouno.test/?s=rioja-laboratorio`
+
+### Comprobaciones manuales recomendadas
+- `GET /healthz` en ambos hosts devuelve `200`.
+- `GET /2015/02/03/...` cae en `archive`.
+- `GET /2024/04/11/...` cae en `live`.
+- `GET /wp-admin/` redirige a `wp-login.php` sin loop.
+- `GET /wp-login.php` responde `200`.
+- `GET /?s=rioja-laboratorio` devuelve resultados mixtos con permalinks canonicos.
 
 ## 5. Resultado esperado
 - Todos los contenedores en estado `healthy`
@@ -116,3 +136,4 @@ docker compose up -d
 - ElasticPress indexa `live` y `archive` por separado y consulta mediante el alias `n9-search-posts`.
 - `xmlrpc.php`, dotfiles y ficheros sensibles comunes quedan bloqueados por Nginx en esta fase.
 - La rotacion minima de logs Docker queda definida en `compose.yaml` con `max-size=10m` y `max-file=3`.
+- Este runbook centraliza la operacion manual de la POC; ya no hace falta una referencia rapida separada.
