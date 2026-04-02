@@ -3,6 +3,8 @@
 ## 1. Objetivo
 Describir el flujo minimo para levantar, verificar y revertir la POC WordPress Docker en local sin depender de conocimiento implicito.
 
+Este runbook sustituye a checklists operativas separadas de validacion local.
+
 ## 2. Prerrequisitos
 - Docker Desktop o daemon Docker operativo
 - Entradas en `/etc/hosts`

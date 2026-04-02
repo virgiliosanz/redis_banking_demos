@@ -76,7 +76,7 @@ Preparar la estructura del repositorio y fijar los artefactos base para desplega
 - Estructura inicial del repo creada.
 - `compose.yaml` base del stack creado.
 - `.env.example` con variables no sensibles creado.
-- Inventario tecnico en `docs/poc-implementation-inventory.md`.
+- Inventario tecnico en `tasks/archive/docs/poc-implementation-inventory.md`.
 
 #### Lecciones aprendidas
 - Conviene separar desde el inicio el layout de laboratorio del layout objetivo en host para no contaminar la configuracion con rutas absolutas.
@@ -117,7 +117,7 @@ Implementar `LB-Nginx` conforme al routing y contrato FastCGI definidos en la do
 
 #### Entregables ejecutados
 - Configuracion de routing en `nginx/lb/conf.d/poc-routing.conf`.
-- Casos de prueba documentados en `docs/poc-lb-routing-test-cases.md`.
+- Casos de prueba documentados en `tasks/archive/docs/poc-lb-routing-test-cases.md`.
 - Validacion estatica de `compose`.
 - Validacion de sintaxis `nginx -t` ejecutada con `nginx:1.27.5-alpine`.
 
@@ -245,7 +245,7 @@ Comprobar que la POC arranca, enruta y responde segun el contrato definido.
 
 #### Entregables ejecutados
 - Runbook local en `docs/poc-local-runbook.md`.
-- Checklist de validacion en `docs/poc-validation-checklist.md`.
+- Checklist de validacion en `tasks/archive/docs/poc-validation-checklist.md`.
 - Script `scripts/smoke-services.sh`.
 - Bateria de smoke tests HTTP y de servicios validada sobre el stack actual.
 
@@ -285,7 +285,7 @@ Cerrar los huecos minimos para que la POC sea operable y pueda servir de base a 
 #### Entregables ejecutados
 - Hardening basico de `LB-Nginx` aplicado.
 - Rotacion minima de logs y `no-new-privileges` materializados en `compose.yaml`.
-- Documento `docs/poc-hardening-and-next-steps.md` con secretos, gaps y siguiente proyecto recomendado.
+- Documento `tasks/archive/docs/poc-hardening-and-next-steps.md` con secretos, gaps y siguiente proyecto recomendado.
 
 #### Lecciones aprendidas
 - Para una POC util, endurecer lo obvio aporta mas valor que simular controles avanzados sin soporte operativo real.

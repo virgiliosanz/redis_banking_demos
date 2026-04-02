@@ -11,8 +11,8 @@ El objetivo no es rehacer la plataforma, sino operar sobre la topologia ya valid
 ## 2. Relacion con la documentacion base
 - Documento de arquitectura vigente: `docs/project.md`
 - Documento funcional del rollover: `docs/annual-content-rollover.md`
-- Documento de interfaz IA-Ops: `docs/ia-ops-bootstrap-interface.md`
-- Proyecto previo completado: `projects/proyecto-docs-seed-search-y-admin.md`
+- Documento de contrato IA-Ops: `docs/ia-ops-bootstrap-contract.md`
+- Proyecto previo completado: `tasks/archive/proyecto-docs-seed-search-y-admin.md`
 
 ## 3. Decisiones ya acordadas
 - `archive` contiene anios cerrados; `live` contiene el anio en curso y el contenido nuevo.
@@ -303,7 +303,7 @@ Fijar de forma cerrada que puede leer, como lo filtra y como responde el bootstr
 - Definir la redaccion de emails e IPs publicas.
 - Fijar el formato de salida de `Sentry Agent` y `Nightly Auditor`.
 - Fijar severidades y umbrales iniciales para alertas basicas reactivas y para la auditoria nocturna.
-- Alinear el contrato con `docs/ia-ops-bootstrap-interface.md`.
+- Alinear el contrato con `docs/ia-ops-bootstrap-contract.md`.
 
 #### Entregables
 - Documento operativo definitivo del bootstrap IA-Ops.
@@ -316,7 +316,7 @@ Fijar de forma cerrada que puede leer, como lo filtra y como responde el bootstr
 
 #### Progreso actual
 - Se crea `docs/ia-ops-bootstrap-contract.md` como contrato operativo completo del bootstrap.
-- `docs/ia-ops-bootstrap-interface.md` pasa a quedar como vista resumida y punto de enlace al contrato definitivo.
+- El contrato definitivo de IA-Ops queda fijado en `docs/ia-ops-bootstrap-contract.md`.
 - Se crea `config/ia-ops-sources.env.example` con fuentes permitidas, servicios base, alias de busqueda y umbrales iniciales no sensibles.
 - El contrato ya fija checks minimos de host, servicios, aplicacion y cron, junto con severidades y ejemplos de salida para `Sentry Agent` y `Nightly Auditor`.
 
@@ -400,7 +400,7 @@ Dejar operativos los flujos minimos del diagnostico reactivo y de la auditoria d
 - `Nightly Auditor` ya genera informe Markdown persistente bajo `runtime/reports/ia-ops/` y referencia el drift report `live/archive`.
 - `Sentry Agent` ya genera diagnostico por servicio con severidad, evidencias, validaciones, acciones manuales y logs acotados.
 - La validacion real se ejecuta en laboratorio para `lb-nginx` y `elastic`, y ambos informes quedan persistidos.
-- `docs/ia-ops-bootstrap-interface.md` se actualiza para apuntar a los scripts reales que materializan el contrato.
+- `docs/ia-ops-bootstrap-contract.md` queda como referencia viva del contrato que materializan los scripts reales.
 
 #### Decisiones tomadas
 - El bootstrap IA-Ops sigue siendo determinista y local: no invoca modelos externos ni automatiza remediacion.

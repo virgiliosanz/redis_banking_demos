@@ -5,7 +5,7 @@ Sustituir los stubs de la POC por WordPress real, materializar la persistencia m
 
 ## 2. Relacion con la documentacion base
 - Documento de arquitectura vigente: `docs/project.md`
-- Proyecto previo completado: `projects/proyecto-implementacion-poc.md`
+- Proyecto previo completado: `tasks/archive/proyecto-implementacion-poc.md`
 - Este proyecto arranca sobre una POC ya desplegable, validada y endurecida a nivel basico.
 
 ## 3. Decisiones ya acordadas
@@ -269,7 +269,7 @@ Preparar el origen para quedar correctamente detras de Cloudflare.
 
 #### Progreso actual
 - Queda documentado el modelo correcto de produccion con Tunnel en `docs/origin-behind-cloudflare-tunnel.md`.
-- Queda una checklist separando responsabilidades de edge y origen en `docs/edge-origin-checklist.md`.
+- La checklist de edge y origen queda absorbida dentro de `docs/origin-behind-cloudflare-tunnel.md`.
 - Nginx ya deja trazabilidad en logs para `CF-Connecting-IP`, `X-Forwarded-For`, `CF-Ray` y `realip_remote_addr`.
 - El repo incluye snippets de produccion para `real_ip` y cierre de origen, sin activarlos en la POC.
 

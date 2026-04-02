@@ -70,7 +70,7 @@ Estos roles son objetivos del sistema. No autorizan por si mismos acciones destr
 
 ## 9. Marco de trabajo para cambios y proyectos
 - Los cambios se discuten primero con el usuario y se proponen opciones cuando haya decisiones de arquitectura.
-- Una vez acordada una linea de trabajo, se crea un fichero `projects/proyecto-[titulo].md`.
+- Una vez acordada una linea de trabajo, se crea un fichero `tasks/proyecto-[titulo].md`.
 - Cada fase debe dejar:
   - cambios implementados
   - validacion ejecutada
@@ -81,6 +81,7 @@ Estos roles son objetivos del sistema. No autorizan por si mismos acciones destr
   - commit final
   - tag con `[titulo-proyecto]`
   - actualizacion de la documentacion en `docs/` basandose en lo implementado y en las notas del proyecto
+- Cuando un proyecto quede cerrado, su fichero pasa a `tasks/archive/`.
 
 ## 10. Criterio de validacion
 Cuando se toque infraestructura o runtime, la salida minima esperada es:

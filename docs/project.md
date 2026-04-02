@@ -5,6 +5,8 @@ Definir de forma unificada la arquitectura, decisiones, fases ejecutadas, operac
 
 Este documento sustituye al resto de documentos tecnicos y al documento de proyecto anterior. La POC queda descrita aqui de forma integral.
 
+Indice documental vivo: `docs/README.md`.
+
 ## 2. Estado del proyecto
 
 ### Estado global

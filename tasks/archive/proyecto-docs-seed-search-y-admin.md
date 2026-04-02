@@ -5,7 +5,7 @@ Mejorar la capacidad de prueba manual de la POC antes del siguiente proyecto may
 
 ## 2. Relacion con la documentacion base
 - Documento de arquitectura vigente: `docs/project.md`
-- Proyecto previo completado: `projects/proyecto-wordpress-real-cache-y-busqueda.md`
+- Proyecto previo completado: `tasks/archive/proyecto-wordpress-real-cache-y-busqueda.md`
 - Este proyecto arranca sobre una POC funcional con WordPress real, politica de cache, busqueda ElasticPress y validacion funcional consolidada.
 
 ## 3. Decisiones ya acordadas

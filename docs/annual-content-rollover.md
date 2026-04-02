@@ -140,7 +140,7 @@ Ejemplo:
 - tras mover un anio, hay que reindexar ambos lados
 
 ## Siguiente proyecto recomendado
-`proyecto-rollover-anual-e-ia-ops-bootstrap.md`
+`tasks/archive/proyecto-rollover-anual-e-ia-ops-bootstrap.md`
 
 Alcance recomendado:
 - script de rollover anual
