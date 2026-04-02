@@ -3,6 +3,8 @@
 ## Objetivo
 Definir el contrato minimo que necesitara un futuro `IA-Ops Bootstrap` para operar sobre esta plataforma sin improvisar fuentes, comandos o formato de salida.
 
+Este documento queda como vista resumida. El contrato operativo completo vive en `docs/ia-ops-bootstrap-contract.md`.
+
 ## Principios
 - solo lectura por defecto
 - contexto acotado

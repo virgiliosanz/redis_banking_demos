@@ -288,7 +288,7 @@ Mantener la consistencia funcional y visual entre `live` y `archive` en aquello 
 
 ### Fase 7. Contrato operativo de IA-Ops Bootstrap
 #### Estado
-Pendiente
+Completada
 
 #### Objetivo
 Fijar de forma cerrada que puede leer, como lo filtra y como responde el bootstrap IA-Ops.
@@ -313,6 +313,21 @@ Fijar de forma cerrada que puede leer, como lo filtra y como responde el bootstr
 
 #### Criterios de cierre
 - El sistema IA-Ops tiene un contrato claro de entrada y salida sin ambiguedad operativa.
+
+#### Progreso actual
+- Se crea `docs/ia-ops-bootstrap-contract.md` como contrato operativo completo del bootstrap.
+- `docs/ia-ops-bootstrap-interface.md` pasa a quedar como vista resumida y punto de enlace al contrato definitivo.
+- Se crea `config/ia-ops-sources.env.example` con fuentes permitidas, servicios base, alias de busqueda y umbrales iniciales no sensibles.
+- El contrato ya fija checks minimos de host, servicios, aplicacion y cron, junto con severidades y ejemplos de salida para `Sentry Agent` y `Nightly Auditor`.
+
+#### Decisiones tomadas
+- IA-Ops se apoya en monitorizacion minima del propio repo y no en una plataforma externa obligatoria en esta iteracion.
+- Los heartbeats de cron pasan a ser la fuente preferida para retrasos de jobs criticos frente a una lectura ciega de logs.
+- Las severidades iniciales quedan reducidas a `info`, `warning` y `critical`.
+
+#### Lecciones aprendidas
+- Sin una plantilla no sensible de fuentes y umbrales, la Fase 8 tenderia a mezclar politica operativa con implementacion local.
+- El contrato de IA-Ops es util solo si incluye checks de host y cron; limitarlo a logs de aplicacion lo dejaria ciego frente a varios fallos reales.
 
 ### Fase 8. Colectores y wrappers de solo lectura
 #### Estado

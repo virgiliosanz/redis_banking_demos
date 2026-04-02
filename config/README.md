@@ -17,3 +17,4 @@ Este directorio documenta convenciones de configuracion no sensible.
 ## Bootstrap local
 - `scripts/bootstrap-local-secrets.sh` genera secretos locales de desarrollo bajo `./.secrets/`.
 - `scripts/bootstrap-wordpress-config.sh` genera `wp-config.php` y `wp-common.php` dentro de `./runtime/wp-root/`.
+- `config/ia-ops-sources.env.example` documenta las fuentes permitidas y umbrales no sensibles del futuro `IA-Ops Bootstrap`.
