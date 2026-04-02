@@ -5,7 +5,8 @@ from pathlib import Path
 
 from ..config import Settings
 from ..runtime.heartbeats import write_heartbeat
-from ..util.docker import compose_exec, wait_for_container_health
+from ..services import compose_service_name, wait_for_service_keys
+from ..util.docker import compose_exec
 from ..util.process import run_command
 from ..util.time import report_stamp, utc_timestamp
 
@@ -42,7 +43,7 @@ def _wp_eval_file(cwd: Path, *, path: str, script_path: str, mode: str, target_y
     if snapshot_file:
         env_args.append(f"ROLLOVER_SNAPSHOT_FILE={snapshot_file}")
     result = compose_exec(
-        "cron-master",
+        compose_service_name("cron-master"),
         [*env_args, "wp", "--allow-root", "eval-file", script_path, f"--path={path}"],
         cwd=cwd,
         exec_args=["--user", "root"],
@@ -52,7 +53,7 @@ def _wp_eval_file(cwd: Path, *, path: str, script_path: str, mode: str, target_y
 
 def _archive_collisions(cwd: Path, *, path: str, slug_csv: str, target_year: int) -> str:
     result = compose_exec(
-        "cron-master",
+        compose_service_name("cron-master"),
         [
             "env",
             f"ROLLOVER_SLUGS_CSV={slug_csv}",
@@ -60,7 +61,7 @@ def _archive_collisions(cwd: Path, *, path: str, slug_csv: str, target_year: int
             "wp",
             "--allow-root",
             "eval-file",
-            "/opt/project/scripts/rollover-detect-archive-collisions.php",
+            "/opt/project/scripts/internal/rollover/detect-archive-collisions.php",
             f"--path={path}",
         ],
         cwd=cwd,
@@ -69,27 +70,12 @@ def _archive_collisions(cwd: Path, *, path: str, slug_csv: str, target_year: int
     return result.stdout.strip()
 
 
-def _write_remote_snapshot(cwd: Path, local_file: Path, remote_file: str) -> None:
-    compose_exec(
-        "cron-master",
-        ["sh", "-lc", f"cat > '{remote_file}'"],
-        cwd=cwd,
-        check=True,
-    )
-    run_command(
-        ["docker", "compose", "exec", "-T", "cron-master", "sh", "-lc", f"cat > '{remote_file}' < /dev/stdin"],
-        cwd=cwd,
-        check=True,
-        env=None,
-    )
-
-
 def _copy_to_container(cwd: Path, local_file: Path, remote_file: str) -> None:
     with local_file.open("rb") as handle:
         import subprocess
 
         completed = subprocess.run(
-            ["docker", "compose", "exec", "-T", "cron-master", "sh", "-lc", f"cat > '{remote_file}'"],
+            ["docker", "compose", "exec", "-T", compose_service_name("cron-master"), "sh", "-lc", f"cat > '{remote_file}'"],
             cwd=str(cwd),
             stdin=handle,
             check=True,
@@ -99,7 +85,7 @@ def _copy_to_container(cwd: Path, local_file: Path, remote_file: str) -> None:
 
 def _reindex_site(cwd: Path, *, path: str, prefix: str, ep_host: str) -> None:
     compose_exec(
-        "cron-master",
+        compose_service_name("cron-master"),
         [
             "wp",
             "--allow-root",
@@ -118,7 +104,7 @@ def _reindex_site(cwd: Path, *, path: str, prefix: str, ep_host: str) -> None:
 
 def _get_index_name(cwd: Path, *, path: str) -> str:
     result = compose_exec(
-        "cron-master",
+        compose_service_name("cron-master"),
         ["wp", "--allow-root", "elasticpress", "get-indices", f"--path={path}"],
         cwd=cwd,
         exec_args=["--user", "root"],
@@ -136,7 +122,7 @@ def _publish_read_alias(cwd: Path, *, alias: str, live_index: str, archive_index
     }
     json_payload = json.dumps(payload, separators=(",", ":"))
     compose_exec(
-        "elastic",
+        compose_service_name("elastic"),
         [
             "sh",
             "-lc",
@@ -156,7 +142,7 @@ def _publish_read_alias(cwd: Path, *, alias: str, live_index: str, archive_index
 def _advance_cutover(cwd: Path, routing_config_file: Path, target_year: int) -> None:
     run_command(["./scripts/advance-routing-cutover.sh", str(routing_config_file), str(target_year)], cwd=cwd)
     run_command(["./scripts/render-routing-cutover.sh", str(routing_config_file)], cwd=cwd)
-    compose_exec("lb-nginx", ["nginx", "-s", "reload"], cwd=cwd)
+    compose_exec(compose_service_name("lb-nginx"), ["nginx", "-s", "reload"], cwd=cwd)
 
 
 def _write_rollover_heartbeat(settings: Settings) -> None:
@@ -213,13 +199,12 @@ def run(
     if mode == "execute" and target_year != live_min_year:
         raise RuntimeError(f"Mode execute requires target year to match LIVE_MIN_YEAR ({live_min_year}).")
 
-    for container in ("n9-db-live", "n9-db-archive", "n9-cron-master"):
-        wait_for_container_health(container)
+    wait_for_service_keys(settings, ("db-live", "db-archive", "cron-master"))
 
     live_summary = _wp_eval_file(
         cwd,
         path="/srv/wp/live",
-        script_path="/opt/project/scripts/rollover-collect-year-summary.php",
+        script_path="/opt/project/scripts/internal/rollover/collect-year-summary.php",
         mode=mode,
         target_year=target_year,
     )
@@ -236,14 +221,14 @@ def run(
     source_snapshot = _wp_eval_file(
         cwd,
         path="/srv/wp/live",
-        script_path="/opt/project/scripts/rollover-export-year.php",
+        script_path="/opt/project/scripts/internal/rollover/export-year.php",
         mode=mode,
         target_year=target_year,
     )
     archive_backup_snapshot = _wp_eval_file(
         cwd,
         path="/srv/wp/archive",
-        script_path="/opt/project/scripts/rollover-export-year.php",
+        script_path="/opt/project/scripts/internal/rollover/export-year.php",
         mode=mode,
         target_year=target_year,
     )
@@ -283,7 +268,7 @@ def run(
         import_result = _wp_eval_file(
             cwd,
             path="/srv/wp/archive",
-            script_path="/opt/project/scripts/rollover-import-snapshot.php",
+            script_path="/opt/project/scripts/internal/rollover/import-snapshot.php",
             mode=mode,
             target_year=target_year,
             snapshot_file=remote_source_snapshot,
@@ -293,7 +278,7 @@ def run(
         delete_result = _wp_eval_file(
             cwd,
             path="/srv/wp/live",
-            script_path="/opt/project/scripts/rollover-delete-source-posts.php",
+            script_path="/opt/project/scripts/internal/rollover/delete-source-posts.php",
             mode=mode,
             target_year=target_year,
             snapshot_file=remote_source_snapshot,

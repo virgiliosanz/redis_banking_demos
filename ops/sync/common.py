@@ -4,7 +4,8 @@ from pathlib import Path
 
 from ..config import Settings
 from ..runtime.heartbeats import write_heartbeat
-from ..util.docker import compose_exec, wait_for_container_health
+from ..services import compose_service_name, wait_for_service_keys
+from ..util.docker import compose_exec
 from ..util.time import report_stamp, utc_timestamp
 
 
@@ -17,10 +18,8 @@ def ensure_sync_mode(mode: str) -> str:
     return mode
 
 
-def wait_for_sync_services() -> None:
-    wait_for_container_health("n9-db-live")
-    wait_for_container_health("n9-db-archive")
-    wait_for_container_health("n9-cron-master")
+def wait_for_sync_services(settings: Settings) -> None:
+    wait_for_service_keys(settings, ("db-live", "db-archive", "cron-master"))
 
 
 def wp_eval_json(
@@ -38,7 +37,7 @@ def wp_eval_json(
         env_args.append(f"SYNC_SOURCE_SNAPSHOT_JSON={snapshot_json}")
 
     command = ["env", *env_args, "wp", "--allow-root", "eval-file", script_path, f"--path={path}"]
-    result = compose_exec("cron-master", command, cwd=cwd, exec_args=["--user", "root"])
+    result = compose_exec(compose_service_name("cron-master"), command, cwd=cwd, exec_args=["--user", "root"])
     return result.stdout.strip()
 
 

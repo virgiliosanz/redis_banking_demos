@@ -103,8 +103,8 @@ wait_for_service n9-db-archive
 wait_for_service n9-elastic
 wait_for_service n9-cron-master
 
-live_summary="$(wp_eval_file /srv/wp/live /opt/project/scripts/rollover-collect-year-summary.php)"
-archive_summary="$(wp_eval_file /srv/wp/archive /opt/project/scripts/rollover-collect-year-summary.php)"
+live_summary="$(wp_eval_file /srv/wp/live /opt/project/scripts/internal/rollover/collect-year-summary.php)"
+archive_summary="$(wp_eval_file /srv/wp/archive /opt/project/scripts/internal/rollover/collect-year-summary.php)"
 
 live_count="$(extract_json_number selected_post_count "$live_summary")"
 archive_count="$(extract_json_number selected_post_count "$archive_summary")"

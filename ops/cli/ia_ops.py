@@ -2,35 +2,34 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import replace
-import json
 import sys
 from pathlib import Path
 
 from ..config import load_settings
-from ..collectors import app as app_collector
-from ..collectors import cron as cron_collector
-from ..collectors import elastic as elastic_collector
 from ..collectors import host as host_collector
 from ..collectors import logs as logs_collector
-from ..collectors import mysql as mysql_collector
-from ..collectors import runtime as runtime_collector
+from ..context import collect_operational_context, load_drift_status
 from ..notifications.telegram import load_telegram_config, send_message
 from ..rollover import content_year as rollover_content_year
 from ..reporting import write_json_report, write_text_report
+from ..runtime import nightly as nightly_runtime
 from ..runtime import reactive as reactive_runtime
-from ..runtime.drift import build_drift_report
+from ..runtime import sentry as sentry_runtime
 from ..scheduling.cron import (
     install_nightly_auditor_crontab,
     install_reactive_watch_crontab,
+    install_sync_jobs_crontab,
     remove_nightly_auditor_crontab,
     remove_reactive_watch_crontab,
+    remove_sync_jobs_crontab,
     render_nightly_auditor_block,
     render_reactive_watch_block,
+    render_sync_jobs_block,
 )
 from ..sync import editorial as editorial_sync
 from ..sync import platform as platform_sync
 from ..util.jsonio import dumps_pretty
-from ..util.time import report_stamp, utc_timestamp
+from ..util.time import report_stamp
 
 
 def _print_json(payload: object) -> None:
@@ -66,59 +65,6 @@ def _default_notify_allowed(args: argparse.Namespace) -> bool:
     if getattr(args, "no_write_report", False):
         return False
     return True
-
-
-def _nightly_telegram_message(
-    *,
-    severity: str,
-    summary: str,
-    host_memory_status: str,
-    docker_status: str,
-    recent_5xx: int,
-    elastic_alias_status: str,
-    cron_warning_jobs: list[str],
-    editorial_drift: str,
-    platform_drift: str,
-    report_file: str | None,
-) -> str:
-    delayed_jobs = ", ".join(cron_warning_jobs) if cron_warning_jobs else "none"
-    report_line = f"report: {report_file}" if report_file else "report: no generado"
-    return "\n".join(
-        [
-            f"[Nightly Auditor][{severity.upper()}]",
-            summary,
-            f"host_memory: {host_memory_status}",
-            f"docker: {docker_status}",
-            f"lb_nginx_recent_5xx: {recent_5xx}",
-            f"elastic_alias: {elastic_alias_status}",
-            f"cron_delayed_jobs: {delayed_jobs}",
-            f"editorial_drift: {editorial_drift}",
-            f"platform_drift: {platform_drift}",
-            report_line,
-        ]
-    )
-
-
-def _sentry_telegram_message(
-    *,
-    severity: str,
-    service: str,
-    summary: str,
-    cause: str,
-    risk: str,
-    report_file: str | None,
-) -> str:
-    report_line = f"report: {report_file}" if report_file else "report: no generado"
-    return "\n".join(
-        [
-            f"[Sentry Agent][{severity.upper()}]",
-            f"service: {service}",
-            summary,
-            f"cause: {cause}",
-            f"risk: {risk}",
-            report_line,
-        ]
-    )
 
 
 def cmd_send_telegram_test(args: argparse.Namespace) -> int:
@@ -170,27 +116,27 @@ def cmd_collect_host(_: argparse.Namespace) -> int:
 
 
 def cmd_collect_cron(_: argparse.Namespace) -> int:
-    _print_json(cron_collector.collect(load_settings()))
+    _print_json(collect_operational_context(load_settings())["cron"])
     return 0
 
 
 def cmd_collect_elastic(_: argparse.Namespace) -> int:
-    _print_json(elastic_collector.collect(load_settings()))
+    _print_json(collect_operational_context(load_settings())["elastic"])
     return 0
 
 
 def cmd_collect_runtime(_: argparse.Namespace) -> int:
-    _print_json(runtime_collector.collect(load_settings()))
+    _print_json(collect_operational_context(load_settings())["runtime"])
     return 0
 
 
 def cmd_collect_app(_: argparse.Namespace) -> int:
-    _print_json(app_collector.collect(load_settings()))
+    _print_json(collect_operational_context(load_settings())["app"])
     return 0
 
 
 def cmd_collect_mysql(_: argparse.Namespace) -> int:
-    _print_json(mysql_collector.collect(load_settings()))
+    _print_json(collect_operational_context(load_settings())["mysql"])
     return 0
 
 
@@ -204,15 +150,7 @@ def cmd_collect_service_logs(args: argparse.Namespace) -> int:
 
 def cmd_collect_nightly_context(args: argparse.Namespace) -> int:
     settings = load_settings()
-    payload = {
-        "generated_at": utc_timestamp(),
-        "host": host_collector.collect(settings),
-        "runtime": runtime_collector.collect(settings),
-        "app": app_collector.collect(settings),
-        "mysql": mysql_collector.collect(settings),
-        "elastic": elastic_collector.collect(settings),
-        "cron": cron_collector.collect(settings),
-    }
+    payload = collect_operational_context(settings)
     if args.write_report:
         report_root = settings.get_path("REPORT_ROOT", "./runtime/reports/ia-ops")
         report_file = write_json_report(report_root, f"nightly-context-{report_stamp()}.json", payload)
@@ -223,8 +161,8 @@ def cmd_collect_nightly_context(args: argparse.Namespace) -> int:
 
 def cmd_report_drift(_: argparse.Namespace) -> int:
     settings = load_settings()
-    report_file, _ = build_drift_report(settings)
-    print(f"sync drift report written to {report_file}")
+    drift = load_drift_status(settings)
+    print(f"sync drift report written to {drift.report_file}")
     return 0
 
 
@@ -240,6 +178,14 @@ def cmd_render_reactive_crontab(args: argparse.Namespace) -> int:
     settings = load_settings()
     project_root = settings.project_root.resolve()
     content = render_reactive_watch_block(settings, project_root=project_root, python_bin=args.python_bin)
+    print(content, end="")
+    return 0
+
+
+def cmd_render_sync_crontab(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    content = render_sync_jobs_block(settings, project_root=project_root, python_bin=args.python_bin)
     print(content, end="")
     return 0
 
@@ -262,6 +208,15 @@ def cmd_install_reactive_crontab(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_install_sync_crontab(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    backup_file, crontab_file = install_sync_jobs_crontab(settings, project_root=project_root, python_bin=args.python_bin)
+    print(f"sync jobs cron installed from {crontab_file}")
+    print(f"previous crontab backed up to {backup_file}")
+    return 0
+
+
 def cmd_remove_nightly_crontab(_: argparse.Namespace) -> int:
     settings = load_settings()
     project_root = settings.project_root.resolve()
@@ -278,145 +233,18 @@ def cmd_remove_reactive_crontab(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_remove_sync_crontab(_: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    crontab_file = remove_sync_jobs_crontab(settings, project_root=project_root)
+    print(f"sync jobs cron block removed using {crontab_file}")
+    return 0
+
+
 def cmd_run_nightly(args: argparse.Namespace) -> int:
     settings = load_settings()
-    context = {
-        "generated_at": utc_timestamp(),
-        "host": host_collector.collect(settings),
-        "runtime": runtime_collector.collect(settings),
-        "app": app_collector.collect(settings),
-        "mysql": mysql_collector.collect(settings),
-        "elastic": elastic_collector.collect(settings),
-        "cron": cron_collector.collect(settings),
-    }
-    drift_report_file, _ = build_drift_report(settings)
-    drift_lines = Path(drift_report_file).read_text(encoding="utf-8").splitlines()
-    editorial_drift = next((line.split(": ", 1)[1] for line in drift_lines if line.startswith("- editorial_drift:")), "unknown")
-    platform_drift = next((line.split(": ", 1)[1] for line in drift_lines if line.startswith("- platform_drift:")), "unknown")
-
-    statuses: list[str] = []
-
-    def collect_statuses(node: object) -> None:
-        if isinstance(node, dict):
-            status = node.get("status")
-            if isinstance(status, str):
-                statuses.append(status)
-            for value in node.values():
-                collect_statuses(value)
-        elif isinstance(node, list):
-            for value in node:
-                collect_statuses(value)
-
-    collect_statuses(context)
-    critical_count = sum(1 for status in statuses if status == "critical")
-    warning_count = sum(1 for status in statuses if status == "warning")
-
-    global_severity = "critical" if critical_count else "warning" if warning_count else "info"
-    summary = "plataforma degradada con checks criticos" if critical_count else "plataforma sana con warnings operativos" if warning_count else "plataforma sana sin hallazgos relevantes"
-
-    host_memory_status = context["host"]["checks"]["memory"]["status"]
-    docker_status = context["host"]["checks"]["docker_daemon"]["status"]
-    recent_5xx = context["runtime"]["checks"]["lb_nginx_recent_5xx"]["count"]
-    recent_4xx = context["runtime"]["checks"]["lb_nginx_recent_4xx"]["count"]
-    elastic_alias_status = context["elastic"]["alias"]["status"]
-    mysql_databases = context["mysql"]["databases"]
-    smoke_failures = [row["name"] for row in context["app"]["checks"]["smoke_scripts"] if row["status"] != "ok"]
-    cron_warning_jobs = [row["job_name"] for row in context["cron"]["jobs"] if row["status"] in {"warning", "critical"}]
-
-    risks: list[str] = []
-    actions: list[str] = []
-    if host_memory_status == "critical":
-        risks.append("- Memoria del host en umbral critico; el laboratorio puede falsear otros sintomas por presion local.")
-        actions.append("- Revisar consumo de memoria del host y cerrar procesos locales ajenos al stack antes de diagnosticar degradaciones de aplicacion.")
-    if docker_status != "ok":
-        risks.append("- Docker no responde; el contexto de runtime deja de ser fiable.")
-        actions.append("- Recuperar el daemon Docker y repetir el ciclo completo de colectores.")
-    if recent_5xx > 0:
-        risks.append("- Existen respuestas 5xx recientes en lb-nginx.")
-        actions.append("- Revisar logs recientes de lb-nginx y correlacionarlos con request_id y upstream.")
-    if context["runtime"]["checks"]["lb_nginx_recent_4xx"]["status"] != "ok":
-        risks.append("- Existen respuestas 4xx repetidas en lb-nginx; pueden indicar routing roto, recursos faltantes o clientes golpeando rutas invalidas.")
-        actions.append("- Revisar patrones de 4xx recientes para distinguir ruido esperado de una regresion de routing o assets.")
-    if elastic_alias_status != "ok":
-        risks.append("- El alias de lectura de Elasticsearch no esta sano.")
-        actions.append("- Confirmar indices live/archive y republicar el alias antes de dar por buena la busqueda.")
-    for db_row in mysql_databases:
-        db_name = db_row["service"]
-        ping_status = db_row["ping"]["status"]
-        processlist = db_row["processlist"]
-        if ping_status != "ok":
-            risks.append(f"- {db_name} no responde correctamente al ping de MySQL.")
-            actions.append(f"- Revisar conectividad y estado interno de {db_name} antes de repetir jobs o smokes dependientes de DB.")
-        elif processlist["status"] != "ok":
-            risks.append(
-                f"- {db_name} tiene queries largas en processlist: {processlist['warning_count']} observadas, {processlist['critical_count']} por encima del umbral critico."
-            )
-            actions.append(
-                f"- Revisar el processlist de {db_name} y validar manualmente si alguna query larga debe investigarse o matarse de forma controlada."
-            )
-    if smoke_failures:
-        joined = ", ".join(smoke_failures)
-        risks.append(f"- Hay smokes fallidos: {joined}.")
-        actions.append("- Repetir los smokes fallidos y revisar el servicio afectado antes de cerrar la auditoria.")
-    if cron_warning_jobs:
-        joined = ", ".join(cron_warning_jobs)
-        risks.append(f"- Hay jobs de cron fuera de ventana: {joined}.")
-        actions.append("- Confirmar los heartbeats y revisar logs recientes de cron-master para los jobs retrasados.")
-    if editorial_drift == "yes" or platform_drift == "yes":
-        risks.append("- Existe drift entre live y archive que puede invalidar operaciones anuales o tareas editoriales.")
-        actions.append("- Revisar el ultimo drift report y ejecutar la sync correspondiente antes de aceptar divergencia.")
-    if not risks:
-        risks.append("- Sin riesgos adicionales fuera de los checks ya reflejados.")
-    if not actions:
-        actions.append("- Sin accion inmediata; mantener la observacion diaria y repetir smokes tras cambios de runtime.")
-
-    report = f"""# Nightly Auditor
-
-- generated_at: {utc_timestamp()}
-- resumen: {summary}
-- severidad_global: {global_severity}
-
-## Host
-```json
-{dumps_pretty(context["host"])}
-```
-
-## Servicios
-```json
-{dumps_pretty(context["runtime"])}
-```
-
-## Aplicacion
-```json
-{dumps_pretty(context["app"])}
-```
-
-## MySQL
-```json
-{dumps_pretty(context["mysql"])}
-```
-
-## Cron
-```json
-{dumps_pretty(context["cron"])}
-```
-
-## Drift detectado
-- editorial_drift: {editorial_drift}
-- platform_drift: {platform_drift}
-- drift_report: {drift_report_file}
-
-## Riesgos
-{chr(10).join(risks)}
-
-## Acciones recomendadas
-{chr(10).join(actions)}
-
-## Elasticsearch
-```json
-{dumps_pretty(context["elastic"])}
-```
-"""
+    assessment = nightly_runtime.build_nightly_assessment(settings)
+    report = nightly_runtime.render_nightly_report(assessment)
 
     report_file: str | None = None
     if not args.no_write_report:
@@ -427,18 +255,7 @@ def cmd_run_nightly(args: argparse.Namespace) -> int:
 
     _notify_telegram(
         settings,
-        _nightly_telegram_message(
-            severity=global_severity,
-            summary=summary,
-            host_memory_status=host_memory_status,
-            docker_status=docker_status,
-            recent_5xx=recent_5xx,
-            elastic_alias_status=elastic_alias_status,
-            cron_warning_jobs=cron_warning_jobs,
-            editorial_drift=editorial_drift,
-            platform_drift=platform_drift,
-            report_file=report_file,
-        ),
+        nightly_runtime.render_nightly_telegram_message(assessment, report_file=report_file),
         explicit=args.notify_telegram,
         preview=args.telegram_preview,
         default_enabled=_default_notify_allowed(args) and load_telegram_config(settings).notify_on_nightly,
@@ -450,191 +267,13 @@ def cmd_run_nightly(args: argparse.Namespace) -> int:
 
 def cmd_run_sentry(args: argparse.Namespace) -> int:
     settings = load_settings()
-    host = host_collector.collect(settings)
-    runtime = runtime_collector.collect(settings)
-    app = app_collector.collect(settings)
-    mysql = mysql_collector.collect(settings)
-    elastic = elastic_collector.collect(settings)
-    cron = cron_collector.collect(settings)
-    service_logs = logs_collector.collect_service_logs(settings, args.service, args.pattern)
-
-    name_map = {
-        "lb-nginx": "/n9-lb-nginx",
-        "fe-live": "/n9-fe-live",
-        "fe-archive": "/n9-fe-archive",
-        "be-admin": "/n9-be-admin",
-        "db-live": "/n9-db-live",
-        "db-archive": "/n9-db-archive",
-        "elastic": "/n9-elastic",
-        "cron-master": "/n9-cron-master",
-    }
-    container_name = name_map.get(args.service, "")
-    container_health = next((row["health_status"] for row in runtime["containers"] if row["container_name"] == container_name), "unknown")
-
-    severity = "info"
-    summary = args.summary or "incidencia sin hallazgo concluyente"
-    cause = "sin causa probable cerrada con el contexto actual"
-    evidence = [f"- health_status del servicio: {container_health}"]
-    validations: list[str] = []
-    actions: list[str] = []
-
-    if service_logs:
-        evidence.append("- logs acotados del servicio contienen coincidencias con el patron seleccionado")
-
-    if args.service == "lb-nginx":
-        recent_4xx = runtime["checks"]["lb_nginx_recent_4xx"]["count"]
-        recent_5xx = runtime["checks"]["lb_nginx_recent_5xx"]["count"]
-        evidence.append(f"- lb_nginx_recent_4xx: {recent_4xx}")
-        evidence.append(f"- lb_nginx_recent_5xx: {recent_5xx}")
-        if container_health != "healthy":
-            severity = "critical"
-            summary = args.summary or "lb-nginx no esta sano"
-            cause = "caida o degradacion directa del balanceador"
-        elif recent_5xx > 0 or service_logs:
-            severity = "warning"
-            summary = args.summary or "lb-nginx muestra errores recientes"
-            cause = "errores recientes en frontend o upstream degradado"
-        elif recent_4xx >= runtime["checks"]["lb_nginx_recent_4xx"]["warning_threshold"]:
-            severity = runtime["checks"]["lb_nginx_recent_4xx"]["status"]
-            summary = args.summary or "lb-nginx acumula respuestas 4xx repetidas"
-            cause = "clientes, assets o rutas estan generando errores 4xx de forma anomala"
-        else:
-            summary = args.summary or "lb-nginx sano sin errores recientes"
-            cause = "sin evidencia actual de fallo en lb-nginx"
-        validations.extend([
-            "- revisar request_id, host y php_upstream de las peticiones afectadas",
-            "- repetir smoke-routing y verificar /healthz en ambos hosts",
-        ])
-        actions.append("- inspeccionar logs recientes de lb-nginx y del upstream implicado")
-    elif args.service == "elastic":
-        alias_status = elastic["alias"]["status"]
-        cluster_status = elastic["cluster_health"]["status"]
-        evidence.append(f"- elastic alias status: {alias_status}")
-        evidence.append(f"- elastic cluster status: {cluster_status}")
-        if container_health != "healthy" or alias_status != "ok":
-            severity = "critical"
-            summary = args.summary or "elastic o el alias de lectura no estan sanos"
-            cause = "busqueda degradada por caida de elastic o alias ausente"
-        elif cluster_status not in {"green", "yellow"}:
-            severity = "warning"
-            summary = args.summary or "elastic reporta estado no nominal"
-            cause = "salud de cluster distinta del baseline de laboratorio"
-        else:
-            summary = args.summary or "elastic sano en el baseline del laboratorio"
-            cause = "sin evidencia actual de fallo de busqueda"
-        validations.extend([
-            "- confirmar _cluster/health, indices live/archive y alias n9-search-posts",
-            "- repetir smoke-search para validar la capa publica",
-        ])
-        actions.append("- revisar el ultimo reindexado y republicar alias si falta")
-    elif args.service == "cron-master":
-        delayed_jobs = [row["job_name"] for row in cron["jobs"] if row["status"] in {"warning", "critical"}]
-        evidence.append(f"- delayed_jobs: {', '.join(delayed_jobs) if delayed_jobs else 'none'}")
-        if container_health != "healthy":
-            severity = "critical"
-            summary = args.summary or "cron-master no esta sano"
-            cause = "caida del runtime que ejecuta jobs criticos"
-        elif delayed_jobs or service_logs:
-            severity = "warning"
-            summary = args.summary or "cron-master presenta retrasos o errores recientes"
-            cause = "jobs fuera de ventana o errores en logs del cron"
-        else:
-            summary = args.summary or "cron-master sano sin retrasos visibles"
-            cause = "sin evidencia actual de fallo en cron-master"
-        validations.append("- confirmar heartbeats de sync editorial, sync de plataforma y rollover")
-        actions.append("- revisar los logs recientes y reejecutar manualmente solo el job afectado si procede")
-    elif args.service in {"db-live", "db-archive"}:
-        db_row = next(row for row in mysql["databases"] if row["service"] == args.service)
-        ping_status = db_row["ping"]["status"]
-        processlist = db_row["processlist"]
-        evidence.append(f"- mysql ping status: {ping_status}")
-        evidence.append(f"- long_queries_warning_count: {processlist['warning_count']}")
-        evidence.append(f"- long_queries_critical_count: {processlist['critical_count']}")
-        if processlist["queries"]:
-            query_ids = ", ".join(str(row["id"]) for row in processlist["queries"][:5])
-            evidence.append(f"- candidate_query_ids: {query_ids}")
-        if ping_status != "ok" or container_health != "healthy":
-            severity = "critical"
-            summary = args.summary or f"{args.service} no esta sano o no responde al ping"
-            cause = "caida del contenedor, conectividad rota o mysql no responde correctamente"
-        elif processlist["critical_count"] > 0:
-            severity = "critical"
-            summary = args.summary or f"{args.service} tiene queries largas por encima del umbral critico"
-            cause = "una o varias queries de larga duracion pueden estar bloqueando o degradando la base de datos"
-        elif processlist["warning_count"] > 0:
-            severity = "warning"
-            summary = args.summary or f"{args.service} tiene queries largas en processlist"
-            cause = "consultas largas activas que conviene revisar antes de que degraden el servicio"
-        else:
-            summary = args.summary or f"{args.service} sano sin queries largas relevantes"
-            cause = "sin evidencia actual de queries largas o bloqueo anomalo"
-        validations.extend(
-            [
-                f"- revisar processlist de {args.service} y confirmar si las queries largas son esperadas",
-                "- contrastar con slow query log y con plugins recientes que afecten a SEO o metadatos",
-            ]
-        )
-        actions.append(
-            "- documentar manualmente cualquier query candidata a `KILL`, pero no ejecutar corte automatico en esta fase"
-        )
-    else:
-        if container_health != "healthy":
-            severity = "critical"
-            summary = args.summary or f"{args.service} no esta sano"
-            cause = "contenedor degradado o caido"
-        elif service_logs:
-            severity = "warning"
-            summary = args.summary or f"{args.service} contiene errores recientes"
-            cause = "errores del servicio detectados en logs acotados"
-        else:
-            summary = args.summary or f"{args.service} sano sin errores recientes"
-            cause = "sin evidencia actual de fallo en el servicio"
-        validations.append(f"- revisar healthcheck y logs recientes del servicio {args.service}")
-        actions.append("- repetir el smoke funcional relacionado con el servicio afectado")
-
-    risk = (
-        "el servicio puede quedar caido o degradar rutas base del sitio"
-        if severity == "critical"
-        else "el problema puede escalar a degradacion visible si persiste"
-        if severity == "warning"
-        else "sin impacto inmediato confirmado"
+    diagnosis = sentry_runtime.build_sentry_diagnosis(
+        settings,
+        args.service,
+        pattern=args.pattern,
+        summary_override=args.summary,
     )
-
-    report = f"""# Sentry Agent
-
-- generated_at: {utc_timestamp()}
-- resumen: {summary}
-- severidad: {severity}
-- servicio_afectado: {args.service}
-
-## Evidencias
-{chr(10).join(evidence)}
-
-## Causa probable
-{cause}
-
-## Validaciones recomendadas
-{chr(10).join(validations)}
-
-## Acciones manuales
-{chr(10).join(actions)}
-
-## Playbook ansible sugerido
-- revisar y traducir el diagnostico a un playbook especifico del servicio antes de automatizar cualquier remediacion
-
-## Riesgo si no se actua
-{risk}
-
-## Contexto adicional
-```json
-{dumps_pretty({"host": host, "runtime": runtime, "app": app, "mysql": mysql, "elastic": elastic, "cron": cron})}
-```
-
-## Logs acotados
-```
-{service_logs or "sin coincidencias"}
-```
-"""
+    report = sentry_runtime.render_sentry_report(diagnosis)
 
     report_file: str | None = None
     if not args.no_write_report:
@@ -645,14 +284,7 @@ def cmd_run_sentry(args: argparse.Namespace) -> int:
 
     _notify_telegram(
         settings,
-        _sentry_telegram_message(
-            severity=severity,
-            service=args.service,
-            summary=summary,
-            cause=cause,
-            risk=risk,
-            report_file=report_file,
-        ),
+        sentry_runtime.render_sentry_telegram_message(diagnosis, report_file=report_file),
         explicit=args.notify_telegram,
         preview=args.telegram_preview,
         default_enabled=_default_notify_allowed(args) and load_telegram_config(settings).notify_on_sentry,
@@ -756,6 +388,10 @@ def build_parser() -> argparse.ArgumentParser:
     render_reactive_cron.add_argument("--python-bin", default=python_bin_default)
     render_reactive_cron.set_defaults(func=cmd_render_reactive_crontab)
 
+    render_sync_cron = subparsers.add_parser("render-sync-crontab")
+    render_sync_cron.add_argument("--python-bin", default=python_bin_default)
+    render_sync_cron.set_defaults(func=cmd_render_sync_crontab)
+
     install_cron = subparsers.add_parser("install-nightly-crontab")
     install_cron.add_argument("--python-bin", default=python_bin_default)
     install_cron.set_defaults(func=cmd_install_nightly_crontab)
@@ -764,11 +400,18 @@ def build_parser() -> argparse.ArgumentParser:
     install_reactive.add_argument("--python-bin", default=python_bin_default)
     install_reactive.set_defaults(func=cmd_install_reactive_crontab)
 
+    install_sync = subparsers.add_parser("install-sync-crontab")
+    install_sync.add_argument("--python-bin", default=python_bin_default)
+    install_sync.set_defaults(func=cmd_install_sync_crontab)
+
     remove_cron = subparsers.add_parser("remove-nightly-crontab")
     remove_cron.set_defaults(func=cmd_remove_nightly_crontab)
 
     remove_reactive = subparsers.add_parser("remove-reactive-crontab")
     remove_reactive.set_defaults(func=cmd_remove_reactive_crontab)
+
+    remove_sync = subparsers.add_parser("remove-sync-crontab")
+    remove_sync.set_defaults(func=cmd_remove_sync_crontab)
 
     telegram_test = subparsers.add_parser("send-telegram-test")
     telegram_test.add_argument("--message")

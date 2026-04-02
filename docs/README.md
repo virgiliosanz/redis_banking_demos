@@ -15,6 +15,8 @@ El historico de trabajo y los planes de proyecto viven en `tasks/`.
 - plano reactivo ligero resuelto con `cron` + evaluador Python + cooldown por incidente
 - orquestacion compleja ya movida a Python en `ops/`
 - checks MySQL en solo lectura con `ping` y processlist largo para `db-live` y `db-archive`
+- drift `live/archive` con resumen accionable para editorial y plataforma
+- baseline reproducible de calidad para Python, shell, PHP y `docker compose`
 
 ## Topologia funcional
 
@@ -43,10 +45,10 @@ La frontera anual real del balanceador ya no esta hardcodeada: sale de `config/r
 - bootstrap local reproducible con `./scripts/bootstrap-local-stack.sh`
 - smoke tests de routing, servicios, busqueda, cache, persistencia y funcionalidad
 - rollover anual con `report-only`, `dry-run` y `execute`
-- sync editorial y de plataforma con drift report
+- sync editorial y de plataforma con drift report accionable
 - auditoria nocturna programable con `cron`
 - agente reactivo programable con `cron`, deduplicacion y salida a Telegram
-- baseline minimo de calidad Python con verificacion reproducible del paquete `ops/`
+- baseline reproducible de calidad para Python, shell, PHP y `docker compose`
 
 ## Limites actuales
 - laboratorio local, no produccion

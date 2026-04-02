@@ -14,24 +14,24 @@ def run(settings: Settings, *, mode: str, report_dir: Path | None = None) -> Pat
     if not target_report_dir.is_absolute():
         target_report_dir = cwd / target_report_dir
 
-    wait_for_sync_services()
+    wait_for_sync_services(settings)
 
     source_snapshot = wp_eval_json(
         cwd=cwd,
         path="/srv/wp/live",
-        script_path="/opt/project/scripts/sync-editorial-source-snapshot.php",
+        script_path="/opt/project/scripts/internal/sync/editorial/source-snapshot.php",
         excluded_logins=excluded_logins,
     )
     sanitized_source_snapshot = wp_eval_json(
         cwd=cwd,
         path="/srv/wp/live",
-        script_path="/opt/project/scripts/sync-editorial-snapshot.php",
+        script_path="/opt/project/scripts/internal/sync/editorial/snapshot.php",
         excluded_logins=excluded_logins,
     )
     plan_json = wp_eval_json(
         cwd=cwd,
         path="/srv/wp/archive",
-        script_path="/opt/project/scripts/sync-editorial-plan.php",
+        script_path="/opt/project/scripts/internal/sync/editorial/plan.php",
         snapshot_json=source_snapshot,
         excluded_logins=excluded_logins,
     )
@@ -41,7 +41,7 @@ def run(settings: Settings, *, mode: str, report_dir: Path | None = None) -> Pat
         apply_json = wp_eval_json(
             cwd=cwd,
             path="/srv/wp/archive",
-            script_path="/opt/project/scripts/sync-editorial-apply.php",
+            script_path="/opt/project/scripts/internal/sync/editorial/apply.php",
             snapshot_json=source_snapshot,
             excluded_logins=excluded_logins,
         )

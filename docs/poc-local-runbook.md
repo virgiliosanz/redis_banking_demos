@@ -86,12 +86,13 @@ Notas:
 - los informes completos siguen quedando en `runtime/reports/ia-ops/`
 - el token del bot no debe guardarse en el repositorio
 
-### Programacion local con cron
+### Programacion gestionada con cron
 Previsualizar el bloque gestionado:
 
 ```sh
 ./scripts/install-nightly-auditor-cron.sh --print
 ./scripts/install-reactive-watch-cron.sh --print
+./scripts/install-sync-jobs-cron.sh --print
 ```
 
 Instalarlo en el `crontab` del usuario actual:
@@ -99,6 +100,7 @@ Instalarlo en el `crontab` del usuario actual:
 ```sh
 ./scripts/install-nightly-auditor-cron.sh
 ./scripts/install-reactive-watch-cron.sh
+./scripts/install-sync-jobs-cron.sh
 ```
 
 Eliminar solo el bloque gestionado del proyecto:
@@ -106,16 +108,25 @@ Eliminar solo el bloque gestionado del proyecto:
 ```sh
 ./scripts/install-nightly-auditor-cron.sh --remove
 ./scripts/install-reactive-watch-cron.sh --remove
+./scripts/install-sync-jobs-cron.sh --remove
 ```
 
 Notas:
-- el job queda programado a las `02:00` hora local del host
+- en este host de laboratorio no se deja ningun bloque gestionado instalado por defecto; aqui se usa sobre todo `--print` y ejecucion manual
+- en preproduccion y produccion si deberian instalarse los bloques gestionados de `nightly`, `reactive` y `sync`, porque forman parte del baseline operativo esperado
+- el `Nightly Auditor` queda programado a las `05:15` hora local del host
 - el bloque se instala con marcador gestionado `NUEVECUATROUNO_IA_OPS_NIGHTLY`
 - el flujo reactivo se programa cada `5` minutos con el bloque `NUEVECUATROUNO_IA_OPS_REACTIVE`
+- la sync editorial queda programada a las `04:15` con el bloque `NUEVECUATROUNO_IA_OPS_SYNC`
+- la sync de plataforma queda programada a las `04:45` dentro del mismo bloque gestionado
 - el `crontab` previo se respalda en `./runtime/reports/ia-ops/`
 - la salida del job se anexa en `./runtime/reports/ia-ops/nightly-auditor.cron.log`
 - la salida del flujo reactivo se anexa en `./runtime/reports/ia-ops/reactive-watch.cron.log`
+- la salida de sync editorial se anexa en `./runtime/reports/sync/editorial-sync.cron.log`
+- la salida de sync de plataforma se anexa en `./runtime/reports/sync/platform-sync.cron.log`
 - el flujo reactivo aplica cooldown y deduplicacion por incidente antes de relanzar `Sentry Agent`
+- ambos sync jobs se ejecutan en `apply` por defecto porque son los que actualizan heartbeats y cierran el baseline operativo del laboratorio
+- los jobs diarios se dejan fuera de la franja `02:00-04:00` para evitar ambiguedades en cambios de hora locales
 
 ### URLs principales
 - Front `live`: `http://nuevecuatrouno.test/`

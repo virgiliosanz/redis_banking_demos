@@ -13,27 +13,27 @@ def run(settings: Settings, *, mode: str, report_dir: Path | None = None) -> Pat
     if not target_report_dir.is_absolute():
         target_report_dir = cwd / target_report_dir
 
-    wait_for_sync_services()
+    wait_for_sync_services(settings)
 
     source_snapshot = wp_eval_json(
         cwd=cwd,
         path="/srv/wp/live",
-        script_path="/opt/project/scripts/sync-platform-source-snapshot.php",
+        script_path="/opt/project/scripts/internal/sync/platform/source-snapshot.php",
     )
     sanitized_live_snapshot = wp_eval_json(
         cwd=cwd,
         path="/srv/wp/live",
-        script_path="/opt/project/scripts/sync-platform-snapshot.php",
+        script_path="/opt/project/scripts/internal/sync/platform/snapshot.php",
     )
     sanitized_archive_snapshot_before = wp_eval_json(
         cwd=cwd,
         path="/srv/wp/archive",
-        script_path="/opt/project/scripts/sync-platform-snapshot.php",
+        script_path="/opt/project/scripts/internal/sync/platform/snapshot.php",
     )
     plan_json = wp_eval_json(
         cwd=cwd,
         path="/srv/wp/archive",
-        script_path="/opt/project/scripts/sync-platform-plan.php",
+        script_path="/opt/project/scripts/internal/sync/platform/plan.php",
         snapshot_json=source_snapshot,
     )
 
@@ -43,13 +43,13 @@ def run(settings: Settings, *, mode: str, report_dir: Path | None = None) -> Pat
         apply_json = wp_eval_json(
             cwd=cwd,
             path="/srv/wp/archive",
-            script_path="/opt/project/scripts/sync-platform-apply.php",
+            script_path="/opt/project/scripts/internal/sync/platform/apply.php",
             snapshot_json=source_snapshot,
         )
         sanitized_archive_snapshot_after = wp_eval_json(
             cwd=cwd,
             path="/srv/wp/archive",
-            script_path="/opt/project/scripts/sync-platform-snapshot.php",
+            script_path="/opt/project/scripts/internal/sync/platform/snapshot.php",
         )
         write_sync_heartbeat(settings, "CRON_JOB_PLATFORM_SYNC", "sync-platform-config")
 

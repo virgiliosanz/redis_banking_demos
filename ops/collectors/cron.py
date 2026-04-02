@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from ..config import Settings
 from ..runtime.heartbeats import read_heartbeat
+from ..services import compose_service_name
 from ..util.docker import service_logs
 from ..util.thresholds import severity_from_thresholds
 from ..util.time import epoch_now, utc_timestamp
@@ -15,26 +15,23 @@ def _job_specs(settings: Settings) -> list[tuple[str, int, int, str]]:
     platform = settings.get("CRON_JOB_PLATFORM_SYNC", "sync-platform-config")
     rollover = settings.get("CRON_JOB_ROLLOVER", "rollover-content-year")
 
-    default_warning = settings.get_int("CRON_WARNING_DELAY_MINUTES", 30)
-    default_critical = settings.get_int("CRON_CRITICAL_DELAY_MINUTES", 120)
-
     return [
         (
             editorial,
-            settings.get_int("CRON_JOB_EDITORIAL_SYNC_WARNING_MINUTES", default_warning),
-            settings.get_int("CRON_JOB_EDITORIAL_SYNC_CRITICAL_MINUTES", default_critical),
+            settings.get_int("CRON_JOB_EDITORIAL_SYNC_WARNING_MINUTES", 1440),
+            settings.get_int("CRON_JOB_EDITORIAL_SYNC_CRITICAL_MINUTES", 2880),
             settings.get("CRON_JOB_EDITORIAL_SYNC_MISSING_STATUS", "warning") or "warning",
         ),
         (
             platform,
-            settings.get_int("CRON_JOB_PLATFORM_SYNC_WARNING_MINUTES", default_warning),
-            settings.get_int("CRON_JOB_PLATFORM_SYNC_CRITICAL_MINUTES", default_critical),
+            settings.get_int("CRON_JOB_PLATFORM_SYNC_WARNING_MINUTES", 1440),
+            settings.get_int("CRON_JOB_PLATFORM_SYNC_CRITICAL_MINUTES", 2880),
             settings.get("CRON_JOB_PLATFORM_SYNC_MISSING_STATUS", "warning") or "warning",
         ),
         (
             rollover,
-            settings.get_int("CRON_JOB_ROLLOVER_WARNING_MINUTES", default_warning),
-            settings.get_int("CRON_JOB_ROLLOVER_CRITICAL_MINUTES", default_critical),
+            settings.get_int("CRON_JOB_ROLLOVER_WARNING_MINUTES", 525600),
+            settings.get_int("CRON_JOB_ROLLOVER_CRITICAL_MINUTES", 527040),
             settings.get("CRON_JOB_ROLLOVER_MISSING_STATUS", "info") or "info",
         ),
     ]
@@ -42,6 +39,8 @@ def _job_specs(settings: Settings) -> list[tuple[str, int, int, str]]:
 
 def collect(settings: Settings) -> dict[str, object]:
     heartbeat_dir = settings.get_path("CRON_HEARTBEAT_DIR", "./runtime/heartbeats")
+    if not heartbeat_dir.is_absolute():
+        heartbeat_dir = settings.project_root.resolve() / heartbeat_dir
     now_epoch = epoch_now()
     jobs: list[dict[str, object]] = []
 
@@ -70,9 +69,17 @@ def collect(settings: Settings) -> dict[str, object]:
         )
 
     log_lines = settings.get_int("LOG_TAIL_LINES", 500)
-    logs = service_logs("cron-master", tail_lines=log_lines, cwd=Path.cwd())
+    logs = service_logs(compose_service_name("cron-master"), tail_lines=log_lines, cwd=settings.project_root.resolve())
     recent_error_count = len(re.findall(r"ERROR|FATAL|CRITICAL", logs, flags=re.IGNORECASE))
-    log_status = "critical" if recent_error_count >= 5 else "warning" if recent_error_count > 0 else "ok"
+    warning_log_count = settings.get_int("CRON_LOG_ERRORS_WARNING_COUNT", 1)
+    critical_log_count = settings.get_int("CRON_LOG_ERRORS_CRITICAL_COUNT", 5)
+    log_status = (
+        "critical"
+        if recent_error_count >= critical_log_count
+        else "warning"
+        if recent_error_count >= warning_log_count
+        else "ok"
+    )
 
     return {
         "generated_at": utc_timestamp(),
@@ -81,5 +88,10 @@ def collect(settings: Settings) -> dict[str, object]:
         "recent_log_errors": {
             "count": recent_error_count,
             "status": log_status,
+            "pattern": "ERROR|FATAL|CRITICAL",
+            "source": compose_service_name("cron-master"),
+            "tail_lines": log_lines,
+            "warning_threshold": warning_log_count,
+            "critical_threshold": critical_log_count,
         },
     }

@@ -6,25 +6,12 @@ import os
 from pathlib import Path
 
 from ..config import Settings
-from ..collectors import cron as cron_collector
-from ..collectors import elastic as elastic_collector
-from ..collectors import runtime as runtime_collector
+from ..context import collect_operational_context, load_drift_status
 from ..reporting import ensure_directory
+from ..services import inspect_name_map
+from .drift import format_drift_summary
+from .incidents import ReactiveIncident, build_reactive_incidents
 from ..util.time import epoch_now, utc_timestamp
-
-
-@dataclass(frozen=True)
-class ReactiveIncident:
-    key: str
-    service: str
-    severity: str
-    summary: str
-    pattern: str | None = None
-
-
-def _reports_root(settings: Settings) -> Path:
-    report_root = settings.get_path("REPORT_ROOT", "./runtime/reports/ia-ops")
-    return (settings.project_root / report_root).resolve() if not report_root.is_absolute() else report_root
 
 
 def state_file(settings: Settings) -> Path:
@@ -111,91 +98,32 @@ def release_lock(target: Path | None) -> None:
 
 
 def evaluate(settings: Settings) -> dict[str, object]:
-    runtime = runtime_collector.collect(settings)
-    elastic = elastic_collector.collect(settings)
-    cron = cron_collector.collect(settings)
-
-    incidents: list[ReactiveIncident] = []
-    service_map = {
-        "/n9-lb-nginx": "lb-nginx",
-        "/n9-fe-live": "fe-live",
-        "/n9-fe-archive": "fe-archive",
-        "/n9-be-admin": "be-admin",
-        "/n9-db-live": "db-live",
-        "/n9-db-archive": "db-archive",
-        "/n9-elastic": "elastic",
-        "/n9-cron-master": "cron-master",
-    }
-
-    for row in runtime["containers"]:
-        health_status = row["health_status"]
-        container_name = row["container_name"]
-        service = service_map.get(container_name)
-        if service is None:
-            continue
-        if health_status in {"unhealthy", "exited", "dead"}:
-            severity = "critical" if health_status != "unhealthy" else "warning"
-            incidents.append(
-                ReactiveIncident(
-                    key=f"{service}:health:{health_status}",
-                    service=service,
-                    severity=severity,
-                    summary=f"{service} con estado {health_status}",
-                )
-            )
-
-    recent_4xx = runtime["checks"]["lb_nginx_recent_4xx"]
-    if recent_4xx["status"] != "ok":
-        incidents.append(
-            ReactiveIncident(
-                key=f"lb-nginx:4xx:{recent_4xx['status']}",
-                service="lb-nginx",
-                severity=recent_4xx["status"],
-                summary=f"lb-nginx acumula {recent_4xx['count']} respuestas 4xx recientes",
-                pattern=" 4\\d\\d ",
-            )
-        )
-
-    recent_5xx = runtime["checks"]["lb_nginx_recent_5xx"]
-    if recent_5xx["status"] != "ok":
-        incidents.append(
-            ReactiveIncident(
-                key=f"lb-nginx:5xx:{recent_5xx['status']}",
-                service="lb-nginx",
-                severity=recent_5xx["status"],
-                summary=f"lb-nginx acumula {recent_5xx['count']} respuestas 5xx recientes",
-                pattern=" 5\\d\\d ",
-            )
-        )
-
-    if elastic["alias"]["status"] != "ok":
-        incidents.append(
-            ReactiveIncident(
-                key="elastic:alias:missing",
-                service="elastic",
-                severity="critical",
-                summary="alias de lectura de Elasticsearch ausente",
-            )
-        )
-
-    delayed_jobs = [row["job_name"] for row in cron["jobs"] if row["status"] in {"warning", "critical"}]
-    if delayed_jobs:
-        severity = "critical" if any(row["status"] == "critical" for row in cron["jobs"]) else "warning"
-        incidents.append(
-            ReactiveIncident(
-                key=f"cron-master:delayed:{severity}",
-                service="cron-master",
-                severity=severity,
-                summary=f"cron-master tiene jobs fuera de ventana: {', '.join(delayed_jobs)}",
-                pattern="ERROR|FATAL|CRITICAL",
-            )
-        )
+    context = collect_operational_context(settings)
+    drift = load_drift_status(settings)
+    context["service_map"] = inspect_name_map(settings)
+    incidents = build_reactive_incidents(
+        context,
+        editorial_drift=drift.editorial.status,
+        platform_drift=drift.platform.status,
+    )
 
     return {
-        "generated_at": utc_timestamp(),
-        "runtime": runtime,
-        "elastic": elastic,
-        "cron": cron,
+        "generated_at": context["generated_at"],
+        "host": context["host"],
+        "runtime": context["runtime"],
+        "app": context["app"],
+        "mysql": context["mysql"],
+        "elastic": context["elastic"],
+        "cron": context["cron"],
+        "drift": {
+            "report_file": drift.report_file,
+            "editorial_drift": drift.editorial.status,
+            "platform_drift": drift.platform.status,
+            "editorial_summary": drift.editorial.summary,
+            "platform_summary": drift.platform.summary,
+            "editorial_brief": format_drift_summary(drift.editorial),
+            "platform_brief": format_drift_summary(drift.platform),
+        },
         "incidents": [
             {
                 "key": incident.key,
