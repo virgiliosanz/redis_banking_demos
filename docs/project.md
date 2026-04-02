@@ -16,8 +16,9 @@ Indice documental vivo: `docs/README.md`.
 - Las syncs editorial y de plataforma ya mantienen la consistencia minima entre `live` y `archive`.
 - `IA-Ops Bootstrap` ya dispone de colectores read-only, `Nightly Auditor` y `Sentry Agent` minimos.
 - `Nightly Auditor` ya puede programarse de forma reproducible con `cron` mediante un bloque gestionado versionado en el repo.
+- La salida ya puede conectarse a Telegram con resumen corto para `Nightly Auditor` y `Sentry Agent`.
 - `Monit` queda evaluado como opcion reactiva futura, no como requisito del laboratorio actual.
-- Siguiente iteracion recomendada: conectar la salida a un canal real de alertas/incidencias y decidir si el disparo reactivo merece `Monit` o una alternativa mas simple.
+- Siguiente iteracion recomendada: validar entrega real a Telegram con credenciales del entorno y decidir si el disparo reactivo merece `Monit` o una alternativa mas simple.
 
 ### Artefactos implementados
 - `compose.yaml` operativo con `LB-Nginx`, `FE-Live`, `FE-Archive`, `BE-Admin`, `DB-Live`, `DB-Archive`, `Elastic` y `Cron-Master`.

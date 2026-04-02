@@ -372,6 +372,9 @@ Dejar el auditor nocturno programado y el flujo reactivo listo para disparo.
 - Un bloque gestionado de `crontab` es suficiente para laboratorio y deja espacio para retirar o sustituir el scheduling sin tocar la logica IA-Ops.
 
 ### Fase 5. Canal real de alertas e incidentes
+#### Estado
+Completada
+
 #### Objetivo
 Conectar la salida a un destino util para operacion humana.
 
@@ -382,6 +385,38 @@ Conectar la salida a un destino util para operacion humana.
 
 #### Criterios de cierre
 - Los informes pueden salir del host hacia un canal real sin exponer datos sensibles.
+
+#### Progreso actual
+- Se fija Telegram como primer canal real de alertas.
+- La integracion se plantea con un backend propio pequeno en `ops/notifications/telegram.py`, sin acoplar el resto del sistema a la API de Telegram.
+- `Nightly Auditor` y `Sentry Agent` pasan a soportar:
+  - vista previa local del mensaje
+  - envio explicito a Telegram
+  - activacion por configuracion si el canal queda habilitado
+- Se protege el repo para que `config/ia-ops-sources.env` quede ignorado por Git y pueda alojar `TELEGRAM_BOT_TOKEN` localmente sin contaminar commits.
+
+#### Decisiones tomadas
+- Telegram se usa como primer canal real porque es suficiente para laboratorio y no obliga a meter infraestructura adicional.
+- El mensaje enviado al canal es un resumen corto y saneado; los informes completos se siguen guardando en `runtime/reports/ia-ops/`.
+- La configuracion sensible del canal vive en `config/ia-ops-sources.env` local o variables de entorno, nunca en el repo.
+- `Nightly Auditor` y `Sentry Agent` soportan dos modos:
+  - envio automatico si el canal queda habilitado por configuracion
+  - envio explicito con `--notify-telegram`
+
+#### Validacion ejecutada
+- `python3 -m py_compile ops/config.py ops/cli/ia_ops.py ops/notifications/telegram.py`: OK.
+- `python3 -m ops.cli.ia_ops send-telegram-test --preview`: OK.
+- `python3 -m ops.cli.ia_ops run-nightly-auditor --telegram-preview --no-write-report`: OK.
+- `python3 -m ops.cli.ia_ops run-sentry-agent --service elastic --telegram-preview --no-write-report`: OK.
+- Envio real a Telegram:
+  - `scripts/send-telegram-test.sh`: OK.
+  - `scripts/run-nightly-auditor.sh --notify-telegram`: OK.
+  - `scripts/run-sentry-agent.sh --service elastic --notify-telegram --no-write-report`: OK.
+
+#### Lecciones aprendidas
+- El canal real debe recibir resúmenes cortos; mandar el informe entero al chat degrada la utilidad operativa.
+- Ignorar `config/ia-ops-sources.env` en Git no es opcional si vamos a permitir tokens de integracion locales.
+- El flag explicito `--notify-telegram` debe prevalecer aunque la activacion automatica del canal este apagada.
 
 ### Fase 6. Migracion selectiva de syncs y rollover
 #### Objetivo

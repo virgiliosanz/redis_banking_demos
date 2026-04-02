@@ -64,6 +64,12 @@ class Settings:
             return default
         return int(value)
 
+    def get_bool(self, key: str, default: bool = False) -> bool:
+        value = self.values.get(key)
+        if value is None or value == "":
+            return default
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+
     def get_path(self, key: str, default: str) -> Path:
         value = self.values.get(key, default)
         return Path(value)

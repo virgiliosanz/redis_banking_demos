@@ -13,8 +13,10 @@ Este directorio documenta convenciones de configuracion no sensible.
 - Usuarios y passwords de WordPress
 - Claves y salts de WordPress
 - Certificados TLS
+- `TELEGRAM_BOT_TOKEN` y cualquier otro token de integracion externa
 
 ## Bootstrap local
 - `scripts/bootstrap-local-secrets.sh` genera secretos locales de desarrollo bajo `./.secrets/`.
 - `scripts/bootstrap-wordpress-config.sh` genera `wp-config.php` y `wp-common.php` dentro de `./runtime/wp-root/`.
 - `config/ia-ops-sources.env.example` documenta las fuentes permitidas y umbrales no sensibles del futuro `IA-Ops Bootstrap`.
+- Si necesitas activar Telegram, crea `config/ia-ops-sources.env` local no versionado o exporta variables de entorno; ese fichero queda ignorado por Git.

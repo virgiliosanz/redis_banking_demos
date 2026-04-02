@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import json
 import sys
 from pathlib import Path
@@ -12,6 +13,7 @@ from ..collectors import elastic as elastic_collector
 from ..collectors import host as host_collector
 from ..collectors import logs as logs_collector
 from ..collectors import runtime as runtime_collector
+from ..notifications.telegram import load_telegram_config, send_message
 from ..reporting import write_json_report, write_text_report
 from ..runtime.drift import build_drift_report
 from ..scheduling.cron import install_nightly_auditor_crontab, remove_nightly_auditor_crontab, render_nightly_auditor_block
@@ -21,6 +23,94 @@ from ..util.time import report_stamp, utc_timestamp
 
 def _print_json(payload: object) -> None:
     print(dumps_pretty(payload))
+
+
+def _send_telegram_preview(message: str) -> None:
+    print(message, file=sys.stderr)
+
+
+def _notify_telegram(settings, message: str, *, explicit: bool, preview: bool, default_enabled: bool) -> None:
+    telegram = load_telegram_config(settings)
+    should_notify = explicit or (telegram.enabled and default_enabled)
+
+    if preview:
+        _send_telegram_preview(message)
+        return
+
+    if not should_notify:
+        return
+
+    if explicit and not telegram.enabled:
+        telegram = replace(telegram, enabled=True)
+
+    result = send_message(telegram, message)
+    message_id = result.get("result", {}).get("message_id", "unknown")
+    print(f"telegram notification sent with message_id={message_id}", file=sys.stderr)
+
+
+def _nightly_telegram_message(
+    *,
+    severity: str,
+    summary: str,
+    host_memory_status: str,
+    docker_status: str,
+    recent_5xx: int,
+    elastic_alias_status: str,
+    cron_warning_jobs: list[str],
+    editorial_drift: str,
+    platform_drift: str,
+    report_file: str | None,
+) -> str:
+    delayed_jobs = ", ".join(cron_warning_jobs) if cron_warning_jobs else "none"
+    report_line = f"report: {report_file}" if report_file else "report: no generado"
+    return "\n".join(
+        [
+            f"[Nightly Auditor][{severity.upper()}]",
+            summary,
+            f"host_memory: {host_memory_status}",
+            f"docker: {docker_status}",
+            f"lb_nginx_recent_5xx: {recent_5xx}",
+            f"elastic_alias: {elastic_alias_status}",
+            f"cron_delayed_jobs: {delayed_jobs}",
+            f"editorial_drift: {editorial_drift}",
+            f"platform_drift: {platform_drift}",
+            report_line,
+        ]
+    )
+
+
+def _sentry_telegram_message(
+    *,
+    severity: str,
+    service: str,
+    summary: str,
+    cause: str,
+    risk: str,
+    report_file: str | None,
+) -> str:
+    report_line = f"report: {report_file}" if report_file else "report: no generado"
+    return "\n".join(
+        [
+            f"[Sentry Agent][{severity.upper()}]",
+            f"service: {service}",
+            summary,
+            f"cause: {cause}",
+            f"risk: {risk}",
+            report_line,
+        ]
+    )
+
+
+def cmd_send_telegram_test(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    message = args.message or "IA-Ops Telegram test desde nuevecuatrouno"
+    if args.preview:
+        _send_telegram_preview(message)
+        return 0
+    result = send_message(load_telegram_config(settings), message)
+    message_id = result.get("result", {}).get("message_id", "unknown")
+    print(f"telegram test sent with message_id={message_id}")
+    return 0
 
 
 def cmd_collect_host(_: argparse.Namespace) -> int:
@@ -221,10 +311,31 @@ def cmd_run_nightly(args: argparse.Namespace) -> int:
 ```
 """
 
+    report_file: str | None = None
     if not args.no_write_report:
         report_root = settings.get_path("REPORT_ROOT", "./runtime/reports/ia-ops")
-        report_file = write_text_report(report_root, f"nightly-auditor-{report_stamp()}.md", report)
+        report_path = write_text_report(report_root, f"nightly-auditor-{report_stamp()}.md", report)
+        report_file = str(report_path)
         print(f"nightly auditor report written to {report_file}", file=sys.stderr)
+
+    _notify_telegram(
+        settings,
+        _nightly_telegram_message(
+            severity=global_severity,
+            summary=summary,
+            host_memory_status=host_memory_status,
+            docker_status=docker_status,
+            recent_5xx=recent_5xx,
+            elastic_alias_status=elastic_alias_status,
+            cron_warning_jobs=cron_warning_jobs,
+            editorial_drift=editorial_drift,
+            platform_drift=platform_drift,
+            report_file=report_file,
+        ),
+        explicit=args.notify_telegram,
+        preview=args.telegram_preview,
+        default_enabled=load_telegram_config(settings).notify_on_nightly,
+    )
 
     print(report)
     return 0
@@ -377,10 +488,27 @@ def cmd_run_sentry(args: argparse.Namespace) -> int:
 ```
 """
 
+    report_file: str | None = None
     if not args.no_write_report:
         report_root = settings.get_path("REPORT_ROOT", "./runtime/reports/ia-ops")
-        report_file = write_text_report(report_root, f"sentry-{args.service}-{report_stamp()}.md", report)
+        report_path = write_text_report(report_root, f"sentry-{args.service}-{report_stamp()}.md", report)
+        report_file = str(report_path)
         print(f"sentry report written to {report_file}", file=sys.stderr)
+
+    _notify_telegram(
+        settings,
+        _sentry_telegram_message(
+            severity=severity,
+            service=args.service,
+            summary=summary,
+            cause=cause,
+            risk=risk,
+            report_file=report_file,
+        ),
+        explicit=args.notify_telegram,
+        preview=args.telegram_preview,
+        default_enabled=load_telegram_config(settings).notify_on_sentry,
+    )
     print(report)
     return 0
 
@@ -419,8 +547,15 @@ def build_parser() -> argparse.ArgumentParser:
     remove_cron = subparsers.add_parser("remove-nightly-crontab")
     remove_cron.set_defaults(func=cmd_remove_nightly_crontab)
 
+    telegram_test = subparsers.add_parser("send-telegram-test")
+    telegram_test.add_argument("--message")
+    telegram_test.add_argument("--preview", action="store_true")
+    telegram_test.set_defaults(func=cmd_send_telegram_test)
+
     nightly = subparsers.add_parser("run-nightly-auditor")
     nightly.add_argument("--no-write-report", action="store_true")
+    nightly.add_argument("--notify-telegram", action="store_true")
+    nightly.add_argument("--telegram-preview", action="store_true")
     nightly.set_defaults(func=cmd_run_nightly)
 
     sentry = subparsers.add_parser("run-sentry-agent")
@@ -428,6 +563,8 @@ def build_parser() -> argparse.ArgumentParser:
     sentry.add_argument("--pattern")
     sentry.add_argument("--summary")
     sentry.add_argument("--no-write-report", action="store_true")
+    sentry.add_argument("--notify-telegram", action="store_true")
+    sentry.add_argument("--telegram-preview", action="store_true")
     sentry.set_defaults(func=cmd_run_sentry)
 
     return parser

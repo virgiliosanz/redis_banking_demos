@@ -44,6 +44,39 @@ Que hace el bootstrap:
 ./scripts/run-sentry-agent.sh --service elastic
 ```
 
+### Canal Telegram
+Configurar en `config/ia-ops-sources.env` local o via entorno:
+
+```sh
+TELEGRAM_NOTIFY_ENABLED=1
+TELEGRAM_NOTIFY_ON_NIGHTLY=1
+TELEGRAM_NOTIFY_ON_SENTRY=1
+TELEGRAM_BOT_TOKEN=<token-del-bot>
+TELEGRAM_CHAT_ID=<chat-id>
+TELEGRAM_MESSAGE_THREAD_ID=
+```
+
+Vista previa sin enviar nada:
+
+```sh
+./scripts/send-telegram-test.sh --preview --message "IA-Ops Telegram test"
+./scripts/run-nightly-auditor.sh --telegram-preview --no-write-report
+./scripts/run-sentry-agent.sh --service lb-nginx --telegram-preview --no-write-report
+```
+
+Envio real:
+
+```sh
+./scripts/send-telegram-test.sh --message "IA-Ops Telegram test"
+./scripts/run-nightly-auditor.sh --notify-telegram
+./scripts/run-sentry-agent.sh --service elastic --notify-telegram
+```
+
+Notas:
+- el canal recibe un resumen corto, no el informe completo
+- los informes completos siguen quedando en `runtime/reports/ia-ops/`
+- el token del bot no debe guardarse en el repositorio
+
 ### Programacion local con cron
 Previsualizar el bloque gestionado:
 

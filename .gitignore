@@ -5,6 +5,7 @@
 __pycache__/
 .pytest_cache/
 /runtime/
+/config/ia-ops-sources.env
 .secrets/*
 !.secrets/README.md
 !.secrets/*.example
