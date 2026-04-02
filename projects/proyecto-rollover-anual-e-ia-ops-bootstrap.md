@@ -94,7 +94,7 @@ Cerrar el contrato funcional y tecnico del rollover antes de mover datos reales.
 
 ### Fase 2. Implementacion del script de rollover
 #### Estado
-En progreso
+Completada
 
 #### Objetivo
 Implementar el script reproducible que mueve un anio cerrado desde `live` a `archive`.
@@ -121,20 +121,32 @@ Implementar el script reproducible que mueve un anio cerrado desde `live` a `arc
 - El laboratorio ya genera informes reales en `runtime/reports/rollover/` para un anio objetivo, sin modificar `live` ni `archive`.
 - Durante esta fase se detecta y corrige una deriva de la semilla: la asignacion de taxonomias estaba creando terminos numericos, lo que invalidaba la futura validacion del rollover.
 - Se elimina el hardcode del corte anual en Nginx y se sustituye por una configuracion renderizada desde `config/routing-cutover.env`.
+- Se implementa la rama `execute` del wrapper con export logico desde `live`, import controlado en `archive`, reindexado de ambos lados, avance de `routing-cutover` y borrado posterior en origen.
+- Se anaden `scripts/rollover-export-year.php`, `scripts/rollover-import-snapshot.php` y `scripts/rollover-delete-source-posts.php` como primitivas de contenido para el movimiento anual.
+- La validacion no destructiva ya cubre sintaxis shell/PHP y una nueva ejecucion `report-only` con snapshots persistentes de origen y backup de `archive`.
+- Se ejecuta en laboratorio el rollover real de `2024`, con informe persistente en `runtime/reports/rollover/2024-execute-20260402T115117Z.md`.
+- Tras la ejecucion, el corte de routing avanza a `archive<=2024` y `live>=2025`, y la validacion funcional general del stack vuelve a verde.
+- Durante la validacion posterior se detecta un hueco de orquestacion: el wrapper no republicaba el alias `n9-search-posts` tras reindexar. Ya queda corregido para siguientes ejecuciones y restaurado en el laboratorio actual.
+- La secuencia `execute` queda ya demostrada en laboratorio: export, import, reindex, avance de cutover, borrado y republicacion del alias de lectura.
 
 #### Decisiones tomadas
 - No se forzara aun la rama `execute` destructiva hasta cerrar el frente de sincronizacion editorial y de plataforma, porque el drift de usuarios y configuracion puede invalidar una importacion aparentemente correcta.
 - La fase actual prioriza prechequeo, inventario y evidencia persistente antes de habilitar la rama destructiva.
 - La frontera `archive/live` deja de vivir fija en `poc-routing.conf` y pasa a ser gobernable por configuracion versionada, requisito necesario para el rollover anual real.
+- La secuencia operativa del `execute` queda fijada como: exportar, importar en `archive`, reindexar `archive`, avanzar routing, borrar en `live` y reindexar `live`.
+- El borrado fisico en `live` sigue requiriendo confirmacion manual previa aunque la rama tecnica ya exista.
 
 #### Lecciones aprendidas
 - El rollover de contenido no puede tratarse como el unico mecanismo de consistencia entre `live` y `archive`; habia un hueco real en usuarios y configuracion de plataforma.
 - Los checks de pre-ejecucion solo son utiles si el dataset de laboratorio mantiene taxonomias y terminos coherentes con el comportamiento editorial esperado.
 - Sin corte anual configurable en Nginx, el `execute` del rollover puede mover contenido correctamente y aun asi romper el frontend por enrutado obsoleto.
+- Tener la rama `execute` codificada no equivale a darla por segura: el riesgo real sigue estando en la validacion end-to-end del movimiento y en el orden de rollback si falla despues del cambio de routing.
+- El rollover debe republishar explicitamente el alias de lectura de Elasticsearch despues del reindexado; asumir que ElasticPress lo conserva por si solo no es seguro.
+- En local, los cambios sobre `wordpress/mu-plugins` no entran en runtime hasta resincronizar `runtime/wp-root/shared/mu-plugins`, porque ese directorio compartido es la fuente que realmente monta Compose.
 
 ### Fase 3. Validacion funcional y operativa del rollover
 #### Estado
-Pendiente
+Completada
 
 #### Objetivo
 Demostrar que el movimiento anual no rompe contenido, URLs ni busqueda.
@@ -153,6 +165,13 @@ Demostrar que el movimiento anual no rompe contenido, URLs ni busqueda.
 
 #### Criterios de cierre
 - El anio movido desaparece de `live`, aparece en `archive` y sigue siendo accesible por su URL canonica y por busqueda.
+
+#### Progreso actual
+- Se crea `scripts/smoke-rollover-year.sh` como verificador especifico por anio, con modos `pre` y `post`.
+- La validacion `pre` del anio `2024` ya pasa en laboratorio: corte anual, distribucion de contenido, URL canonica y busqueda unificada siguen coherentes antes del movimiento real.
+- La checklist operativa del rollover incorpora ya el uso explicito de este smoke antes y despues del `execute`.
+- La validacion `post` del anio `2024` ya pasa completa: distribucion de contenido, routing, URL canonica, busqueda unificada y smokes generales.
+- Se corrige un bug de la UI de busqueda del laboratorio: algunos resultados movidos renderizaban `href=""` porque `live` consultaba IDs que ya solo existian en `archive`. La correccion queda en `wordpress/mu-plugins/n9-elasticpress-alias.php`.
 
 ### Fase 4. Contrato de sincronizacion editorial y de plataforma
 #### Estado

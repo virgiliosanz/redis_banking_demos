@@ -7,6 +7,7 @@
 - Confirmar que `db-live`, `db-archive`, `elastic` y `cron-master` estan sanos.
 - Confirmar que la busqueda unificada responde y que el alias `n9-search-posts` existe.
 - Ejecutar `report-only` o `dry-run` y revisar el informe antes de continuar.
+- Ejecutar `./scripts/smoke-rollover-year.sh --year <YYYY> --state pre` y confirmar que el anio objetivo sigue resolviendo desde `live`.
 
 ## 2. Validacion previa al borrado
 - El numero de posts seleccionados en `live` coincide con los importados en `archive`.
@@ -27,6 +28,7 @@
 - La URL canonica publica sigue respondiendo correctamente.
 - La busqueda unificada sigue devolviendo el contenido movido.
 - Los smoke tests de routing y busqueda siguen pasando.
+- Ejecutar `./scripts/smoke-rollover-year.sh --year <YYYY> --state post` y confirmar que el anio objetivo ya resuelve desde `archive`.
 
 ## 5. Rollback
 - Si el movimiento falla antes del borrado, restaurar `archive` si fuera necesario y cerrar la ejecucion como fallida.
