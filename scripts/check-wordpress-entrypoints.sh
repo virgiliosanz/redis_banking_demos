@@ -1,6 +1,11 @@
 #!/bin/sh
 set -eu
 
+if [ ! -d "./runtime/wp-root" ]; then
+  printf '%s\n' "==> skipped (no runtime bootstrapped)"
+  exit 0
+fi
+
 check_index() {
   target="$1"
   grep -q "wp-blog-header.php" "$target"
