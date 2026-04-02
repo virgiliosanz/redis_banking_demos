@@ -7,7 +7,7 @@ Ordenar la documentacion viva del repositorio para que deje de mezclar arquitect
 - Documentacion viva actual: `docs/`
 - Runbook operativo local: `docs/poc-local-runbook.md`
 - Contrato IA-Ops actual: `docs/ia-ops-bootstrap-contract.md`
-- Proyecto previo completado: `tasks/proyecto-refactor-shell-a-python-y-operacion-ia-ops.md`
+- Proyecto previo completado: `tasks/archive/proyecto-refactor-shell-a-python-y-operacion-ia-ops.md`
 
 ## 3. Motivacion
 - `docs/` sigue teniendo demasiada fragmentacion para el tamano real del proyecto.
@@ -172,7 +172,7 @@ Destino:
 
 ### Fase 2. Implementacion de la racionalizacion de docs
 #### Estado
-Pendiente
+Completada
 
 #### Objetivo
 Ejecutar la fusion y simplificacion de `docs/` sin perder informacion activa.
@@ -186,6 +186,37 @@ Ejecutar la fusion y simplificacion de `docs/` sin perder informacion activa.
 
 #### Criterios de cierre
 - `docs/` queda con menos documentos, sin duplicidad funcional evidente y con referencias internas correctas.
+
+#### Progreso actual
+- `docs/README.md` deja de ser un simple indice y pasa a ser el documento principal de arquitectura, estado y mapa documental.
+- `docs/project.md` queda absorbido y eliminado.
+- Se crea `docs/content-lifecycle-live-archive.md` como documento unico del dominio `live/archive`.
+- Se eliminan por absorcion:
+  - `docs/annual-content-rollover.md`
+  - `docs/annual-content-rollover-checklist.md`
+  - `docs/live-archive-sync-contract.md`
+- El proyecto previo cerrado se mueve de `tasks/` a `tasks/archive/`.
+
+#### Resultado documental tras la fase
+- `docs/README.md`
+- `docs/poc-local-runbook.md`
+- `docs/content-lifecycle-live-archive.md`
+- `docs/ia-ops-bootstrap-contract.md`
+- `docs/search-architecture-live-archive.md`
+- `docs/cache-policy-by-context.md`
+- `docs/wordpress-persistence-layout.md`
+- `docs/origin-behind-cloudflare-tunnel.md`
+
+#### Decisiones tomadas
+- El detalle operativo global vive ahora en `docs/README.md`; ya no existe un segundo documento competidor para arquitectura y estado.
+- El dominio `live/archive` se consolida en un solo documento porque rollover, sync editorial y sync de plataforma ya forman un mismo ciclo de vida operativo.
+- El contrato de IA-Ops se mantiene separado porque define otro bounded context.
+- `tasks/` vuelve a reflejar mejor su papel: plan activo en raiz e historico en `tasks/archive/`.
+
+#### Lecciones aprendidas
+- Eliminar `project.md` simplifica mas de lo que parece porque obliga a que `README.md` tenga una responsabilidad clara.
+- Fusionar checklist y contrato en el dominio `live/archive` mejora la operabilidad: el flujo, las validaciones y el rollback quedan juntos.
+- No conviene fusionar por fusionar: `ia-ops-bootstrap-contract.md` sigue mereciendo su propio documento.
 
 ### Fase 3. Decision del plano reactivo
 #### Estado
@@ -242,4 +273,4 @@ Cerrar el proyecto con documentacion viva actualizada, historico ordenado y plan
 - La deuda pequena puede quedarse cronica si no se acota en esta iteracion.
 
 ## 10. Siguiente paso recomendado
-Abrir la Fase 1 y cerrar primero el mapa documental objetivo antes de tocar ningun fichero vivo.
+Abrir la Fase 3 y decidir el plano reactivo de `Sentry Agent` antes de seguir con deuda tecnica menor o software adicional.
