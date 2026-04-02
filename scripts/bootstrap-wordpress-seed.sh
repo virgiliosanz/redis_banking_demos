@@ -66,11 +66,25 @@ ensure_category() {
 
   existing_id="$(wp_exec term list category --path="$path" --slug="$slug" --field=term_id 2>/dev/null || true)"
   if [ -n "$existing_id" ]; then
-    printf '%s\n' "$existing_id"
+    printf '%s\n' "$slug"
     return 0
   fi
 
-  wp_exec term create category "$name" --slug="$slug" --path="$path" --porcelain
+  wp_exec term create category "$name" --slug="$slug" --path="$path" --porcelain >/dev/null
+  printf '%s\n' "$slug"
+}
+
+delete_numeric_categories() {
+  path="$1"
+
+  numeric_term_ids="$(wp_exec term list category --path="$path" --fields=term_id,slug --format=csv 2>/dev/null | awk -F, 'NR > 1 && $2 ~ /^[0-9]+$/ { print $1 }')"
+  if [ -z "$numeric_term_ids" ]; then
+    return 0
+  fi
+
+  for term_id in $numeric_term_ids; do
+    wp_exec term delete category "$term_id" --path="$path" >/dev/null
+  done
 }
 
 ensure_post() {
@@ -78,7 +92,7 @@ ensure_post() {
   title="$2"
   slug="$3"
   post_date="$4"
-  category_id="$5"
+  category_slug="$5"
   content="$6"
 
   existing_id="$(wp_exec post list --path="$path" --post_type=post --name="$slug" --field=ID --posts_per_page=1 2>/dev/null || true)"
@@ -91,7 +105,7 @@ ensure_post() {
       --post_name="$slug" \
       --post_date="$post_date" \
       --post_content="$content" >/dev/null
-    wp_exec post term set "$existing_id" category "$category_id" --path="$path" >/dev/null
+    wp_exec post term set "$existing_id" category "$category_slug" --path="$path" >/dev/null
     printf '%s\n' "$existing_id"
     return 0
   fi
@@ -107,13 +121,16 @@ ensure_post() {
       --post_content="$content" \
       --porcelain
   )"
-  wp_exec post term set "$post_id" category "$category_id" --path="$path" >/dev/null
+  wp_exec post term set "$post_id" category "$category_slug" --path="$path" >/dev/null
   printf '%s\n' "$post_id"
 }
 
 wait_for_service n9-db-live
 wait_for_service n9-db-archive
 wait_for_service n9-cron-master
+
+delete_numeric_categories "/srv/wp/live"
+delete_numeric_categories "/srv/wp/archive"
 
 delete_post_by_slug "/srv/wp/live" "hello-world"
 delete_post_by_slug "/srv/wp/live" "cobertura-live-2026"

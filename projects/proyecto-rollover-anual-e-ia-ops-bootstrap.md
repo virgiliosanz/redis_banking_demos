@@ -3,6 +3,7 @@
 ## 1. Objetivo
 Diseñar e implementar el siguiente salto operativo de la plataforma sobre la POC ya estabilizada:
 - un proceso anual, auditable y reversible para mover el anio cerrado desde `live` a `archive`
+- una sincronizacion frecuente de usuarios/editorial y otra de plataforma compartida entre `live` y `archive`
 - una interfaz minima de `IA-Ops Bootstrap` de solo lectura para diagnostico reactivo y auditoria programada
 
 El objetivo no es rehacer la plataforma, sino operar sobre la topologia ya validada.
@@ -19,6 +20,9 @@ El objetivo no es rehacer la plataforma, sino operar sobre la topologia ya valid
 - `uploads` permanece compartido; la cache sigue aislada por contexto.
 - Elasticsearch sigue con indices separados y alias de lectura unificado `n9-search-posts`.
 - La busqueda no debe cambiar su punto de lectura al ejecutar el rollover.
+- Los usuarios, roles y passwords editoriales deben sincronizarse entre `live` y `archive` con una frecuencia mayor que el rollover anual.
+- El codigo de plataforma compartido no debe sincronizarse de forma artesanal desde WordPress; theme, plugins y `mu-plugins` deben mantenerse coherentes por despliegue declarativo.
+- La configuracion visual o funcional persistida en DB que deba ser comun entre `live` y `archive` necesita su propia sincronizacion logica separada del rollover.
 - La futura capa IA-Ops debe ser de solo lectura por defecto y con filtrado de datos sensibles antes de salir del host.
 - IA-Ops no sustituye a la monitorizacion minima; se apoya en checks de host, servicios, aplicacion y cron para poder diagnosticar con contexto real.
 - En esta iteracion no se introduce `cloudflared` en la POC local.
@@ -28,6 +32,8 @@ El objetivo no es rehacer la plataforma, sino operar sobre la topologia ya valid
 - Definir y automatizar validaciones previas y posteriores al movimiento.
 - Generar un informe legible y persistente por ejecucion.
 - Dejar preparado un modo `dry-run` y un modo `report-only`.
+- Diseñar la sincronizacion editorial de usuarios, roles y passwords entre `live` y `archive`.
+- Diseñar la sincronizacion de configuracion comun de plataforma entre `live` y `archive`.
 - Implementar colectores minimos de contexto para `IA-Ops Bootstrap`.
 - Definir prompts/contrato de salida y fuentes permitidas para `Sentry Agent` y `Nightly Auditor`.
 - Integrar el bootstrap IA-Ops con los logs, checks y smokes ya existentes.
@@ -88,7 +94,7 @@ Cerrar el contrato funcional y tecnico del rollover antes de mover datos reales.
 
 ### Fase 2. Implementacion del script de rollover
 #### Estado
-Pendiente
+En progreso
 
 #### Objetivo
 Implementar el script reproducible que mueve un anio cerrado desde `live` a `archive`.
@@ -107,6 +113,21 @@ Implementar el script reproducible que mueve un anio cerrado desde `live` a `arc
 
 #### Criterios de cierre
 - El script puede ejecutarse varias veces sin dejar estado inconsistente y deja informe legible.
+
+#### Progreso actual
+- Se inicia la implementacion del wrapper de rollover desde host usando `cron-master` como punto de ejecucion de lectura y orquestacion.
+- La primera entrega tecnica de esta fase se centra en `dry-run` y `report-only`, con informes persistentes y deteccion previa de seleccion/candidatos, antes de habilitar el movimiento real.
+- Se crea `scripts/rollover-content-year.sh` como wrapper inicial y los colectores `scripts/rollover-collect-year-summary.php` y `scripts/rollover-detect-archive-collisions.php`.
+- El laboratorio ya genera informes reales en `runtime/reports/rollover/` para un anio objetivo, sin modificar `live` ni `archive`.
+- Durante esta fase se detecta y corrige una deriva de la semilla: la asignacion de taxonomias estaba creando terminos numericos, lo que invalidaba la futura validacion del rollover.
+
+#### Decisiones tomadas
+- No se forzara aun la rama `execute` destructiva hasta cerrar el frente de sincronizacion editorial y de plataforma, porque el drift de usuarios y configuracion puede invalidar una importacion aparentemente correcta.
+- La fase actual prioriza prechequeo, inventario y evidencia persistente antes de habilitar la rama destructiva.
+
+#### Lecciones aprendidas
+- El rollover de contenido no puede tratarse como el unico mecanismo de consistencia entre `live` y `archive`; habia un hueco real en usuarios y configuracion de plataforma.
+- Los checks de pre-ejecucion solo son utiles si el dataset de laboratorio mantiene taxonomias y terminos coherentes con el comportamiento editorial esperado.
 
 ### Fase 3. Validacion funcional y operativa del rollover
 #### Estado
@@ -130,7 +151,105 @@ Demostrar que el movimiento anual no rompe contenido, URLs ni busqueda.
 #### Criterios de cierre
 - El anio movido desaparece de `live`, aparece en `archive` y sigue siendo accesible por su URL canonica y por busqueda.
 
-### Fase 4. Contrato operativo de IA-Ops Bootstrap
+### Fase 4. Contrato de sincronizacion editorial y de plataforma
+#### Estado
+Completada
+
+#### Objetivo
+Fijar de forma cerrada que debe sincronizarse con alta frecuencia entre `live` y `archive`, y que debe seguir gestionandose por despliegue declarativo.
+
+#### Tareas
+- Inventariar entidades editoriales a sincronizar: usuarios, hashes de password, emails, roles y capacidades.
+- Determinar que metadata editorial si debe sincronizarse y cual debe excluirse.
+- Fijar que partes de theme/plugins se mantienen por despliegue declarativo y cuales requieren sincronizacion logica.
+- Inventariar configuraciones de DB que deben permanecer alineadas: widgets, menus, opciones de tema o de plugins compartidos.
+- Definir frecuencia prevista: diaria o bajo demanda para editorial; por despliegue o cambio para plataforma.
+- Documentar rollback operativo de ambas sincronizaciones.
+
+#### Entregables
+- Documento operativo definitivo de sincronizacion editorial y de plataforma.
+- Inventario de entidades sincronizables y exclusiones.
+- Criterios de rollback y de validacion.
+
+#### Criterios de cierre
+- El sistema tiene un contrato claro de consistencia frecuente entre `live` y `archive`, separado del rollover anual.
+
+#### Progreso actual
+- Se crea `docs/live-archive-sync-contract.md` con la separacion formal entre rollover anual, sincronizacion editorial y sincronizacion de plataforma.
+- Quedan definidas las cuentas bootstrap excluidas por diseno: `n9liveadmin` y `n9archiveadmin`.
+- Se crean snapshots de solo lectura para estado editorial y de plataforma, y un primer informe de drift `live/archive`.
+- El primer informe de drift del laboratorio confirma `editorial_drift: no` y `platform_drift: no` bajo las reglas actuales y excluyendo las cuentas bootstrap.
+
+#### Decisiones tomadas
+- Los admins bootstrap de cada contexto no forman parte de la sincronizacion editorial; se preservan como cuentas locales de emergencia.
+- La sincronizacion editorial tendra `live` como fuente de verdad y no copiara sesiones ni metadata efimera.
+- El codigo de theme/plugins/mu-plugins sigue gobernado por despliegue declarativo; la sincronizacion logica se limita a configuracion persistida en DB y a una allowlist controlada.
+
+#### Lecciones aprendidas
+- Sin excluir cuentas bootstrap, la sincronizacion editorial generaria falsos positivos permanentes de drift.
+- La consistencia de plataforma no puede medirse solo por plugins activos; hay que incluir tambien opciones comunes como widgets, menus y `theme_mods`.
+- Un informe de drift de solo lectura da una base mucho mas fiable para abrir la sync real que asumir consistencia por inspeccion manual.
+
+### Fase 5. Implementacion de sincronizacion editorial
+#### Estado
+Completada
+
+#### Objetivo
+Implementar la base reproducible para sincronizar usuarios, hashes de password, roles y capacidades entre `live` y `archive`.
+
+#### Tareas
+- Crear sincronizacion idempotente de usuarios y roles.
+- Preservar coherencia de hashes de password sin exponer credenciales en claro.
+- Excluir sesiones, tokens y metadata efimera.
+- Dejar informe y validacion de altas, bajas y cambios aplicados.
+
+#### Entregables
+- Script de sincronizacion editorial.
+- Informe de ejecucion y validacion.
+- Documentacion de frecuencia y rollback.
+
+#### Criterios de cierre
+- `archive` mantiene usuarios y permisos editoriales alineados con `live` sin copiar DB completas.
+
+#### Progreso actual
+- Se crean `scripts/sync-editorial-users.sh`, `scripts/sync-editorial-source-snapshot.php`, `scripts/sync-editorial-plan.php` y `scripts/sync-editorial-apply.php`.
+- La herramienta soporta `report-only`, `dry-run` y `apply`.
+- En esta primera iteracion, las bajas quedan reportadas como `stale_users`, pero no se eliminan automaticamente.
+- La validacion funcional se realiza con un usuario editorial de laboratorio `redactor-lab` creado en `live` y sincronizado correctamente hacia `archive`.
+- Los informes operativos dejan de exponer hashes de password reales; solo muestran digest de comparacion.
+- Tras la aplicacion de la sync, el informe de drift vuelve a `editorial_drift: no`, confirmando alineacion efectiva entre `live` y `archive` para usuarios editoriales.
+
+#### Decisiones tomadas
+- La sincronizacion editorial usara `live` como fuente de verdad y `archive` como destino.
+- La aplicacion real preserva hashes de password, roles y capacidades, sin exponer passwords en claro.
+- La primera version no borra usuarios sobrantes en `archive`; los informa para revision.
+
+#### Lecciones aprendidas
+- Para este frente, el riesgo principal no es crear o actualizar usuarios, sino borrar demasiado pronto una cuenta que aun tenga valor operativo en `archive`.
+- Los informes de sincronizacion no deben incluir hashes reales aunque vivan bajo `runtime/`; la salida util para auditoria debe estar saneada por defecto.
+
+### Fase 6. Implementacion de sincronizacion de plataforma compartida
+#### Estado
+Pendiente
+
+#### Objetivo
+Mantener la consistencia funcional y visual entre `live` y `archive` en aquello que no debe divergir.
+
+#### Tareas
+- Formalizar que codigo de theme/plugins se despliega igual en ambos contextos.
+- Implementar o documentar sincronizacion de widgets, menus y opciones compartidas de DB.
+- Evitar que `archive` derive funcionalmente respecto a `live` salvo en aquello que se quiera separar de forma explicita.
+- Dejar validacion e informe de drift o de sincronizacion aplicada.
+
+#### Entregables
+- Script o procedimiento de sincronizacion de plataforma.
+- Validacion de consistencia de configuracion compartida.
+- Documentacion de exclusiones y divergencias permitidas.
+
+#### Criterios de cierre
+- `archive` mantiene el mismo plano funcional/visual que `live` alli donde el proyecto lo exige.
+
+### Fase 7. Contrato operativo de IA-Ops Bootstrap
 #### Estado
 Pendiente
 
@@ -158,7 +277,7 @@ Fijar de forma cerrada que puede leer, como lo filtra y como responde el bootstr
 #### Criterios de cierre
 - El sistema IA-Ops tiene un contrato claro de entrada y salida sin ambiguedad operativa.
 
-### Fase 5. Colectores y wrappers de solo lectura
+### Fase 8. Colectores y wrappers de solo lectura
 #### Estado
 Pendiente
 
@@ -183,7 +302,7 @@ Implementar la base local que permitira a IA-Ops reunir contexto sin tocar estad
 #### Criterios de cierre
 - Los colectores devuelven contexto util, acotado y seguro sin modificar el runtime.
 
-### Fase 6. Flujos minimos Sentry/Nightly y cierre del proyecto
+### Fase 9. Flujos minimos Sentry/Nightly y cierre del proyecto
 #### Estado
 Pendiente
 
@@ -205,18 +324,20 @@ Dejar operativos los flujos minimos del diagnostico reactivo y de la auditoria d
 - Actualizacion de `docs/` y runbooks.
 
 #### Criterios de cierre
-- El proyecto deja una operacion anual reproducible y una interfaz IA-Ops minima utilizable en laboratorio.
+- El proyecto deja una operacion anual reproducible, sincronizaciones frecuentes coherentes y una interfaz IA-Ops minima utilizable en laboratorio.
 
 ## 8. Riesgos a vigilar
 - Mover taxonomias o meta de forma incompleta y dejar contenido inconsistente.
 - Borrar en `live` antes de completar validaciones e indexacion.
 - Introducir dependencias ocultas entre WordPress, ElasticPress y el script de rollover.
+- Dejar fuera del plan el drift de usuarios o de configuracion compartida y descubrirlo tarde cuando `archive` ya no sea administrable de forma consistente.
 - Filtrar mal el contexto y exponer datos sensibles al salir del host.
 - Diseñar IA-Ops demasiado pronto como automatismo de accion en vez de diagnostico de solo lectura.
 
 ## 9. Criterio de exito global
 - Existe un rollover anual repetible, con `dry-run`, informe y rollback documentado.
 - La busqueda sigue unificada tras mover un anio de `live` a `archive`.
+- `archive` mantiene consistencia editorial y de plataforma con `live` mediante flujos separados del rollover anual.
 - IA-Ops puede leer el estado del stack con contexto acotado, filtrado y accionable.
 - IA-Ops dispone de una base minima de monitorizacion operativa: checks de host, servicios, aplicacion y cron, con alertas basicas y severidades iniciales.
 - La documentacion deja claro que esta implementado, que esta validado y que sigue siendo limite de la POC.
