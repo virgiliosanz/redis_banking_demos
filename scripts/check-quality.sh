@@ -7,3 +7,6 @@ set -eu
 ./scripts/check-wordpress-entrypoints.sh
 ./scripts/check-php-syntax.sh
 ./scripts/check-compose-config.sh
+
+echo "--- Unit tests ---"
+python3 -m unittest discover -s tests -v

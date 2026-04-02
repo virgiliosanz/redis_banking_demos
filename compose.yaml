@@ -218,7 +218,7 @@ services:
       - no-new-privileges:true
     environment:
       discovery.type: single-node
-      xpack.security.enabled: "false"
+      xpack.security.enabled: "false"  # POC ONLY — habilitar en producción
       ES_JAVA_OPTS: -Xms512m -Xmx512m
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9200/_cluster/health >/dev/null 2>&1 || exit 1"]

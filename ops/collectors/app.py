@@ -18,8 +18,8 @@ def _http_check(url: str, *, expected_http_code: int = 200) -> dict[str, object]
     }
 
 
-def _run_smoke(name: str, script: str) -> dict[str, object]:
-    result = run_command([script], cwd=Path.cwd(), check=False)
+def _run_smoke(name: str, script: str, *, cwd: Path) -> dict[str, object]:
+    result = run_command([script], cwd=cwd, check=False)
     return {
         "name": name,
         "script": script,
@@ -32,10 +32,11 @@ def collect(settings: Settings) -> dict[str, object]:
     base_url = settings.get("BASE_URL", "http://nuevecuatrouno.test") or "http://nuevecuatrouno.test"
     archive_url = settings.get("ARCHIVE_URL", "http://archive.nuevecuatrouno.test") or "http://archive.nuevecuatrouno.test"
 
+    project_root = settings.project_root.resolve()
     smoke_scripts = [
-        _run_smoke("routing", "./scripts/smoke-routing.sh"),
-        _run_smoke("search", "./scripts/smoke-search.sh"),
-        _run_smoke("services", "./scripts/smoke-services.sh"),
+        _run_smoke("routing", "./scripts/smoke-routing.sh", cwd=project_root),
+        _run_smoke("search", "./scripts/smoke-search.sh", cwd=project_root),
+        _run_smoke("services", "./scripts/smoke-services.sh", cwd=project_root),
     ]
 
     return {

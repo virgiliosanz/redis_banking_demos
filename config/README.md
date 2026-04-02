@@ -25,8 +25,4 @@ Este directorio documenta convenciones de configuracion no sensible.
   - watch reactivo cada `5` minutos
   - cooldown de alertas
   - umbrales de `4xx` y `5xx` recientes en `lb-nginx`
-- El mismo fichero de IA-Ops documenta tambien el baseline de scheduling local:
-  - auditoria nocturna
-  - watch reactivo cada `5` minutos
-  - cooldown de alertas
-  - umbrales de `4xx` y `5xx` recientes en `lb-nginx`
+  - umbrales por job de cron (sync editorial/plataforma: 1440/2880 min, rollover: 525600/527040 min)

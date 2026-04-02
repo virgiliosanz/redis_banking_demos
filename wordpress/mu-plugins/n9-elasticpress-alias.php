@@ -170,7 +170,7 @@ add_filter(
 
 add_filter(
     'the_permalink',
-    static function (string $permalink): string {
+    static function (string $permalink) use ($n9_ep_resolve_search_permalink): string {
         if (!is_search()) {
             return $permalink;
         }
@@ -178,12 +178,6 @@ add_filter(
         global $post;
 
         if (!$post instanceof \WP_Post) {
-            return $permalink;
-        }
-
-        global $n9_ep_resolve_search_permalink;
-
-        if (!$n9_ep_resolve_search_permalink instanceof \Closure) {
             return $permalink;
         }
 
@@ -198,7 +192,7 @@ add_filter(
 
 add_filter(
     'render_block',
-    static function (string $blockContent, array $block): string {
+    static function (string $blockContent, array $block) use ($n9_ep_resolve_search_permalink): string {
         if (!is_search()) {
             return $blockContent;
         }
@@ -210,12 +204,6 @@ add_filter(
         global $post;
 
         if (!$post instanceof \WP_Post) {
-            return $blockContent;
-        }
-
-        global $n9_ep_resolve_search_permalink;
-
-        if (!$n9_ep_resolve_search_permalink instanceof \Closure) {
             return $blockContent;
         }
 
