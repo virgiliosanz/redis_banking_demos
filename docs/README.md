@@ -45,6 +45,7 @@ La frontera anual real del balanceador ya no esta hardcodeada: sale de `config/r
 - sync editorial y de plataforma con drift report
 - auditoria nocturna programable con `cron`
 - agente reactivo programable con `cron`, deduplicacion y salida a Telegram
+- baseline minimo de calidad Python con verificacion reproducible del paquete `ops/`
 
 ## Limites actuales
 - laboratorio local, no produccion

@@ -34,6 +34,7 @@ Que hace el bootstrap:
 ### Verificacion funcional completa
 ```sh
 ./scripts/smoke-functional.sh
+./scripts/check-python-tooling.sh
 ```
 
 ### Verificacion IA-Ops minima
@@ -64,12 +65,18 @@ Vista previa sin enviar nada:
 ./scripts/run-sentry-agent.sh --service lb-nginx --telegram-preview --no-write-report
 ```
 
+Notas de semantica:
+- `--no-write-report` ya no dispara notificaciones por defecto
+- `--notify-telegram` fuerza el envio aunque no se escriba informe
+- `--no-notify-telegram` silencia Telegram aunque la configuracion local lo tenga activado
+
 Envio real:
 
 ```sh
 ./scripts/send-telegram-test.sh --message "IA-Ops Telegram test"
 ./scripts/run-nightly-auditor.sh --notify-telegram
 ./scripts/run-sentry-agent.sh --service elastic --notify-telegram
+./scripts/run-nightly-auditor.sh --no-notify-telegram
 ```
 
 Notas:

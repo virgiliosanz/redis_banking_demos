@@ -20,6 +20,11 @@ Este directorio documenta convenciones de configuracion no sensible.
 - `scripts/bootstrap-wordpress-config.sh` genera `wp-config.php` y `wp-common.php` dentro de `./runtime/wp-root/`.
 - `config/ia-ops-sources.env.example` documenta las fuentes permitidas y umbrales no sensibles del futuro `IA-Ops Bootstrap`.
 - Si necesitas activar Telegram, crea `config/ia-ops-sources.env` local no versionado o exporta variables de entorno; ese fichero queda ignorado por Git.
+- El mismo fichero de IA-Ops documenta tambien el baseline local de scheduling y alertas:
+  - auditoria nocturna
+  - watch reactivo cada `5` minutos
+  - cooldown de alertas
+  - umbrales de `4xx` y `5xx` recientes en `lb-nginx`
 - El mismo fichero de IA-Ops documenta tambien el baseline de scheduling local:
   - auditoria nocturna
   - watch reactivo cada `5` minutos

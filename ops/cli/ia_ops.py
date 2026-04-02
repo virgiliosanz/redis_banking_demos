@@ -59,6 +59,14 @@ def _notify_telegram(settings, message: str, *, explicit: bool, preview: bool, d
     print(f"telegram notification sent with message_id={message_id}", file=sys.stderr)
 
 
+def _default_notify_allowed(args: argparse.Namespace) -> bool:
+    if getattr(args, "no_notify_telegram", False):
+        return False
+    if getattr(args, "no_write_report", False):
+        return False
+    return True
+
+
 def _nightly_telegram_message(
     *,
     severity: str,
@@ -405,7 +413,7 @@ def cmd_run_nightly(args: argparse.Namespace) -> int:
         ),
         explicit=args.notify_telegram,
         preview=args.telegram_preview,
-        default_enabled=load_telegram_config(settings).notify_on_nightly,
+        default_enabled=_default_notify_allowed(args) and load_telegram_config(settings).notify_on_nightly,
     )
 
     print(report)
@@ -584,7 +592,7 @@ def cmd_run_sentry(args: argparse.Namespace) -> int:
         ),
         explicit=args.notify_telegram,
         preview=args.telegram_preview,
-        default_enabled=load_telegram_config(settings).notify_on_sentry,
+        default_enabled=_default_notify_allowed(args) and load_telegram_config(settings).notify_on_sentry,
     )
     print(report)
     return 0
@@ -723,6 +731,7 @@ def build_parser() -> argparse.ArgumentParser:
     nightly = subparsers.add_parser("run-nightly-auditor")
     nightly.add_argument("--no-write-report", action="store_true")
     nightly.add_argument("--notify-telegram", action="store_true")
+    nightly.add_argument("--no-notify-telegram", action="store_true")
     nightly.add_argument("--telegram-preview", action="store_true")
     nightly.set_defaults(func=cmd_run_nightly)
 
@@ -732,6 +741,7 @@ def build_parser() -> argparse.ArgumentParser:
     sentry.add_argument("--summary")
     sentry.add_argument("--no-write-report", action="store_true")
     sentry.add_argument("--notify-telegram", action="store_true")
+    sentry.add_argument("--no-notify-telegram", action="store_true")
     sentry.add_argument("--telegram-preview", action="store_true")
     sentry.set_defaults(func=cmd_run_sentry)
 

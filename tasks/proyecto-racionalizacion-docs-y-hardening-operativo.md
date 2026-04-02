@@ -292,7 +292,7 @@ Decidir el mecanismo de disparo reactivo de `Sentry Agent` mas simple y defendib
 
 ### Fase 4. Hardening operativo pequeno
 #### Estado
-Pendiente
+Completada
 
 #### Objetivo
 Eliminar fricciones pequenas del tooling actual antes de abrir otro frente mayor.
@@ -302,6 +302,32 @@ Eliminar fricciones pequenas del tooling actual antes de abrir otro frente mayor
 - Eliminar el warning de `mysqladmin` por password en CLI en smokes o checks.
 - Definir tooling Python minimo de calidad (`compile`, lint o tests basicos) sin sobredimensionar el repo.
 - Revisar si el flujo cron/Telegram necesita guardas adicionales.
+
+#### Progreso actual
+- `--no-write-report` deja de implicar envio por defecto; solo se notifica si se fuerza con `--notify-telegram`.
+- Se anade `--no-notify-telegram` para ejecucion silenciosa aunque la config local tenga Telegram activado.
+- `scripts/smoke-services.sh` deja de pasar passwords de MySQL por linea de comandos.
+- Se crea `scripts/check-python-tooling.sh` como baseline reproducible de calidad minima para `ops/`.
+
+#### Validacion ejecutada
+- `./scripts/check-python-tooling.sh`
+- `./scripts/smoke-services.sh`
+- `python3 -m ops.cli.ia_ops run-nightly-auditor --no-write-report --no-notify-telegram`
+- validacion indirecta de `Sentry Agent` silencioso reutilizando los mismos colectores y confirmando ausencia de proceso residual
+
+#### Resultado de la validacion
+- El baseline Python compila y la CLI principal responde.
+- El smoke de servicios ya no muestra el warning de password en `mysqladmin`.
+- `Nightly Auditor` ejecuta sin escribir informe y sin enviar Telegram cuando se usa `--no-notify-telegram`.
+- La semantica de flags queda mas defendible:
+  - `--no-write-report` no implica ya notificar por defecto
+  - `--notify-telegram` permite forzar envio
+  - `--no-notify-telegram` permite silenciar ejecuciones locales con config activa
+
+#### Lecciones aprendidas
+- En herramientas operativas, la semantica por defecto importa mas que la comodidad del laboratorio.
+- Separar “persistir informe” de “notificar” evita sorpresas y ruido en canales reales.
+- Un baseline minimo de calidad vale mas si se puede ejecutar siempre sin dependencias nuevas.
 
 #### Criterios de cierre
 - El tooling actual queda mas limpio, menos ruidoso y con comportamiento menos ambiguo.
