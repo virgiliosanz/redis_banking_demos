@@ -14,9 +14,12 @@ from ..collectors import host as host_collector
 from ..collectors import logs as logs_collector
 from ..collectors import runtime as runtime_collector
 from ..notifications.telegram import load_telegram_config, send_message
+from ..rollover import content_year as rollover_content_year
 from ..reporting import write_json_report, write_text_report
 from ..runtime.drift import build_drift_report
 from ..scheduling.cron import install_nightly_auditor_crontab, remove_nightly_auditor_crontab, render_nightly_auditor_block
+from ..sync import editorial as editorial_sync
+from ..sync import platform as platform_sync
 from ..util.jsonio import dumps_pretty
 from ..util.time import report_stamp, utc_timestamp
 
@@ -110,6 +113,37 @@ def cmd_send_telegram_test(args: argparse.Namespace) -> int:
     result = send_message(load_telegram_config(settings), message)
     message_id = result.get("result", {}).get("message_id", "unknown")
     print(f"telegram test sent with message_id={message_id}")
+    return 0
+
+
+def cmd_sync_editorial(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    report_dir = Path(args.report_dir).resolve() if args.report_dir else None
+    report_file = editorial_sync.run(settings, mode=args.mode, report_dir=report_dir)
+    print(f"editorial sync {args.mode} report written to {report_file}")
+    return 0
+
+
+def cmd_sync_platform(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    report_dir = Path(args.report_dir).resolve() if args.report_dir else None
+    report_file = platform_sync.run(settings, mode=args.mode, report_dir=report_dir)
+    print(f"platform sync {args.mode} report written to {report_file}")
+    return 0
+
+
+def cmd_rollover_content_year(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    report_dir = Path(args.report_dir).resolve() if args.report_dir else None
+    routing_config = Path(args.routing_config).resolve() if args.routing_config else None
+    report_file = rollover_content_year.run(
+        settings,
+        mode=args.mode,
+        target_year=args.year,
+        report_dir=report_dir,
+        routing_config_file=routing_config,
+    )
+    print(f"rollover {args.mode} report written to {report_file}")
     return 0
 
 
@@ -551,6 +585,23 @@ def build_parser() -> argparse.ArgumentParser:
     telegram_test.add_argument("--message")
     telegram_test.add_argument("--preview", action="store_true")
     telegram_test.set_defaults(func=cmd_send_telegram_test)
+
+    sync_editorial = subparsers.add_parser("sync-editorial-users")
+    sync_editorial.add_argument("--mode", required=True, choices=["report-only", "dry-run", "apply"])
+    sync_editorial.add_argument("--report-dir")
+    sync_editorial.set_defaults(func=cmd_sync_editorial)
+
+    sync_platform = subparsers.add_parser("sync-platform-config")
+    sync_platform.add_argument("--mode", required=True, choices=["report-only", "dry-run", "apply"])
+    sync_platform.add_argument("--report-dir")
+    sync_platform.set_defaults(func=cmd_sync_platform)
+
+    rollover = subparsers.add_parser("rollover-content-year")
+    rollover.add_argument("--mode", required=True, choices=["dry-run", "report-only", "execute"])
+    rollover.add_argument("--year", required=True, type=int)
+    rollover.add_argument("--report-dir")
+    rollover.add_argument("--routing-config")
+    rollover.set_defaults(func=cmd_rollover_content_year)
 
     nightly = subparsers.add_parser("run-nightly-auditor")
     nightly.add_argument("--no-write-report", action="store_true")

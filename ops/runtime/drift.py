@@ -1,34 +1,11 @@
 from __future__ import annotations
 
-import time
 from pathlib import Path
 
 from ..config import Settings
 from ..reporting import write_text_report
-from ..util.docker import compose_exec
-from ..util.process import run_command
+from ..util.docker import compose_exec, wait_for_container_health
 from ..util.time import report_stamp, utc_timestamp
-
-
-def _wait_for_container(container: str, *, timeout_seconds: int = 120) -> None:
-    deadline = time.monotonic() + timeout_seconds
-    while time.monotonic() < deadline:
-        state_result = run_command(
-            ["docker", "inspect", "--format", "{{.State.Status}}", container],
-            check=False,
-        )
-        health_result = run_command(
-            ["docker", "inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}", container],
-            check=False,
-        )
-
-        state = state_result.stdout.strip()
-        health = health_result.stdout.strip()
-        if state == "running" and health in {"healthy", "none"}:
-            return
-        time.sleep(2)
-
-    raise RuntimeError(f"Container {container} did not become healthy within {timeout_seconds} seconds")
 
 
 def _wp_eval_json(path: str, script_path: str, excluded_logins: str, *, cwd: Path) -> str:
@@ -44,6 +21,7 @@ def _wp_eval_json(path: str, script_path: str, excluded_logins: str, *, cwd: Pat
             f"--path={path}",
         ],
         cwd=cwd,
+        exec_args=["--user", "root"],
     )
     return result.stdout.strip()
 
@@ -54,7 +32,7 @@ def build_drift_report(settings: Settings) -> tuple[str, str]:
     project_root = settings.project_root.resolve()
 
     for container in ("n9-db-live", "n9-db-archive", "n9-cron-master"):
-        _wait_for_container(container)
+        wait_for_container_health(container)
 
     live_editorial = _wp_eval_json(
         "/srv/wp/live",

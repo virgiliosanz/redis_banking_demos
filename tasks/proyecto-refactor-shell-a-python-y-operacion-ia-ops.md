@@ -419,6 +419,9 @@ Conectar la salida a un destino util para operacion humana.
 - El flag explicito `--notify-telegram` debe prevalecer aunque la activacion automatica del canal este apagada.
 
 ### Fase 6. Migracion selectiva de syncs y rollover
+#### Estado
+Completada
+
 #### Objetivo
 Empezar a mover a Python las piezas mas complejas del plano operativo.
 
@@ -429,6 +432,52 @@ Empezar a mover a Python las piezas mas complejas del plano operativo.
 
 #### Criterios de cierre
 - La logica operativa deja de depender de Bash en sus partes mas fragiles.
+
+#### Progreso actual
+- Se migra a Python la orquestacion de:
+  - `sync-editorial-users`
+  - `sync-platform-config`
+  - `rollover-content-year`
+- La nueva capa queda repartida en:
+  - `ops/sync/common.py`
+  - `ops/sync/editorial.py`
+  - `ops/sync/platform.py`
+  - `ops/rollover/content_year.py`
+- `ops/util/docker.py` gana soporte reusable para:
+  - opciones de `docker compose exec`
+  - espera de contenedores sanos
+  - inspeccion simple de salud
+- Los wrappers shell pasan a ser solo:
+  - `scripts/sync-editorial-users.sh`
+  - `scripts/sync-platform-config.sh`
+  - `scripts/rollover-content-year.sh`
+  todos como `exec python3 -m ops.cli.ia_ops ...`
+
+#### Decisiones tomadas
+- La capa PHP de WordPress no se toca; sigue siendo la fuente de verdad para snapshots, plan, apply, export e import.
+- La migracion se limita a la orquestacion: esperas, `wp-cli`, artefactos, reportes, reindexado, alias y heartbeats.
+- `render-routing-cutover.sh` y `advance-routing-cutover.sh` permanecen en shell por ahora; son lineales y ya estaban acotados.
+- El `execute` del rollover se deja implementado en Python, pero no se revalida en esta pasada sin confirmacion manual porque sigue siendo destructivo.
+
+#### Validacion ejecutada
+- `python3 -m py_compile` sobre `ops/sync/*`, `ops/rollover/content_year.py`, `ops/util/docker.py` y `ops/cli/ia_ops.py`: OK.
+- `python3 -m ops.cli.ia_ops sync-editorial-users --mode report-only`: OK.
+- `python3 -m ops.cli.ia_ops sync-platform-config --mode report-only`: OK.
+- `./scripts/sync-editorial-users.sh --mode dry-run`: OK.
+- `./scripts/sync-platform-config.sh --mode dry-run`: OK.
+- `./scripts/sync-editorial-users.sh --mode apply`: OK.
+- `./scripts/sync-platform-config.sh --mode apply`: OK.
+- Heartbeats:
+  - `runtime/heartbeats/sync-editorial-users.success`: actualizado
+  - `runtime/heartbeats/sync-platform-config.success`: actualizado
+- `python3 -m ops.cli.ia_ops rollover-content-year --mode report-only --year 2025`: OK.
+- `./scripts/rollover-content-year.sh --mode dry-run --year 2025`: OK.
+- `python3 -m ops.cli.ia_ops report-live-archive-sync-drift`: OK tras aplicar syncs.
+
+#### Lecciones aprendidas
+- En estos flujos el valor de Python no esta en reemplazar `wp-cli`, sino en ordenar la orquestacion y el manejo de artefactos.
+- `docker compose exec` necesitaba una capa comun con `exec_args`; sin eso, la migracion habria seguido acumulando hacks locales.
+- La parte realmente sensible del rollover no es el snapshot, sino la secuencia import -> reindex -> cutover -> delete -> alias; tenerla en Python mejora mucho su legibilidad.
 
 ### Fase 7. Cierre documental y validacion
 #### Objetivo
