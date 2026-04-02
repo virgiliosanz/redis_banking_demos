@@ -241,7 +241,7 @@ Crear el esqueleto Python comun para configuracion, subprocess, JSON, tiempo, he
 
 ### Fase 3. Migracion de colectores y reporting IA-Ops
 #### Estado
-Pendiente
+Completada
 
 #### Objetivo
 Pasar a Python los `collect-*`, el agregador nocturno y la generacion de informes.
@@ -253,6 +253,63 @@ Pasar a Python los `collect-*`, el agregador nocturno y la generacion de informe
 
 #### Criterios de cierre
 - La salida funcional de IA-Ops es equivalente o mejor que la actual.
+
+#### Progreso actual
+- Se migra a Python la capa de colectores y agregacion IA-Ops manteniendo los wrappers shell como interfaz estable del repo.
+- La nueva capa queda repartida en:
+  - `ops/collectors/host.py`
+  - `ops/collectors/cron.py`
+  - `ops/collectors/elastic.py`
+  - `ops/collectors/runtime.py`
+  - `ops/collectors/app.py`
+  - `ops/collectors/logs.py`
+  - `ops/runtime/drift.py`
+  - `ops/cli/ia_ops.py`
+  - `ops/util/docker.py`
+  - `ops/util/http.py`
+  - `ops/util/thresholds.py`
+- Los wrappers shell migrados quedan reducidos a `exec python3 -m ops.cli.ia_ops ...`:
+  - `scripts/collect-host-health.sh`
+  - `scripts/collect-cron-health.sh`
+  - `scripts/collect-elastic-health.sh`
+  - `scripts/collect-runtime-health.sh`
+  - `scripts/collect-app-health.sh`
+  - `scripts/collect-service-logs.sh`
+  - `scripts/collect-nightly-context.sh`
+  - `scripts/report-live-archive-sync-drift.sh`
+  - `scripts/run-nightly-auditor.sh`
+  - `scripts/run-sentry-agent.sh`
+
+#### Decisiones tomadas
+- `ops/reporting.py` se mantiene como modulo simple de escritura de reportes; el drift report se mueve a `ops/runtime/drift.py` para evitar conflicto entre modulo y paquete.
+- La capa HTTP degrada timeouts a `http_code=0` en lugar de abortar el flujo, porque en IA-Ops interesa conservar el informe aunque un endpoint tarde demasiado.
+- `docker compose exec` se sigue encapsulando en Python, pero las opciones especiales de ejecucion se resuelven dentro del comando del contenedor cuando no merece la pena complicar mas el helper.
+- La deteccion de `5xx` recientes en `lb-nginx` se rehace en Python evitando regex POSIX incompatibles con `re`.
+
+#### Validacion ejecutada
+- `python3 -m py_compile` sobre la nueva capa Python: OK.
+- `python3 -m ops.cli.ia_ops collect-host-health`: OK.
+- `python3 -m ops.cli.ia_ops collect-cron-health`: OK.
+- `python3 -m ops.cli.ia_ops collect-elastic-health`: OK.
+- `python3 -m ops.cli.ia_ops collect-runtime-health`: OK.
+- `python3 -m ops.cli.ia_ops collect-app-health`: OK.
+- `python3 -m ops.cli.ia_ops collect-nightly-context --write-report`: OK.
+- `python3 -m ops.cli.ia_ops report-live-archive-sync-drift`: OK.
+- `python3 -m ops.cli.ia_ops run-nightly-auditor --no-write-report`: OK.
+- `python3 -m ops.cli.ia_ops run-sentry-agent --service elastic --no-write-report`: OK.
+- Compatibilidad de wrappers shell de colectores y drift:
+  - `scripts/collect-host-health.sh`
+  - `scripts/collect-cron-health.sh`
+  - `scripts/collect-elastic-health.sh`
+  - `scripts/collect-runtime-health.sh`
+  - `scripts/collect-app-health.sh`
+  - `scripts/report-live-archive-sync-drift.sh`
+  Todo en verde.
+
+#### Lecciones aprendidas
+- La frontera correcta es estable: shell para entrypoints finos, Python para parsing, severidades, agregacion y reporting.
+- La migracion obliga a revisar detalles que Bash ocultaba, como timeouts HTTP, quoting en `docker compose exec` y diferencias entre regex POSIX y `re`.
+- Mantener los wrappers shell como `exec` plano protege los runbooks sin arrastrar mas logica al shell.
 
 ### Fase 4. Programacion de flujos
 #### Objetivo
