@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.*.local
+__pycache__/
+.pytest_cache/
 runtime/
 .secrets/*
 !.secrets/README.md

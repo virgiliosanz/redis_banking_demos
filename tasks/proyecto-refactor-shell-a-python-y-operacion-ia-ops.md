@@ -197,7 +197,7 @@ ops/
 
 ### Fase 2. Base Python y utilidades comunes
 #### Estado
-Pendiente
+Completada
 
 #### Objetivo
 Crear el esqueleto Python comun para configuracion, subprocess, JSON, tiempo, heartbeats y reporting.
@@ -210,7 +210,39 @@ Crear el esqueleto Python comun para configuracion, subprocess, JSON, tiempo, he
 #### Criterios de cierre
 - Los nuevos modulos pueden reemplazar logica repetida de shell sin duplicacion.
 
+#### Progreso actual
+- Se crea `pyproject.toml` minimo para formalizar la nueva capa Python sin introducir dependencias externas.
+- Se crea el paquete `ops/` con submodulos para configuracion, reporting, subprocess, tiempo y heartbeats.
+- La estructura real creada queda en:
+  - `ops/config.py`
+  - `ops/reporting.py`
+  - `ops/runtime/heartbeats.py`
+  - `ops/util/jsonio.py`
+  - `ops/util/process.py`
+  - `ops/util/time.py`
+  - paquetes vacios preparados en `ops/cli/`, `ops/collectors/`, `ops/runtime/`, `ops/scheduling/` y `ops/util/`
+- `.gitignore` pasa a ignorar `__pycache__/` y `.pytest_cache/` para no contaminar el repo al validar Python.
+
+#### Decisiones tomadas
+- La base Python se apoya solo en libreria estandar en esta fase.
+- La configuracion sigue cargandose desde `config/ia-ops-sources.env` o su ejemplo, con sobreescritura por variables de entorno.
+- Los helpers comunes se centralizan antes de migrar ningun colector concreto.
+- `pyproject.toml` queda lo bastante simple para empaquetar `ops*`, sin abrir aun el frente de tooling adicional.
+
+#### Validacion ejecutada
+- Import y uso real de `ops.config`, `ops.reporting`, `ops.runtime.heartbeats`, `ops.util.process` y `ops.util.time`.
+- Escritura y lectura de heartbeat en directorio temporal.
+- Escritura de reportes JSON y Markdown en directorio temporal.
+- Ejecucion segura de un subprocess de prueba (`python3 --version`).
+
+#### Lecciones aprendidas
+- Merece la pena fijar primero utilidades de configuracion, tiempo, procesos y reporting; sin ellas, la migracion de colectores repetiría patrones otra vez.
+- Un `pyproject.toml` minimo ayuda a ordenar la nueva capa Python sin obligarnos todavia a introducir pytest, ruff o tooling adicional.
+
 ### Fase 3. Migracion de colectores y reporting IA-Ops
+#### Estado
+Pendiente
+
 #### Objetivo
 Pasar a Python los `collect-*`, el agregador nocturno y la generacion de informes.
 
