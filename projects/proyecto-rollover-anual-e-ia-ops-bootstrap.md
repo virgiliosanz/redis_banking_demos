@@ -120,14 +120,17 @@ Implementar el script reproducible que mueve un anio cerrado desde `live` a `arc
 - Se crea `scripts/rollover-content-year.sh` como wrapper inicial y los colectores `scripts/rollover-collect-year-summary.php` y `scripts/rollover-detect-archive-collisions.php`.
 - El laboratorio ya genera informes reales en `runtime/reports/rollover/` para un anio objetivo, sin modificar `live` ni `archive`.
 - Durante esta fase se detecta y corrige una deriva de la semilla: la asignacion de taxonomias estaba creando terminos numericos, lo que invalidaba la futura validacion del rollover.
+- Se elimina el hardcode del corte anual en Nginx y se sustituye por una configuracion renderizada desde `config/routing-cutover.env`.
 
 #### Decisiones tomadas
 - No se forzara aun la rama `execute` destructiva hasta cerrar el frente de sincronizacion editorial y de plataforma, porque el drift de usuarios y configuracion puede invalidar una importacion aparentemente correcta.
 - La fase actual prioriza prechequeo, inventario y evidencia persistente antes de habilitar la rama destructiva.
+- La frontera `archive/live` deja de vivir fija en `poc-routing.conf` y pasa a ser gobernable por configuracion versionada, requisito necesario para el rollover anual real.
 
 #### Lecciones aprendidas
 - El rollover de contenido no puede tratarse como el unico mecanismo de consistencia entre `live` y `archive`; habia un hueco real en usuarios y configuracion de plataforma.
 - Los checks de pre-ejecucion solo son utiles si el dataset de laboratorio mantiene taxonomias y terminos coherentes con el comportamiento editorial esperado.
+- Sin corte anual configurable en Nginx, el `execute` del rollover puede mover contenido correctamente y aun asi romper el frontend por enrutado obsoleto.
 
 ### Fase 3. Validacion funcional y operativa del rollover
 #### Estado

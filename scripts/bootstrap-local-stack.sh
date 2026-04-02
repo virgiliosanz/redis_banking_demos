@@ -3,6 +3,7 @@ set -eu
 
 ROOT="${1:-./runtime/wp-root}"
 
+./scripts/render-routing-cutover.sh
 ./scripts/bootstrap-local-runtime.sh "$ROOT"
 docker compose up -d --build
 ./scripts/bootstrap-wordpress-install.sh

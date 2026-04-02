@@ -41,6 +41,7 @@ Ejemplo:
 - `uploads` no se mueve ni se duplica; sigue compartido
 - la lectura de busqueda sigue yendo al alias `n9-search-posts`
 - el contenido movido deja de existir en `live` solo cuando la validacion en `archive` ya ha pasado
+- el corte anual del balanceador debe avanzar de forma coherente con el anio movido
 
 ## Modos de ejecucion
 
@@ -61,16 +62,18 @@ Ejemplo:
 ## Flujo recomendado
 1. ejecutar en modo `dry-run`
 2. validar que el anio objetivo es cerrado y elegible
-3. exportar un snapshot logico del subconjunto objetivo de `live`
-4. exportar un snapshot logico previo de `archive` para rollback local
-5. seleccionar posts, meta, taxonomias y adjuntos relacionados del anio a mover
-6. importar en `archive`
-7. validar conteos, slugs, taxonomias, adjuntos y URLs
-8. reindexar `archive`
-9. validar busqueda unificada contra `n9-search-posts`
-10. borrar en `live` solo si las validaciones anteriores han pasado
-11. reindexar `live`
-12. emitir informe de ejecucion y artefactos de rollback
+3. validar que el anio objetivo coincide con el `LIVE_MIN_YEAR` vigente en el corte anual del balanceador
+4. exportar un snapshot logico del subconjunto objetivo de `live`
+5. exportar un snapshot logico previo de `archive` para rollback local
+6. seleccionar posts, meta, taxonomias y adjuntos relacionados del anio a mover
+7. importar en `archive`
+8. validar conteos, slugs, taxonomias, adjuntos y URLs
+9. reindexar `archive`
+10. validar busqueda unificada contra `n9-search-posts`
+11. avanzar el corte anual de routing y recargar el balanceador
+12. borrar en `live` solo si las validaciones anteriores han pasado
+13. reindexar `live`
+14. emitir informe de ejecucion y artefactos de rollback
 
 ## Requisitos del script futuro
 - idempotente
@@ -85,6 +88,7 @@ Ejemplo:
 
 ## Validaciones obligatorias antes de borrar en `live`
 - el anio objetivo no es el anio en curso
+- el anio objetivo coincide con el `LIVE_MIN_YEAR` configurado en el corte anual del balanceador
 - los posts seleccionados en `live` coinciden con los importados en `archive`
 - no hay colisiones de slug o, si existen, quedan resueltas y documentadas
 - las categorias y tags usadas por los posts movidos existen en `archive`
@@ -119,11 +123,12 @@ Ejemplo:
 ### Artefactos minimos de rollback
 - export logico del subconjunto del anio objetivo desde `live`
 - export logico previo del estado de `archive` afectado por la importacion
+- snapshot del corte anual de routing antes del cambio
 - informe de ejecucion con conteos y IDs afectados
 
 ### Estrategia de rollback
-1. si falla antes del borrado en `live`, se limpia el contenido importado en `archive` y se restaura `archive` desde su export previo si hiciera falta
-2. si falla despues del borrado en `live`, se reimporta el subconjunto exportado desde `live` y se reindexan ambos lados
+1. si falla antes del borrado en `live`, se limpia el contenido importado en `archive`, se restaura `archive` desde su export previo si hiciera falta y se revierte el corte anual del balanceador
+2. si falla despues del borrado en `live`, se reimporta el subconjunto exportado desde `live`, se revierte el corte anual del balanceador y se reindexan ambos lados
 3. tras el rollback, se vuelven a ejecutar los smoke tests de routing y busqueda
 
 ## Checklist operativa

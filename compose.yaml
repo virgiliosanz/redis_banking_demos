@@ -17,6 +17,7 @@ services:
     volumes:
       - ./nginx/lb/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/lb/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/lb/generated:/etc/nginx/generated:ro
       - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/live/current/public:/var/www/html/live:ro
       - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/archive/current/public:/var/www/html/archive:ro
       - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/admin-live/current/public:/var/www/html/admin-live:ro

@@ -4,11 +4,12 @@ set -eu
 MODE=""
 TARGET_YEAR=""
 REPORT_DIR="${REPORT_DIR:-./runtime/reports/rollover}"
+ROUTING_CONFIG_FILE="${ROUTING_CONFIG_FILE:-./config/routing-cutover.env}"
 
 usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/rollover-content-year.sh --mode <dry-run|report-only|execute> --year <YYYY> [--report-dir <path>]
+  ./scripts/rollover-content-year.sh --mode <dry-run|report-only|execute> --year <YYYY> [--report-dir <path>] [--routing-config <path>]
 
 Notes:
   - `dry-run` and `report-only` are currently implemented.
@@ -28,6 +29,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --report-dir)
       REPORT_DIR="$2"
+      shift 2
+      ;;
+    --routing-config)
+      ROUTING_CONFIG_FILE="$2"
       shift 2
       ;;
     -h|--help)
@@ -69,8 +74,43 @@ if [ "$TARGET_YEAR" -ge "$CURRENT_YEAR" ]; then
   exit 1
 fi
 
+if [ ! -f "$ROUTING_CONFIG_FILE" ]; then
+  printf '%s\n' "Missing routing config: $ROUTING_CONFIG_FILE" >&2
+  exit 1
+fi
+
+# shellcheck disable=SC1090
+. "$ROUTING_CONFIG_FILE"
+
+: "${ARCHIVE_MIN_YEAR:?Missing ARCHIVE_MIN_YEAR}"
+: "${ARCHIVE_MAX_YEAR:?Missing ARCHIVE_MAX_YEAR}"
+: "${LIVE_MIN_YEAR:?Missing LIVE_MIN_YEAR}"
+: "${LIVE_MAX_YEAR:?Missing LIVE_MAX_YEAR}"
+
+next_archive_max="$ARCHIVE_MAX_YEAR"
+next_live_min="$LIVE_MIN_YEAR"
+cutover_warning=""
+
+if [ "$TARGET_YEAR" -lt "$LIVE_MIN_YEAR" ]; then
+  cutover_warning="target_year_is_already_below_live_cutover"
+fi
+
+if [ "$TARGET_YEAR" -gt "$LIVE_MIN_YEAR" ]; then
+  cutover_warning="target_year_skips_current_live_cutover"
+fi
+
+if [ "$TARGET_YEAR" -eq "$LIVE_MIN_YEAR" ]; then
+  next_archive_max="$TARGET_YEAR"
+  next_live_min=$((TARGET_YEAR + 1))
+fi
+
 if [ "$MODE" = "execute" ]; then
-  printf '%s\n' "Mode execute is not enabled yet. Close editorial/platform sync phases first." >&2
+  if [ "$TARGET_YEAR" -ne "$LIVE_MIN_YEAR" ]; then
+    printf '%s\n' "Mode execute requires target year to match LIVE_MIN_YEAR ($LIVE_MIN_YEAR)." >&2
+    exit 1
+  fi
+
+  printf '%s\n' "Mode execute is not enabled yet. Content import/delete branch still pending implementation." >&2
   exit 1
 fi
 
@@ -142,6 +182,13 @@ cat >"$report_file" <<EOF
 - generated_at: $timestamp_utc
 - mode: $MODE
 - target_year: $TARGET_YEAR
+- routing_archive_min_year: $ARCHIVE_MIN_YEAR
+- routing_archive_max_year: $ARCHIVE_MAX_YEAR
+- routing_live_min_year: $LIVE_MIN_YEAR
+- routing_live_max_year: $LIVE_MAX_YEAR
+- next_archive_max_year_if_applied: $next_archive_max
+- next_live_min_year_if_applied: $next_live_min
+- cutover_warning: ${cutover_warning:-none}
 - selected_posts: ${selected_posts:-0}
 - selected_terms: ${selected_terms:-0}
 - selected_attachments: ${selected_attachments:-0}
@@ -160,7 +207,8 @@ $archive_collisions
 
 ## Notes
 - This report is read-only and does not modify \`live\` or \`archive\`.
-- \`execute\` remains blocked until editorial and platform sync phases are closed.
+- The routing cutover is now versioned via \`$ROUTING_CONFIG_FILE\`.
+- \`execute\` remains blocked until the content import/delete branch is implemented.
 EOF
 
 printf '%s\n' "rollover $MODE report written to $report_file"
