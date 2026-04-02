@@ -122,6 +122,7 @@ $plan_json
 EOF
 
 if [ -n "$apply_json" ]; then
+  ./scripts/write-heartbeat.sh "${CRON_JOB_PLATFORM_SYNC:-sync-platform-config}"
   cat >>"$report_file" <<EOF
 
 ## Apply result

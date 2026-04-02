@@ -34,6 +34,14 @@ Que hace el bootstrap:
 ./scripts/smoke-functional.sh
 ```
 
+### Verificacion IA-Ops minima
+```sh
+./scripts/collect-nightly-context.sh --write-report
+./scripts/run-nightly-auditor.sh
+./scripts/run-sentry-agent.sh --service lb-nginx
+./scripts/run-sentry-agent.sh --service elastic
+```
+
 ### URLs principales
 - Front `live`: `http://nuevecuatrouno.test/`
 - Front `archive` por host admin: `http://archive.nuevecuatrouno.test/`
@@ -134,6 +142,8 @@ docker compose up -d
 - El stack actual usa WordPress real, no stubs PHP.
 - La semilla de laboratorio puede regenerarse sin reinstalar WordPress con `./scripts/bootstrap-wordpress-seed.sh`.
 - ElasticPress indexa `live` y `archive` por separado y consulta mediante el alias `n9-search-posts`.
+- Los heartbeats de jobs criticos viven en `./runtime/heartbeats/`.
+- Los informes JSON y Markdown de IA-Ops viven en `./runtime/reports/ia-ops/`.
 - `xmlrpc.php`, dotfiles y ficheros sensibles comunes quedan bloqueados por Nginx en esta fase.
 - La rotacion minima de logs Docker queda definida en `compose.yaml` con `max-size=10m` y `max-file=3`.
 - Este runbook centraliza la operacion manual de la POC; ya no hace falta una referencia rapida separada.

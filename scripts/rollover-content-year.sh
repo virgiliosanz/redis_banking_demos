@@ -272,6 +272,7 @@ if [ "$MODE" = "execute" ]; then
   live_index="$(get_index_name /srv/wp/live)"
   archive_index="$(get_index_name /srv/wp/archive)"
   publish_read_alias "$live_index" "$archive_index"
+  ./scripts/write-heartbeat.sh "${CRON_JOB_ROLLOVER:-rollover-content-year}"
   execute_enabled="yes"
 fi
 

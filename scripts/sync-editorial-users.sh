@@ -119,6 +119,7 @@ $plan_json
 EOF
 
 if [ -n "$apply_json" ]; then
+  ./scripts/write-heartbeat.sh "${CRON_JOB_EDITORIAL_SYNC:-sync-editorial-users}"
   cat >>"$report_file" <<EOF
 
 ## Apply result

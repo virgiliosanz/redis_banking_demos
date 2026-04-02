@@ -86,3 +86,13 @@ Deberia consumir:
 - los logs estructurados actuales
 - los runbooks ya documentados
 - el estado del rollover anual cuando exista
+
+## Implementacion minima actual
+- `scripts/collect-host-health.sh`
+- `scripts/collect-runtime-health.sh`
+- `scripts/collect-app-health.sh`
+- `scripts/collect-elastic-health.sh`
+- `scripts/collect-cron-health.sh`
+- `scripts/collect-nightly-context.sh`
+- `scripts/run-nightly-auditor.sh`
+- `scripts/run-sentry-agent.sh`

@@ -9,9 +9,11 @@ Este documento sustituye al resto de documentos tecnicos y al documento de proye
 
 ### Estado global
 - POC implementada y validada en laboratorio con `docker compose`.
-- Fases `1` a `6` completadas.
 - La topologia `live`, `archive` y `admin` ya arranca, enruta y pasa smoke tests.
-- Siguiente iteracion recomendada: formalizar el rollover anual `live -> archive` y preparar `IA-Ops Bootstrap`.
+- El rollover anual `live -> archive` ya esta implementado y probado en laboratorio sobre `2024`.
+- Las syncs editorial y de plataforma ya mantienen la consistencia minima entre `live` y `archive`.
+- `IA-Ops Bootstrap` ya dispone de colectores read-only, `Nightly Auditor` y `Sentry Agent` minimos.
+- Siguiente iteracion recomendada: programar estos flujos en cron/Monit o integrarlos con el entorno real de operacion.
 
 ### Artefactos implementados
 - `compose.yaml` operativo con `LB-Nginx`, `FE-Live`, `FE-Archive`, `BE-Admin`, `DB-Live`, `DB-Archive`, `Elastic` y `Cron-Master`.
@@ -32,6 +34,9 @@ Este documento sustituye al resto de documentos tecnicos y al documento de proye
 - El salto a produccion es sobre todo operativo: secretos, backups, despliegue, recuperacion y capacidad.
 - En Docker, Nginx debe resolver dinamicamente los upstreams si los contenedores se recrean.
 - Para laboratorio, la rotacion minima de logs en el runtime Docker evita crecimiento opaco del host.
+- La frontera anual de routing debe salir de configuracion versionada para poder acompasar el rollover con seguridad.
+- Los heartbeats de jobs criticos son una fuente mas fiable que una lectura ciega de logs para vigilar cron y syncs.
+- Una capa IA-Ops minima ya aporta valor sin LLM externo si consume checks estructurados, logs acotados y drift report.
 
 ## 3. Alcance y premisas
 - Plataforma base: `docker`.

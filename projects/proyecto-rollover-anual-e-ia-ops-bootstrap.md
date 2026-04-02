@@ -331,7 +331,7 @@ Fijar de forma cerrada que puede leer, como lo filtra y como responde el bootstr
 
 ### Fase 8. Colectores y wrappers de solo lectura
 #### Estado
-Pendiente
+Completada
 
 #### Objetivo
 Implementar la base local que permitira a IA-Ops reunir contexto sin tocar estado persistente.
@@ -354,9 +354,26 @@ Implementar la base local que permitira a IA-Ops reunir contexto sin tocar estad
 #### Criterios de cierre
 - Los colectores devuelven contexto util, acotado y seguro sin modificar el runtime.
 
+#### Progreso actual
+- Se crean colectores read-only para host, runtime, aplicacion, Elasticsearch, cron y agregacion nocturna.
+- Se integra `scripts/redact-sensitive.sh` para redaccion de emails e IPs publicas en la lectura de logs acotados.
+- El primer ciclo de validacion ya confirma salida JSON util para host, runtime, app, elastic y contexto nocturno.
+- Durante la validacion se detecta que el chequeo de cron no podia tratar igual jobs diarios y el rollover anual; se corrige el contrato para soportar umbrales y severidad de ausencia por job.
+- Los jobs existentes de sincronizacion editorial, sincronizacion de plataforma y rollover pasan a poder escribir heartbeat de exito para que la lectura de cron tenga una fuente fiable.
+
+#### Decisiones tomadas
+- El baseline de cron deja de usar una sola ventana global y pasa a aceptar umbrales por job, porque el rollover anual no puede tratarse igual que una sync diaria.
+- Los colectores persisten JSON solo bajo `runtime/reports/ia-ops/`; fuera de esa ruta su comportamiento por defecto sigue siendo de solo lectura.
+- La lectura de logs acotados pasa a filtrar por `ERROR|FATAL|CRITICAL` por defecto para no inundar el contexto.
+
+#### Lecciones aprendidas
+- El valor real del colector de cron aparece solo cuando los jobs productores escriben heartbeat; si no, la auditoria se queda en ausencia de evidencia.
+- En macOS, el path del proyecto no puede venir fijado a un valor Linux por defecto; el colector de host debe degradar al `cwd` real.
+- Incluso en laboratorio, la memoria del host puede ser el principal hallazgo operativo y condicionar la interpretacion del resto de checks.
+
 ### Fase 9. Flujos minimos Sentry/Nightly y cierre del proyecto
 #### Estado
-Pendiente
+Completada
 
 #### Objetivo
 Dejar operativos los flujos minimos del diagnostico reactivo y de la auditoria diaria sobre la plataforma ya instrumentada.
@@ -377,6 +394,23 @@ Dejar operativos los flujos minimos del diagnostico reactivo y de la auditoria d
 
 #### Criterios de cierre
 - El proyecto deja una operacion anual reproducible, sincronizaciones frecuentes coherentes y una interfaz IA-Ops minima utilizable en laboratorio.
+
+#### Progreso actual
+- Se crean `scripts/run-nightly-auditor.sh` y `scripts/run-sentry-agent.sh` como wrappers minimos sobre los colectores validados.
+- `Nightly Auditor` ya genera informe Markdown persistente bajo `runtime/reports/ia-ops/` y referencia el drift report `live/archive`.
+- `Sentry Agent` ya genera diagnostico por servicio con severidad, evidencias, validaciones, acciones manuales y logs acotados.
+- La validacion real se ejecuta en laboratorio para `lb-nginx` y `elastic`, y ambos informes quedan persistidos.
+- `docs/ia-ops-bootstrap-interface.md` se actualiza para apuntar a los scripts reales que materializan el contrato.
+
+#### Decisiones tomadas
+- El bootstrap IA-Ops sigue siendo determinista y local: no invoca modelos externos ni automatiza remediacion.
+- El `Nightly Auditor` eleva severidad global a `critical` si cualquier check base entra en critico, incluso si el stack de aplicacion sigue sano.
+- `Sentry Agent` opera por servicio Compose, no por tipo abstracto de incidente, para mantener el contrato simple en esta primera iteracion.
+
+#### Lecciones aprendidas
+- El mayor hallazgo del laboratorio actual no viene de WordPress sino de la memoria del host; el auditor debe reflejarlo aunque no haya fallos de aplicacion.
+- Un wrapper reactivo util necesita mezclar logs acotados con checks estructurados; solo logs no bastan y solo JSON tampoco.
+- La interfaz minima ya es util sin LLM externo siempre que produzca salida accionable y persistente.
 
 ## 8. Riesgos a vigilar
 - Mover taxonomias o meta de forma incompleta y dejar contenido inconsistente.
