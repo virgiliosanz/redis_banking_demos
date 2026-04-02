@@ -480,6 +480,9 @@ Empezar a mover a Python las piezas mas complejas del plano operativo.
 - La parte realmente sensible del rollover no es el snapshot, sino la secuencia import -> reindex -> cutover -> delete -> alias; tenerla en Python mejora mucho su legibilidad.
 
 ### Fase 7. Cierre documental y validacion
+#### Estado
+Completada
+
 #### Objetivo
 Cerrar la migracion acordada con documentacion limpia y operacion verificable.
 
@@ -490,6 +493,25 @@ Cerrar la migracion acordada con documentacion limpia y operacion verificable.
 
 #### Criterios de cierre
 - La nueva capa operativa queda mantenible, programable y preparada para alertado real.
+
+#### Progreso actual
+- Se actualiza `docs/project.md` para reflejar el estado real tras la migracion: Telegram validado, `cron` operativo y orquestacion compleja ya movida a `ops/`.
+- Se actualiza `docs/poc-local-runbook.md` para dejar explicito que los wrappers shell son ya interfaz de compatibilidad sobre la capa Python.
+- El plan queda cerrado con todas las fases ejecutadas y con el repo en estado consistente para tag final.
+
+#### Validacion ejecutada
+- `./scripts/smoke-functional.sh`: OK.
+- `./scripts/run-nightly-auditor.sh --no-write-report`: OK.
+- `./scripts/run-sentry-agent.sh --service lb-nginx --no-write-report`: OK.
+- La integracion Telegram sigue operativa en laboratorio durante la validacion final.
+
+#### Riesgos residuales
+- El host local sigue pudiendo salir en `critical` de memoria durante auditorias; es una caracteristica del laboratorio, no un fallo de la plataforma WordPress.
+- `smoke-functional.sh` sigue mostrando el warning de `mysqladmin` por password en CLI; no rompe la POC, pero conviene limpiarlo en una iteracion de hardening de tooling.
+
+#### Lecciones aprendidas
+- El cierre documental tiene que explicitar no solo nuevas capacidades, sino tambien que Bash ya no es la fuente de verdad de la logica operativa.
+- Una fase final de validacion real evita cerrar el proyecto con “documentacion bonita” pero sin comprobar el stack vivo.
 
 ## 9. Criterio de exito global
 - La complejidad operativa deja de acumularse en Bash.

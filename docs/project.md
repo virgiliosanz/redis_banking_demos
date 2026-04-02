@@ -16,9 +16,10 @@ Indice documental vivo: `docs/README.md`.
 - Las syncs editorial y de plataforma ya mantienen la consistencia minima entre `live` y `archive`.
 - `IA-Ops Bootstrap` ya dispone de colectores read-only, `Nightly Auditor` y `Sentry Agent` minimos.
 - `Nightly Auditor` ya puede programarse de forma reproducible con `cron` mediante un bloque gestionado versionado en el repo.
-- La salida ya puede conectarse a Telegram con resumen corto para `Nightly Auditor` y `Sentry Agent`.
+- La salida a Telegram ya esta validada en laboratorio con resumen corto para `Nightly Auditor` y `Sentry Agent`.
+- La orquestacion operativa compleja de IA-Ops, syncs y rollover ya corre desde `ops/` en Python; Bash queda como capa fina de entrada.
 - `Monit` queda evaluado como opcion reactiva futura, no como requisito del laboratorio actual.
-- Siguiente iteracion recomendada: validar entrega real a Telegram con credenciales del entorno y decidir si el disparo reactivo merece `Monit` o una alternativa mas simple.
+- Siguiente iteracion recomendada: decidir si el disparo reactivo merece `Monit` o una alternativa mas simple, y si compensa anadir tests/lint de la nueva capa Python.
 
 ### Artefactos implementados
 - `compose.yaml` operativo con `LB-Nginx`, `FE-Live`, `FE-Archive`, `BE-Admin`, `DB-Live`, `DB-Archive`, `Elastic` y `Cron-Master`.
@@ -26,6 +27,7 @@ Indice documental vivo: `docs/README.md`.
 - Configuracion minima de `php-fpm` en `php/common/`.
 - Plantillas WordPress por contexto en `wordpress/templates/`.
 - Bootstrap local y smoke tests en `scripts/`.
+- Capa operativa Python en `ops/` para IA-Ops, scheduling, syncs y rollover.
 - Runbook, checklist y documentos auxiliares en `docs/`.
 
 ### Lecciones aprendidas

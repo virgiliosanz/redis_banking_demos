@@ -206,6 +206,7 @@ docker compose up -d
 - Los heartbeats de jobs criticos viven en `./runtime/heartbeats/`.
 - Los informes JSON y Markdown de IA-Ops viven en `./runtime/reports/ia-ops/`.
 - La programacion baseline de `Nightly Auditor` se resuelve con `cron`; `Monit` queda evaluado pero no es requisito del laboratorio.
+- La orquestacion compleja de IA-Ops, syncs y rollover ya vive en `ops/`; los scripts shell son wrappers de compatibilidad.
 - `xmlrpc.php`, dotfiles y ficheros sensibles comunes quedan bloqueados por Nginx en esta fase.
 - La rotacion minima de logs Docker queda definida en `compose.yaml` con `max-size=10m` y `max-file=3`.
 - Este runbook centraliza la operacion manual de la POC; ya no hace falta una referencia rapida separada.
