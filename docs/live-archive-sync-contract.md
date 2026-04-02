@@ -120,6 +120,14 @@ Esto no debe resolverse copiando ficheros entre `live` y `archive` en caliente.
 - informe de opciones modificadas
 - restauracion selectiva de opciones previas
 
+### Primera iteracion de implementacion
+- la sync de plataforma aplica solo una allowlist corta:
+  - `sidebars_widgets`
+  - `nav_menu_locations`
+  - `theme_mods_<theme-activo>`
+- el drift de `active_plugins`, `template` y `stylesheet` se informa, pero no se corrige desde este script
+- cualquier ampliacion de allowlist debe justificarse y documentarse antes de tocar opciones de plugins
+
 ## 4. Dependencia con el rollover anual
 - el `execute` del rollover no debe abrirse mientras no exista al menos contrato cerrado de sincronizacion editorial y de plataforma
 - el contenido puede moverse bien y aun asi dejar un `archive` incoherente si usuarios, roles o configuracion comun no estan alineados

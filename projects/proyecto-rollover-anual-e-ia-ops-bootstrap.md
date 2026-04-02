@@ -230,7 +230,7 @@ Implementar la base reproducible para sincronizar usuarios, hashes de password, 
 
 ### Fase 6. Implementacion de sincronizacion de plataforma compartida
 #### Estado
-Pendiente
+Completada
 
 #### Objetivo
 Mantener la consistencia funcional y visual entre `live` y `archive` en aquello que no debe divergir.
@@ -248,6 +248,21 @@ Mantener la consistencia funcional y visual entre `live` y `archive` en aquello 
 
 #### Criterios de cierre
 - `archive` mantiene el mismo plano funcional/visual que `live` alli donde el proyecto lo exige.
+
+#### Progreso actual
+- Se crea una allowlist inicial para sync de plataforma: `sidebars_widgets`, `nav_menu_locations` y `theme_mods_<theme-activo>`.
+- Se crean `scripts/sync-platform-source-snapshot.php`, `scripts/sync-platform-plan.php`, `scripts/sync-platform-apply.php` y `scripts/sync-platform-config.sh`.
+- El drift de `active_plugins`, `template` y `stylesheet` queda reportado, pero no se corrige desde la sync de plataforma porque sigue siendo responsabilidad del despliegue declarativo.
+- La validacion funcional se realiza generando drift controlado en `live` mediante una `theme_mod` de laboratorio (`n9_lab_banner`) y cerrandolo despues en `archive` con la sync.
+- Tras aplicar la sync de plataforma, el informe global vuelve a `platform_drift: no`.
+
+#### Decisiones tomadas
+- La primera version de la sync de plataforma solo aplica opciones persistidas en DB con una allowlist corta y revisable.
+- El codigo y la activacion base de plugins/tema permanecen fuera del `apply` y solo entran en reporting.
+
+#### Lecciones aprendidas
+- Si la sync de plataforma intenta corregir tambien el codigo o la activacion de plugins, mezcla dos planos operativos distintos y se vuelve mas fragil.
+- Una allowlist corta pero validada es mucho mas defendible que intentar sincronizar opciones de plugins sin contrato previo.
 
 ### Fase 7. Contrato operativo de IA-Ops Bootstrap
 #### Estado

@@ -32,6 +32,11 @@ $result = [
     'stylesheet' => $stylesheet,
     'template' => $template,
     'active_plugins' => array_values($active_plugins),
+    'allowlist_option_names' => [
+        'sidebars_widgets',
+        'nav_menu_locations',
+        'theme_mods_' . $stylesheet,
+    ],
     'theme_mods_hash' => hash('sha256', wp_json_encode($theme_mods)),
     'sidebars_widgets_hash' => hash('sha256', wp_json_encode($sidebars_widgets)),
     'nav_menu_locations_hash' => hash('sha256', wp_json_encode($nav_menu_locations)),
