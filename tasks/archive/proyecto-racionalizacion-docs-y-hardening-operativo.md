@@ -341,7 +341,7 @@ Eliminar fricciones pequenas del tooling actual antes de abrir otro frente mayor
 
 ### Fase 5. Cierre del proyecto
 #### Estado
-Pendiente
+Completada
 
 #### Objetivo
 Cerrar el proyecto con documentacion viva actualizada, historico ordenado y plan siguiente sugerido.
@@ -354,6 +354,33 @@ Cerrar el proyecto con documentacion viva actualizada, historico ordenado y plan
 
 #### Criterios de cierre
 - `docs/` y `tasks/` reflejan una estructura limpia y el proyecto queda cerrado formalmente.
+
+#### Progreso actual
+- `docs/` queda racionalizado y reducido a documentos vivos por dominio.
+- `tasks/` queda con el plan activo fuera del archivo solo mientras dura la ejecucion.
+- El plano reactivo queda resuelto sin introducir `Monit`.
+- El tooling operativo queda mas predecible en notificaciones, checks y smoke tests.
+- IA-Ops incorpora ya checks MySQL read-only con `ping` y processlist largo.
+
+#### Decisiones finales
+- `docs/project.md` no vuelve; `docs/README.md` queda como documento principal del sistema.
+- El dominio `live/archive` queda consolidado en `docs/content-lifecycle-live-archive.md`.
+- El contrato de IA-Ops se mantiene separado porque ya es un dominio operativo propio.
+- El plano reactivo del laboratorio queda con `cron` + evaluador Python + Telegram, sin software supervisor adicional.
+- Los checks MySQL largos se quedan en observacion manual; cualquier `KILL` automatico se difiere a un proyecto posterior.
+
+#### Lecciones finales
+- La simplificacion documental mejora la operacion tanto como el codigo.
+- En este stack, la siguiente ganancia real ya no esta en meter mas piezas, sino en hacer mas fiable la reaccion operativa.
+- La automatizacion segura requiere antes buenos checks, buena deduplicacion y semantica clara de flags.
+
+#### Siguiente proyecto recomendado
+`proyecto-remediacion-controlada-y-observabilidad-mysql.md`
+
+Alcance recomendado:
+- estudiar acciones controladas y confirmadas para queries largas de MySQL
+- decidir si conviene automatizar recomendaciones o remediaciones manualmente aprobadas
+- mejorar observabilidad de DB y slow queries sin introducir una plataforma pesada
 
 ## 9. Riesgos y atencion especial
 - Fusionar documentos sin definir autoridad puede esconder informacion en vez de simplificar.
