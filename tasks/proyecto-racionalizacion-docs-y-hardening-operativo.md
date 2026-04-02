@@ -329,6 +329,13 @@ Eliminar fricciones pequenas del tooling actual antes de abrir otro frente mayor
 - Separar “persistir informe” de “notificar” evita sorpresas y ruido en canales reales.
 - Un baseline minimo de calidad vale mas si se puede ejecutar siempre sin dependencias nuevas.
 
+#### Ampliacion posterior acordada
+- Se anaden checks MySQL read-only a IA-Ops:
+  - `mysqladmin ping`
+  - processlist resumido
+  - queries largas candidatas a revision manual
+- Se mantiene fuera de alcance cualquier `KILL` automatico de queries.
+
 #### Criterios de cierre
 - El tooling actual queda mas limpio, menos ruidoso y con comportamiento menos ambiguo.
 

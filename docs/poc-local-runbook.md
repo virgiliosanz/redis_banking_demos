@@ -40,9 +40,11 @@ Que hace el bootstrap:
 ### Verificacion IA-Ops minima
 ```sh
 ./scripts/collect-nightly-context.sh --write-report
+./scripts/collect-mysql-health.sh
 ./scripts/run-nightly-auditor.sh
 ./scripts/run-sentry-agent.sh --service lb-nginx
 ./scripts/run-sentry-agent.sh --service elastic
+./scripts/run-sentry-agent.sh --service db-live --no-notify-telegram
 ```
 
 ### Canal Telegram

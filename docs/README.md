@@ -14,6 +14,7 @@ El historico de trabajo y los planes de proyecto viven en `tasks/`.
 - IA-Ops minimo operativo con `Nightly Auditor`, `Sentry Agent`, `cron` y salida a Telegram
 - plano reactivo ligero resuelto con `cron` + evaluador Python + cooldown por incidente
 - orquestacion compleja ya movida a Python en `ops/`
+- checks MySQL en solo lectura con `ping` y processlist largo para `db-live` y `db-archive`
 
 ## Topologia funcional
 

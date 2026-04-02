@@ -45,6 +45,7 @@ No autoriza remediacion automatica.
 
 ### 3.5 MySQL
 - `mysqladmin ping`
+- processlist resumido en modo solo lectura
 - slow query log
 - tamano por base o tabla
 - estado basico de conectividad
@@ -130,6 +131,7 @@ Checks obligatorios:
 - `4xx` repetidos en ventana corta en `lb-nginx`
 - `5xx` o errores recientes en logs de `lb-nginx`
 - `mysqladmin ping` para ambas DB
+- queries largas en `processlist` para `db-live` y `db-archive`
 - salud de Elasticsearch y presencia del alias `n9-search-posts`
 
 Umbrales iniciales:
@@ -143,6 +145,9 @@ Umbrales iniciales:
 - `5xx` repetidos en ventana corta
   - `warning` si hay recurrencia
   - `critical` si se concentran en pocos minutos o afectan a rutas base
+- queries largas en MySQL
+  - `warning` si superan `30s`
+  - `critical` si superan `120s`
 
 ### 7.3 Aplicacion
 Checks obligatorios:
@@ -207,6 +212,7 @@ Umbrales iniciales:
 - `5xx` repetidos en frontend
 - `4xx` repetidos en frontend fuera del baseline esperado
 - `db-live` o `db-archive` no responden
+- `db-live` o `db-archive` con processlist anomalo y queries largas
 - slow queries repetidas
 - `elastic` caido
 - alias `n9-search-posts` ausente

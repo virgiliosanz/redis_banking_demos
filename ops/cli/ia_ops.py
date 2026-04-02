@@ -12,6 +12,7 @@ from ..collectors import cron as cron_collector
 from ..collectors import elastic as elastic_collector
 from ..collectors import host as host_collector
 from ..collectors import logs as logs_collector
+from ..collectors import mysql as mysql_collector
 from ..collectors import runtime as runtime_collector
 from ..notifications.telegram import load_telegram_config, send_message
 from ..rollover import content_year as rollover_content_year
@@ -188,6 +189,11 @@ def cmd_collect_app(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_collect_mysql(_: argparse.Namespace) -> int:
+    _print_json(mysql_collector.collect(load_settings()))
+    return 0
+
+
 def cmd_collect_service_logs(args: argparse.Namespace) -> int:
     settings = load_settings()
     content = logs_collector.collect_service_logs(settings, args.service, args.pattern)
@@ -203,6 +209,7 @@ def cmd_collect_nightly_context(args: argparse.Namespace) -> int:
         "host": host_collector.collect(settings),
         "runtime": runtime_collector.collect(settings),
         "app": app_collector.collect(settings),
+        "mysql": mysql_collector.collect(settings),
         "elastic": elastic_collector.collect(settings),
         "cron": cron_collector.collect(settings),
     }
@@ -278,6 +285,7 @@ def cmd_run_nightly(args: argparse.Namespace) -> int:
         "host": host_collector.collect(settings),
         "runtime": runtime_collector.collect(settings),
         "app": app_collector.collect(settings),
+        "mysql": mysql_collector.collect(settings),
         "elastic": elastic_collector.collect(settings),
         "cron": cron_collector.collect(settings),
     }
@@ -311,6 +319,7 @@ def cmd_run_nightly(args: argparse.Namespace) -> int:
     recent_5xx = context["runtime"]["checks"]["lb_nginx_recent_5xx"]["count"]
     recent_4xx = context["runtime"]["checks"]["lb_nginx_recent_4xx"]["count"]
     elastic_alias_status = context["elastic"]["alias"]["status"]
+    mysql_databases = context["mysql"]["databases"]
     smoke_failures = [row["name"] for row in context["app"]["checks"]["smoke_scripts"] if row["status"] != "ok"]
     cron_warning_jobs = [row["job_name"] for row in context["cron"]["jobs"] if row["status"] in {"warning", "critical"}]
 
@@ -331,6 +340,20 @@ def cmd_run_nightly(args: argparse.Namespace) -> int:
     if elastic_alias_status != "ok":
         risks.append("- El alias de lectura de Elasticsearch no esta sano.")
         actions.append("- Confirmar indices live/archive y republicar el alias antes de dar por buena la busqueda.")
+    for db_row in mysql_databases:
+        db_name = db_row["service"]
+        ping_status = db_row["ping"]["status"]
+        processlist = db_row["processlist"]
+        if ping_status != "ok":
+            risks.append(f"- {db_name} no responde correctamente al ping de MySQL.")
+            actions.append(f"- Revisar conectividad y estado interno de {db_name} antes de repetir jobs o smokes dependientes de DB.")
+        elif processlist["status"] != "ok":
+            risks.append(
+                f"- {db_name} tiene queries largas en processlist: {processlist['warning_count']} observadas, {processlist['critical_count']} por encima del umbral critico."
+            )
+            actions.append(
+                f"- Revisar el processlist de {db_name} y validar manualmente si alguna query larga debe investigarse o matarse de forma controlada."
+            )
     if smoke_failures:
         joined = ", ".join(smoke_failures)
         risks.append(f"- Hay smokes fallidos: {joined}.")
@@ -366,6 +389,11 @@ def cmd_run_nightly(args: argparse.Namespace) -> int:
 ## Aplicacion
 ```json
 {dumps_pretty(context["app"])}
+```
+
+## MySQL
+```json
+{dumps_pretty(context["mysql"])}
 ```
 
 ## Cron
@@ -425,6 +453,7 @@ def cmd_run_sentry(args: argparse.Namespace) -> int:
     host = host_collector.collect(settings)
     runtime = runtime_collector.collect(settings)
     app = app_collector.collect(settings)
+    mysql = mysql_collector.collect(settings)
     elastic = elastic_collector.collect(settings)
     cron = cron_collector.collect(settings)
     service_logs = logs_collector.collect_service_logs(settings, args.service, args.pattern)
@@ -514,6 +543,40 @@ def cmd_run_sentry(args: argparse.Namespace) -> int:
             cause = "sin evidencia actual de fallo en cron-master"
         validations.append("- confirmar heartbeats de sync editorial, sync de plataforma y rollover")
         actions.append("- revisar los logs recientes y reejecutar manualmente solo el job afectado si procede")
+    elif args.service in {"db-live", "db-archive"}:
+        db_row = next(row for row in mysql["databases"] if row["service"] == args.service)
+        ping_status = db_row["ping"]["status"]
+        processlist = db_row["processlist"]
+        evidence.append(f"- mysql ping status: {ping_status}")
+        evidence.append(f"- long_queries_warning_count: {processlist['warning_count']}")
+        evidence.append(f"- long_queries_critical_count: {processlist['critical_count']}")
+        if processlist["queries"]:
+            query_ids = ", ".join(str(row["id"]) for row in processlist["queries"][:5])
+            evidence.append(f"- candidate_query_ids: {query_ids}")
+        if ping_status != "ok" or container_health != "healthy":
+            severity = "critical"
+            summary = args.summary or f"{args.service} no esta sano o no responde al ping"
+            cause = "caida del contenedor, conectividad rota o mysql no responde correctamente"
+        elif processlist["critical_count"] > 0:
+            severity = "critical"
+            summary = args.summary or f"{args.service} tiene queries largas por encima del umbral critico"
+            cause = "una o varias queries de larga duracion pueden estar bloqueando o degradando la base de datos"
+        elif processlist["warning_count"] > 0:
+            severity = "warning"
+            summary = args.summary or f"{args.service} tiene queries largas en processlist"
+            cause = "consultas largas activas que conviene revisar antes de que degraden el servicio"
+        else:
+            summary = args.summary or f"{args.service} sano sin queries largas relevantes"
+            cause = "sin evidencia actual de queries largas o bloqueo anomalo"
+        validations.extend(
+            [
+                f"- revisar processlist de {args.service} y confirmar si las queries largas son esperadas",
+                "- contrastar con slow query log y con plugins recientes que afecten a SEO o metadatos",
+            ]
+        )
+        actions.append(
+            "- documentar manualmente cualquier query candidata a `KILL`, pero no ejecutar corte automatico en esta fase"
+        )
     else:
         if container_health != "healthy":
             severity = "critical"
@@ -564,7 +627,7 @@ def cmd_run_sentry(args: argparse.Namespace) -> int:
 
 ## Contexto adicional
 ```json
-{dumps_pretty({"host": host, "runtime": runtime, "app": app, "elastic": elastic, "cron": cron})}
+{dumps_pretty({"host": host, "runtime": runtime, "app": app, "mysql": mysql, "elastic": elastic, "cron": cron})}
 ```
 
 ## Logs acotados
@@ -671,6 +734,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("collect-elastic-health").set_defaults(func=cmd_collect_elastic)
     subparsers.add_parser("collect-runtime-health").set_defaults(func=cmd_collect_runtime)
     subparsers.add_parser("collect-app-health").set_defaults(func=cmd_collect_app)
+    subparsers.add_parser("collect-mysql-health").set_defaults(func=cmd_collect_mysql)
 
     collect_logs = subparsers.add_parser("collect-service-logs")
     collect_logs.add_argument("service")
