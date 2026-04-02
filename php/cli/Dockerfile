@@ -8,3 +8,5 @@ RUN set -eux; \
     curl -fsSL https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -o /usr/local/bin/wp; \
     chmod +x /usr/local/bin/wp; \
     wp --allow-root --info >/dev/null
+
+COPY php/common/zz-security.ini /usr/local/etc/php/conf.d/zz-security.ini

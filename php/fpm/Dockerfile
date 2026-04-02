@@ -4,3 +4,5 @@ RUN set -eux; \
     apk add --no-cache --virtual .build-deps $PHPIZE_DEPS; \
     docker-php-ext-install mysqli pdo_mysql exif; \
     apk del .build-deps
+
+COPY php/common/zz-security.ini /usr/local/etc/php/conf.d/zz-security.ini
