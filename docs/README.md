@@ -17,6 +17,9 @@ El historico de trabajo y los planes de proyecto viven en `tasks/`.
 - checks MySQL en solo lectura con `ping` y processlist largo para `db-live` y `db-archive`
 - drift `live/archive` con resumen accionable para editorial y plataforma
 - baseline reproducible de calidad para Python, shell, PHP y `docker compose`
+- 84 tests unitarios cubriendo 22 de 28 modulos Python
+- dispatch table en `sentry.py` para extender diagnosticos sin tocar el core
+- heartbeat writing consolidado entre sync y rollover
 
 ## Topologia funcional
 
@@ -48,7 +51,8 @@ La frontera anual real del balanceador ya no esta hardcodeada: sale de `config/r
 - sync editorial y de plataforma con drift report accionable
 - auditoria nocturna programable con `cron`
 - agente reactivo programable con `cron`, deduplicacion y salida a Telegram
-- baseline reproducible de calidad para Python, shell, PHP y `docker compose`
+- baseline reproducible de calidad: `./scripts/check-quality.sh` (unittest, shellcheck, php -l, py_compile, compose config)
+- gestion de crontabs refactorizada con helpers genericos reutilizables
 
 ## Limites actuales
 - laboratorio local, no produccion

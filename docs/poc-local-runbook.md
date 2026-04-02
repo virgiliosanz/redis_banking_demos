@@ -34,7 +34,7 @@ Que hace el bootstrap:
 ### Verificacion funcional completa
 ```sh
 ./scripts/smoke-functional.sh
-./scripts/check-python-tooling.sh
+./scripts/check-quality.sh
 ```
 
 ### Verificacion IA-Ops minima

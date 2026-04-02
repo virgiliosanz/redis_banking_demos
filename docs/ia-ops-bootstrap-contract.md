@@ -63,7 +63,6 @@ No autoriza remediacion automatica.
 ## 4. Comandos permitidos
 
 ### 4.1 Host
-- `date`
 - `uptime`
 - `df -h`
 - `iostat`
