@@ -304,10 +304,15 @@ def cmd_run_reactive_watch(args: argparse.Namespace) -> int:
     try:
         evaluation = reactive_runtime.evaluate(settings)
         _incident_fields = {"key", "service", "severity", "summary", "pattern"}
-        incidents = [
-            reactive_runtime.ReactiveIncident(**{k: v for k, v in row.items() if k in _incident_fields})
-            for row in evaluation["incidents"]
-        ]
+        _required_fields = {"key", "service", "severity", "summary"}
+        incidents: list[reactive_runtime.ReactiveIncident] = []
+        for row in evaluation["incidents"]:
+            if not isinstance(row, dict) or not _required_fields.issubset(row):
+                print(f"reactive watch: skipping malformed incident row: {row!r}", file=sys.stderr)
+                continue
+            incidents.append(
+                reactive_runtime.ReactiveIncident(**{k: v for k, v in row.items() if k in _incident_fields})
+            )
         state = reactive_runtime.load_state(settings)
         now_epoch = None
         emitted: list[str] = []
