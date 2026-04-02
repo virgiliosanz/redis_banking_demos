@@ -6,6 +6,7 @@ from unittest import mock
 
 from ops.config import Settings
 from ops.collectors.logs import collect_service_logs
+from ops.util.process import CommandResult
 
 
 def _settings(**overrides: str) -> Settings:
@@ -15,55 +16,51 @@ def _settings(**overrides: str) -> Settings:
 
 
 class LogsCollectorTests(unittest.TestCase):
-    @mock.patch("ops.collectors.logs.subprocess.run")
+    @mock.patch("ops.collectors.logs.run_command")
     @mock.patch("ops.collectors.logs.service_logs")
-    def test_collect_service_logs_filters_and_redacts(self, mock_svc_logs: mock.MagicMock, mock_run: mock.MagicMock) -> None:
+    def test_collect_service_logs_filters_and_redacts(self, mock_svc_logs: mock.MagicMock, mock_run_cmd: mock.MagicMock) -> None:
         mock_svc_logs.return_value = "INFO: ok\nERROR: something broke\nINFO: fine\nFATAL: crash\n"
+        mock_run_cmd.return_value = CommandResult(
+            args=["redact"], returncode=0, stdout="ERROR: something broke\nFATAL: crash", stderr="",
+        )
 
-        def fake_run(args, *, input=None, capture_output=False, text=False, check=False):
-            if "grep" in args:
-                filtered = "\n".join(line for line in (input or "").splitlines() if "ERROR" in line or "FATAL" in line)
-                return mock.Mock(returncode=0, stdout=filtered + "\n" if filtered else "", stderr="")
-            if "redact" in " ".join(args):
-                return mock.Mock(returncode=0, stdout=input or "", stderr="")
-            return mock.Mock(returncode=0, stdout="", stderr="")
-
-        mock_run.side_effect = fake_run
         result = collect_service_logs(_settings(), "lb-nginx")
         self.assertIn("ERROR", result)
         self.assertIn("FATAL", result)
         self.assertNotIn("INFO", result)
+        mock_run_cmd.assert_called_once()
 
-    @mock.patch("ops.collectors.logs.subprocess.run")
+    @mock.patch("ops.collectors.logs.run_command")
     @mock.patch("ops.collectors.logs.service_logs")
-    def test_collect_service_logs_returns_empty_when_no_matches(self, mock_svc_logs: mock.MagicMock, mock_run: mock.MagicMock) -> None:
+    def test_collect_service_logs_returns_empty_when_no_matches(self, mock_svc_logs: mock.MagicMock, mock_run_cmd: mock.MagicMock) -> None:
         mock_svc_logs.return_value = "INFO: all good\n"
 
-        def fake_run(args, *, input=None, capture_output=False, text=False, check=False):
-            if "grep" in args:
-                return mock.Mock(returncode=1, stdout="", stderr="")
-            return mock.Mock(returncode=0, stdout="", stderr="")
-
-        mock_run.side_effect = fake_run
         result = collect_service_logs(_settings(), "lb-nginx")
         self.assertEqual(result, "")
+        mock_run_cmd.assert_not_called()
 
-    @mock.patch("ops.collectors.logs.subprocess.run")
+    @mock.patch("ops.collectors.logs.run_command")
     @mock.patch("ops.collectors.logs.service_logs")
-    def test_collect_service_logs_uses_custom_pattern(self, mock_svc_logs: mock.MagicMock, mock_run: mock.MagicMock) -> None:
-        mock_svc_logs.return_value = "WARN: something\n"
+    def test_collect_service_logs_uses_custom_pattern(self, mock_svc_logs: mock.MagicMock, mock_run_cmd: mock.MagicMock) -> None:
+        mock_svc_logs.return_value = "WARN: something\nINFO: ok\n"
+        mock_run_cmd.return_value = CommandResult(
+            args=["redact"], returncode=0, stdout="WARN: something", stderr="",
+        )
 
-        patterns_seen: list[str] = []
+        result = collect_service_logs(_settings(), "lb-nginx", pattern="WARN|NOTICE")
+        self.assertIn("WARN", result)
+        self.assertNotIn("INFO", result)
 
-        def fake_run(args, *, input=None, capture_output=False, text=False, check=False):
-            if "grep" in args:
-                patterns_seen.append(args[args.index("-E") + 1] if "-E" in args else "unknown")
-                return mock.Mock(returncode=1, stdout="", stderr="")
-            return mock.Mock(returncode=0, stdout="", stderr="")
+    @mock.patch("ops.collectors.logs.run_command")
+    @mock.patch("ops.collectors.logs.service_logs")
+    def test_collect_falls_back_to_filtered_on_redact_failure(self, mock_svc_logs: mock.MagicMock, mock_run_cmd: mock.MagicMock) -> None:
+        mock_svc_logs.return_value = "ERROR: secret data\n"
+        mock_run_cmd.return_value = CommandResult(
+            args=["redact"], returncode=1, stdout="", stderr="script not found",
+        )
 
-        mock_run.side_effect = fake_run
-        collect_service_logs(_settings(), "lb-nginx", pattern="WARN|NOTICE")
-        self.assertEqual(patterns_seen[0], "WARN|NOTICE")
+        result = collect_service_logs(_settings(), "lb-nginx")
+        self.assertIn("ERROR: secret data", result)
 
 
 if __name__ == "__main__":

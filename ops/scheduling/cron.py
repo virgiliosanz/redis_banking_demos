@@ -81,8 +81,8 @@ def render_sync_jobs_block(settings: Settings, *, project_root: Path, python_bin
     editorial_minute = settings.get_int("SYNC_EDITORIAL_CRON_MINUTE", 15)
     platform_hour = settings.get_int("SYNC_PLATFORM_CRON_HOUR", 4)
     platform_minute = settings.get_int("SYNC_PLATFORM_CRON_MINUTE", 45)
-    editorial_mode = settings.get("SYNC_EDITORIAL_CRON_MODE", "apply") or "apply"
-    platform_mode = settings.get("SYNC_PLATFORM_CRON_MODE", "apply") or "apply"
+    editorial_mode = settings.get("SYNC_EDITORIAL_CRON_MODE", "apply")
+    platform_mode = settings.get("SYNC_PLATFORM_CRON_MODE", "apply")
     config_file = settings.config_file.resolve()
     editorial_log_file = settings.get_path("SYNC_EDITORIAL_LOG_FILE", "./runtime/reports/sync/editorial-sync.cron.log")
     platform_log_file = settings.get_path("SYNC_PLATFORM_LOG_FILE", "./runtime/reports/sync/platform-sync.cron.log")

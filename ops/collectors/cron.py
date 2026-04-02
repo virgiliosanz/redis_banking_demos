@@ -20,19 +20,19 @@ def _job_specs(settings: Settings) -> list[tuple[str, int, int, str]]:
             editorial,
             settings.get_int("CRON_JOB_EDITORIAL_SYNC_WARNING_MINUTES", 1440),
             settings.get_int("CRON_JOB_EDITORIAL_SYNC_CRITICAL_MINUTES", 2880),
-            settings.get("CRON_JOB_EDITORIAL_SYNC_MISSING_STATUS", "warning") or "warning",
+            settings.get("CRON_JOB_EDITORIAL_SYNC_MISSING_STATUS", "warning"),
         ),
         (
             platform,
             settings.get_int("CRON_JOB_PLATFORM_SYNC_WARNING_MINUTES", 1440),
             settings.get_int("CRON_JOB_PLATFORM_SYNC_CRITICAL_MINUTES", 2880),
-            settings.get("CRON_JOB_PLATFORM_SYNC_MISSING_STATUS", "warning") or "warning",
+            settings.get("CRON_JOB_PLATFORM_SYNC_MISSING_STATUS", "warning"),
         ),
         (
             rollover,
             settings.get_int("CRON_JOB_ROLLOVER_WARNING_MINUTES", 525600),
             settings.get_int("CRON_JOB_ROLLOVER_CRITICAL_MINUTES", 527040),
-            settings.get("CRON_JOB_ROLLOVER_MISSING_STATUS", "info") or "info",
+            settings.get("CRON_JOB_ROLLOVER_MISSING_STATUS", "info"),
         ),
     ]
 

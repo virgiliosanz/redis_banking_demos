@@ -9,6 +9,7 @@ from ..util.time import utc_timestamp
 
 
 def _curl_json(service: str, path: str, *, cwd: Path) -> object:
+    # 127.0.0.1 refers to the loopback inside the container (via docker compose exec)
     command = ["sh", "-lc", f"curl -fsS http://127.0.0.1:9200{path}"]
     return compose_exec(service, command, cwd=cwd).json()
 
@@ -22,7 +23,7 @@ def _cluster_health_status(raw_status: object) -> str:
 
 
 def collect(settings: Settings) -> dict[str, object]:
-    alias_name = settings.get("EP_SEARCH_ALIAS", "n9-search-posts") or "n9-search-posts"
+    alias_name = settings.get("EP_SEARCH_ALIAS", "n9-search-posts")
     cwd = settings.project_root.resolve()
     elastic_service = compose_service_name("elastic")
     cluster_health = _curl_json(elastic_service, "/_cluster/health", cwd=cwd)

@@ -64,7 +64,7 @@ class LoadSettingsTests(unittest.TestCase):
             settings = load_settings(str(config_file))
 
             self.assertEqual(settings.get("VALID_KEY"), "valid_value")
-            self.assertEqual(settings.get("ANOTHER_KEY"), "")
+            self.assertIsNone(settings.get("ANOTHER_KEY"))  # empty value treated as absent
             self.assertEqual(settings.get("KEY_WITH_EQUALS"), "value=with=equals")
             self.assertIsNone(settings.get("no_equals_sign"))
 

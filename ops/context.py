@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 from .collectors import app as app_collector
 from .collectors import cron as cron_collector
 from .collectors import elastic as elastic_collector
@@ -12,15 +14,19 @@ from .util.time import utc_timestamp
 
 
 def collect_operational_context(settings: Settings) -> dict[str, object]:
-    return {
-        "generated_at": utc_timestamp(),
-        "host": host_collector.collect(settings),
-        "runtime": runtime_collector.collect(settings),
-        "app": app_collector.collect(settings),
-        "mysql": mysql_collector.collect(settings),
-        "elastic": elastic_collector.collect(settings),
-        "cron": cron_collector.collect(settings),
+    collectors = {
+        "host": host_collector.collect,
+        "runtime": runtime_collector.collect,
+        "app": app_collector.collect,
+        "mysql": mysql_collector.collect,
+        "elastic": elastic_collector.collect,
+        "cron": cron_collector.collect,
     }
+    with ThreadPoolExecutor(max_workers=len(collectors)) as pool:
+        futures = {key: pool.submit(fn, settings) for key, fn in collectors.items()}
+        results = {key: future.result() for key, future in futures.items()}
+    results["generated_at"] = utc_timestamp()
+    return results
 
 
 def load_drift_status(settings: Settings) -> DriftStatus:

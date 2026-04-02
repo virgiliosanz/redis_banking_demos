@@ -25,11 +25,13 @@ def run_command(
     cwd: Path | None = None,
     env: Mapping[str, str] | None = None,
     check: bool = True,
+    input: str | None = None,
 ) -> CommandResult:
     completed = subprocess.run(
         args,
         cwd=str(cwd) if cwd else None,
         env=dict(env) if env else None,
+        input=input,
         capture_output=True,
         text=True,
         check=False,

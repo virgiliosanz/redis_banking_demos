@@ -9,7 +9,7 @@ from .common import ensure_sync_mode, markdown_header, sync_report_path, wait_fo
 def run(settings: Settings, *, mode: str, report_dir: Path | None = None) -> Path:
     mode = ensure_sync_mode(mode)
     cwd = settings.project_root.resolve()
-    excluded_logins = settings.get("SYNC_EXCLUDE_USER_LOGINS", "n9liveadmin,n9archiveadmin") or "n9liveadmin,n9archiveadmin"
+    excluded_logins = settings.get("SYNC_EXCLUDE_USER_LOGINS", "n9liveadmin,n9archiveadmin")
     target_report_dir = report_dir or settings.get_path("REPORT_DIR", "./runtime/reports/sync")
     if not target_report_dir.is_absolute():
         target_report_dir = cwd / target_report_dir

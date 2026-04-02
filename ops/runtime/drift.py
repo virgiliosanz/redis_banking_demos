@@ -223,7 +223,7 @@ def format_drift_summary(section: DriftSection) -> str:
 
 
 def build_drift_report(settings: Settings) -> DriftStatus:
-    excluded_logins = settings.get("SYNC_EXCLUDE_USER_LOGINS", "n9liveadmin,n9archiveadmin") or "n9liveadmin,n9archiveadmin"
+    excluded_logins = settings.get("SYNC_EXCLUDE_USER_LOGINS", "n9liveadmin,n9archiveadmin")
     report_dir = settings.get_path("REPORT_DIR", "./runtime/reports/sync")
     project_root = settings.project_root.resolve()
 

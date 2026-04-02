@@ -11,6 +11,9 @@ DEFAULT_CONFIG_CANDIDATES = (
     Path("./config/ia-ops-sources.env.example"),
 )
 
+DEFAULT_BASE_URL = "http://nuevecuatrouno.test"
+DEFAULT_ARCHIVE_URL = "http://archive.nuevecuatrouno.test"
+
 
 def _parse_env_file(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
@@ -50,7 +53,10 @@ class Settings:
     values: Mapping[str, str]
 
     def get(self, key: str, default: str | None = None) -> str | None:
-        return self.values.get(key, default)
+        value = self.values.get(key, default)
+        if value is not None and value == "":
+            return default
+        return value
 
     def require(self, key: str) -> str:
         value = self.values.get(key)

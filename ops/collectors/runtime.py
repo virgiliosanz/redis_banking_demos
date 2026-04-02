@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import re
 from pathlib import Path
 
-from ..config import Settings
+from ..config import DEFAULT_ARCHIVE_URL, DEFAULT_BASE_URL, Settings
 from ..services import container_name, service_keys
 from ..util.docker import service_logs
 from ..util.http import get_status_code
@@ -54,9 +55,10 @@ def collect(settings: Settings) -> dict[str, object]:
     project_root = settings.project_root.resolve()
     containers = [container_name(settings, service_key) for service_key in service_keys()]
 
-    rows = [_inspect_container(container) for container in containers]
-    base_url = settings.get("BASE_URL", "http://nuevecuatrouno.test") or "http://nuevecuatrouno.test"
-    archive_url = settings.get("ARCHIVE_URL", "http://archive.nuevecuatrouno.test") or "http://archive.nuevecuatrouno.test"
+    with ThreadPoolExecutor(max_workers=len(containers)) as pool:
+        rows = list(pool.map(_inspect_container, containers))
+    base_url = settings.get("BASE_URL", DEFAULT_BASE_URL)
+    archive_url = settings.get("ARCHIVE_URL", DEFAULT_ARCHIVE_URL)
 
     live_health_code = get_status_code(f"{base_url}/healthz")
     archive_health_code = get_status_code(f"{archive_url}/healthz")

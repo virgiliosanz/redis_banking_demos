@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..config import Settings
+from ..config import DEFAULT_ARCHIVE_URL, DEFAULT_BASE_URL, Settings
 from ..util.http import get_status_code
 from ..util.process import run_command
 from ..util.time import utc_timestamp
@@ -29,8 +29,8 @@ def _run_smoke(name: str, script: str, *, cwd: Path) -> dict[str, object]:
 
 
 def collect(settings: Settings) -> dict[str, object]:
-    base_url = settings.get("BASE_URL", "http://nuevecuatrouno.test") or "http://nuevecuatrouno.test"
-    archive_url = settings.get("ARCHIVE_URL", "http://archive.nuevecuatrouno.test") or "http://archive.nuevecuatrouno.test"
+    base_url = settings.get("BASE_URL", DEFAULT_BASE_URL)
+    archive_url = settings.get("ARCHIVE_URL", DEFAULT_ARCHIVE_URL)
 
     project_root = settings.project_root.resolve()
     smoke_scripts = [

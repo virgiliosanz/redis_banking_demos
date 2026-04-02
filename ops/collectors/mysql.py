@@ -14,6 +14,7 @@ def _mysql_shell(service: str, secret_path: str, sql: str, *, cwd: Path) -> str:
         "-lc",
         (
             f'MYSQL_PWD="$(cat {secret_path})" '
+            # 127.0.0.1 refers to the loopback inside the container (via docker compose exec)
             f'mysql -h 127.0.0.1 -uroot --batch --raw --skip-column-names -e "{escaped_sql}"'
         ),
     ]
@@ -109,8 +110,8 @@ def _database_snapshot(settings: Settings, *, service: str, secret_path: str) ->
 
 
 def collect(settings: Settings) -> dict[str, object]:
-    live_secret = settings.get("DB_LIVE_ROOT_SECRET_PATH", "/run/secrets/db_live_mysql_root_password") or "/run/secrets/db_live_mysql_root_password"
-    archive_secret = settings.get("DB_ARCHIVE_ROOT_SECRET_PATH", "/run/secrets/db_archive_mysql_root_password") or "/run/secrets/db_archive_mysql_root_password"
+    live_secret = settings.get("DB_LIVE_ROOT_SECRET_PATH", "/run/secrets/db_live_mysql_root_password")
+    archive_secret = settings.get("DB_ARCHIVE_ROOT_SECRET_PATH", "/run/secrets/db_archive_mysql_root_password")
 
     return {
         "generated_at": utc_timestamp(),

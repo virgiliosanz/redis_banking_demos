@@ -27,8 +27,8 @@ class TelegramConfig:
 def load_telegram_config(settings: Settings) -> TelegramConfig:
     return TelegramConfig(
         enabled=settings.get_bool("TELEGRAM_NOTIFY_ENABLED", False),
-        bot_token=settings.get("TELEGRAM_BOT_TOKEN", "") or "",
-        chat_id=settings.get("TELEGRAM_CHAT_ID", "") or "",
+        bot_token=settings.get("TELEGRAM_BOT_TOKEN", ""),
+        chat_id=settings.get("TELEGRAM_CHAT_ID", ""),
         thread_id=settings.get("TELEGRAM_MESSAGE_THREAD_ID"),
         disable_notification=settings.get_bool("TELEGRAM_DISABLE_NOTIFICATION", False),
         notify_on_nightly=settings.get_bool("TELEGRAM_NOTIFY_ON_NIGHTLY", True),

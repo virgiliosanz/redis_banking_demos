@@ -241,10 +241,10 @@ def run(
     source_snapshot_file.write_text(f"{source_snapshot}\n", encoding="utf-8")
     archive_backup_file.write_text(f"{archive_backup_snapshot}\n", encoding="utf-8")
 
-    ep_host = settings.get("EP_HOST", "http://elastic:9200") or "http://elastic:9200"
-    ep_search_alias = settings.get("EP_SEARCH_ALIAS", "n9-search-posts") or "n9-search-posts"
-    archive_ep_prefix = settings.get("ARCHIVE_EP_PREFIX", "n9-archive") or "n9-archive"
-    live_ep_prefix = settings.get("LIVE_EP_PREFIX", "n9-live") or "n9-live"
+    ep_host = settings.get("EP_HOST", "http://elastic:9200")
+    ep_search_alias = settings.get("EP_SEARCH_ALIAS", "n9-search-posts")
+    archive_ep_prefix = settings.get("ARCHIVE_EP_PREFIX", "n9-archive")
+    live_ep_prefix = settings.get("LIVE_EP_PREFIX", "n9-live")
 
     import_result = ""
     delete_result = ""
