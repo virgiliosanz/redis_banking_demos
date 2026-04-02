@@ -132,5 +132,21 @@ class SentryRuntimeTests(unittest.TestCase):
         self.assertEqual(diagnosis.severity, "critical")
 
 
+    def test_diagnose_sentry_unknown_service_with_summary_override(self) -> None:
+        diagnosis = diagnose_sentry_service(
+            "custom-svc", _base_context(),
+            container_health="unhealthy",
+            summary_override="custom-svc caido por mantenimiento",
+        )
+        self.assertEqual(diagnosis.severity, "critical")
+        self.assertEqual(diagnosis.summary, "custom-svc caido por mantenimiento")
+
+    def test_diagnose_sentry_unknown_service_default_container_health(self) -> None:
+        """When container_health defaults to 'unknown' the handler treats it as unhealthy."""
+        diagnosis = diagnose_sentry_service("mystery-svc", _base_context())
+        self.assertEqual(diagnosis.severity, "critical")
+        self.assertIn("mystery-svc no esta sano", diagnosis.summary)
+
+
 if __name__ == "__main__":
     unittest.main()

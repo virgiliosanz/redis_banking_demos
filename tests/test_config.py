@@ -89,5 +89,46 @@ class LoadSettingsTests(unittest.TestCase):
             self.assertEqual(settings.get_int("MISSING_KEY", 99), 99)
 
 
+    def test_get_bool_truthy_and_falsy_values(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config_file = Path(tmp) / "ia-ops.env"
+            config_file.write_text(
+                "\n".join([
+                    "A=1", "B=true", "C=yes", "D=on",
+                    "E=0", "F=false", "G=no", "H=off", "I=random",
+                ]),
+                encoding="utf-8",
+            )
+            settings = load_settings(str(config_file))
+
+            for key in ("A", "B", "C", "D"):
+                self.assertTrue(settings.get_bool(key), f"{key} should be truthy")
+            for key in ("E", "F", "G", "H", "I"):
+                self.assertFalse(settings.get_bool(key), f"{key} should be falsy")
+
+    def test_get_int_raises_on_non_numeric(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config_file = Path(tmp) / "ia-ops.env"
+            config_file.write_text("BAD_INT=abc\n", encoding="utf-8")
+            settings = load_settings(str(config_file))
+            with self.assertRaises(ValueError):
+                settings.get_int("BAD_INT", 0)
+
+    def test_load_settings_comments_only_file(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config_file = Path(tmp) / "ia-ops.env"
+            config_file.write_text("# only comments\n# another comment\n\n", encoding="utf-8")
+            settings = load_settings(str(config_file))
+            self.assertIsNone(settings.get("anything"))
+
+    def test_require_raises_on_empty_value(self) -> None:
+        with TemporaryDirectory() as tmp:
+            config_file = Path(tmp) / "ia-ops.env"
+            config_file.write_text("EMPTY_VAL=\n", encoding="utf-8")
+            settings = load_settings(str(config_file))
+            with self.assertRaises(KeyError):
+                settings.require("EMPTY_VAL")
+
+
 if __name__ == "__main__":
     unittest.main()

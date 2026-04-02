@@ -141,5 +141,42 @@ class NightlyRuntimeTests(unittest.TestCase):
         self.assertTrue(any("routing" in risk and "search" in risk for risk in assessment.risks))
 
 
+    def test_assess_nightly_context_db_ping_failed_plus_smoke_failures(self) -> None:
+        context = _base_context()
+        context["mysql"]["databases"][0]["ping"]["status"] = "critical"
+        context["app"]["checks"]["smoke_scripts"] = [
+            {"name": "routing", "status": "critical"},
+            {"name": "search", "status": "critical"},
+        ]
+
+        assessment = assess_nightly_context(
+            context,
+            drift_report_file="/tmp/drift.md",
+            editorial_drift="no",
+            platform_drift="no",
+        )
+
+        self.assertEqual(assessment.severity, "critical")
+        self.assertTrue(any("db-live" in r for r in assessment.risks))
+        self.assertTrue(any("routing" in r and "search" in r for r in assessment.risks))
+        self.assertGreaterEqual(len(assessment.actions), 2)
+
+    def test_assess_nightly_context_docker_down_with_4xx(self) -> None:
+        context = _base_context()
+        context["host"]["checks"]["docker_daemon"]["status"] = "critical"
+        context["runtime"]["checks"]["lb_nginx_recent_4xx"] = {"status": "warning", "count": 30}
+
+        assessment = assess_nightly_context(
+            context,
+            drift_report_file="/tmp/drift.md",
+            editorial_drift="no",
+            platform_drift="no",
+        )
+
+        self.assertEqual(assessment.severity, "critical")
+        self.assertTrue(any("Docker" in r for r in assessment.risks))
+        self.assertTrue(any("4xx" in r for r in assessment.risks))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -92,5 +92,60 @@ System-wide memory free percentage: 42%
         self.assertEqual(payload["checks"]["docker_daemon"]["status"], "critical")
 
 
+    def test_parse_darwin_iostat_with_malformed_single_line(self) -> None:
+        """iostat returning only a header line — last line has no numeric fields."""
+        with self.assertRaises((ValueError, IndexError)):
+            host_collector._parse_darwin_iostat("us sy id\n")
+
+    def test_parse_darwin_iostat_picks_last_line(self) -> None:
+        output = "header line\n3 4 93 1.10 0.90 0.70\n5 6 89 2.20 1.80 1.40\n"
+        user, sys_, idle, l1, l5, l15 = host_collector._parse_darwin_iostat(output)
+        self.assertEqual(user, 5.0)
+        self.assertEqual(sys_, 6.0)
+        self.assertEqual(idle, 89.0)
+        self.assertAlmostEqual(l1, 2.2)
+
+    def test_parse_darwin_vm_stat_no_page_size_uses_default(self) -> None:
+        output = "some garbage without page size info\nPages free: 1000\n"
+        page_size, free_pages = host_collector._parse_darwin_vm_stat(output)
+        self.assertEqual(page_size, 16384)
+        self.assertEqual(free_pages, 1000)
+
+    def test_collect_falls_back_to_vm_stat_when_memory_pressure_fails(self) -> None:
+        settings = Settings(config_file=__file__, values={"PROJECT_ROOT": "."})
+
+        def fake_run_command(args: list[str], check: bool = True):
+            class Result:
+                def __init__(self, stdout: str, returncode: int = 0):
+                    self.stdout = stdout
+                    self.stderr = ""
+                    self.returncode = returncode
+
+            if args == ["docker", "info"]:
+                return Result("", 0)
+            if args == ["sysctl", "-n", "hw.memsize"]:
+                return Result("17179869184\n")
+            if args == ["memory_pressure"]:
+                return Result("", 1)  # fails
+            if args == ["vm_stat"]:
+                return Result(
+                    "Mach Virtual Memory Statistics: (page size of 16384 bytes)\n"
+                    "Pages free:  100000.\nPages speculative:  50000.\n"
+                )
+            if args == ["iostat", "-w", "1", "-c", "2"]:
+                return Result("us sy id load\n1 2 97 0.50 0.40 0.30\n")
+            raise AssertionError(f"unexpected command: {args}")
+
+        with mock.patch("ops.collectors.host.platform.system", return_value="Darwin"):
+            with mock.patch("ops.collectors.host.run_command", side_effect=fake_run_command):
+                with mock.patch("ops.collectors.host.os.cpu_count", return_value=4):
+                    with mock.patch("ops.collectors.host.shutil.disk_usage") as disk_usage:
+                        disk_usage.return_value = mock.Mock(total=100, free=50)
+                        payload = host_collector.collect(settings)
+
+        self.assertNotEqual(payload["checks"]["memory"]["used_pct"], 0.0)
+        self.assertIsInstance(payload["checks"]["memory"]["used_pct"], float)
+
+
 if __name__ == "__main__":
     unittest.main()
