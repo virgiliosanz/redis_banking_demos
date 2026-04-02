@@ -82,26 +82,31 @@ Previsualizar el bloque gestionado:
 
 ```sh
 ./scripts/install-nightly-auditor-cron.sh --print
+./scripts/install-reactive-watch-cron.sh --print
 ```
 
 Instalarlo en el `crontab` del usuario actual:
 
 ```sh
 ./scripts/install-nightly-auditor-cron.sh
+./scripts/install-reactive-watch-cron.sh
 ```
 
 Eliminar solo el bloque gestionado del proyecto:
 
 ```sh
 ./scripts/install-nightly-auditor-cron.sh --remove
+./scripts/install-reactive-watch-cron.sh --remove
 ```
 
 Notas:
 - el job queda programado a las `02:00` hora local del host
 - el bloque se instala con marcador gestionado `NUEVECUATROUNO_IA_OPS_NIGHTLY`
+- el flujo reactivo se programa cada `5` minutos con el bloque `NUEVECUATROUNO_IA_OPS_REACTIVE`
 - el `crontab` previo se respalda en `./runtime/reports/ia-ops/`
 - la salida del job se anexa en `./runtime/reports/ia-ops/nightly-auditor.cron.log`
-- en esta POC el flujo reactivo `Sentry Agent` sigue siendo manual; no se programa por `cron`
+- la salida del flujo reactivo se anexa en `./runtime/reports/ia-ops/reactive-watch.cron.log`
+- el flujo reactivo aplica cooldown y deduplicacion por incidente antes de relanzar `Sentry Agent`
 
 ### URLs principales
 - Front `live`: `http://nuevecuatrouno.test/`

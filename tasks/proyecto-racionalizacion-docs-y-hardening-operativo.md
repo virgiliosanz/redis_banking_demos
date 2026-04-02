@@ -220,7 +220,7 @@ Ejecutar la fusion y simplificacion de `docs/` sin perder informacion activa.
 
 ### Fase 3. Decision del plano reactivo
 #### Estado
-Pendiente
+Completada
 
 #### Objetivo
 Decidir el mecanismo de disparo reactivo de `Sentry Agent` mas simple y defendible para el estado actual del proyecto.
@@ -231,8 +231,64 @@ Decidir el mecanismo de disparo reactivo de `Sentry Agent` mas simple y defendib
 - Definir como se integra con Telegram.
 - Documentar la decision y el por que de las opciones descartadas.
 
+#### Decision en curso
+- Se descarta `Monit` para esta iteracion.
+- Se implementa un plano reactivo ligero del propio repo:
+  - `cron` cada `5` minutos
+  - evaluador Python de incidentes
+  - deduplicacion y cooldown por incidente
+  - disparo de `Sentry Agent` con salida a Telegram
+- Eventos minimos previstos:
+  - contenedor `unhealthy`, `exited` o `dead`
+  - alias `n9-search-posts` ausente
+  - cron critico o fuera de ventana
+  - `5xx` repetidos en ventana corta
+  - `4xx` repetidos en ventana corta
+
 #### Criterios de cierre
 - Existe una decision clara del trigger reactivo y un contrato operativo para implementarlo o aplazarlo conscientemente.
+
+#### Progreso actual
+- Se descarta `Monit` para esta iteracion por aportar mas complejidad operativa que valor real en el laboratorio actual.
+- Se implementa un plano reactivo ligero propio del repo con:
+  - `cron` cada `5` minutos
+  - evaluador Python de incidentes
+  - lock para evitar solapamiento
+  - estado persistente para deduplicacion
+  - cooldown por incidente
+  - disparo de `Sentry Agent` con notificacion a Telegram
+- Se crean:
+  - `ops/runtime/reactive.py`
+  - `scripts/install-reactive-watch-cron.sh`
+- Se amplia el runtime collector para contar `4xx` y `5xx` recientes de `lb-nginx`.
+
+#### Decisiones tomadas
+- El baseline reactivo queda resuelto con `cron`, no con `Monit`.
+- Los disparadores minimos aceptados pasan a ser:
+  - contenedor `unhealthy`, `exited` o `dead`
+  - alias `n9-search-posts` ausente
+  - cron critico o fuera de ventana
+  - `5xx` repetidos en ventana corta
+  - `4xx` repetidos en ventana corta
+- El evaluador reactivo no ejecuta remediacion; solo dispara diagnostico con `Sentry Agent`.
+- La integracion con Telegram se hace a traves del propio flujo de `Sentry Agent`, no desde un notificador paralelo.
+
+#### Validacion ejecutada
+- `python3 -m py_compile ops/cli/ia_ops.py ops/collectors/runtime.py ops/scheduling/cron.py ops/runtime/reactive.py`
+- `python3 -m ops.cli.ia_ops collect-runtime-health`
+- `python3 -m ops.cli.ia_ops render-reactive-crontab`
+- `python3 -m ops.cli.ia_ops run-reactive-watch --write-report`
+- segunda ejecucion inmediata de `run-reactive-watch --write-report` para confirmar deduplicacion
+
+#### Resultado de la validacion
+- El bloque de `cron` reactivo se renderiza correctamente.
+- La primera ejecucion real emitio incidentes del laboratorio actual y disparo `Sentry Agent`.
+- La segunda ejecucion inmediata no reenvi o incidentes gracias al cooldown y al estado persistente.
+
+#### Lecciones aprendidas
+- En esta POC, `Monit` duplicaria supervision sin aportar una mejora proporcional.
+- El evaluador reactivo propio permite acoplar triggers, reporting y Telegram al contrato real del repo.
+- Los `4xx` repetidos merecen trigger propio, pero con umbral mas alto que `5xx` para no confundir ruido con regresiones reales.
 
 ### Fase 4. Hardening operativo pequeno
 #### Estado

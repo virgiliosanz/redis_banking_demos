@@ -9,6 +9,7 @@ from ..util.time import report_stamp
 
 
 MANAGED_BLOCK_NAME = "NUEVECUATROUNO_IA_OPS_NIGHTLY"
+REACTIVE_MANAGED_BLOCK_NAME = "NUEVECUATROUNO_IA_OPS_REACTIVE"
 
 
 def _default_path() -> str:
@@ -49,6 +50,30 @@ def render_nightly_auditor_block(settings: Settings, *, project_root: Path, pyth
     )
 
 
+def render_reactive_watch_block(settings: Settings, *, project_root: Path, python_bin: str = "python3") -> str:
+    interval_minutes = settings.get_int("REACTIVE_WATCH_CRON_INTERVAL_MINUTES", 5)
+    config_file = settings.config_file.resolve()
+    log_file = settings.get_path("REACTIVE_WATCH_LOG_FILE", "./runtime/reports/ia-ops/reactive-watch.cron.log")
+    log_file = (project_root / log_file).resolve() if not log_file.is_absolute() else log_file
+
+    command = (
+        f"cd {project_root} && "
+        f"IA_OPS_CONFIG_FILE={config_file} "
+        f"{python_bin} -m ops.cli.ia_ops run-reactive-watch >> {log_file} 2>&1"
+    )
+
+    return "\n".join(
+        [
+            f"# BEGIN {REACTIVE_MANAGED_BLOCK_NAME}",
+            "SHELL=/bin/sh",
+            f"PATH={_default_path()}",
+            f"*/{interval_minutes} * * * * {command}",
+            f"# END {REACTIVE_MANAGED_BLOCK_NAME}",
+            "",
+        ]
+    )
+
+
 def read_user_crontab() -> str:
     result = run_command(["crontab", "-l"], check=False)
     if result.returncode == 0:
@@ -63,11 +88,15 @@ def read_user_crontab() -> str:
 
 
 def _strip_managed_block(content: str) -> str:
+    return _strip_named_block(content, block_name=MANAGED_BLOCK_NAME)
+
+
+def _strip_named_block(content: str, *, block_name: str) -> str:
     lines = content.splitlines()
     kept: list[str] = []
     inside = False
-    begin = f"# BEGIN {MANAGED_BLOCK_NAME}"
-    end = f"# END {MANAGED_BLOCK_NAME}"
+    begin = f"# BEGIN {block_name}"
+    end = f"# END {block_name}"
 
     for line in lines:
         if line.strip() == begin:
@@ -103,6 +132,26 @@ def install_nightly_auditor_crontab(settings: Settings, *, project_root: Path, p
     return backup_file, crontab_file
 
 
+def install_reactive_watch_crontab(settings: Settings, *, project_root: Path, python_bin: str = "python3") -> tuple[Path, Path]:
+    current = read_user_crontab()
+    report_root = settings.get_path("REPORT_ROOT", "./runtime/reports/ia-ops")
+    report_root = (project_root / report_root).resolve() if not report_root.is_absolute() else report_root
+    ensure_directory(report_root)
+
+    backup_file = write_text_report(report_root, f"crontab-backup-{report_stamp()}.txt", current)
+    managed_block = render_reactive_watch_block(settings, project_root=project_root, python_bin=python_bin)
+    updated = _strip_named_block(current, block_name=REACTIVE_MANAGED_BLOCK_NAME).rstrip()
+    if updated:
+        updated = f"{updated}\n\n{managed_block}"
+    else:
+        updated = managed_block
+
+    crontab_file = report_root / f"crontab-reactive-install-{report_stamp()}.txt"
+    crontab_file.write_text(updated, encoding="utf-8")
+    run_command(["crontab", str(crontab_file)])
+    return backup_file, crontab_file
+
+
 def remove_nightly_auditor_crontab(settings: Settings, *, project_root: Path) -> Path:
     current = read_user_crontab()
     updated = _strip_managed_block(current)
@@ -111,6 +160,19 @@ def remove_nightly_auditor_crontab(settings: Settings, *, project_root: Path) ->
     ensure_directory(report_root)
 
     crontab_file = report_root / f"crontab-remove-{report_stamp()}.txt"
+    crontab_file.write_text(updated, encoding="utf-8")
+    run_command(["crontab", str(crontab_file)])
+    return crontab_file
+
+
+def remove_reactive_watch_crontab(settings: Settings, *, project_root: Path) -> Path:
+    current = read_user_crontab()
+    updated = _strip_named_block(current, block_name=REACTIVE_MANAGED_BLOCK_NAME)
+    report_root = settings.get_path("REPORT_ROOT", "./runtime/reports/ia-ops")
+    report_root = (project_root / report_root).resolve() if not report_root.is_absolute() else report_root
+    ensure_directory(report_root)
+
+    crontab_file = report_root / f"crontab-reactive-remove-{report_stamp()}.txt"
     crontab_file.write_text(updated, encoding="utf-8")
     run_command(["crontab", str(crontab_file)])
     return crontab_file

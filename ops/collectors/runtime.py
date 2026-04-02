@@ -44,7 +44,12 @@ def collect(settings: Settings) -> dict[str, object]:
     live_health_code = get_status_code(f"{base_url}/healthz")
     archive_health_code = get_status_code(f"{archive_url}/healthz")
     log_tail = service_logs("lb-nginx", tail_lines=settings.get_int("LOG_TAIL_LINES", 500), cwd=project_root)
+    recent_4xx_count = len(re.findall(r"(?:^|\s)4\d\d(?:\s|$)", log_tail))
     recent_5xx_count = len(re.findall(r"(?:^|\s)5\d\d(?:\s|$)", log_tail))
+    warning_4xx = settings.get_int("LB_NGINX_4XX_WARNING_COUNT", 20)
+    critical_4xx = settings.get_int("LB_NGINX_4XX_CRITICAL_COUNT", 50)
+    warning_5xx = settings.get_int("LB_NGINX_5XX_WARNING_COUNT", 1)
+    critical_5xx = settings.get_int("LB_NGINX_5XX_CRITICAL_COUNT", 10)
 
     return {
         "generated_at": utc_timestamp(),
@@ -58,9 +63,17 @@ def collect(settings: Settings) -> dict[str, object]:
                 "http_code": archive_health_code,
                 "status": "ok" if archive_health_code == 200 else "critical",
             },
+            "lb_nginx_recent_4xx": {
+                "count": recent_4xx_count,
+                "warning_threshold": warning_4xx,
+                "critical_threshold": critical_4xx,
+                "status": "critical" if recent_4xx_count >= critical_4xx else "warning" if recent_4xx_count >= warning_4xx else "ok",
+            },
             "lb_nginx_recent_5xx": {
                 "count": recent_5xx_count,
-                "status": "critical" if recent_5xx_count >= 10 else "warning" if recent_5xx_count > 0 else "ok",
+                "warning_threshold": warning_5xx,
+                "critical_threshold": critical_5xx,
+                "status": "critical" if recent_5xx_count >= critical_5xx else "warning" if recent_5xx_count >= warning_5xx else "ok",
             },
         },
     }

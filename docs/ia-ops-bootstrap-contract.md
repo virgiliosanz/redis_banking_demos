@@ -127,6 +127,7 @@ Umbrales iniciales:
 Checks obligatorios:
 - estado de todos los contenedores
 - `healthcheck` de `lb-nginx`, `fe-live`, `fe-archive`, `be-admin`, `db-live`, `db-archive`, `elastic`, `cron-master`
+- `4xx` repetidos en ventana corta en `lb-nginx`
 - `5xx` o errores recientes en logs de `lb-nginx`
 - `mysqladmin ping` para ambas DB
 - salud de Elasticsearch y presencia del alias `n9-search-posts`
@@ -136,6 +137,9 @@ Umbrales iniciales:
   - `critical`
 - alias de lectura ausente
   - `critical`
+- `4xx` repetidos en ventana corta
+  - `warning` si superan el baseline esperado
+  - `critical` si apuntan a regresion de routing, assets o rotura de frontend
 - `5xx` repetidos en ventana corta
   - `warning` si hay recurrencia
   - `critical` si se concentran en pocos minutos o afectan a rutas base
@@ -201,6 +205,7 @@ Umbrales iniciales:
 ## 10. Casos minimos que debe cubrir
 - `lb-nginx` no responde
 - `5xx` repetidos en frontend
+- `4xx` repetidos en frontend fuera del baseline esperado
 - `db-live` o `db-archive` no responden
 - slow queries repetidas
 - `elastic` caido

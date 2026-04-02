@@ -16,8 +16,16 @@ from ..collectors import runtime as runtime_collector
 from ..notifications.telegram import load_telegram_config, send_message
 from ..rollover import content_year as rollover_content_year
 from ..reporting import write_json_report, write_text_report
+from ..runtime import reactive as reactive_runtime
 from ..runtime.drift import build_drift_report
-from ..scheduling.cron import install_nightly_auditor_crontab, remove_nightly_auditor_crontab, render_nightly_auditor_block
+from ..scheduling.cron import (
+    install_nightly_auditor_crontab,
+    install_reactive_watch_crontab,
+    remove_nightly_auditor_crontab,
+    remove_reactive_watch_crontab,
+    render_nightly_auditor_block,
+    render_reactive_watch_block,
+)
 from ..sync import editorial as editorial_sync
 from ..sync import platform as platform_sync
 from ..util.jsonio import dumps_pretty
@@ -213,6 +221,14 @@ def cmd_render_nightly_crontab(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_render_reactive_crontab(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    content = render_reactive_watch_block(settings, project_root=project_root, python_bin=args.python_bin)
+    print(content, end="")
+    return 0
+
+
 def cmd_install_nightly_crontab(args: argparse.Namespace) -> int:
     settings = load_settings()
     project_root = settings.project_root.resolve()
@@ -222,11 +238,28 @@ def cmd_install_nightly_crontab(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_install_reactive_crontab(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    backup_file, crontab_file = install_reactive_watch_crontab(settings, project_root=project_root, python_bin=args.python_bin)
+    print(f"reactive watch cron installed from {crontab_file}")
+    print(f"previous crontab backed up to {backup_file}")
+    return 0
+
+
 def cmd_remove_nightly_crontab(_: argparse.Namespace) -> int:
     settings = load_settings()
     project_root = settings.project_root.resolve()
     crontab_file = remove_nightly_auditor_crontab(settings, project_root=project_root)
     print(f"nightly auditor cron block removed using {crontab_file}")
+    return 0
+
+
+def cmd_remove_reactive_crontab(_: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    crontab_file = remove_reactive_watch_crontab(settings, project_root=project_root)
+    print(f"reactive watch cron block removed using {crontab_file}")
     return 0
 
 
@@ -268,6 +301,7 @@ def cmd_run_nightly(args: argparse.Namespace) -> int:
     host_memory_status = context["host"]["checks"]["memory"]["status"]
     docker_status = context["host"]["checks"]["docker_daemon"]["status"]
     recent_5xx = context["runtime"]["checks"]["lb_nginx_recent_5xx"]["count"]
+    recent_4xx = context["runtime"]["checks"]["lb_nginx_recent_4xx"]["count"]
     elastic_alias_status = context["elastic"]["alias"]["status"]
     smoke_failures = [row["name"] for row in context["app"]["checks"]["smoke_scripts"] if row["status"] != "ok"]
     cron_warning_jobs = [row["job_name"] for row in context["cron"]["jobs"] if row["status"] in {"warning", "critical"}]
@@ -283,6 +317,9 @@ def cmd_run_nightly(args: argparse.Namespace) -> int:
     if recent_5xx > 0:
         risks.append("- Existen respuestas 5xx recientes en lb-nginx.")
         actions.append("- Revisar logs recientes de lb-nginx y correlacionarlos con request_id y upstream.")
+    if context["runtime"]["checks"]["lb_nginx_recent_4xx"]["status"] != "ok":
+        risks.append("- Existen respuestas 4xx repetidas en lb-nginx; pueden indicar routing roto, recursos faltantes o clientes golpeando rutas invalidas.")
+        actions.append("- Revisar patrones de 4xx recientes para distinguir ruido esperado de una regresion de routing o assets.")
     if elastic_alias_status != "ok":
         risks.append("- El alias de lectura de Elasticsearch no esta sano.")
         actions.append("- Confirmar indices live/archive y republicar el alias antes de dar por buena la busqueda.")
@@ -408,7 +445,9 @@ def cmd_run_sentry(args: argparse.Namespace) -> int:
         evidence.append("- logs acotados del servicio contienen coincidencias con el patron seleccionado")
 
     if args.service == "lb-nginx":
+        recent_4xx = runtime["checks"]["lb_nginx_recent_4xx"]["count"]
         recent_5xx = runtime["checks"]["lb_nginx_recent_5xx"]["count"]
+        evidence.append(f"- lb_nginx_recent_4xx: {recent_4xx}")
         evidence.append(f"- lb_nginx_recent_5xx: {recent_5xx}")
         if container_health != "healthy":
             severity = "critical"
@@ -418,6 +457,10 @@ def cmd_run_sentry(args: argparse.Namespace) -> int:
             severity = "warning"
             summary = args.summary or "lb-nginx muestra errores recientes"
             cause = "errores recientes en frontend o upstream degradado"
+        elif recent_4xx >= runtime["checks"]["lb_nginx_recent_4xx"]["warning_threshold"]:
+            severity = runtime["checks"]["lb_nginx_recent_4xx"]["status"]
+            summary = args.summary or "lb-nginx acumula respuestas 4xx repetidas"
+            cause = "clientes, assets o rutas estan generando errores 4xx de forma anomala"
         else:
             summary = args.summary or "lb-nginx sano sin errores recientes"
             cause = "sin evidencia actual de fallo en lb-nginx"
@@ -547,6 +590,69 @@ def cmd_run_sentry(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_run_reactive_watch(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    lock = reactive_runtime.acquire_lock(settings)
+    if lock is None:
+        print("reactive watch skipped: existing non-stale lock detected", file=sys.stderr)
+        return 0
+
+    try:
+        evaluation = reactive_runtime.evaluate(settings)
+        incidents = [reactive_runtime.ReactiveIncident(**row) for row in evaluation["incidents"]]
+        state = reactive_runtime.load_state(settings)
+        now_epoch = None
+        emitted: list[str] = []
+
+        for incident in incidents:
+            if not reactive_runtime.should_emit(settings, state, incident, now_epoch=now_epoch):
+                continue
+
+            command = [
+                sys.executable or "python3",
+                "-m",
+                "ops.cli.ia_ops",
+                "run-sentry-agent",
+                "--service",
+                incident.service,
+                "--summary",
+                incident.summary,
+                "--notify-telegram",
+            ]
+            if incident.pattern:
+                command.extend(["--pattern", incident.pattern])
+            result = subprocess_run_sentry(command)
+            if result:
+                state = reactive_runtime.mark_emitted(settings, state, incident, now_epoch=now_epoch)
+                emitted.append(incident.key)
+
+        payload = {
+            "generated_at": evaluation["generated_at"],
+            "incidents_seen": evaluation["incidents"],
+            "incidents_emitted": emitted,
+        }
+        if args.write_report:
+            report_root = settings.get_path("REPORT_ROOT", "./runtime/reports/ia-ops")
+            report_file = write_json_report(report_root, f"reactive-watch-{report_stamp()}.json", payload)
+            print(f"reactive watch report written to {report_file}", file=sys.stderr)
+
+        reactive_runtime.save_state(settings, state)
+        _print_json(payload)
+        return 0
+    finally:
+        reactive_runtime.release_lock(lock)
+
+
+def subprocess_run_sentry(command: list[str]) -> bool:
+    from ..util.process import run_command
+
+    result = run_command(command, check=False)
+    if result.returncode != 0:
+        print(result.stderr or result.stdout, file=sys.stderr, end="" if (result.stderr or result.stdout).endswith("\n") else "\n")
+        return False
+    return True
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m ops.cli.ia_ops")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -574,12 +680,23 @@ def build_parser() -> argparse.ArgumentParser:
     render_cron.add_argument("--python-bin", default=python_bin_default)
     render_cron.set_defaults(func=cmd_render_nightly_crontab)
 
+    render_reactive_cron = subparsers.add_parser("render-reactive-crontab")
+    render_reactive_cron.add_argument("--python-bin", default=python_bin_default)
+    render_reactive_cron.set_defaults(func=cmd_render_reactive_crontab)
+
     install_cron = subparsers.add_parser("install-nightly-crontab")
     install_cron.add_argument("--python-bin", default=python_bin_default)
     install_cron.set_defaults(func=cmd_install_nightly_crontab)
 
+    install_reactive = subparsers.add_parser("install-reactive-crontab")
+    install_reactive.add_argument("--python-bin", default=python_bin_default)
+    install_reactive.set_defaults(func=cmd_install_reactive_crontab)
+
     remove_cron = subparsers.add_parser("remove-nightly-crontab")
     remove_cron.set_defaults(func=cmd_remove_nightly_crontab)
+
+    remove_reactive = subparsers.add_parser("remove-reactive-crontab")
+    remove_reactive.set_defaults(func=cmd_remove_reactive_crontab)
 
     telegram_test = subparsers.add_parser("send-telegram-test")
     telegram_test.add_argument("--message")
@@ -617,6 +734,10 @@ def build_parser() -> argparse.ArgumentParser:
     sentry.add_argument("--notify-telegram", action="store_true")
     sentry.add_argument("--telegram-preview", action="store_true")
     sentry.set_defaults(func=cmd_run_sentry)
+
+    reactive = subparsers.add_parser("run-reactive-watch")
+    reactive.add_argument("--write-report", action="store_true")
+    reactive.set_defaults(func=cmd_run_reactive_watch)
 
     return parser
 

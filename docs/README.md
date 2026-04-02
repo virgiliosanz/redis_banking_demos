@@ -12,6 +12,7 @@ El historico de trabajo y los planes de proyecto viven en `tasks/`.
 - rollover anual `live -> archive` probado en laboratorio
 - sincronizacion editorial y de plataforma disponible entre `live` y `archive`
 - IA-Ops minimo operativo con `Nightly Auditor`, `Sentry Agent`, `cron` y salida a Telegram
+- plano reactivo ligero resuelto con `cron` + evaluador Python + cooldown por incidente
 - orquestacion compleja ya movida a Python en `ops/`
 
 ## Topologia funcional
@@ -43,7 +44,7 @@ La frontera anual real del balanceador ya no esta hardcodeada: sale de `config/r
 - rollover anual con `report-only`, `dry-run` y `execute`
 - sync editorial y de plataforma con drift report
 - auditoria nocturna programable con `cron`
-- agente reactivo manual con salida estructurada y Telegram
+- agente reactivo programable con `cron`, deduplicacion y salida a Telegram
 
 ## Limites actuales
 - laboratorio local, no produccion
