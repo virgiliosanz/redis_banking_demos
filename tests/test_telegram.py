@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import unittest
 from unittest import mock
+from urllib.error import HTTPError, URLError
 
 from ops.notifications.telegram import TelegramConfig, _truncate, load_telegram_config, send_message
 from ops.config import Settings
@@ -97,6 +98,51 @@ class SendMessageTests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             send_message(config, "hello")
         self.assertIn("rejected", str(ctx.exception))
+
+
+    @mock.patch("ops.notifications.telegram.urlopen")
+    def test_send_message_http_error(self, mock_urlopen: mock.MagicMock) -> None:
+        import io
+
+        mock_urlopen.side_effect = HTTPError(
+            url="https://api.telegram.org/bot/sendMessage",
+            code=403,
+            msg="Forbidden",
+            hdrs=None,  # type: ignore[arg-type]
+            fp=io.BytesIO(b"Bot was blocked"),
+        )
+        config = _config()
+        with self.assertRaises(RuntimeError) as ctx:
+            send_message(config, "hello")
+        self.assertIn("HTTP 403", str(ctx.exception))
+
+    @mock.patch("ops.notifications.telegram.urlopen")
+    def test_send_message_url_error(self, mock_urlopen: mock.MagicMock) -> None:
+        mock_urlopen.side_effect = URLError("Name or service not known")
+        config = _config()
+        with self.assertRaises(RuntimeError) as ctx:
+            send_message(config, "hello")
+        self.assertIn("Unable to reach Telegram API", str(ctx.exception))
+
+    @mock.patch("ops.notifications.telegram.urlopen")
+    def test_send_message_with_thread_id(self, mock_urlopen: mock.MagicMock) -> None:
+        response_payload = json.dumps({"ok": True, "result": {}})
+        mock_response = mock.MagicMock()
+        mock_response.read.return_value = response_payload.encode("utf-8")
+        mock_response.__enter__ = mock.Mock(return_value=mock_response)
+        mock_response.__exit__ = mock.Mock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        config = TelegramConfig(
+            enabled=True, bot_token="tok", chat_id="123",
+            thread_id="99", disable_notification=True,
+            notify_on_nightly=True, notify_on_sentry=True,
+        )
+        result = send_message(config, "hello")
+        self.assertTrue(result["ok"])
+        call_args = mock_urlopen.call_args
+        request = call_args[0][0]
+        self.assertIn(b"message_thread_id=99", request.data)
 
 
 if __name__ == "__main__":
