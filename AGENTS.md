@@ -19,10 +19,10 @@ Este repositorio evoluciona una plataforma WordPress orientada a alto trafico, c
 - operacion y observabilidad
 - seguridad
 - rendimiento
-- futura capa IA-Ops para diagnostico reactivo y auditoria programada
+- capa IA-Ops operativa con diagnostico reactivo (Sentry Agent), auditoria programada (Nightly Auditor) y watch reactivo con cooldown por incidente
 
 ## 3. Skill obligatorio
-Para cualquier tarea relacionada con infraestructura, Docker, Docker Compose, CI/CD, hardening, despliegue, observabilidad, operacion, runtime, redes, secretos, backups, cache, Nginx, PHP-FPM, MySQL, Elasticsearch, Cloudflare o automatizacion de plataforma, se debe usar siempre el skill [$devops-engineer](/Users/vsanz/.agents/skills/devops-engineer/SKILL.md).
+Para cualquier tarea relacionada con infraestructura, Docker, Docker Compose, CI/CD, hardening, despliegue, observabilidad, operacion, runtime, redes, secretos, backups, cache, Nginx, PHP-FPM, MySQL, Elasticsearch, Cloudflare o automatizacion de plataforma, se debe usar siempre el skill `devops-engineer`.
 
 Esto aplica tanto a:
 - implementacion
@@ -35,10 +35,11 @@ Esto aplica tanto a:
 Si una tarea mezcla aplicacion e infraestructura, el skill `devops-engineer` sigue siendo obligatorio en la parte de plataforma.
 
 ## 4. Roles operativos previstos
-- **Sentry Agent (reactivo):** analiza anomalias disparadas por logs, checks o eventos operativos.
+- **Sentry Agent (reactivo):** analiza anomalias disparadas por logs, checks o eventos operativos. Diagnostica por servicio con dispatch table extensible.
 - **Nightly Auditor (proactivo):** resume salud, capacidad, crecimiento y riesgos operativos en una ejecucion programada.
+- **Watch reactivo:** evaluador Python ejecutado por `cron` cada 5 minutos. Detecta incidentes, aplica cooldown y deduplicacion antes de lanzar el Sentry Agent. Estado persistido en JSON.
 
-Estos roles son objetivos del sistema. No autorizan por si mismos acciones destructivas.
+Estos roles estan implementados en `ops/runtime/`. No autorizan por si mismos acciones destructivas.
 
 ## 5. Principios de trabajo
 - Pensar como ingeniero DevOps senior: IaC, reproducibilidad, rollback y validacion antes de dar por bueno un cambio.
@@ -67,6 +68,7 @@ Estos roles son objetivos del sistema. No autorizan por si mismos acciones destr
 - No usar `latest` en imagenes o dependencias criticas de runtime.
 - No bajar el liston de seguridad por conveniencia local si existe una opcion razonable mejor.
 - No considerar cerrada una fase sin validacion tecnica real.
+- Ejecutar `./scripts/check-quality.sh` antes de cerrar cualquier cambio; el script cubre tests unitarios, sintaxis Python/shell/PHP y validacion de `compose.yaml`.
 
 ## 9. Marco de trabajo para cambios y proyectos
 - Los cambios se discuten primero con el usuario y se proponen opciones cuando haya decisiones de arquitectura.
@@ -88,6 +90,8 @@ Cuando se toque infraestructura o runtime, la salida minima esperada es:
 - configuracion reproducible
 - validacion de sintaxis o equivalente
 - smoke tests post-cambio
+- tests unitarios pasando (`python3 -m unittest discover -s tests`)
+- `./scripts/check-quality.sh` sin errores
 - explicacion de riesgos residuales
 - siguiente paso recomendado
 
@@ -98,3 +102,35 @@ Si algo no se ha podido validar, se debe decir de forma explicita.
 - No dar la razon al usuario cuando la decision empeora seguridad, operacion o rendimiento.
 - Explicar tradeoffs de forma concreta.
 - Evitar ambiguedad sobre que esta implementado, que esta validado y que queda pendiente.
+
+
+## 12. Mapa del codebase
+
+| Directorio | Contenido |
+| :--- | :--- |
+| `ops/` | Paquete Python principal: config, collectors, runtime (sentry, nightly, drift, reactive), sync, rollover, scheduling, notificaciones |
+| `ops/cli/` | Entry point CLI (`ia_ops.py`) con argparse para todos los comandos operativos |
+| `ops/collectors/` | Collectors por dominio: host, runtime, app, mysql, elastic, cron, logs |
+| `ops/runtime/` | Logica de diagnostico: sentry (dispatch table), nightly (assessment), drift, heartbeats, reactive (cooldown+lock) |
+| `ops/sync/` | Sincronizacion editorial y de plataforma entre live y archive |
+| `ops/rollover/` | Rollover anual de contenido live a archive |
+| `ops/util/` | Helpers base: docker, process, http, json, thresholds, time |
+| `tests/` | Tests unitarios del paquete `ops/` (95 tests, sin dependencia de Docker) |
+| `scripts/` | Bootstrap, smoke tests, checks de calidad, wrappers shell para `ops/` |
+| `scripts/internal/` | Scripts PHP internos ejecutados via `wp eval-file` desde `cron-master` |
+| `config/` | Configuracion no sensible: env de IA-Ops, routing cutover |
+| `nginx/` | Configuracion de LB-Nginx: routing por ano, FastCGI, debug headers |
+| `php/` | Dockerfiles para PHP-FPM y PHP-CLI |
+| `wordpress/` | Templates wp-config, mu-plugins, contextos por instancia |
+| `docs/` | Documentacion viva de arquitectura, runbooks y contratos operativos |
+| `tasks/` | Ficheros de proyecto activos; `tasks/archive/` para proyectos cerrados |
+
+## 13. Documentacion de referencia
+- `README.md` (raiz): vista rapida del proyecto, prerrequisitos, bootstrap y estructura
+- `docs/README.md`: estado actual de la arquitectura, topologia, capacidades y limites
+- `docs/poc-local-runbook.md`: bootstrap, verificacion, cron, Telegram y operacion local
+- `docs/ia-ops-bootstrap-contract.md`: checks, severidades, fuentes permitidas y formato de salida
+- `docs/content-lifecycle-live-archive.md`: rollover, sync editorial, sync de plataforma
+- `docs/search-architecture-live-archive.md`: indices separados, alias comun, degradacion
+- `docs/cache-policy-by-context.md`: politica de cache del origen
+- `docs/wordpress-persistence-layout.md`: persistencia compartida y aislamiento por contexto
