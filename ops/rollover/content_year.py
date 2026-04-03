@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 from ..config import Settings
@@ -73,11 +72,11 @@ def _archive_collisions(cwd: Path, *, path: str, slug_csv: str, target_year: int
 
 def _copy_to_container(cwd: Path, local_file: Path, remote_file: str) -> None:
     with local_file.open("rb") as handle:
-        subprocess.run(
-            ["docker", "compose", "exec", "-T", compose_service_name("cron-master"), "sh", "-lc", f"cat > '{remote_file}'"],
-            cwd=str(cwd),
+        compose_exec(
+            compose_service_name("cron-master"),
+            ["sh", "-lc", f"cat > '{remote_file}'"],
+            cwd=cwd,
             stdin=handle,
-            check=True,
         )
 
 

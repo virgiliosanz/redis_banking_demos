@@ -2,12 +2,19 @@ from __future__ import annotations
 
 from pathlib import Path
 import time
+from typing import IO
 
 from .process import CommandResult, run_command
 
 
-def compose_command(args: list[str], *, cwd: Path | None = None, check: bool = True) -> CommandResult:
-    return run_command(["docker", "compose", *args], cwd=cwd, check=check)
+def compose_command(
+    args: list[str],
+    *,
+    cwd: Path | None = None,
+    check: bool = True,
+    stdin: IO[bytes] | None = None,
+) -> CommandResult:
+    return run_command(["docker", "compose", *args], cwd=cwd, check=check, stdin=stdin)
 
 
 def compose_exec(
@@ -17,9 +24,10 @@ def compose_exec(
     cwd: Path | None = None,
     check: bool = True,
     exec_args: list[str] | None = None,
+    stdin: IO[bytes] | None = None,
 ) -> CommandResult:
     extra = exec_args or []
-    return compose_command(["exec", "-T", *extra, service, *args], cwd=cwd, check=check)
+    return compose_command(["exec", "-T", *extra, service, *args], cwd=cwd, check=check, stdin=stdin)
 
 
 def service_logs(service: str, *, tail_lines: int, cwd: Path | None = None) -> str:
