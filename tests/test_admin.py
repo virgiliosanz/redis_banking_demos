@@ -228,6 +228,29 @@ class TestApiRoutes(unittest.TestCase):
         resp = self.client.get("/containers/")
         self.assertEqual(resp.status_code, 200)
 
+    def test_health_returns_ok_with_services(self) -> None:
+        self.mock_run.return_value = subprocess.CompletedProcess(
+            args=["docker"], returncode=0,
+            stdout='{"Service":"nginx","State":"running"}\n', stderr=""
+        )
+        resp = self.client.get("/health")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertEqual(data["status"], "ok")
+        self.assertIn("timestamp", data)
+        self.assertIsInstance(data["services"], list)
+        self.assertEqual(len(data["services"]), 1)
+        self.assertEqual(data["services"][0]["name"], "nginx")
+
+    def test_health_returns_ok_when_docker_fails(self) -> None:
+        self.mock_run.return_value = subprocess.CompletedProcess(
+            args=["docker"], returncode=1, stdout="", stderr="error"
+        )
+        resp = self.client.get("/health")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertEqual(data["status"], "ok")
+        self.assertIsNone(data["services"])
 
 
 # ---------------------------------------------------------------------------

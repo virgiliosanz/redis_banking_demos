@@ -22,6 +22,12 @@
         </div>
         <div class="level-right">
             <div class="level-item">
+                <label class="checkbox mr-4" title="Actualiza la tabla cada 30 segundos automaticamente">
+                    <input type="checkbox" id="autoRefreshToggle">
+                    Auto-refresh (30s)
+                </label>
+            </div>
+            <div class="level-item">
                 <span id="lastUpdate" class="has-text-grey-light"></span>
             </div>
         </div>
@@ -88,8 +94,11 @@ function showError(message) {
 }
 
 function updateLastUpdate() {
-    const now = new Date().toLocaleTimeString();
-    document.getElementById('lastUpdate').textContent = `Last update: ${now}`;
+    var now = new Date();
+    var hh = String(now.getHours()).padStart(2, '0');
+    var mm = String(now.getMinutes()).padStart(2, '0');
+    var ss = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('lastUpdate').textContent = 'Ultima actualizacion: ' + hh + ':' + mm + ':' + ss;
 }
 
 function getStateClass(state) {
@@ -254,6 +263,20 @@ async function startService(service) {
 // Event listeners
 document.getElementById('refreshBtn').addEventListener('click', loadContainers);
 document.getElementById('confirmBtn').addEventListener('click', executeAction);
+
+// Auto-refresh logic
+var autoRefreshInterval = null;
+
+document.getElementById('autoRefreshToggle').addEventListener('change', function() {
+    if (this.checked) {
+        autoRefreshInterval = setInterval(loadContainers, 30000);
+    } else {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+    }
+});
 
 // Initial load
 loadContainers();

@@ -5,7 +5,10 @@ Entry point: python -m admin.app
 
 from __future__ import annotations
 
+import json
 import sys
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, render_template, jsonify, request, Blueprint, abort
@@ -13,6 +16,8 @@ from flask import Flask, render_template, jsonify, request, Blueprint, abort
 from .config import ADMIN_PORT, ADMIN_HOST, DEBUG
 from .runner import run_cli
 from . import containers
+from . import history
+from . import history_bp
 from . import reports
 
 
@@ -28,10 +33,51 @@ def create_app() -> Flask:
     # Register blueprints
     app.register_blueprint(containers.bp)
     app.register_blueprint(reports.bp)
+    app.register_blueprint(history_bp.bp)
 
     @app.route("/")
     def index():
         return render_template("index.html")
+
+    @app.route("/health")
+    def health():
+        """Health check endpoint.
+
+        Returns JSON with service status when Docker is reachable,
+        or ``services: null`` when it is not.
+        """
+        timestamp = datetime.now(timezone.utc).isoformat()
+        services_summary = None
+        try:
+            compose_root = containers.get_compose_root()
+            result = run_cli(
+                ["docker", "compose", "ps", "--format", "json"],
+                timeout=10,
+                cwd=str(compose_root),
+            )
+            if result.success:
+                svc_list = []
+                for line in result.stdout.strip().split("\n"):
+                    if line:
+                        try:
+                            svc_list.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            continue
+                services_summary = [
+                    {
+                        "name": s.get("Service") or s.get("Name", "unknown"),
+                        "state": s.get("State", "unknown"),
+                    }
+                    for s in svc_list
+                ]
+        except Exception:
+            pass
+
+        return jsonify({
+            "status": "ok",
+            "timestamp": timestamp,
+            "services": services_summary,
+        })
 
     @app.route("/diagnostics")
     def diagnostics():
@@ -79,7 +125,15 @@ def create_app() -> Flask:
             return jsonify({"error": "No command provided"}), 400
 
         timeout = data.get("timeout", 120)
+        t0 = time.monotonic()
         result = run_cli(args, timeout=timeout)
+        elapsed = time.monotonic() - t0
+        history.save_entry(
+            command=result.command,
+            returncode=result.returncode,
+            duration_seconds=elapsed,
+            success=result.success,
+        )
         return jsonify({
             "command": result.command,
             "returncode": result.returncode,
