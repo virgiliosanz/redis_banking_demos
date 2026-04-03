@@ -1,29 +1,41 @@
 # Persistencia WordPress por contexto
 
 ## Objetivo
-Dejar explicito que datos se comparten entre `live`, `archive`, `admin-live` y `admin-archive`, y que datos deben mantenerse aislados aunque compartan el mismo codigo WordPress.
+Dejar explicito que datos se comparten entre los servicios (`fe-live`, `fe-archive`, `be-admin`, `cron-master`) y que datos deben mantenerse aislados, todo sobre un unico docroot WordPress.
+
+## Modelo de docroot unico
+Todos los servicios PHP comparten un unico core WordPress en:
+
+```
+runtime/wp-root/current/public/
+```
+
+Un solo `wp-config.php` dinamico selecciona la base de datos segun la variable `N9_SITE_CONTEXT`:
+- Nginx la pasa como `fastcgi_param N9_SITE_CONTEXT` al upstream correspondiente.
+- WP-CLI la recibe como variable de entorno.
+
+Valores validos: `live`, `archive`.
 
 ## Layout operativo
 
-### Compartido
-- `runtime/wp-root/shared/uploads`
-- `runtime/wp-root/shared/mu-plugins`
-- `runtime/wp-root/shared/config`
+### Docroot unico
+- `runtime/wp-root/current/public/` — core WordPress, `wp-config.php`, `index.php`
 
-### Aislado por contexto
-- `runtime/wp-root/live/current/public`
-- `runtime/wp-root/archive/current/public`
-- `runtime/wp-root/admin-live/current/public`
-- `runtime/wp-root/admin-archive/current/public`
-- `runtime/wp-root/live/var/cache/wp-content`
-- `runtime/wp-root/archive/var/cache/wp-content`
-- `runtime/wp-root/admin-live/var/cache/wp-content`
-- `runtime/wp-root/admin-archive/var/cache/wp-content`
+### Compartido
+- `runtime/wp-root/shared/uploads` — media compartido entre `live` y `archive`
+- `runtime/wp-root/shared/mu-plugins` — plugins must-use comunes
+- `runtime/wp-root/shared/config` — configuracion no sensible fuera del docroot
+
+### Cache aislada por servicio
+- `runtime/wp-root/live/var/cache/wp-content` — cache de `fe-live`
+- `runtime/wp-root/archive/var/cache/wp-content` — cache de `fe-archive`
+
+`be-admin` no tiene directorio de cache propio; las operaciones administrativas no generan cache de pagina.
 
 ## Regla de montaje
-- `uploads` se monta sobre `wp-content/uploads` en todos los contextos.
-- `mu-plugins` se monta sobre `wp-content/mu-plugins` en todos los contextos.
-- `cache` se monta sobre `wp-content/cache` con un directorio distinto por contexto.
+- `uploads` se monta sobre `wp-content/uploads` en todos los servicios.
+- `mu-plugins` se monta sobre `wp-content/mu-plugins` en todos los servicios.
+- `cache` se monta sobre `wp-content/cache` con un directorio distinto por servicio frontend.
 - `shared/config` queda fuera del docroot y solo lectura para los servicios PHP y CLI.
 
 ## Politica de escritura
@@ -34,7 +46,7 @@ Dejar explicito que datos se comparten entre `live`, `archive`, `admin-live` y `
 
 ## Ownership esperado
 - `cron-master` puede escribir en `uploads` cuando se usen flujos de mantenimiento o WP-CLI.
-- Los procesos `php-fpm` escriben solo donde WordPress lo necesita (`uploads` y cache del contexto).
+- Los procesos `php-fpm` escriben solo donde WordPress lo necesita (`uploads` y cache del servicio).
 - `lb-nginx` consume `uploads` y `mu-plugins` en solo lectura.
 
 ## Validacion minima

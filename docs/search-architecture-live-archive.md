@@ -31,7 +31,7 @@ La busqueda publica usa el alias:
 
 ## Como se implementa en la POC
 - ElasticPress se instala y activa en `live` y `archive`
-- los docroots `admin-live` y `admin-archive` reciben el mismo codigo del plugin
+- `be-admin` comparte el mismo docroot y recibe el plugin via el core unico
 - un mu-plugin compartido redirige las busquedas al alias `n9-search-posts`
 - el alias se publica sobre los dos indices reales
 

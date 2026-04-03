@@ -192,8 +192,8 @@ docker compose ps
 - `archive.nuevecuatrouno.test/healthz` responde `200 ok`
 - Los posts `2015-2023` caen en `fe-archive`
 - Los posts `2024+` caen en `fe-live`
-- El admin `live` cae en `be-admin` con `admin-live`
-- El admin `archive` cae en `be-admin` con `admin-archive`
+- El admin `live` cae en `be-admin` con `N9_SITE_CONTEXT=live`
+- El admin `archive` cae en `be-admin` con `N9_SITE_CONTEXT=archive`
 - `wp-admin/` redirige a `wp-login.php` sin loop de `302`
 - El host `archive` no admin redirige a `nuevecuatrouno.test`
 - La busqueda en `live` encuentra contenido de `live` y `archive` con enlaces canonicos, no `?p=<id>`

@@ -30,6 +30,6 @@ done
 printf '%s\n' "ok"
 
 echo "==> cache mounts are exposed in containers"
-docker compose exec -T fe-live test -d /var/www/html/live/wp-content/cache
-docker compose exec -T fe-archive test -d /var/www/html/archive/wp-content/cache
+docker compose exec -T fe-live test -d /var/www/html/wp/wp-content/cache
+docker compose exec -T fe-archive test -d /var/www/html/wp/wp-content/cache
 printf '%s\n' "ok"
