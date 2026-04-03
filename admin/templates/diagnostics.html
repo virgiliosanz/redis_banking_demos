@@ -69,24 +69,6 @@
 
             <form id="nightlyForm">
                 <div class="field">
-                    <label class="checkbox">
-                        <input type="checkbox" name="no-write-report">
-                        No escribir reporte
-                    </label>
-                </div>
-                <div class="field">
-                    <label class="checkbox">
-                        <input type="checkbox" name="notify-telegram">
-                        Notificar Telegram
-                    </label>
-                </div>
-                <div class="field">
-                    <label class="checkbox">
-                        <input type="checkbox" name="telegram-preview">
-                        Preview Telegram (no enviar)
-                    </label>
-                </div>
-                <div class="field">
                     <button type="submit" class="button is-primary">
                         <span class="icon"><i class="fas fa-play"></i></span>
                         <span>Ejecutar</span>
@@ -126,12 +108,6 @@
                                 <option value="cron-master">cron-master</option>
                             </select>
                         </div>
-                    </div>
-                </div>
-                <div class="field">
-                    <label class="label">Patron (opcional)</label>
-                    <div class="control">
-                        <input class="input" type="text" name="pattern" placeholder="ERROR|CRITICAL">
                     </div>
                 </div>
                 <div class="field">
@@ -233,17 +209,6 @@
     document.getElementById('nightlyForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const args = ['python3', '-m', 'ops.cli.ia_ops', 'run-nightly-auditor'];
-        
-        if (this.querySelector('[name="no-write-report"]').checked) {
-            args.push('--no-write-report');
-        }
-        if (this.querySelector('[name="notify-telegram"]').checked) {
-            args.push('--notify-telegram');
-        }
-        if (this.querySelector('[name="telegram-preview"]').checked) {
-            args.push('--telegram-preview');
-        }
-        
         runCommand(args);
     });
 
@@ -258,12 +223,6 @@
         }
 
         const args = ['python3', '-m', 'ops.cli.ia_ops', 'run-sentry-agent', '--service', service];
-        
-        const pattern = this.querySelector('[name="pattern"]').value.trim();
-        if (pattern) {
-            args.push('--pattern', pattern);
-        }
-        
         runCommand(args);
     });
 })();
