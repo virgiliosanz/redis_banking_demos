@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Crontab{% endblock %}
+
+{% block content %}
+<h1 class="title">
+    <span class="icon-text">
+        <span class="icon"><i class="fas fa-clock"></i></span>
+        <span>Crontab Management</span>
+    </span>
+</h1>
+<h2 class="subtitle">Instalar, desinstalar y renderizar crontabs</h2>
+
+<!-- Nightly Auditor -->
+<div class="box">
+    <h3 class="title is-5">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-moon"></i></span>
+            <span>Nightly Auditor</span>
+        </span>
+    </h3>
+    <div class="buttons">
+        <button class="button is-success" onclick="runCrontab('render-nightly-crontab')">
+            <span class="icon"><i class="fas fa-file-code"></i></span>
+            <span>Render</span>
+        </button>
+        <button class="button is-primary" onclick="showConfirmModal('install-nightly-crontab', 'instalar', 'Nightly Auditor')">
+            <span class="icon"><i class="fas fa-plus-circle"></i></span>
+            <span>Install</span>
+        </button>
+        <button class="button is-danger" onclick="showConfirmModal('remove-nightly-crontab', 'desinstalar', 'Nightly Auditor')">
+            <span class="icon"><i class="fas fa-trash-alt"></i></span>
+            <span>Remove</span>
+        </button>
+    </div>
+</div>
+
+<!-- Reactive Watch -->
+<div class="box">
+    <h3 class="title is-5">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-heartbeat"></i></span>
+            <span>Reactive Watch</span>
+        </span>
+    </h3>
+    <div class="buttons">
+        <button class="button is-success" onclick="runCrontab('render-reactive-crontab')">
+            <span class="icon"><i class="fas fa-file-code"></i></span>
+            <span>Render</span>
+        </button>
+        <button class="button is-primary" onclick="showConfirmModal('install-reactive-crontab', 'instalar', 'Reactive Watch')">
+            <span class="icon"><i class="fas fa-plus-circle"></i></span>
+            <span>Install</span>
+        </button>
+        <button class="button is-danger" onclick="showConfirmModal('remove-reactive-crontab', 'desinstalar', 'Reactive Watch')">
+            <span class="icon"><i class="fas fa-trash-alt"></i></span>
+            <span>Remove</span>
+        </button>
+    </div>
+</div>
+
+<!-- Sync Jobs -->
+<div class="box">
+    <h3 class="title is-5">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-sync-alt"></i></span>
+            <span>Sync Jobs</span>
+        </span>
+    </h3>
+    <div class="buttons">
+        <button class="button is-success" onclick="runCrontab('render-sync-crontab')">
+            <span class="icon"><i class="fas fa-file-code"></i></span>
+            <span>Render</span>
+        </button>
+        <button class="button is-primary" onclick="showConfirmModal('install-sync-crontab', 'instalar', 'Sync Jobs')">
+            <span class="icon"><i class="fas fa-plus-circle"></i></span>
+            <span>Install</span>
+        </button>
+        <button class="button is-danger" onclick="showConfirmModal('remove-sync-crontab', 'desinstalar', 'Sync Jobs')">
+            <span class="icon"><i class="fas fa-trash-alt"></i></span>
+            <span>Remove</span>
+        </button>
+    </div>
+</div>
+
+<div class="box" id="outputContainer" style="display: none;">
+    <h3 class="title is-5">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-terminal"></i></span>
+            <span>Salida</span>
+        </span>
+    </h3>
+    <pre class="output-box" id="output"></pre>
+</div>
+
+<!-- Modal de confirmacion -->
+<div class="modal" id="confirmModal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">
+                <span class="icon-text">
+                    <span class="icon has-text-warning"><i class="fas fa-exclamation-triangle"></i></span>
+                    <span>Confirmar Accion</span>
+                </span>
+            </p>
+            <button class="delete" aria-label="close" id="modalCloseBtn"></button>
+        </header>
+        <section class="modal-card-body">
+            <p class="block">Estas a punto de <strong id="confirmAction"></strong> el crontab de <strong id="confirmCronType"></strong>.</p>
+            <p class="block has-text-warning">Esta accion modifica el crontab del sistema.</p>
+            <p class="block">¿Deseas continuar?</p>
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button is-primary" id="confirmBtn">
+                <span class="icon"><i class="fas fa-check"></i></span>
+                <span>Si, continuar</span>
+            </button>
+            <button class="button" id="cancelBtn">Cancelar</button>
+        </footer>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const outputContainer = document.getElementById('outputContainer');
+    const outputBox = document.getElementById('output');
+    const modal = document.getElementById('confirmModal');
+    const confirmAction = document.getElementById('confirmAction');
+    const confirmCronType = document.getElementById('confirmCronType');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const modalCloseBtn = document.getElementById('modalCloseBtn');
+
+    let pendingCommand = null;
+
+    function closeModal() {
+        modal.classList.remove('is-active');
+        pendingCommand = null;
+    }
+
+    modalCloseBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+
+    function showConfirmModal(command, actionText, cronType) {
+        confirmAction.textContent = actionText;
+        confirmCronType.textContent = cronType;
+        pendingCommand = command;
+        modal.classList.add('is-active');
+    }
+
+    confirmBtn.addEventListener('click', function() {
+        if (pendingCommand) {
+            const cmd = pendingCommand;
+            closeModal();
+            runCrontab(cmd);
+        }
+    });
+
+    function runCrontab(command) {
+        const buttons = document.querySelectorAll('button');
+        buttons.forEach(btn => btn.disabled = true);
+        
+        outputContainer.style.display = 'block';
+        outputBox.textContent = 'Ejecutando ' + command + '...\n';
+
+        const args = ['python3', '-m', 'ops.cli.ia_ops', command];
+
+        fetch('/api/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ args: args, timeout: 60 })
+        })
+        .then(response => response.json())
+        .then(data => {
+            let output = '';
+            if (data.stdout) output += data.stdout;
+            if (data.stderr) output += '\n--- STDERR ---\n' + data.stderr;
+            if (!data.success) {
+                output += '\n\n--- ERROR ---\nComando fallo con codigo ' + data.returncode;
+            }
+            outputBox.textContent = output;
+            outputBox.scrollTop = outputBox.scrollHeight;
+        })
+        .catch(err => {
+            outputBox.textContent = 'Error de red: ' + err.message;
+        })
+        .finally(() => {
+            buttons.forEach(btn => btn.disabled = false);
+        });
+    }
+</script>
+{% endblock %}
