@@ -21,16 +21,41 @@ if (!function_exists('n9_secret')) {
     }
 }
 
-define('DB_NAME', '{{DB_NAME}}');
-define('DB_USER', '{{DB_USER}}');
-define('DB_PASSWORD', n9_secret('{{DB_PASSWORD_ENV}}', '{{DB_PASSWORD_FILE}}'));
-define('DB_HOST', '{{DB_HOST}}');
+// --- Context-based DB selection ---
+$n9_context = $_SERVER['N9_SITE_CONTEXT'] ?? getenv('N9_SITE_CONTEXT') ?: 'live';
+
+switch ($n9_context) {
+    case 'live':
+        define('DB_NAME', 'n9_live');
+        define('DB_USER', 'wp_live');
+        define('DB_PASSWORD', n9_secret('WP_LIVE_DB_PASSWORD', '/run/project-secrets/wp-live-db-password'));
+        define('DB_HOST', 'db-live:3306');
+        define('EP_INDEX_PREFIX', 'n9-live');
+        break;
+    case 'archive':
+        define('DB_NAME', 'n9_archive');
+        define('DB_USER', 'wp_archive');
+        define('DB_PASSWORD', n9_secret('WP_ARCHIVE_DB_PASSWORD', '/run/project-secrets/wp-archive-db-password'));
+        define('DB_HOST', 'db-archive:3306');
+        define('EP_INDEX_PREFIX', 'n9-archive');
+        break;
+    default:
+        die('[wp-config] ERROR: N9_SITE_CONTEXT must be "live" or "archive", got: "' . htmlspecialchars($n9_context, ENT_QUOTES, 'UTF-8') . '"');
+}
+
 define('DB_CHARSET', 'utf8mb4');
 define('DB_COLLATE', '');
 
-define('WP_HOME', '{{WP_HOME}}');
-define('WP_SITEURL', '{{WP_SITEURL}}');
-define('EP_INDEX_PREFIX', '{{EP_INDEX_PREFIX}}');
+// --- Dynamic WP_HOME / WP_SITEURL from HTTP_HOST ---
+if (isset($_SERVER['HTTP_HOST'])) {
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    define('WP_HOME', $scheme . '://' . $_SERVER['HTTP_HOST']);
+    define('WP_SITEURL', $scheme . '://' . $_SERVER['HTTP_HOST']);
+} else {
+    // CLI fallback
+    define('WP_HOME', getenv('WP_HOME') ?: 'http://nuevecuatrouno.test');
+    define('WP_SITEURL', getenv('WP_SITEURL') ?: 'http://nuevecuatrouno.test');
+}
 
 define('AUTH_KEY', n9_secret('{{AUTH_KEY_ENV}}', '{{AUTH_KEY_FILE}}', 'change-me'));
 define('SECURE_AUTH_KEY', n9_secret('{{SECURE_AUTH_KEY_ENV}}', '{{SECURE_AUTH_KEY_FILE}}', 'change-me'));
