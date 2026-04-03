@@ -9,9 +9,8 @@ services:
     image: ${NGINX_IMAGE:-nginx:1.27.5-alpine}
     container_name: n9-lb-nginx
     restart: unless-stopped
-    read_only: true
-    cap_drop:
-      - ALL
+    # read_only: true — DISABLED: nginx entrypoint needs write to /var/cache/nginx/*_temp
+    # cap_drop: [ALL] — DISABLED: tmpfs+noexec blocks entrypoint chown calls
     security_opt:
       - no-new-privileges:true
     tmpfs:
