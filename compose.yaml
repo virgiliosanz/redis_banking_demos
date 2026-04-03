@@ -24,18 +24,9 @@ services:
       - ./nginx/lb/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/lb/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/lb/generated:/etc/nginx/generated:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/live/current/public:/var/www/html/live:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/archive/current/public:/var/www/html/archive:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/admin-live/current/public:/var/www/html/admin-live:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/admin-archive/current/public:/var/www/html/admin-archive:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/var/www/html/live/wp-content/uploads:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/var/www/html/archive/wp-content/uploads:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/var/www/html/admin-live/wp-content/uploads:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/var/www/html/admin-archive/wp-content/uploads:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/var/www/html/live/wp-content/mu-plugins:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/var/www/html/archive/wp-content/mu-plugins:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/var/www/html/admin-live/wp-content/mu-plugins:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/var/www/html/admin-archive/wp-content/mu-plugins:ro
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/current/public:/var/www/html/wp:ro
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/var/www/html/wp/wp-content/uploads:ro
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/var/www/html/wp/wp-content/mu-plugins:ro
     depends_on:
       fe-live:
         condition: service_started
@@ -78,11 +69,11 @@ services:
     volumes:
       - ./php/common:/usr/local/etc/php-fpm.d/zzz-project:ro
       - ./.secrets:/run/project-secrets:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/live/current/public:/var/www/html/live
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/current/public:/var/www/html/wp
       - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/config:/var/www/shared/config:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/var/www/html/live/wp-content/uploads
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/var/www/html/live/wp-content/mu-plugins
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/live/var/cache/wp-content:/var/www/html/live/wp-content/cache
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/var/www/html/wp/wp-content/uploads
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/var/www/html/wp/wp-content/mu-plugins:ro
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/live/var/cache/wp-content:/var/www/html/wp/wp-content/cache
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 9000"]
       interval: 10s
@@ -118,11 +109,11 @@ services:
     volumes:
       - ./php/common:/usr/local/etc/php-fpm.d/zzz-project:ro
       - ./.secrets:/run/project-secrets:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/archive/current/public:/var/www/html/archive
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/current/public:/var/www/html/wp
       - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/config:/var/www/shared/config:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/var/www/html/archive/wp-content/uploads
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/var/www/html/archive/wp-content/mu-plugins
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/archive/var/cache/wp-content:/var/www/html/archive/wp-content/cache
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/var/www/html/wp/wp-content/uploads
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/var/www/html/wp/wp-content/mu-plugins:ro
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/archive/var/cache/wp-content:/var/www/html/wp/wp-content/cache
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 9000"]
       interval: 10s
@@ -158,15 +149,10 @@ services:
     volumes:
       - ./php/common:/usr/local/etc/php-fpm.d/zzz-project:ro
       - ./.secrets:/run/project-secrets:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/admin-live/current/public:/var/www/html/admin-live
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/admin-archive/current/public:/var/www/html/admin-archive
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/current/public:/var/www/html/wp
       - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/config:/var/www/shared/config:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/var/www/html/admin-live/wp-content/uploads
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/var/www/html/admin-archive/wp-content/uploads
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/var/www/html/admin-live/wp-content/mu-plugins
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/var/www/html/admin-archive/wp-content/mu-plugins
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/admin-live/var/cache/wp-content:/var/www/html/admin-live/wp-content/cache
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/admin-archive/var/cache/wp-content:/var/www/html/admin-archive/wp-content/cache
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/var/www/html/wp/wp-content/uploads
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/var/www/html/wp/wp-content/mu-plugins:ro
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 9000"]
       interval: 10s
@@ -301,23 +287,10 @@ services:
     command: ["sh", "-c", "trap : TERM INT; sleep infinity & wait"]
     volumes:
       - ./.secrets:/run/project-secrets:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/live/current/public:/srv/wp/live
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/archive/current/public:/srv/wp/archive
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/admin-live/current/public:/srv/wp/admin-live
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/admin-archive/current/public:/srv/wp/admin-archive
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/current/public:/srv/wp/site
       - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/config:/var/www/shared/config:ro
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/srv/wp/live/wp-content/uploads
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/srv/wp/archive/wp-content/uploads
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/srv/wp/admin-live/wp-content/uploads
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/srv/wp/admin-archive/wp-content/uploads
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/srv/wp/live/wp-content/mu-plugins
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/srv/wp/archive/wp-content/mu-plugins
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/srv/wp/admin-live/wp-content/mu-plugins
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/srv/wp/admin-archive/wp-content/mu-plugins
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/live/var/cache/wp-content:/srv/wp/live/wp-content/cache
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/archive/var/cache/wp-content:/srv/wp/archive/wp-content/cache
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/admin-live/var/cache/wp-content:/srv/wp/admin-live/wp-content/cache
-      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/admin-archive/var/cache/wp-content:/srv/wp/admin-archive/wp-content/cache
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/uploads:/srv/wp/site/wp-content/uploads
+      - ${WP_ROOT_HOST_PATH:-./runtime/wp-root}/shared/mu-plugins:/srv/wp/site/wp-content/mu-plugins:ro
       - ./scripts:/opt/project/scripts:ro
     healthcheck:
       test: ["CMD-SHELL", "ps -o comm= 1 | grep -q sh"]
