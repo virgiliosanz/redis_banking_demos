@@ -19,19 +19,25 @@
         </span>
     </h3>
     <div class="buttons">
-        <button class="button is-success" onclick="runCrontab('render-nightly-crontab')">
+        <button class="button is-success" onclick="runCrontab('render-nightly-crontab')" title="Muestra el bloque crontab que se instalaria. Solo lectura.">
             <span class="icon"><i class="fas fa-file-code"></i></span>
             <span>Render</span>
         </button>
-        <button class="button is-primary" onclick="showConfirmModal('install-nightly-crontab', 'instalar', 'Nightly Auditor')">
+        <button class="button is-primary" onclick="showConfirmModal('install-nightly-crontab', 'instalar', 'Nightly Auditor')" title="Instala el cron job en el crontab del sistema. Reemplaza entrada anterior si existe.">
             <span class="icon"><i class="fas fa-plus-circle"></i></span>
             <span>Install</span>
         </button>
-        <button class="button is-danger" onclick="showConfirmModal('remove-nightly-crontab', 'desinstalar', 'Nightly Auditor')">
+        <button class="button is-danger" onclick="showConfirmModal('remove-nightly-crontab', 'desinstalar', 'Nightly Auditor')" title="Elimina el cron job del crontab del sistema.">
             <span class="icon"><i class="fas fa-trash-alt"></i></span>
             <span>Remove</span>
         </button>
     </div>
+    <p class="help">
+        <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
+        Render: solo lectura.
+        Install: reemplaza entrada anterior si existe.
+        Remove: elimina el cron job del sistema.
+    </p>
 </div>
 
 <!-- Reactive Watch -->
@@ -43,19 +49,25 @@
         </span>
     </h3>
     <div class="buttons">
-        <button class="button is-success" onclick="runCrontab('render-reactive-crontab')">
+        <button class="button is-success" onclick="runCrontab('render-reactive-crontab')" title="Muestra el bloque crontab que se instalaria. Solo lectura.">
             <span class="icon"><i class="fas fa-file-code"></i></span>
             <span>Render</span>
         </button>
-        <button class="button is-primary" onclick="showConfirmModal('install-reactive-crontab', 'instalar', 'Reactive Watch')">
+        <button class="button is-primary" onclick="showConfirmModal('install-reactive-crontab', 'instalar', 'Reactive Watch')" title="Instala el cron job en el crontab del sistema. Reemplaza entrada anterior si existe.">
             <span class="icon"><i class="fas fa-plus-circle"></i></span>
             <span>Install</span>
         </button>
-        <button class="button is-danger" onclick="showConfirmModal('remove-reactive-crontab', 'desinstalar', 'Reactive Watch')">
+        <button class="button is-danger" onclick="showConfirmModal('remove-reactive-crontab', 'desinstalar', 'Reactive Watch')" title="Elimina el cron job del crontab del sistema.">
             <span class="icon"><i class="fas fa-trash-alt"></i></span>
             <span>Remove</span>
         </button>
     </div>
+    <p class="help">
+        <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
+        Render: solo lectura.
+        Install: reemplaza entrada anterior si existe.
+        Remove: elimina el cron job del sistema.
+    </p>
 </div>
 
 <!-- Sync Jobs -->
@@ -67,19 +79,25 @@
         </span>
     </h3>
     <div class="buttons">
-        <button class="button is-success" onclick="runCrontab('render-sync-crontab')">
+        <button class="button is-success" onclick="runCrontab('render-sync-crontab')" title="Muestra el bloque crontab que se instalaria. Solo lectura.">
             <span class="icon"><i class="fas fa-file-code"></i></span>
             <span>Render</span>
         </button>
-        <button class="button is-primary" onclick="showConfirmModal('install-sync-crontab', 'instalar', 'Sync Jobs')">
+        <button class="button is-primary" onclick="showConfirmModal('install-sync-crontab', 'instalar', 'Sync Jobs')" title="Instala el cron job en el crontab del sistema. Reemplaza entrada anterior si existe.">
             <span class="icon"><i class="fas fa-plus-circle"></i></span>
             <span>Install</span>
         </button>
-        <button class="button is-danger" onclick="showConfirmModal('remove-sync-crontab', 'desinstalar', 'Sync Jobs')">
+        <button class="button is-danger" onclick="showConfirmModal('remove-sync-crontab', 'desinstalar', 'Sync Jobs')" title="Elimina el cron job del crontab del sistema.">
             <span class="icon"><i class="fas fa-trash-alt"></i></span>
             <span>Remove</span>
         </button>
     </div>
+    <p class="help">
+        <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
+        Render: solo lectura.
+        Install: reemplaza entrada anterior si existe.
+        Remove: elimina el cron job del sistema.
+    </p>
 </div>
 
 <div class="box" id="outputContainer" style="display: none;">

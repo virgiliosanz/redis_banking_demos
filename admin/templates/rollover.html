@@ -41,10 +41,9 @@
                             </select>
                         </div>
                     </div>
-                    <p class="help">
-                        <strong>report-only:</strong> solo muestra que se haria<br>
-                        <strong>dry-run:</strong> simula la operacion sin cambios reales<br>
-                        <strong>execute:</strong> ejecuta el rollover (requiere confirmacion)
+                    <p class="help" id="modeHelp">
+                        <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
+                        Analiza que contenido se moveria del ano seleccionado. Solo lectura.
                     </p>
                 </div>
             </div>
@@ -108,9 +107,20 @@
 
 {% block extra_scripts %}
 <script>
+    const ROLLOVER_MODE_DESCRIPTIONS = {
+        'report-only': '<span class="icon is-small"><i class="fas fa-shield-alt"></i></span> Analiza que contenido se moveria del ano seleccionado. Solo lectura.',
+        'dry-run': '<span class="icon is-small"><i class="fas fa-shield-alt"></i></span> Simula el movimiento de contenido. No modifica nada.',
+        'execute': '<span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span> Mueve contenido real de live a archive para el ano indicado. Operacion pesada e irreversible sin rollback manual.'
+    };
+
     const form = document.getElementById('rolloverForm');
     const yearInput = document.getElementById('year');
     const modeSelect = document.getElementById('mode');
+    const modeHelp = document.getElementById('modeHelp');
+
+    modeSelect.addEventListener('change', function() {
+        modeHelp.innerHTML = ROLLOVER_MODE_DESCRIPTIONS[this.value] || '';
+    });
     const runButton = document.getElementById('runButton');
     const outputContainer = document.getElementById('outputContainer');
     const outputBox = document.getElementById('output');

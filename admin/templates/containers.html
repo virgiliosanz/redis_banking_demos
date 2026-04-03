@@ -14,7 +14,7 @@
     <div class="level">
         <div class="level-left">
             <div class="level-item">
-                <button class="button is-link" id="refreshBtn">
+                <button class="button is-link" id="refreshBtn" title="Muestra el estado actual de los servicios Docker. Solo lectura.">
                     <span class="icon"><i class="fas fa-sync-alt"></i></span>
                     <span>Refresh</span>
                 </button>
@@ -40,6 +40,10 @@
     </div>
 
     <div id="tableContainer" class="is-hidden">
+        <p class="help mb-3">
+            <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
+            Refresh: solo lectura. Start/Restart/Stop: modifican el estado del servicio. Logs: solo lectura.
+        </p>
         <table class="table is-fullwidth is-striped is-hoverable">
             <thead>
                 <tr>
@@ -131,19 +135,19 @@ function renderServices(services) {
         
         actionsCell.innerHTML = `
             <div class="buttons">
-                <button class="button is-small is-success" onclick="startService('${serviceName}')">
+                <button class="button is-small is-success" onclick="startService('${serviceName}')" title="Inicia un servicio detenido.">
                     <span class="icon is-small"><i class="fas fa-play"></i></span>
                     <span>Start</span>
                 </button>
-                <button class="button is-small is-warning" onclick="confirmAction('restart', '${serviceName}')">
+                <button class="button is-small is-warning" onclick="confirmAction('restart', '${serviceName}')" title="Reinicia el servicio. Causa interrupcion temporal del servicio afectado.">
                     <span class="icon is-small"><i class="fas fa-redo"></i></span>
                     <span>Restart</span>
                 </button>
-                <button class="button is-small is-danger" onclick="confirmAction('stop', '${serviceName}')">
+                <button class="button is-small is-danger" onclick="confirmAction('stop', '${serviceName}')" title="Detiene el servicio. El servicio dejara de responder hasta que se inicie manualmente.">
                     <span class="icon is-small"><i class="fas fa-stop"></i></span>
                     <span>Stop</span>
                 </button>
-                <a class="button is-small is-info" href="/containers/${serviceName}/logs">
+                <a class="button is-small is-info" href="/containers/${serviceName}/logs" title="Muestra las ultimas lineas de log del servicio. Solo lectura.">
                     <span class="icon is-small"><i class="fas fa-file-alt"></i></span>
                     <span>Logs</span>
                 </a>

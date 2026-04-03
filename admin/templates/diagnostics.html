@@ -22,24 +22,28 @@
             </h3>
             <p class="subtitle is-6">Recoleccion de metricas operativas (output JSON)</p>
 
+            <p class="help mb-3">
+                <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
+                Recopila metricas operativas del servicio. Solo lectura.
+            </p>
             <div class="buttons">
-                <button class="button is-info" data-collector="host">
+                <button class="button is-info" data-collector="host" title="Recopila metricas operativas del host. Solo lectura.">
                     <span class="icon"><i class="fas fa-server"></i></span>
                     <span>Host Health</span>
                 </button>
-                <button class="button is-info" data-collector="runtime">
+                <button class="button is-info" data-collector="runtime" title="Recopila metricas operativas del runtime Docker. Solo lectura.">
                     <span class="icon"><i class="fas fa-docker"></i></span>
                     <span>Runtime Health</span>
                 </button>
-                <button class="button is-info" data-collector="mysql">
+                <button class="button is-info" data-collector="mysql" title="Recopila metricas operativas de MySQL. Solo lectura.">
                     <span class="icon"><i class="fas fa-database"></i></span>
                     <span>MySQL Health</span>
                 </button>
-                <button class="button is-info" data-collector="elastic">
+                <button class="button is-info" data-collector="elastic" title="Recopila metricas operativas de Elasticsearch. Solo lectura.">
                     <span class="icon"><i class="fas fa-search"></i></span>
                     <span>Elastic Health</span>
                 </button>
-                <button class="button is-info" data-collector="app">
+                <button class="button is-info" data-collector="app" title="Recopila metricas operativas de la aplicacion. Solo lectura.">
                     <span class="icon"><i class="fas fa-code"></i></span>
                     <span>App Health</span>
                 </button>
@@ -58,6 +62,10 @@
                 </span>
             </h3>
             <p class="subtitle is-6">Auditoria programada de salud operativa</p>
+            <p class="help mb-3">
+                <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
+                Ejecuta auditoria completa de salud del sistema. Solo lectura, genera reporte.
+            </p>
 
             <form id="nightlyForm">
                 <div class="field">
@@ -96,6 +104,10 @@
                 </span>
             </h3>
             <p class="subtitle is-6">Diagnostico reactivo por servicio</p>
+            <p class="help mb-3">
+                <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
+                Ejecuta diagnostico reactivo del servicio seleccionado. Solo lectura.
+            </p>
 
             <form id="sentryForm">
                 <div class="field">

@@ -24,7 +24,10 @@
                     </select>
                 </div>
             </div>
-            <p class="help">report-only: lectura, dry-run: simulacion, apply: ejecuta cambios reales</p>
+            <p class="help" id="modeHelp">
+                <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
+                Compara usuarios/configuracion entre live y archive. Solo lectura, sin cambios.
+            </p>
         </div>
         {% endif %}
 
@@ -95,6 +98,19 @@
 <script>
 const COMMAND = {{ command | tojson }};
 const SHOW_MODE_SELECTOR = {{ show_mode_selector | tojson }};
+
+const MODE_DESCRIPTIONS = {
+    'report-only': '<span class="icon is-small"><i class="fas fa-shield-alt"></i></span> Compara usuarios/configuracion entre live y archive. Solo lectura, sin cambios.',
+    'dry-run': '<span class="icon is-small"><i class="fas fa-shield-alt"></i></span> Simula los cambios que se aplicarian. No modifica nada.',
+    'apply': '<span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span> Aplica cambios reales en la instancia destino. Irreversible sin backup previo.'
+};
+
+if (SHOW_MODE_SELECTOR) {
+    const modeHelp = document.getElementById('modeHelp');
+    document.getElementById('modeSelect').addEventListener('change', function() {
+        modeHelp.innerHTML = MODE_DESCRIPTIONS[this.value] || '';
+    });
+}
 
 const form = document.getElementById('syncForm');
 const runButton = document.getElementById('runButton');
