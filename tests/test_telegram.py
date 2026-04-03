@@ -104,13 +104,16 @@ class SendMessageTests(unittest.TestCase):
     def test_send_message_http_error(self, mock_urlopen: mock.MagicMock) -> None:
         import io
 
-        mock_urlopen.side_effect = HTTPError(
+        fp = io.BytesIO(b"Bot was blocked")
+        err = HTTPError(
             url="https://api.telegram.org/bot/sendMessage",
             code=403,
             msg="Forbidden",
             hdrs=None,  # type: ignore[arg-type]
-            fp=io.BytesIO(b"Bot was blocked"),
+            fp=fp,
         )
+        self.addCleanup(err.close)
+        mock_urlopen.side_effect = err
         config = _config()
         with self.assertRaises(RuntimeError) as ctx:
             send_message(config, "hello")
