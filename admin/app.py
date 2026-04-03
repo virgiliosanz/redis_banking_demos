@@ -13,6 +13,7 @@ from flask import Flask, render_template, jsonify, request, Blueprint, abort
 from .config import ADMIN_PORT, ADMIN_HOST, DEBUG
 from .runner import run_cli
 from . import containers
+from . import reports
 
 
 def create_app() -> Flask:
@@ -26,6 +27,7 @@ def create_app() -> Flask:
 
     # Register blueprints
     app.register_blueprint(containers.bp)
+    app.register_blueprint(reports.bp)
 
     @app.route("/")
     def index():
@@ -124,6 +126,82 @@ def create_app() -> Flask:
             return jsonify({"error": str(exc), "success": False}), 500
 
         return jsonify({"content": content, "path": str(resolved), "success": True})
+
+    @app.route("/api/latest-nightly")
+    def api_latest_nightly():
+        """Return metadata from the most recent nightly auditor report.
+
+        Scans ``runtime/reports/ia-ops/`` for ``nightly-auditor-*.md``,
+        picks the latest by filename (lexicographic = chronological) and
+        extracts the header fields.
+        """
+        report_dir = Path(__file__).parent.parent / "runtime" / "reports" / "ia-ops"
+        if not report_dir.is_dir():
+            return jsonify({"error": "Report directory not found"}), 404
+
+        files = sorted(report_dir.glob("nightly-auditor-*.md"))
+        if not files:
+            return jsonify({"error": "No nightly reports found"}), 404
+
+        latest = files[-1]
+        try:
+            content = latest.read_text(encoding="utf-8")
+        except OSError as exc:
+            return jsonify({"error": str(exc)}), 500
+
+        # Parse header fields from markdown
+        date = severity = summary = ""
+        for line in content.splitlines()[:10]:
+            if line.startswith("- generated_at:"):
+                date = line.split(":", 1)[1].strip()
+            elif line.startswith("- severidad_global:"):
+                severity = line.split(":", 1)[1].strip()
+            elif line.startswith("- resumen:"):
+                summary = line.split(":", 1)[1].strip()
+
+        return jsonify({
+            "filename": latest.name,
+            "date": date,
+            "severity": severity,
+            "summary": summary,
+        })
+
+    @app.route("/api/latest-drift")
+    def api_latest_drift():
+        """Return metadata from the most recent drift report.
+
+        Scans ``runtime/reports/sync/`` for ``live-archive-sync-*.md``,
+        picks the latest by filename and extracts drift status fields.
+        """
+        report_dir = Path(__file__).parent.parent / "runtime" / "reports" / "sync"
+        if not report_dir.is_dir():
+            return jsonify({"error": "Report directory not found"}), 404
+
+        files = sorted(report_dir.glob("live-archive-sync-*.md"))
+        if not files:
+            return jsonify({"error": "No drift reports found"}), 404
+
+        latest = files[-1]
+        try:
+            content = latest.read_text(encoding="utf-8")
+        except OSError as exc:
+            return jsonify({"error": str(exc)}), 500
+
+        date = editorial_drift = platform_drift = ""
+        for line in content.splitlines()[:10]:
+            if line.startswith("- generated_at:"):
+                date = line.split(":", 1)[1].strip()
+            elif line.startswith("- editorial_drift:"):
+                editorial_drift = line.split(":", 1)[1].strip()
+            elif line.startswith("- platform_drift:"):
+                platform_drift = line.split(":", 1)[1].strip()
+
+        return jsonify({
+            "filename": latest.name,
+            "date": date,
+            "editorial_drift": editorial_drift,
+            "platform_drift": platform_drift,
+        })
 
     # Register blueprints
     app.register_blueprint(create_rollover_blueprint())
