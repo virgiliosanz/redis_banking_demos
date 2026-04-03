@@ -169,10 +169,11 @@ function executeCommand(mode) {
         if (data.stdout) output += data.stdout;
         if (data.stderr) output += '\n' + data.stderr;
         if (!output) output = '(sin salida)';
-        
+
         const prefix = `$ ${args.join(' ')}\n\n`;
         const suffix = `\n\nCodigo de salida: ${data.returncode}`;
         showOutput(prefix + output + suffix);
+        AdminReports.handleCommandResult(data, outputContainer);
     })
     .catch(error => {
         showOutput('Error: ' + error.message);

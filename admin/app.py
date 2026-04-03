@@ -8,7 +8,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from flask import Flask, render_template, jsonify, request, Blueprint
+from flask import Flask, render_template, jsonify, request, Blueprint, abort
 
 from .config import ADMIN_PORT, ADMIN_HOST, DEBUG
 from .runner import run_cli
@@ -85,6 +85,45 @@ def create_app() -> Flask:
             "stderr": result.stderr,
             "success": result.success,
         })
+
+    @app.route("/api/read-file")
+    def api_read_file():
+        """Read a report file and return its content as JSON.
+
+        Only allows reading files under ``runtime/reports/`` for security.
+        """
+        file_path = request.args.get("path", "")
+        if not file_path:
+            return jsonify({"error": "No path provided", "success": False}), 400
+
+        try:
+            resolved = Path(file_path).resolve()
+        except (ValueError, OSError):
+            return jsonify({"error": "Invalid path", "success": False}), 400
+
+        # Security: only allow files under any runtime/reports/ directory
+        allowed = False
+        for part_idx, part in enumerate(resolved.parts):
+            if (
+                part == "runtime"
+                and part_idx + 1 < len(resolved.parts)
+                and resolved.parts[part_idx + 1] == "reports"
+            ):
+                allowed = True
+                break
+
+        if not allowed:
+            return jsonify({"error": "Access denied", "success": False}), 403
+
+        if not resolved.is_file():
+            return jsonify({"error": "File not found", "success": False}), 404
+
+        try:
+            content = resolved.read_text(encoding="utf-8")
+        except OSError as exc:
+            return jsonify({"error": str(exc), "success": False}), 500
+
+        return jsonify({"content": content, "path": str(resolved), "success": True})
 
     # Register blueprints
     app.register_blueprint(create_rollover_blueprint())

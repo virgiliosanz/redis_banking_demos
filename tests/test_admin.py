@@ -227,3 +227,72 @@ class TestApiRoutes(unittest.TestCase):
     def test_containers_index(self) -> None:
         resp = self.client.get("/containers/")
         self.assertEqual(resp.status_code, 200)
+
+
+
+# ---------------------------------------------------------------------------
+# /api/read-file tests
+# ---------------------------------------------------------------------------
+
+class TestApiReadFile(unittest.TestCase):
+    """Test the /api/read-file endpoint security and behaviour."""
+
+    def setUp(self) -> None:
+        self.app = create_app()
+        self.app.config["TESTING"] = True
+        self.client = self.app.test_client()
+
+    def test_no_path_returns_400(self) -> None:
+        resp = self.client.get("/api/read-file")
+        self.assertEqual(resp.status_code, 400)
+        data = resp.get_json()
+        self.assertFalse(data["success"])
+
+    def test_path_outside_reports_returns_403(self) -> None:
+        resp = self.client.get("/api/read-file?path=/etc/passwd")
+        self.assertEqual(resp.status_code, 403)
+        data = resp.get_json()
+        self.assertFalse(data["success"])
+
+    def test_path_without_runtime_reports_returns_403(self) -> None:
+        resp = self.client.get("/api/read-file?path=/tmp/somefile.md")
+        self.assertEqual(resp.status_code, 403)
+        data = resp.get_json()
+        self.assertFalse(data["success"])
+
+    def test_valid_path_file_not_found_returns_404(self) -> None:
+        resp = self.client.get(
+            "/api/read-file?path=/tmp/runtime/reports/nonexistent.md"
+        )
+        self.assertEqual(resp.status_code, 404)
+        data = resp.get_json()
+        self.assertFalse(data["success"])
+
+    def test_valid_path_reads_file(self) -> None:
+        import tempfile, os
+        tmpdir = tempfile.mkdtemp()
+        reports_dir = Path(tmpdir) / "runtime" / "reports"
+        reports_dir.mkdir(parents=True)
+        report_file = reports_dir / "test-report.md"
+        report_file.write_text("# Test\nHello", encoding="utf-8")
+        try:
+            resp = self.client.get(
+                f"/api/read-file?path={report_file}"
+            )
+            self.assertEqual(resp.status_code, 200)
+            data = resp.get_json()
+            self.assertTrue(data["success"])
+            self.assertEqual(data["content"], "# Test\nHello")
+        finally:
+            report_file.unlink()
+            reports_dir.rmdir()
+            (Path(tmpdir) / "runtime").rmdir()
+            os.rmdir(tmpdir)
+
+    def test_traversal_attempt_returns_403(self) -> None:
+        resp = self.client.get(
+            "/api/read-file?path=/foo/runtime/reports/../../etc/passwd"
+        )
+        self.assertEqual(resp.status_code, 403)
+        data = resp.get_json()
+        self.assertFalse(data["success"])

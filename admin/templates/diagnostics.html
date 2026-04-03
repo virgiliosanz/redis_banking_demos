@@ -214,6 +214,7 @@
             }
 
             showOutput(result.stdout || result.stderr || '(sin output)');
+            AdminReports.handleCommandResult(result, outputSection);
         } catch (error) {
             showError('Error de red: ' + error.message);
         }

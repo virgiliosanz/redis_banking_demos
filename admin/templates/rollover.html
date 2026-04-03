@@ -160,6 +160,7 @@
             }
             outputBox.textContent = output;
             outputBox.scrollTop = outputBox.scrollHeight;
+            AdminReports.handleCommandResult(data, outputContainer);
         })
         .catch(err => {
             outputBox.textContent = 'Error de red: ' + err.message;
