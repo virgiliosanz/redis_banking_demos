@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}Containers{% endblock %}
+
+{% block content %}
+<h1 class="title">
+    <span class="icon-text">
+        <span class="icon"><i class="fas fa-cubes"></i></span>
+        <span>Containers</span>
+    </span>
+</h1>
+<h2 class="subtitle">Docker Compose services status and management</h2>
+
+<div class="box">
+    <div class="level">
+        <div class="level-left">
+            <div class="level-item">
+                <button class="button is-link" id="refreshBtn">
+                    <span class="icon"><i class="fas fa-sync-alt"></i></span>
+                    <span>Refresh</span>
+                </button>
+            </div>
+        </div>
+        <div class="level-right">
+            <div class="level-item">
+                <span id="lastUpdate" class="has-text-grey-light"></span>
+            </div>
+        </div>
+    </div>
+
+    <div id="errorAlert" class="notification is-danger is-hidden">
+        <button class="delete" onclick="this.parentElement.classList.add('is-hidden')"></button>
+        <span id="errorMessage"></span>
+    </div>
+
+    <div id="loadingState" class="has-text-centered">
+        <span class="icon is-large">
+            <i class="fas fa-spinner fa-pulse fa-2x"></i>
+        </span>
+        <p>Loading containers...</p>
+    </div>
+
+    <div id="tableContainer" class="is-hidden">
+        <table class="table is-fullwidth is-striped is-hoverable">
+            <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>State</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="servicesTable">
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal" id="confirmModal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title" id="confirmTitle">Confirm Action</p>
+            <button class="delete" aria-label="close" onclick="closeModal()"></button>
+        </header>
+        <section class="modal-card-body">
+            <p id="confirmMessage"></p>
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button is-danger" id="confirmBtn">Confirm</button>
+            <button class="button" onclick="closeModal()">Cancel</button>
+        </footer>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentAction = null;
+
+function showError(message) {
+    document.getElementById('errorMessage').textContent = message;
+    document.getElementById('errorAlert').classList.remove('is-hidden');
+}
+
+function updateLastUpdate() {
+    const now = new Date().toLocaleTimeString();
+    document.getElementById('lastUpdate').textContent = `Last update: ${now}`;
+}
+
+function getStateClass(state) {
+    if (!state) return 'tag';
+    const stateLower = state.toLowerCase();
+    if (stateLower.includes('running')) return 'tag is-success';
+    if (stateLower.includes('exited')) return 'tag is-danger';
+    if (stateLower.includes('paused')) return 'tag is-warning';
+    return 'tag is-info';
+}
+
+function renderServices(services) {
+    const tbody = document.getElementById('servicesTable');
+    tbody.innerHTML = '';
+    
+    if (services.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="has-text-centered has-text-grey-light">No services found</td></tr>';
+        return;
+    }
+    
+    services.forEach(service => {
+        const row = document.createElement('tr');
+        
+        // Service name
+        const nameCell = document.createElement('td');
+        nameCell.innerHTML = `<strong>${service.Service || service.Name || 'Unknown'}</strong>`;
+        row.appendChild(nameCell);
+        
+        // State
+        const stateCell = document.createElement('td');
+        const state = service.State || 'unknown';
+        stateCell.innerHTML = `<span class="${getStateClass(state)}">${state}</span>`;
+        row.appendChild(stateCell);
+        
+        // Status
+        const statusCell = document.createElement('td');
+        statusCell.textContent = service.Status || '-';
+        row.appendChild(statusCell);
+        
+        // Actions
+        const actionsCell = document.createElement('td');
+        const serviceName = service.Service || service.Name;
+        
+        actionsCell.innerHTML = `
+            <div class="buttons">
+                <button class="button is-small is-success" onclick="startService('${serviceName}')">
+                    <span class="icon is-small"><i class="fas fa-play"></i></span>
+                    <span>Start</span>
+                </button>
+                <button class="button is-small is-warning" onclick="confirmAction('restart', '${serviceName}')">
+                    <span class="icon is-small"><i class="fas fa-redo"></i></span>
+                    <span>Restart</span>
+                </button>
+                <button class="button is-small is-danger" onclick="confirmAction('stop', '${serviceName}')">
+                    <span class="icon is-small"><i class="fas fa-stop"></i></span>
+                    <span>Stop</span>
+                </button>
+                <a class="button is-small is-info" href="/containers/${serviceName}/logs">
+                    <span class="icon is-small"><i class="fas fa-file-alt"></i></span>
+                    <span>Logs</span>
+                </a>
+            </div>
+        `;
+        row.appendChild(actionsCell);
+        
+        tbody.appendChild(row);
+    });
+}
+
+async function loadContainers() {
+    document.getElementById('loadingState').classList.remove('is-hidden');
+    document.getElementById('tableContainer').classList.add('is-hidden');
+    document.getElementById('errorAlert').classList.add('is-hidden');
+    
+    try {
+        const response = await fetch('/containers/api/status');
+        const data = await response.json();
+        
+        if (data.error) {
+            showError(data.error + (data.stderr ? ': ' + data.stderr : ''));
+            document.getElementById('loadingState').classList.add('is-hidden');
+            return;
+        }
+        
+        renderServices(data.services || []);
+        updateLastUpdate();
+        document.getElementById('loadingState').classList.add('is-hidden');
+        document.getElementById('tableContainer').classList.remove('is-hidden');
+    } catch (error) {
+        showError('Failed to load containers: ' + error.message);
+        document.getElementById('loadingState').classList.add('is-hidden');
+    }
+}
+
+function confirmAction(action, service) {
+    currentAction = { action, service };
+    const modal = document.getElementById('confirmModal');
+    const title = action.charAt(0).toUpperCase() + action.slice(1) + ' Service';
+    const message = `Are you sure you want to ${action} service "${service}"?`;
+    
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    modal.classList.add('is-active');
+}
+
+function closeModal() {
+    document.getElementById('confirmModal').classList.remove('is-active');
+    currentAction = null;
+}
+
+async function executeAction() {
+    if (!currentAction) return;
+    
+    const { action, service } = currentAction;
+    closeModal();
+    
+    // Disable all buttons temporarily
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(btn => btn.disabled = true);
+    
+    try {
+        const response = await fetch(`/containers/api/${service}/${action}`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            // Reload containers after successful action
+            await loadContainers();
+        } else {
+            showError(`Failed to ${action} service: ${data.output || 'Unknown error'}`);
+        }
+    } catch (error) {
+        showError(`Error executing ${action}: ${error.message}`);
+    } finally {
+        buttons.forEach(btn => btn.disabled = false);
+    }
+}
+
+async function startService(service) {
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(btn => btn.disabled = true);
+    
+    try {
+        const response = await fetch(`/containers/api/${service}/start`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            await loadContainers();
+        } else {
+            showError(`Failed to start service: ${data.output || 'Unknown error'}`);
+        }
+    } catch (error) {
+        showError(`Error starting service: ${error.message}`);
+    } finally {
+        buttons.forEach(btn => btn.disabled = false);
+    }
+}
+
+// Event listeners
+document.getElementById('refreshBtn').addEventListener('click', loadContainers);
+document.getElementById('confirmBtn').addEventListener('click', executeAction);
+
+// Initial load
+loadContainers();
+</script>
+{% endblock %}
