@@ -31,12 +31,17 @@
             <span class="icon"><i class="fas fa-trash-alt"></i></span>
             <span>Remove</span>
         </button>
+        <button class="button is-warning" onclick="runCrontab('run-nightly-auditor')" title="Ejecuta el Nightly Auditor ahora. Solo lectura, genera reporte.">
+            <span class="icon"><i class="fas fa-play"></i></span>
+            <span>Run Now</span>
+        </button>
     </div>
     <p class="help">
         <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
         Render: solo lectura.
         Install: reemplaza entrada anterior si existe.
         Remove: elimina el cron job del sistema.
+        Run Now: ejecuta el job manualmente.
     </p>
 </div>
 
@@ -61,12 +66,17 @@
             <span class="icon"><i class="fas fa-trash-alt"></i></span>
             <span>Remove</span>
         </button>
+        <button class="button is-warning" onclick="runCrontab('run-reactive-watch')" title="Ejecuta el watch reactivo ahora. Detecta incidentes activos.">
+            <span class="icon"><i class="fas fa-play"></i></span>
+            <span>Run Now</span>
+        </button>
     </div>
     <p class="help">
         <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
         Render: solo lectura.
         Install: reemplaza entrada anterior si existe.
         Remove: elimina el cron job del sistema.
+        Run Now: ejecuta el job manualmente.
     </p>
 </div>
 
@@ -91,12 +101,21 @@
             <span class="icon"><i class="fas fa-trash-alt"></i></span>
             <span>Remove</span>
         </button>
+        <button class="button is-warning" onclick="runSyncNow('sync-editorial-users')" title="Ejecuta sync editorial en modo report-only. Solo lectura.">
+            <span class="icon"><i class="fas fa-play"></i></span>
+            <span>Run Editorial Now</span>
+        </button>
+        <button class="button is-warning" onclick="runSyncNow('sync-platform-config')" title="Ejecuta sync platform en modo report-only. Solo lectura.">
+            <span class="icon"><i class="fas fa-play"></i></span>
+            <span>Run Platform Now</span>
+        </button>
     </div>
     <p class="help">
         <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
         Render: solo lectura.
         Install: reemplaza entrada anterior si existe.
         Remove: elimina el cron job del sistema.
+        Run Now: ejecuta el job manualmente.
     </p>
 </div>
 
@@ -175,14 +194,22 @@
         }
     });
 
+    function runSyncNow(command) {
+        const args = ['python3', '-m', 'ops.cli.ia_ops', command, '--mode', 'report-only'];
+        runWithArgs(command, args);
+    }
+
     function runCrontab(command) {
+        const args = ['python3', '-m', 'ops.cli.ia_ops', command];
+        runWithArgs(command, args);
+    }
+
+    function runWithArgs(command, args) {
         const buttons = document.querySelectorAll('button');
         buttons.forEach(btn => btn.disabled = true);
-        
+
         outputContainer.style.display = 'block';
         outputBox.textContent = 'Ejecutando ' + command + '...\n';
-
-        const args = ['python3', '-m', 'ops.cli.ia_ops', command];
 
         fetch('/api/run', {
             method: 'POST',
