@@ -1,0 +1,186 @@
+"""Tests for ops.cli.ia_ops — parser construction, argument parsing, and dispatch."""
+
+from __future__ import annotations
+
+import argparse
+import io
+import unittest
+
+from ops.cli.ia_ops import (
+    build_parser,
+    cmd_collect_host,
+    cmd_collect_service_logs,
+    cmd_collect_nightly_context,
+    cmd_report_drift,
+    cmd_render_nightly_crontab,
+    cmd_run_nightly,
+    cmd_run_sentry,
+    cmd_run_reactive_watch,
+    cmd_send_telegram_test,
+    cmd_sync_editorial,
+    cmd_sync_platform,
+    cmd_rollover_content_year,
+)
+
+
+class TestBuildParser(unittest.TestCase):
+    """build_parser() returns a valid ArgumentParser."""
+
+    def test_returns_argument_parser(self):
+        parser = build_parser()
+        self.assertIsInstance(parser, argparse.ArgumentParser)
+
+    def test_subparsers_are_required(self):
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args([])
+
+
+class TestHelpDoesNotFail(unittest.TestCase):
+    """--help on the root parser and selected subcommands exits 0."""
+
+    def _help_exits_zero(self, argv: list[str]):
+        parser = build_parser()
+        with self.assertRaises(SystemExit) as ctx:
+            parser.parse_args(argv)
+        self.assertEqual(ctx.exception.code, 0)
+
+    def test_root_help(self):
+        self._help_exits_zero(["--help"])
+
+    def test_subcommand_help(self):
+        self._help_exits_zero(["run-sentry-agent", "--help"])
+
+
+class TestParsingSimpleCollectors(unittest.TestCase):
+    """Subcommands without extra arguments parse correctly."""
+
+    SIMPLE_SUBCOMMANDS = [
+        "collect-host-health",
+        "collect-cron-health",
+        "collect-elastic-health",
+        "collect-runtime-health",
+        "collect-app-health",
+        "collect-mysql-health",
+        "report-live-archive-sync-drift",
+    ]
+
+    def test_simple_subcommands_parse(self):
+        parser = build_parser()
+        for subcmd in self.SIMPLE_SUBCOMMANDS:
+            with self.subTest(subcmd=subcmd):
+                args = parser.parse_args([subcmd])
+                self.assertEqual(args.command, subcmd)
+                self.assertTrue(callable(args.func))
+
+
+class TestParsingSentryAgent(unittest.TestCase):
+    """run-sentry-agent requires --service and accepts optional flags."""
+
+    def test_requires_service(self):
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["run-sentry-agent"])
+
+    def test_minimal(self):
+        parser = build_parser()
+        args = parser.parse_args(["run-sentry-agent", "--service", "nginx"])
+        self.assertEqual(args.service, "nginx")
+        self.assertFalse(args.notify_telegram)
+        self.assertIsNone(args.pattern)
+        self.assertIsNone(args.summary)
+
+    def test_all_flags(self):
+        parser = build_parser()
+        args = parser.parse_args([
+            "run-sentry-agent",
+            "--service", "mysql",
+            "--pattern", "OOM",
+            "--summary", "disk full",
+            "--notify-telegram",
+            "--telegram-preview",
+            "--no-write-report",
+        ])
+        self.assertEqual(args.service, "mysql")
+        self.assertEqual(args.pattern, "OOM")
+        self.assertEqual(args.summary, "disk full")
+        self.assertTrue(args.notify_telegram)
+        self.assertTrue(args.telegram_preview)
+        self.assertTrue(args.no_write_report)
+
+
+class TestParsingNightlyAuditor(unittest.TestCase):
+    def test_defaults(self):
+        parser = build_parser()
+        args = parser.parse_args(["run-nightly-auditor"])
+        self.assertFalse(args.no_write_report)
+        self.assertFalse(args.notify_telegram)
+
+
+class TestParsingSyncEditorial(unittest.TestCase):
+    def test_requires_mode(self):
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["sync-editorial-users"])
+
+    def test_valid_mode(self):
+        parser = build_parser()
+        args = parser.parse_args(["sync-editorial-users", "--mode", "dry-run"])
+        self.assertEqual(args.mode, "dry-run")
+
+
+class TestParsingRollover(unittest.TestCase):
+    def test_requires_mode_and_year(self):
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["rollover-content-year"])
+
+    def test_valid_args(self):
+        parser = build_parser()
+        args = parser.parse_args(["rollover-content-year", "--mode", "dry-run", "--year", "2024"])
+        self.assertEqual(args.mode, "dry-run")
+        self.assertEqual(args.year, 2024)
+
+
+class TestDispatchFunctions(unittest.TestCase):
+    """The func default set on each subparser points to the expected handler."""
+
+    EXPECTED_DISPATCH = {
+        "collect-host-health": cmd_collect_host,
+        "collect-service-logs": (cmd_collect_service_logs, ["collect-service-logs", "nginx"]),
+        "collect-nightly-context": cmd_collect_nightly_context,
+        "report-live-archive-sync-drift": cmd_report_drift,
+        "render-nightly-crontab": cmd_render_nightly_crontab,
+        "run-nightly-auditor": cmd_run_nightly,
+        "run-sentry-agent": (cmd_run_sentry, ["run-sentry-agent", "--service", "x"]),
+        "run-reactive-watch": cmd_run_reactive_watch,
+        "send-telegram-test": cmd_send_telegram_test,
+        "sync-editorial-users": (cmd_sync_editorial, ["sync-editorial-users", "--mode", "dry-run"]),
+        "sync-platform-config": (cmd_sync_platform, ["sync-platform-config", "--mode", "dry-run"]),
+        "rollover-content-year": (cmd_rollover_content_year, ["rollover-content-year", "--mode", "dry-run", "--year", "2024"]),
+    }
+
+    def test_dispatch_targets(self):
+        parser = build_parser()
+        for subcmd, expected in self.EXPECTED_DISPATCH.items():
+            with self.subTest(subcmd=subcmd):
+                if isinstance(expected, tuple):
+                    expected_func, argv = expected
+                else:
+                    expected_func = expected
+                    argv = [subcmd]
+                args = parser.parse_args(argv)
+                self.assertIs(args.func, expected_func)
+
+
+class TestCollectServiceLogsParsing(unittest.TestCase):
+    def test_service_required(self):
+        parser = build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["collect-service-logs"])
+
+    def test_service_and_optional_pattern(self):
+        parser = build_parser()
+        args = parser.parse_args(["collect-service-logs", "nginx", "error"])
+        self.assertEqual(args.service, "nginx")
+        self.assertEqual(args.pattern, "error")
