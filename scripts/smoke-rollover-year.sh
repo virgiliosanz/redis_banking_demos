@@ -71,14 +71,15 @@ wait_for_service() {
 }
 
 wp_eval_file() {
-  path="$1"
+  context="$1"
   script_path="$2"
 
   docker compose exec -T \
     --user root \
+    -e "N9_SITE_CONTEXT=$context" \
     -e ROLLOVER_TARGET_YEAR="$TARGET_YEAR" \
     cron-master \
-    wp --allow-root eval-file "$script_path" --path="$path"
+    wp --allow-root eval-file "$script_path" --path=/srv/wp/site
 }
 
 extract_json_number() {
@@ -103,8 +104,8 @@ wait_for_service n9-db-archive
 wait_for_service n9-elastic
 wait_for_service n9-cron-master
 
-live_summary="$(wp_eval_file /srv/wp/live /opt/project/scripts/internal/rollover/collect-year-summary.php)"
-archive_summary="$(wp_eval_file /srv/wp/archive /opt/project/scripts/internal/rollover/collect-year-summary.php)"
+live_summary="$(wp_eval_file live /opt/project/scripts/internal/rollover/collect-year-summary.php)"
+archive_summary="$(wp_eval_file archive /opt/project/scripts/internal/rollover/collect-year-summary.php)"
 
 live_count="$(extract_json_number selected_post_count "$live_summary")"
 archive_count="$(extract_json_number selected_post_count "$archive_summary")"

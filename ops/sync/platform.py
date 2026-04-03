@@ -17,22 +17,22 @@ def run(settings: Settings, *, mode: str, report_dir: Path | None = None) -> Pat
 
     source_snapshot = wp_eval_json(
         cwd=cwd,
-        path="/srv/wp/live",
+        context="live",
         script_path="/opt/project/scripts/internal/sync/platform/source-snapshot.php",
     )
     sanitized_live_snapshot = wp_eval_json(
         cwd=cwd,
-        path="/srv/wp/live",
+        context="live",
         script_path="/opt/project/scripts/internal/sync/platform/snapshot.php",
     )
     sanitized_archive_snapshot_before = wp_eval_json(
         cwd=cwd,
-        path="/srv/wp/archive",
+        context="archive",
         script_path="/opt/project/scripts/internal/sync/platform/snapshot.php",
     )
     plan_json = wp_eval_json(
         cwd=cwd,
-        path="/srv/wp/archive",
+        context="archive",
         script_path="/opt/project/scripts/internal/sync/platform/plan.php",
         snapshot_json=source_snapshot,
     )
@@ -42,13 +42,13 @@ def run(settings: Settings, *, mode: str, report_dir: Path | None = None) -> Pat
     if mode == "apply":
         apply_json = wp_eval_json(
             cwd=cwd,
-            path="/srv/wp/archive",
+            context="archive",
             script_path="/opt/project/scripts/internal/sync/platform/apply.php",
             snapshot_json=source_snapshot,
         )
         sanitized_archive_snapshot_after = wp_eval_json(
             cwd=cwd,
-            path="/srv/wp/archive",
+            context="archive",
             script_path="/opt/project/scripts/internal/sync/platform/snapshot.php",
         )
         write_sync_heartbeat(settings, "CRON_JOB_PLATFORM_SYNC", "sync-platform-config")

@@ -7,8 +7,7 @@ LIVE_PREFIX="${LIVE_EP_PREFIX:-n9-live}"
 ARCHIVE_PREFIX="${ARCHIVE_EP_PREFIX:-n9-archive}"
 WP_ROOT_HOST_PATH="${WP_ROOT_HOST_PATH:-./runtime/wp-root}"
 
-LIVE_PATH="/srv/wp/live"
-ARCHIVE_PATH="/srv/wp/archive"
+WP_PATH="/srv/wp/site"
 LIVE_HOST_PATH="$WP_ROOT_HOST_PATH/live/current/public"
 ARCHIVE_HOST_PATH="$WP_ROOT_HOST_PATH/archive/current/public"
 
@@ -22,19 +21,20 @@ wait_for_service() {
 }
 
 wp_exec() {
-  docker compose exec -T --user root cron-master wp --allow-root "$@"
+  context="$1"; shift
+  docker compose exec -T --user root -e "N9_SITE_CONTEXT=$context" cron-master wp --allow-root --path="$WP_PATH" "$@"
 }
 
 ensure_plugin() {
-  path="$1"
+  context="$1"
 
-  if ! wp_exec plugin is-installed elasticpress --path="$path" >/dev/null 2>&1; then
-    wp_exec plugin install elasticpress --activate --path="$path"
+  if ! wp_exec "$context" plugin is-installed elasticpress >/dev/null 2>&1; then
+    wp_exec "$context" plugin install elasticpress --activate
     return 0
   fi
 
-  if ! wp_exec plugin is-active elasticpress --path="$path" >/dev/null 2>&1; then
-    wp_exec plugin activate elasticpress --path="$path"
+  if ! wp_exec "$context" plugin is-active elasticpress >/dev/null 2>&1; then
+    wp_exec "$context" plugin activate elasticpress
   fi
 }
 
@@ -49,9 +49,9 @@ sync_plugin_code() {
 }
 
 get_index_name() {
-  path="$1"
+  context="$1"
 
-  wp_exec elasticpress get-indices --path="$path" | tr -d '[]"' | cut -d',' -f1
+  wp_exec "$context" elasticpress get-indices | tr -d '[]"' | cut -d',' -f1
 }
 
 publish_read_alias() {
@@ -80,14 +80,14 @@ JSON
 wait_for_service n9-elastic
 wait_for_service n9-cron-master
 
-ensure_plugin "$LIVE_PATH"
-ensure_plugin "$ARCHIVE_PATH"
+ensure_plugin "live"
+ensure_plugin "archive"
 
-wp_exec elasticpress sync --setup --yes --path="$LIVE_PATH" --ep-host="$EP_HOST" --ep-prefix="$LIVE_PREFIX"
-wp_exec elasticpress sync --setup --yes --path="$ARCHIVE_PATH" --ep-host="$EP_HOST" --ep-prefix="$ARCHIVE_PREFIX"
+wp_exec "live" elasticpress sync --setup --yes --ep-host="$EP_HOST" --ep-prefix="$LIVE_PREFIX"
+wp_exec "archive" elasticpress sync --setup --yes --ep-host="$EP_HOST" --ep-prefix="$ARCHIVE_PREFIX"
 
-live_index="$(get_index_name "$LIVE_PATH")"
-archive_index="$(get_index_name "$ARCHIVE_PATH")"
+live_index="$(get_index_name "live")"
+archive_index="$(get_index_name "archive")"
 
 publish_read_alias "$live_index" "$archive_index"
 

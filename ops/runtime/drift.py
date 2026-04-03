@@ -27,17 +27,18 @@ class DriftStatus:
     platform: DriftSection
 
 
-def _wp_eval_json(path: str, script_path: str, excluded_logins: str, *, cwd: Path) -> str:
+def _wp_eval_json(context: str, script_path: str, excluded_logins: str, *, cwd: Path) -> str:
     result = compose_exec(
         compose_service_name("cron-master"),
         [
             "env",
+            f"N9_SITE_CONTEXT={context}",
             f"SYNC_EXCLUDE_USER_LOGINS={excluded_logins}",
             "wp",
             "--allow-root",
             "eval-file",
             script_path,
-            f"--path={path}",
+            "--path=/srv/wp/site",
         ],
         cwd=cwd,
         exec_args=["--user", "root"],
@@ -229,7 +230,7 @@ def build_drift_report(settings: Settings) -> DriftStatus:
 
     live_editorial = _load_snapshot(
         _wp_eval_json(
-            "/srv/wp/live",
+            "live",
             "/opt/project/scripts/internal/sync/editorial/snapshot.php",
             excluded_logins,
             cwd=project_root,
@@ -237,7 +238,7 @@ def build_drift_report(settings: Settings) -> DriftStatus:
     )
     archive_editorial = _load_snapshot(
         _wp_eval_json(
-            "/srv/wp/archive",
+            "archive",
             "/opt/project/scripts/internal/sync/editorial/snapshot.php",
             excluded_logins,
             cwd=project_root,
@@ -245,7 +246,7 @@ def build_drift_report(settings: Settings) -> DriftStatus:
     )
     live_platform = _load_snapshot(
         _wp_eval_json(
-            "/srv/wp/live",
+            "live",
             "/opt/project/scripts/internal/sync/platform/snapshot.php",
             excluded_logins,
             cwd=project_root,
@@ -253,7 +254,7 @@ def build_drift_report(settings: Settings) -> DriftStatus:
     )
     archive_platform = _load_snapshot(
         _wp_eval_json(
-            "/srv/wp/archive",
+            "archive",
             "/opt/project/scripts/internal/sync/platform/snapshot.php",
             excluded_logins,
             cwd=project_root,

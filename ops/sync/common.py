@@ -25,18 +25,18 @@ def wait_for_sync_services(settings: Settings) -> None:
 def wp_eval_json(
     *,
     cwd: Path,
-    path: str,
+    context: str,
     script_path: str,
     snapshot_json: str | None = None,
     excluded_logins: str | None = None,
 ) -> str:
-    env_args = []
+    env_args = [f"N9_SITE_CONTEXT={context}"]
     if excluded_logins:
         env_args.append(f"SYNC_EXCLUDE_USER_LOGINS={excluded_logins}")
     if snapshot_json:
         env_args.append(f"SYNC_SOURCE_SNAPSHOT_JSON={snapshot_json}")
 
-    command = ["env", *env_args, "wp", "--allow-root", "eval-file", script_path, f"--path={path}"]
+    command = ["env", *env_args, "wp", "--allow-root", "eval-file", script_path, "--path=/srv/wp/site"]
     result = compose_exec(compose_service_name("cron-master"), command, cwd=cwd, exec_args=["--user", "root"])
     return result.stdout.strip()
 

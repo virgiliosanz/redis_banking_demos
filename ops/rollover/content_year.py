@@ -38,31 +38,33 @@ def _rollover_env(mode: str, target_year: int) -> list[str]:
     ]
 
 
-def _wp_eval_file(cwd: Path, *, path: str, script_path: str, mode: str, target_year: int, snapshot_file: str | None = None) -> str:
+def _wp_eval_file(cwd: Path, *, context: str, script_path: str, mode: str, target_year: int, snapshot_file: str | None = None) -> str:
     env_args = _rollover_env(mode, target_year)
+    env_args.append(f"N9_SITE_CONTEXT={context}")
     if snapshot_file:
         env_args.append(f"ROLLOVER_SNAPSHOT_FILE={snapshot_file}")
     result = compose_exec(
         compose_service_name("cron-master"),
-        [*env_args, "wp", "--allow-root", "eval-file", script_path, f"--path={path}"],
+        [*env_args, "wp", "--allow-root", "eval-file", script_path, "--path=/srv/wp/site"],
         cwd=cwd,
         exec_args=["--user", "root"],
     )
     return result.stdout.strip()
 
 
-def _archive_collisions(cwd: Path, *, path: str, slug_csv: str, target_year: int) -> str:
+def _archive_collisions(cwd: Path, *, context: str, slug_csv: str, target_year: int) -> str:
     result = compose_exec(
         compose_service_name("cron-master"),
         [
             "env",
+            f"N9_SITE_CONTEXT={context}",
             f"ROLLOVER_SLUGS_CSV={slug_csv}",
             f"ROLLOVER_TARGET_YEAR={target_year}",
             "wp",
             "--allow-root",
             "eval-file",
             "/opt/project/scripts/internal/rollover/detect-archive-collisions.php",
-            f"--path={path}",
+            "--path=/srv/wp/site",
         ],
         cwd=cwd,
         exec_args=["--user", "root"],
@@ -81,17 +83,19 @@ def _copy_to_container(cwd: Path, local_file: Path, remote_file: str) -> None:
 
 
 
-def _reindex_site(cwd: Path, *, path: str, prefix: str, ep_host: str) -> None:
+def _reindex_site(cwd: Path, *, context: str, prefix: str, ep_host: str) -> None:
     compose_exec(
         compose_service_name("cron-master"),
         [
+            "env",
+            f"N9_SITE_CONTEXT={context}",
             "wp",
             "--allow-root",
             "elasticpress",
             "sync",
             "--setup",
             "--yes",
-            f"--path={path}",
+            "--path=/srv/wp/site",
             f"--ep-host={ep_host}",
             f"--ep-prefix={prefix}",
         ],
@@ -100,10 +104,10 @@ def _reindex_site(cwd: Path, *, path: str, prefix: str, ep_host: str) -> None:
     )
 
 
-def _get_index_name(cwd: Path, *, path: str) -> str:
+def _get_index_name(cwd: Path, *, context: str) -> str:
     result = compose_exec(
         compose_service_name("cron-master"),
-        ["wp", "--allow-root", "elasticpress", "get-indices", f"--path={path}"],
+        ["env", f"N9_SITE_CONTEXT={context}", "wp", "--allow-root", "elasticpress", "get-indices", "--path=/srv/wp/site"],
         cwd=cwd,
         exec_args=["--user", "root"],
     )
@@ -195,7 +199,7 @@ def run(
 
     live_summary = _wp_eval_file(
         cwd,
-        path="/srv/wp/live",
+        context="live",
         script_path="/opt/project/scripts/internal/rollover/collect-year-summary.php",
         mode=mode,
         target_year=target_year,
@@ -205,21 +209,21 @@ def run(
 
     archive_collisions = _archive_collisions(
         cwd,
-        path="/srv/wp/archive",
+        context="archive",
         slug_csv=live_slug_csv,
         target_year=target_year,
     )
     archive_collisions_json = json.loads(archive_collisions)
     source_snapshot = _wp_eval_file(
         cwd,
-        path="/srv/wp/live",
+        context="live",
         script_path="/opt/project/scripts/internal/rollover/export-year.php",
         mode=mode,
         target_year=target_year,
     )
     archive_backup_snapshot = _wp_eval_file(
         cwd,
-        path="/srv/wp/archive",
+        context="archive",
         script_path="/opt/project/scripts/internal/rollover/export-year.php",
         mode=mode,
         target_year=target_year,
@@ -259,25 +263,25 @@ def run(
         _copy_to_container(cwd, source_snapshot_file, remote_source_snapshot)
         import_result = _wp_eval_file(
             cwd,
-            path="/srv/wp/archive",
+            context="archive",
             script_path="/opt/project/scripts/internal/rollover/import-snapshot.php",
             mode=mode,
             target_year=target_year,
             snapshot_file=remote_source_snapshot,
         )
-        _reindex_site(cwd, path="/srv/wp/archive", prefix=archive_ep_prefix, ep_host=ep_host)
+        _reindex_site(cwd, context="archive", prefix=archive_ep_prefix, ep_host=ep_host)
         _advance_cutover(cwd, routing_file, target_year)
         delete_result = _wp_eval_file(
             cwd,
-            path="/srv/wp/live",
+            context="live",
             script_path="/opt/project/scripts/internal/rollover/delete-source-posts.php",
             mode=mode,
             target_year=target_year,
             snapshot_file=remote_source_snapshot,
         )
-        _reindex_site(cwd, path="/srv/wp/live", prefix=live_ep_prefix, ep_host=ep_host)
-        live_index = _get_index_name(cwd, path="/srv/wp/live")
-        archive_index = _get_index_name(cwd, path="/srv/wp/archive")
+        _reindex_site(cwd, context="live", prefix=live_ep_prefix, ep_host=ep_host)
+        live_index = _get_index_name(cwd, context="live")
+        archive_index = _get_index_name(cwd, context="archive")
         _publish_read_alias(cwd, alias=ep_search_alias, live_index=live_index, archive_index=archive_index)
         write_sync_heartbeat(settings, "CRON_JOB_ROLLOVER", "rollover-content-year")
         execute_enabled = "yes"

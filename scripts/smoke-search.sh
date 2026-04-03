@@ -5,11 +5,11 @@ BASE_URL="${BASE_URL:-http://nuevecuatrouno.test}"
 EP_SEARCH_ALIAS="${EP_SEARCH_ALIAS:-n9-search-posts}"
 
 echo "==> elasticpress status live"
-docker compose exec -T cron-master wp --allow-root elasticpress status --path=/srv/wp/live >/dev/null
+docker compose exec -T -e N9_SITE_CONTEXT=live cron-master wp --allow-root elasticpress status --path=/srv/wp/site >/dev/null
 printf '%s\n' "ok"
 
 echo "==> elasticpress status archive"
-docker compose exec -T cron-master wp --allow-root elasticpress status --path=/srv/wp/archive >/dev/null
+docker compose exec -T -e N9_SITE_CONTEXT=archive cron-master wp --allow-root elasticpress status --path=/srv/wp/site >/dev/null
 printf '%s\n' "ok"
 
 echo "==> read alias published"
