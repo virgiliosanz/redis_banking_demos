@@ -5,11 +5,8 @@ EP_HOST="${EP_HOST:-http://elastic:9200}"
 EP_SEARCH_ALIAS="${EP_SEARCH_ALIAS:-n9-search-posts}"
 LIVE_PREFIX="${LIVE_EP_PREFIX:-n9-live}"
 ARCHIVE_PREFIX="${ARCHIVE_EP_PREFIX:-n9-archive}"
-WP_ROOT_HOST_PATH="${WP_ROOT_HOST_PATH:-./runtime/wp-root}"
 
 WP_PATH="/srv/wp/site"
-LIVE_HOST_PATH="$WP_ROOT_HOST_PATH/live/current/public"
-ARCHIVE_HOST_PATH="$WP_ROOT_HOST_PATH/archive/current/public"
 
 
 wait_for_service() {
@@ -36,16 +33,6 @@ ensure_plugin() {
   if ! wp_exec "$context" plugin is-active elasticpress >/dev/null 2>&1; then
     wp_exec "$context" plugin activate elasticpress
   fi
-}
-
-sync_plugin_code() {
-  source_path="$1"
-  target_path="$2"
-
-  mkdir -p "$target_path/wp-content/plugins"
-  rsync -a --delete \
-    "$source_path/wp-content/plugins/elasticpress/" \
-    "$target_path/wp-content/plugins/elasticpress/"
 }
 
 get_index_name() {
