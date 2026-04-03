@@ -165,6 +165,11 @@ function loadContainers() {
         .catch(function() { setCardError(el); });
 }
 
+function truncateText(text, maxLen) {
+    if (text.length <= maxLen) return text;
+    return text.substring(0, maxLen) + '...';
+}
+
 function loadDiagnostics() {
     var el = document.getElementById('card-diagnostics');
     fetch('/api/latest-nightly')
@@ -178,22 +183,58 @@ function loadDiagnostics() {
                 'ok': 'fa-check-circle', 'warning': 'fa-exclamation-triangle',
                 'critical': 'fa-times-circle'
             };
+            var findingSevMap = {
+                'warning': 'is-warning', 'error': 'is-danger', 'critical': 'is-danger'
+            };
+            var findingIconMap = {
+                'warning': 'fa-exclamation-triangle',
+                'error': 'fa-times-circle',
+                'critical': 'fa-times-circle'
+            };
             var tagClass = sevMap[data.severity] || 'is-info';
             var icon = iconMap[data.severity] || 'fa-info-circle';
             var reportLink = data.path
                 ? '/reports/?file=' + encodeURIComponent(data.path)
                 : '/reports/';
-            el.innerHTML =
+
+            var html =
                 '<p><span class="tag ' + tagClass + ' is-medium">' +
                 '<span class="icon"><i class="fas ' + icon + '"></i></span>&nbsp;' +
-                data.severity + '</span></p>' +
-                '<p class="is-size-7 mt-2">' + (data.summary || '') + '</p>' +
-                '<p class="is-size-7 mt-1">' +
+                data.severity + '</span></p>';
+
+            var findings = data.findings || [];
+            if (findings.length > 0 && data.severity !== 'ok') {
+                var maxShow = 5;
+                var shown = findings.slice(0, maxShow);
+                html += '<ul class="is-size-7 mt-2" style="list-style:none;margin-left:0;padding-left:0;">';
+                shown.forEach(function(f) {
+                    var fTagClass = findingSevMap[f.severity] || 'is-info';
+                    var fIcon = findingIconMap[f.severity] || 'fa-info-circle';
+                    html += '<li class="mb-1">' +
+                        '<span class="tag ' + fTagClass + ' is-small">' +
+                        '<span class="icon is-small"><i class="fas ' + fIcon + '"></i></span>' +
+                        '</span> ' +
+                        truncateText(f.text, 80) +
+                        '</li>';
+                });
+                html += '</ul>';
+                if (findings.length > maxShow) {
+                    html += '<p class="is-size-7">' +
+                        '<a href="' + reportLink + '" class="has-text-link">' +
+                        'y ' + (findings.length - maxShow) + ' mas...' +
+                        '</a></p>';
+                }
+            } else {
+                html += '<p class="is-size-7 mt-2">' + (data.summary || '') + '</p>';
+            }
+
+            html += '<p class="is-size-7 mt-1">' +
                 '<a href="' + reportLink + '" class="has-text-link">' +
                 '<span class="icon is-small"><i class="fas fa-calendar"></i></span> ' +
                 data.date +
                 ' <span class="icon is-small"><i class="fas fa-external-link-alt"></i></span>' +
                 '</a></p>';
+            el.innerHTML = html;
         })
         .catch(function() { setCardError(el); });
 }
@@ -212,25 +253,47 @@ function loadSync() {
             var driftLink = data.path
                 ? '/reports/?file=' + encodeURIComponent(data.path)
                 : '/reports/';
-            var editorialLabel = data.editorial_drift === 'yes'
-                ? '<a href="' + driftLink + '" class="has-text-danger">si <span class="icon is-small"><i class="fas fa-external-link-alt"></i></span></a>'
-                : 'no';
-            var platformLabel = data.platform_drift === 'yes'
-                ? '<a href="' + driftLink + '" class="has-text-danger">si <span class="icon is-small"><i class="fas fa-external-link-alt"></i></span></a>'
-                : 'no';
-            el.innerHTML =
+
+            var html =
                 '<p><span class="tag ' + tagClass + ' is-medium">' +
                 '<span class="icon"><i class="fas ' + icon + '"></i></span>&nbsp;' +
-                label + '</span></p>' +
-                '<p class="is-size-7 mt-2">' +
-                'Editorial: ' + editorialLabel +
-                ' / Platform: ' + platformLabel + '</p>' +
-                '<p class="is-size-7 mt-1">' +
+                label + '</span></p>';
+
+            if (hasDrift) {
+                html += '<div class="is-size-7 mt-2">';
+                var ed = data.editorial_details || {};
+                var pl = data.platform_details || {};
+
+                if (data.editorial_drift === 'yes') {
+                    var edBrief = ed.brief || (ed.count + ' diferencias');
+                    html += '<p><span class="tag is-warning is-small">' +
+                        '<span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span>' +
+                        '</span> Editorial: ' + truncateText(edBrief, 60) + '</p>';
+                } else {
+                    html += '<p><span class="tag is-success is-small">' +
+                        '<span class="icon is-small"><i class="fas fa-check-circle"></i></span>' +
+                        '</span> Editorial: en sync</p>';
+                }
+                if (data.platform_drift === 'yes') {
+                    var plBrief = pl.brief || (pl.count + ' diferencias');
+                    html += '<p><span class="tag is-warning is-small">' +
+                        '<span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span>' +
+                        '</span> Platform: ' + truncateText(plBrief, 60) + '</p>';
+                } else {
+                    html += '<p><span class="tag is-success is-small">' +
+                        '<span class="icon is-small"><i class="fas fa-check-circle"></i></span>' +
+                        '</span> Platform: en sync</p>';
+                }
+                html += '</div>';
+            }
+
+            html += '<p class="is-size-7 mt-1">' +
                 '<a href="' + driftLink + '" class="has-text-link">' +
                 '<span class="icon is-small"><i class="fas fa-calendar"></i></span> ' +
                 data.date +
                 ' <span class="icon is-small"><i class="fas fa-external-link-alt"></i></span>' +
                 '</a></p>';
+            el.innerHTML = html;
         })
         .catch(function() { setCardError(el); });
 }

@@ -6,10 +6,12 @@ Entry point: python -m admin.app
 from __future__ import annotations
 
 import json
+import re
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from flask import Flask, render_template, jsonify, request, Blueprint, abort
 
@@ -19,6 +21,198 @@ from . import containers
 from . import history
 from . import history_bp
 from . import reports
+
+
+def _extract_json_blocks(content: str) -> list[tuple[str, dict[str, Any]]]:
+    """Return ``(section_heading, parsed_dict)`` for each JSON code block."""
+    results: list[tuple[str, dict[str, Any]]] = []
+    current_heading = ""
+    in_block = False
+    block_lines: list[str] = []
+    for line in content.splitlines():
+        if line.startswith("## "):
+            current_heading = line[3:].strip()
+        elif line.strip() == "```json":
+            in_block = True
+            block_lines = []
+        elif line.strip() == "```" and in_block:
+            in_block = False
+            try:
+                parsed = json.loads("\n".join(block_lines))
+                results.append((current_heading, parsed))
+            except (json.JSONDecodeError, ValueError):
+                pass
+        elif in_block:
+            block_lines.append(line)
+    return results
+
+
+def _collect_non_ok_checks(
+    data: dict[str, Any], section: str
+) -> list[dict[str, str]]:
+    """Walk a collector JSON dict and return findings for non-ok checks."""
+    findings: list[dict[str, str]] = []
+
+    checks: dict[str, Any] | None = data.get("checks")
+    if isinstance(checks, dict):
+        for name, val in checks.items():
+            if isinstance(val, dict) and val.get("status") not in (
+                "ok",
+                "not_supported",
+                None,
+            ):
+                status = val["status"]
+                sev = "error" if status == "critical" else status
+                text = f"{section}: {name} = {status}"
+                detail = val.get("count")
+                if detail is not None:
+                    text += f" (count: {detail})"
+                pct = val.get("used_pct")
+                if pct is not None:
+                    text += f" ({pct}%)"
+                findings.append({"severity": sev, "text": text})
+            if isinstance(val, list):
+                for item in val:
+                    if isinstance(item, dict) and item.get("status") not in (
+                        "ok",
+                        "not_supported",
+                        None,
+                    ):
+                        item_status = item["status"]
+                        sev = "error" if item_status == "critical" else item_status
+                        item_name = item.get("name") or item.get("script", name)
+                        findings.append({
+                            "severity": sev,
+                            "text": f"{section}: {item_name} = {item_status}",
+                        })
+
+    # Cron jobs
+    jobs = data.get("jobs")
+    if isinstance(jobs, list):
+        for job in jobs:
+            if isinstance(job, dict) and job.get("status") not in ("ok", "info", None):
+                sev = "error" if job["status"] == "critical" else job["status"]
+                findings.append({
+                    "severity": sev,
+                    "text": f"{section}: {job.get('job_name', '?')} heartbeat {job['status']}",
+                })
+
+    # Elasticsearch cluster_health
+    cluster = data.get("cluster_health")
+    if isinstance(cluster, dict):
+        cs = cluster.get("collector_status", cluster.get("status", ""))
+        if cs not in ("ok", "green", ""):
+            sev = "error" if cs in ("critical", "red") else "warning"
+            es_status = cluster.get("status", cs)
+            findings.append({
+                "severity": sev,
+                "text": f"{section}: cluster {es_status}",
+            })
+
+    # Databases
+    dbs = data.get("databases")
+    if isinstance(dbs, list):
+        for db in dbs:
+            if not isinstance(db, dict):
+                continue
+            svc = db.get("service", "?")
+            for sub_key in ("ping", "processlist"):
+                sub = db.get(sub_key)
+                if isinstance(sub, dict) and sub.get("status") not in ("ok", None):
+                    sev = "error" if sub["status"] == "critical" else sub["status"]
+                    findings.append({
+                        "severity": sev,
+                        "text": f"{section}: {svc} {sub_key} = {sub['status']}",
+                    })
+
+    return findings
+
+
+def _parse_nightly_findings(content: str) -> list[dict[str, str]]:
+    """Extract findings from a nightly auditor markdown report."""
+    findings: list[dict[str, str]] = []
+
+    # Extract from JSON blocks
+    for section, data in _extract_json_blocks(content):
+        findings.extend(_collect_non_ok_checks(data, section))
+
+    # Extract from Riesgos section
+    in_riesgos = False
+    for line in content.splitlines():
+        if line.startswith("## Riesgos"):
+            in_riesgos = True
+            continue
+        if in_riesgos:
+            if line.startswith("## "):
+                break
+            stripped = line.strip()
+            if stripped.startswith("- "):
+                text = stripped[2:].strip()
+                if text and text.lower() != "sin riesgos adicionales fuera de los checks ya reflejados.":
+                    findings.append({"severity": "warning", "text": text})
+
+    return findings
+
+
+_EDITORIAL_DETAIL_KEYS = (
+    "only_in_live_logins",
+    "only_in_archive_logins",
+    "changed_users",
+)
+
+_PLATFORM_DETAIL_KEYS = (
+    "scalar_mismatches",
+    "active_plugins_only_in_live",
+    "active_plugins_only_in_archive",
+    "hash_mismatches",
+)
+
+
+def _parse_drift_details(content: str) -> dict[str, dict[str, Any]]:
+    """Extract editorial and platform drift detail summaries."""
+    editorial: dict[str, Any] = {"count": 0, "items": [], "brief": ""}
+    platform: dict[str, Any] = {"count": 0, "items": [], "brief": ""}
+
+    current_section = ""
+    for line in content.splitlines():
+        if line.startswith("## Editorial drift") or line.startswith("### Editorial drift"):
+            current_section = "editorial"
+            continue
+        elif line.startswith("## Platform drift") or line.startswith("### Platform drift"):
+            current_section = "platform"
+            continue
+        elif line.startswith("## ") or line.startswith("### "):
+            if current_section:
+                current_section = ""
+            continue
+
+        if not line.startswith("- "):
+            continue
+
+        key_val = line[2:].strip()
+        if ":" not in key_val:
+            continue
+        key, val = key_val.split(":", 1)
+        key = key.strip()
+        val = val.strip()
+
+        if current_section == "editorial":
+            if key == "editorial_brief":
+                editorial["brief"] = val
+            elif key in _EDITORIAL_DETAIL_KEYS and val != "none":
+                items = [v.strip() for v in val.split(",") if v.strip()]
+                editorial["items"].append(f"{key}: {val}")
+                editorial["count"] += len(items)
+
+        elif current_section == "platform":
+            if key == "platform_brief":
+                platform["brief"] = val
+            elif key in _PLATFORM_DETAIL_KEYS and val != "none":
+                items = [v.strip() for v in val.split(",") if v.strip()]
+                platform["items"].append(f"{key}: {val}")
+                platform["count"] += len(items)
+
+    return {"editorial": editorial, "platform": platform}
 
 
 def create_app() -> Flask:
@@ -187,7 +381,7 @@ def create_app() -> Flask:
 
         Scans ``runtime/reports/ia-ops/`` for ``nightly-auditor-*.md``,
         picks the latest by filename (lexicographic = chronological) and
-        extracts the header fields.
+        extracts the header fields plus findings.
         """
         report_dir = Path(__file__).parent.parent / "runtime" / "reports" / "ia-ops"
         if not report_dir.is_dir():
@@ -213,12 +407,15 @@ def create_app() -> Flask:
             elif line.startswith("- resumen:"):
                 summary = line.split(":", 1)[1].strip()
 
+        findings = _parse_nightly_findings(content)
+
         return jsonify({
             "filename": latest.name,
             "path": str(latest.resolve()),
             "date": date,
             "severity": severity,
             "summary": summary,
+            "findings": findings,
         })
 
     @app.route("/api/latest-drift")
@@ -226,7 +423,8 @@ def create_app() -> Flask:
         """Return metadata from the most recent drift report.
 
         Scans ``runtime/reports/sync/`` for ``live-archive-sync-*.md``,
-        picks the latest by filename and extracts drift status fields.
+        picks the latest by filename and extracts drift status fields
+        plus detail summaries.
         """
         report_dir = Path(__file__).parent.parent / "runtime" / "reports" / "sync"
         if not report_dir.is_dir():
@@ -251,12 +449,16 @@ def create_app() -> Flask:
             elif line.startswith("- platform_drift:"):
                 platform_drift = line.split(":", 1)[1].strip()
 
+        drift_details = _parse_drift_details(content)
+
         return jsonify({
             "filename": latest.name,
             "path": str(latest.resolve()),
             "date": date,
             "editorial_drift": editorial_drift,
             "platform_drift": platform_drift,
+            "editorial_details": drift_details["editorial"],
+            "platform_details": drift_details["platform"],
         })
 
     # Register blueprints
