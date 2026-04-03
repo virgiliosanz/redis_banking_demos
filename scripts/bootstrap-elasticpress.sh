@@ -11,8 +11,7 @@ LIVE_PATH="/srv/wp/live"
 ARCHIVE_PATH="/srv/wp/archive"
 LIVE_HOST_PATH="$WP_ROOT_HOST_PATH/live/current/public"
 ARCHIVE_HOST_PATH="$WP_ROOT_HOST_PATH/archive/current/public"
-ADMIN_LIVE_HOST_PATH="$WP_ROOT_HOST_PATH/admin-live/current/public"
-ADMIN_ARCHIVE_HOST_PATH="$WP_ROOT_HOST_PATH/admin-archive/current/public"
+
 
 wait_for_service() {
   service_name="$1"
@@ -83,9 +82,6 @@ wait_for_service n9-cron-master
 
 ensure_plugin "$LIVE_PATH"
 ensure_plugin "$ARCHIVE_PATH"
-
-sync_plugin_code "$LIVE_HOST_PATH" "$ADMIN_LIVE_HOST_PATH"
-sync_plugin_code "$ARCHIVE_HOST_PATH" "$ADMIN_ARCHIVE_HOST_PATH"
 
 wp_exec elasticpress sync --setup --yes --path="$LIVE_PATH" --ep-host="$EP_HOST" --ep-prefix="$LIVE_PREFIX"
 wp_exec elasticpress sync --setup --yes --path="$ARCHIVE_PATH" --ep-host="$EP_HOST" --ep-prefix="$ARCHIVE_PREFIX"

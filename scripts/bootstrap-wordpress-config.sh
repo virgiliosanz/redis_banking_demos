@@ -23,42 +23,21 @@ render_template() {
 }
 
 mkdir -p \
-  "$RUNTIME_ROOT/live/current/public/wp-content" \
-  "$RUNTIME_ROOT/archive/current/public/wp-content" \
-  "$RUNTIME_ROOT/admin-live/current/public/wp-content" \
-  "$RUNTIME_ROOT/admin-archive/current/public/wp-content" \
+  "$RUNTIME_ROOT/current/public/wp-content" \
   "$RUNTIME_ROOT/shared/config" \
   "$RUNTIME_ROOT/shared/uploads" \
   "$RUNTIME_ROOT/shared/mu-plugins" \
   "$RUNTIME_ROOT/live/var/cache/wp-content" \
-  "$RUNTIME_ROOT/archive/var/cache/wp-content" \
-  "$RUNTIME_ROOT/admin-live/var/cache/wp-content" \
-  "$RUNTIME_ROOT/admin-archive/var/cache/wp-content"
+  "$RUNTIME_ROOT/archive/var/cache/wp-content"
 
 cp "$TEMPLATE_ROOT/wp-common.php.tpl" "$RUNTIME_ROOT/shared/config/wp-common.php"
 
 render_context() {
   context_dir="$1"
-  db_name="$2"
-  db_user="$3"
-  db_password_env="$4"
-  db_password_file="$5"
-  db_host="$6"
-  wp_home="$7"
-  wp_siteurl="$8"
-  ep_index_prefix="$9"
 
   render_template \
     "$TEMPLATE_ROOT/wp-config.php.tpl" \
     "$context_dir/wp-config.php" \
-    DB_NAME "$db_name" \
-    DB_USER "$db_user" \
-    DB_PASSWORD_ENV "$db_password_env" \
-    DB_PASSWORD_FILE "$db_password_file" \
-    DB_HOST "$db_host" \
-    WP_HOME "$wp_home" \
-    WP_SITEURL "$wp_siteurl" \
-    EP_INDEX_PREFIX "$ep_index_prefix" \
     TABLE_PREFIX "wp_" \
     AUTH_KEY_ENV "WP_AUTH_KEY" \
     AUTH_KEY_FILE "/run/project-secrets/wp-auth-key" \
@@ -78,9 +57,6 @@ render_context() {
     NONCE_SALT_FILE "/run/project-secrets/wp-nonce-salt"
 }
 
-render_context "$RUNTIME_ROOT/live/current/public" "n9_live" "wp_live" "WP_LIVE_DB_PASSWORD" "/run/project-secrets/wp-live-db-password" "db-live:3306" "http://nuevecuatrouno.test" "http://nuevecuatrouno.test" "n9-live"
-render_context "$RUNTIME_ROOT/archive/current/public" "n9_archive" "wp_archive" "WP_ARCHIVE_DB_PASSWORD" "/run/project-secrets/wp-archive-db-password" "db-archive:3306" "http://nuevecuatrouno.test" "http://nuevecuatrouno.test" "n9-archive"
-render_context "$RUNTIME_ROOT/admin-live/current/public" "n9_live" "wp_live" "WP_LIVE_DB_PASSWORD" "/run/project-secrets/wp-live-db-password" "db-live:3306" "http://nuevecuatrouno.test" "http://nuevecuatrouno.test" "n9-live"
-render_context "$RUNTIME_ROOT/admin-archive/current/public" "n9_archive" "wp_archive" "WP_ARCHIVE_DB_PASSWORD" "/run/project-secrets/wp-archive-db-password" "db-archive:3306" "http://archive.nuevecuatrouno.test" "http://archive.nuevecuatrouno.test" "n9-archive"
+render_context "$RUNTIME_ROOT/current/public"
 
 printf '%s\n' "wordpress config bootstrap created under $RUNTIME_ROOT"

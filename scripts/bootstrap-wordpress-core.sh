@@ -56,9 +56,6 @@ fi
 
 prepare_source_tree
 
-install_core "$RUNTIME_ROOT/live/current/public"
-install_core "$RUNTIME_ROOT/archive/current/public"
-install_core "$RUNTIME_ROOT/admin-live/current/public"
-install_core "$RUNTIME_ROOT/admin-archive/current/public"
+install_core "$RUNTIME_ROOT/current/public"
 
 printf '%s\n' "wordpress core refreshed under $RUNTIME_ROOT"

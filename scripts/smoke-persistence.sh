@@ -23,9 +23,7 @@ printf '%s\n' "ok"
 echo "==> isolated cache directories exist"
 for cache_dir in \
   "$ROOT/live/var/cache/wp-content" \
-  "$ROOT/archive/var/cache/wp-content" \
-  "$ROOT/admin-live/var/cache/wp-content" \
-  "$ROOT/admin-archive/var/cache/wp-content"
+  "$ROOT/archive/var/cache/wp-content"
 do
   test -d "$cache_dir"
 done
@@ -34,6 +32,4 @@ printf '%s\n' "ok"
 echo "==> cache mounts are exposed in containers"
 docker compose exec -T fe-live test -d /var/www/html/live/wp-content/cache
 docker compose exec -T fe-archive test -d /var/www/html/archive/wp-content/cache
-docker compose exec -T be-admin test -d /var/www/html/admin-live/wp-content/cache
-docker compose exec -T be-admin test -d /var/www/html/admin-archive/wp-content/cache
 printf '%s\n' "ok"
