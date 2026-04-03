@@ -215,6 +215,7 @@ def create_app() -> Flask:
 
         return jsonify({
             "filename": latest.name,
+            "path": str(latest.resolve()),
             "date": date,
             "severity": severity,
             "summary": summary,
@@ -252,6 +253,7 @@ def create_app() -> Flask:
 
         return jsonify({
             "filename": latest.name,
+            "path": str(latest.resolve()),
             "date": date,
             "editorial_drift": editorial_drift,
             "platform_drift": platform_drift,

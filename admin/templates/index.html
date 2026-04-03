@@ -180,14 +180,20 @@ function loadDiagnostics() {
             };
             var tagClass = sevMap[data.severity] || 'is-info';
             var icon = iconMap[data.severity] || 'fa-info-circle';
+            var reportLink = data.path
+                ? '/reports/?file=' + encodeURIComponent(data.path)
+                : '/reports/';
             el.innerHTML =
                 '<p><span class="tag ' + tagClass + ' is-medium">' +
                 '<span class="icon"><i class="fas ' + icon + '"></i></span>&nbsp;' +
                 data.severity + '</span></p>' +
                 '<p class="is-size-7 mt-2">' + (data.summary || '') + '</p>' +
-                '<p class="is-size-7 has-text-grey mt-1">' +
+                '<p class="is-size-7 mt-1">' +
+                '<a href="' + reportLink + '" class="has-text-link">' +
                 '<span class="icon is-small"><i class="fas fa-calendar"></i></span> ' +
-                data.date + '</p>';
+                data.date +
+                ' <span class="icon is-small"><i class="fas fa-external-link-alt"></i></span>' +
+                '</a></p>';
         })
         .catch(function() { setCardError(el); });
 }
@@ -203,16 +209,28 @@ function loadSync() {
             var tagClass = hasDrift ? 'is-danger' : 'is-success';
             var icon = hasDrift ? 'fa-exclamation-triangle' : 'fa-check-circle';
             var label = hasDrift ? 'Drift detectado' : 'En sync';
+            var driftLink = data.path
+                ? '/reports/?file=' + encodeURIComponent(data.path)
+                : '/reports/';
+            var editorialLabel = data.editorial_drift === 'yes'
+                ? '<a href="' + driftLink + '" class="has-text-danger">si <span class="icon is-small"><i class="fas fa-external-link-alt"></i></span></a>'
+                : 'no';
+            var platformLabel = data.platform_drift === 'yes'
+                ? '<a href="' + driftLink + '" class="has-text-danger">si <span class="icon is-small"><i class="fas fa-external-link-alt"></i></span></a>'
+                : 'no';
             el.innerHTML =
                 '<p><span class="tag ' + tagClass + ' is-medium">' +
                 '<span class="icon"><i class="fas ' + icon + '"></i></span>&nbsp;' +
                 label + '</span></p>' +
                 '<p class="is-size-7 mt-2">' +
-                'Editorial: ' + data.editorial_drift +
-                ' / Platform: ' + data.platform_drift + '</p>' +
-                '<p class="is-size-7 has-text-grey mt-1">' +
+                'Editorial: ' + editorialLabel +
+                ' / Platform: ' + platformLabel + '</p>' +
+                '<p class="is-size-7 mt-1">' +
+                '<a href="' + driftLink + '" class="has-text-link">' +
                 '<span class="icon is-small"><i class="fas fa-calendar"></i></span> ' +
-                data.date + '</p>';
+                data.date +
+                ' <span class="icon is-small"><i class="fas fa-external-link-alt"></i></span>' +
+                '</a></p>';
         })
         .catch(function() { setCardError(el); });
 }

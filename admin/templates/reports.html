@@ -123,6 +123,27 @@
 
     window.__loadReport = loadReport;
 
+    function autoOpenFromQuery(categories) {
+        var params = new URLSearchParams(window.location.search);
+        var targetFile = params.get('file');
+        if (!targetFile) return;
+        for (var ci = 0; ci < categories.length; ci++) {
+            for (var fi = 0; fi < categories[ci].files.length; fi++) {
+                if (categories[ci].files[fi].path === targetFile) {
+                    var vid = 'viewer-' + ci + '-' + fi;
+                    var card = document.getElementById(vid);
+                    if (card) {
+                        card.closest('.card').querySelector('.card-content').style.display = '';
+                    }
+                    loadReport(targetFile, vid);
+                    var row = document.querySelector('[onclick*="' + vid + '"]');
+                    if (row) row.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    return;
+                }
+            }
+        }
+    }
+
     fetch('/reports/api/list')
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -131,6 +152,7 @@
                 empty.style.display = 'block'; return;
             }
             renderCategories(data.categories);
+            autoOpenFromQuery(data.categories);
         })
         .catch(function(e) {
             loading.style.display = 'none';
