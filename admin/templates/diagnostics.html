@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block title %}Diagnostics{% endblock %}
+
+{% block content %}
+<h1 class="title">
+    <span class="icon-text">
+        <span class="icon"><i class="fas fa-stethoscope"></i></span>
+        <span>Diagnostics</span>
+    </span>
+</h1>
+<h2 class="subtitle">Collectors y agentes de diagnostico</h2>
+
+<div class="columns">
+    <!-- Collectors column -->
+    <div class="column is-half">
+        <div class="box">
+            <h3 class="title is-4">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas fa-chart-line"></i></span>
+                    <span>Collectors</span>
+                </span>
+            </h3>
+            <p class="subtitle is-6">Recoleccion de metricas operativas (output JSON)</p>
+
+            <div class="buttons">
+                <button class="button is-info" data-collector="host">
+                    <span class="icon"><i class="fas fa-server"></i></span>
+                    <span>Host Health</span>
+                </button>
+                <button class="button is-info" data-collector="runtime">
+                    <span class="icon"><i class="fas fa-docker"></i></span>
+                    <span>Runtime Health</span>
+                </button>
+                <button class="button is-info" data-collector="mysql">
+                    <span class="icon"><i class="fas fa-database"></i></span>
+                    <span>MySQL Health</span>
+                </button>
+                <button class="button is-info" data-collector="elastic">
+                    <span class="icon"><i class="fas fa-search"></i></span>
+                    <span>Elastic Health</span>
+                </button>
+                <button class="button is-info" data-collector="app">
+                    <span class="icon"><i class="fas fa-code"></i></span>
+                    <span>App Health</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agents column -->
+    <div class="column is-half">
+        <!-- Nightly auditor -->
+        <div class="box">
+            <h3 class="title is-4">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas fa-moon"></i></span>
+                    <span>Nightly Auditor</span>
+                </span>
+            </h3>
+            <p class="subtitle is-6">Auditoria programada de salud operativa</p>
+
+            <form id="nightlyForm">
+                <div class="field">
+                    <label class="checkbox">
+                        <input type="checkbox" name="no-write-report">
+                        No escribir reporte
+                    </label>
+                </div>
+                <div class="field">
+                    <label class="checkbox">
+                        <input type="checkbox" name="notify-telegram">
+                        Notificar Telegram
+                    </label>
+                </div>
+                <div class="field">
+                    <label class="checkbox">
+                        <input type="checkbox" name="telegram-preview">
+                        Preview Telegram (no enviar)
+                    </label>
+                </div>
+                <div class="field">
+                    <button type="submit" class="button is-primary">
+                        <span class="icon"><i class="fas fa-play"></i></span>
+                        <span>Ejecutar</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Sentry agent -->
+        <div class="box">
+            <h3 class="title is-4">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas fa-bug"></i></span>
+                    <span>Sentry Agent</span>
+                </span>
+            </h3>
+            <p class="subtitle is-6">Diagnostico reactivo por servicio</p>
+
+            <form id="sentryForm">
+                <div class="field">
+                    <label class="label">Servicio</label>
+                    <div class="control">
+                        <div class="select is-fullwidth">
+                            <select name="service" required>
+                                <option value="">-- Seleccionar servicio --</option>
+                                <option value="lb-nginx">lb-nginx</option>
+                                <option value="fe-live">fe-live</option>
+                                <option value="fe-archive">fe-archive</option>
+                                <option value="be-admin">be-admin</option>
+                                <option value="db-live">db-live</option>
+                                <option value="db-archive">db-archive</option>
+                                <option value="elastic">elastic</option>
+                                <option value="cron-master">cron-master</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">Patron (opcional)</label>
+                    <div class="control">
+                        <input class="input" type="text" name="pattern" placeholder="ERROR|CRITICAL">
+                    </div>
+                </div>
+                <div class="field">
+                    <button type="submit" class="button is-primary">
+                        <span class="icon"><i class="fas fa-play"></i></span>
+                        <span>Ejecutar</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Output section -->
+<div class="box" id="outputSection" style="display: none;">
+    <h3 class="title is-4">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-terminal"></i></span>
+            <span>Output</span>
+        </span>
+    </h3>
+    <div id="loadingIndicator" class="notification is-info" style="display: none;">
+        <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span>
+        <span>Ejecutando comando...</span>
+    </div>
+    <div id="errorBox" class="notification is-danger" style="display: none;"></div>
+    <pre class="output-box" id="outputBox"></pre>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+    'use strict';
+
+    const outputSection = document.getElementById('outputSection');
+    const outputBox = document.getElementById('outputBox');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const errorBox = document.getElementById('errorBox');
+
+    function showLoading() {
+        outputSection.style.display = 'block';
+        loadingIndicator.style.display = 'block';
+        errorBox.style.display = 'none';
+        outputBox.textContent = '';
+    }
+
+    function showOutput(text) {
+        loadingIndicator.style.display = 'none';
+        outputBox.textContent = text;
+    }
+
+    function showError(message) {
+        loadingIndicator.style.display = 'none';
+        errorBox.textContent = message;
+        errorBox.style.display = 'block';
+    }
+
+    async function runCommand(args) {
+        showLoading();
+        try {
+            const response = await fetch('/api/run', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ args: args, timeout: 120 }),
+            });
+            
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+
+            const result = await response.json();
+            
+            if (!result.success) {
+                showError('Error (codigo ' + result.returncode + '):\n' + (result.stderr || result.stdout || 'Sin output'));
+                return;
+            }
+
+            showOutput(result.stdout || result.stderr || '(sin output)');
+        } catch (error) {
+            showError('Error de red: ' + error.message);
+        }
+    }
+
+    // Collector buttons
+    document.querySelectorAll('[data-collector]').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const collector = this.getAttribute('data-collector');
+            const args = ['python3', '-m', 'ops.cli.ia_ops', 'collect-' + collector + '-health'];
+            runCommand(args);
+        });
+    });
+
+    // Nightly form
+    document.getElementById('nightlyForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const args = ['python3', '-m', 'ops.cli.ia_ops', 'run-nightly-auditor'];
+        
+        if (this.querySelector('[name="no-write-report"]').checked) {
+            args.push('--no-write-report');
+        }
+        if (this.querySelector('[name="notify-telegram"]').checked) {
+            args.push('--notify-telegram');
+        }
+        if (this.querySelector('[name="telegram-preview"]').checked) {
+            args.push('--telegram-preview');
+        }
+        
+        runCommand(args);
+    });
+
+    // Sentry form
+    document.getElementById('sentryForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const service = this.querySelector('[name="service"]').value;
+        
+        if (!service) {
+            showError('Debe seleccionar un servicio');
+            return;
+        }
+
+        const args = ['python3', '-m', 'ops.cli.ia_ops', 'run-sentry-agent', '--service', service];
+        
+        const pattern = this.querySelector('[name="pattern"]').value.trim();
+        if (pattern) {
+            args.push('--pattern', pattern);
+        }
+        
+        runCommand(args);
+    });
+})();
+</script>
+{% endblock %}
