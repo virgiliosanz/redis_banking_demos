@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h1 class="title">
+    <span class="icon-text">
+        <span class="icon"><i class="fas fa-tachometer-alt"></i></span>
+        <span>Dashboard</span>
+    </span>
+</h1>
+<h2 class="subtitle">Panel de administracion - nuevecuatrouno</h2>
+
+<div class="columns is-multiline">
+
+    <!-- Sincronizacion -->
+    <div class="column is-half-tablet is-one-third-desktop">
+        <div class="card">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon"><i class="fas fa-sync-alt"></i></span>
+                    Sincronizacion
+                </p>
+            </header>
+            <div class="card-content">
+                <div class="content">
+                    <ul>
+                        <li>Sync editorial users</li>
+                        <li>Sync platform config</li>
+                        <li>Drift report live/archive</li>
+                    </ul>
+                </div>
+            </div>
+            <footer class="card-footer">
+                <span class="card-footer-item has-text-grey-light">Pendiente</span>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Contenedores -->
+    <div class="column is-half-tablet is-one-third-desktop">
+        <div class="card">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon"><i class="fas fa-cubes"></i></span>
+                    Contenedores
+                </p>
+            </header>
+            <div class="card-content">
+                <div class="content">
+                    <ul>
+                        <li>Estado de servicios</li>
+                        <li>Reiniciar / parar / arrancar</li>
+                        <li>Ver logs recientes</li>
+                    </ul>
+                </div>
+            </div>
+            <footer class="card-footer">
+                <span class="card-footer-item has-text-grey-light">Pendiente</span>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Diagnostico -->
+    <div class="column is-half-tablet is-one-third-desktop">
+        <div class="card">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon"><i class="fas fa-stethoscope"></i></span>
+                    Diagnostico
+                </p>
+            </header>
+            <div class="card-content">
+                <div class="content">
+                    <ul>
+                        <li>Collectors: host, runtime, mysql, elastic, app</li>
+                        <li>Nightly auditor</li>
+                        <li>Sentry agent</li>
+                    </ul>
+                </div>
+            </div>
+            <footer class="card-footer">
+                <span class="card-footer-item has-text-grey-light">Pendiente</span>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Rollover -->
+    <div class="column is-half-tablet is-one-third-desktop">
+        <div class="card">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon"><i class="fas fa-calendar-alt"></i></span>
+                    Rollover
+                </p>
+            </header>
+            <div class="card-content">
+                <div class="content">
+                    <ul>
+                        <li>Rollover content year</li>
+                        <li>Modos: report-only / dry-run / execute</li>
+                    </ul>
+                </div>
+            </div>
+            <footer class="card-footer">
+                <span class="card-footer-item has-text-grey-light">Pendiente</span>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Crontab -->
+    <div class="column is-half-tablet is-one-third-desktop">
+        <div class="card">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon"><i class="fas fa-clock"></i></span>
+                    Crontab
+                </p>
+            </header>
+            <div class="card-content">
+                <div class="content">
+                    <ul>
+                        <li>Instalar/desinstalar crons</li>
+                        <li>Render crontab blocks</li>
+                        <li>Sync, nightly, reactive</li>
+                    </ul>
+                </div>
+            </div>
+            <footer class="card-footer">
+                <span class="card-footer-item has-text-grey-light">Pendiente</span>
+            </footer>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
