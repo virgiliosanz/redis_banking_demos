@@ -12,32 +12,6 @@
 
 <div class="columns is-multiline">
 
-    <!-- Sincronizacion -->
-    <div class="column is-half-tablet is-one-third-desktop">
-        <div class="card">
-            <header class="card-header">
-                <p class="card-header-title">
-                    <span class="icon"><i class="fas fa-sync-alt"></i></span>
-                    Sincronizacion
-                </p>
-            </header>
-            <div class="card-content">
-                <div class="content">
-                    <ul>
-                        <li>Sync editorial users</li>
-                        <li>Sync platform config</li>
-                        <li>Drift report live/archive</li>
-                    </ul>
-                </div>
-            </div>
-            <footer class="card-footer">
-                <a href="/sync/editorial" class="card-footer-item">Editorial Users</a>
-                <a href="/sync/platform" class="card-footer-item">Platform Config</a>
-                <a href="/sync/drift" class="card-footer-item">Drift Report</a>
-            </footer>
-        </div>
-    </div>
-
     <!-- Contenedores -->
     <div class="column is-half-tablet is-one-third-desktop">
         <div class="card">
@@ -48,12 +22,11 @@
                 </p>
             </header>
             <div class="card-content">
-                <div class="content">
-                    <ul>
-                        <li>Estado de servicios</li>
-                        <li>Reiniciar / parar / arrancar</li>
-                        <li>Ver logs recientes</li>
-                    </ul>
+                <div class="content" id="card-containers">
+                    <p class="has-text-centered">
+                        <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span>
+                        Cargando...
+                    </p>
                 </div>
             </div>
             <footer class="card-footer">
@@ -72,16 +45,40 @@
                 </p>
             </header>
             <div class="card-content">
-                <div class="content">
-                    <ul>
-                        <li>Collectors: host, runtime, mysql, elastic, app</li>
-                        <li>Nightly auditor</li>
-                        <li>Sentry agent</li>
-                    </ul>
+                <div class="content" id="card-diagnostics">
+                    <p class="has-text-centered">
+                        <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span>
+                        Cargando...
+                    </p>
                 </div>
             </div>
             <footer class="card-footer">
                 <a href="/diagnostics" class="card-footer-item">Ir a Diagnostics</a>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Sincronizacion -->
+    <div class="column is-half-tablet is-one-third-desktop">
+        <div class="card">
+            <header class="card-header">
+                <p class="card-header-title">
+                    <span class="icon"><i class="fas fa-sync-alt"></i></span>
+                    Sincronizacion
+                </p>
+            </header>
+            <div class="card-content">
+                <div class="content" id="card-sync">
+                    <p class="has-text-centered">
+                        <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span>
+                        Cargando...
+                    </p>
+                </div>
+            </div>
+            <footer class="card-footer">
+                <a href="/sync/editorial" class="card-footer-item">Editorial</a>
+                <a href="/sync/platform" class="card-footer-item">Platform</a>
+                <a href="/sync/drift" class="card-footer-item">Drift</a>
             </footer>
         </div>
     </div>
@@ -134,4 +131,96 @@
     </div>
 
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+'use strict';
+
+function setCardError(el) {
+    el.innerHTML = '<p class="has-text-grey">' +
+        '<span class="icon"><i class="fas fa-exclamation-circle"></i></span> ' +
+        'No disponible</p>';
+}
+
+function loadContainers() {
+    var el = document.getElementById('card-containers');
+    fetch('/containers/api/status')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error || !data.services) { setCardError(el); return; }
+            var total = data.services.length;
+            var running = data.services.filter(function(s) {
+                return s.State === 'running';
+            }).length;
+            var allUp = running === total && total > 0;
+            var tagClass = allUp ? 'is-success' : 'is-danger';
+            var icon = allUp ? 'fa-check-circle' : 'fa-times-circle';
+            el.innerHTML =
+                '<p><span class="tag ' + tagClass + ' is-medium">' +
+                '<span class="icon"><i class="fas ' + icon + '"></i></span>&nbsp;' +
+                running + '/' + total + ' running</span></p>' +
+                '<p class="is-size-7 has-text-grey mt-2">Servicios Docker Compose</p>';
+        })
+        .catch(function() { setCardError(el); });
+}
+
+function loadDiagnostics() {
+    var el = document.getElementById('card-diagnostics');
+    fetch('/api/latest-nightly')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) { setCardError(el); return; }
+            var sevMap = {
+                'ok': 'is-success', 'warning': 'is-warning', 'critical': 'is-danger'
+            };
+            var iconMap = {
+                'ok': 'fa-check-circle', 'warning': 'fa-exclamation-triangle',
+                'critical': 'fa-times-circle'
+            };
+            var tagClass = sevMap[data.severity] || 'is-info';
+            var icon = iconMap[data.severity] || 'fa-info-circle';
+            el.innerHTML =
+                '<p><span class="tag ' + tagClass + ' is-medium">' +
+                '<span class="icon"><i class="fas ' + icon + '"></i></span>&nbsp;' +
+                data.severity + '</span></p>' +
+                '<p class="is-size-7 mt-2">' + (data.summary || '') + '</p>' +
+                '<p class="is-size-7 has-text-grey mt-1">' +
+                '<span class="icon is-small"><i class="fas fa-calendar"></i></span> ' +
+                data.date + '</p>';
+        })
+        .catch(function() { setCardError(el); });
+}
+
+function loadSync() {
+    var el = document.getElementById('card-sync');
+    fetch('/api/latest-drift')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) { setCardError(el); return; }
+            var hasDrift = data.editorial_drift === 'yes' ||
+                           data.platform_drift === 'yes';
+            var tagClass = hasDrift ? 'is-danger' : 'is-success';
+            var icon = hasDrift ? 'fa-exclamation-triangle' : 'fa-check-circle';
+            var label = hasDrift ? 'Drift detectado' : 'En sync';
+            el.innerHTML =
+                '<p><span class="tag ' + tagClass + ' is-medium">' +
+                '<span class="icon"><i class="fas ' + icon + '"></i></span>&nbsp;' +
+                label + '</span></p>' +
+                '<p class="is-size-7 mt-2">' +
+                'Editorial: ' + data.editorial_drift +
+                ' / Platform: ' + data.platform_drift + '</p>' +
+                '<p class="is-size-7 has-text-grey mt-1">' +
+                '<span class="icon is-small"><i class="fas fa-calendar"></i></span> ' +
+                data.date + '</p>';
+        })
+        .catch(function() { setCardError(el); });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadContainers();
+    loadDiagnostics();
+    loadSync();
+});
+</script>
 {% endblock %}
