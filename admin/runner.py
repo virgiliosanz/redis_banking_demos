@@ -33,7 +33,7 @@ class CommandResult:
         return "\n".join(parts)
 
 
-def run_cli(args: list[str], *, timeout: int = 120) -> CommandResult:
+def run_cli(args: list[str], *, timeout: int = 120, cwd: str | None = None) -> CommandResult:
     """Run a CLI command and return the captured result.
 
     Parameters
@@ -42,6 +42,9 @@ def run_cli(args: list[str], *, timeout: int = 120) -> CommandResult:
         Command and arguments as a list of strings.
     timeout:
         Maximum seconds to wait for the command to finish.
+    cwd:
+        Working directory for the command.  When *None* the current
+        process working directory is used.
 
     Returns
     -------
@@ -53,6 +56,7 @@ def run_cli(args: list[str], *, timeout: int = 120) -> CommandResult:
             capture_output=True,
             text=True,
             timeout=timeout,
+            cwd=cwd,
         )
         return CommandResult(
             command=args,

@@ -43,7 +43,8 @@ def api_status():
     compose_root = get_compose_root()
     result = run_cli(
         ["docker", "compose", "ps", "--format", "json"],
-        timeout=30
+        timeout=30,
+        cwd=str(compose_root),
     )
     
     if not result.success:
@@ -72,7 +73,8 @@ def api_restart(service: str):
     """
     result = run_cli(
         ["docker", "compose", "restart", service],
-        timeout=60
+        timeout=60,
+        cwd=str(get_compose_root()),
     )
     
     return jsonify({
@@ -90,7 +92,8 @@ def api_stop(service: str):
     """
     result = run_cli(
         ["docker", "compose", "stop", service],
-        timeout=60
+        timeout=60,
+        cwd=str(get_compose_root()),
     )
     
     return jsonify({
@@ -108,7 +111,8 @@ def api_start(service: str):
     """
     result = run_cli(
         ["docker", "compose", "start", service],
-        timeout=60
+        timeout=60,
+        cwd=str(get_compose_root()),
     )
     
     return jsonify({
@@ -150,7 +154,8 @@ def api_logs(service: str):
     
     result = run_cli(
         ["docker", "compose", "logs", f"--tail={lines_int}", service],
-        timeout=30
+        timeout=30,
+        cwd=str(get_compose_root()),
     )
     
     return jsonify({
