@@ -3,8 +3,6 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import re
-from pathlib import Path
-
 from ..config import DEFAULT_ARCHIVE_URL, DEFAULT_BASE_URL, Settings
 from ..services import container_name, service_keys
 from ..util.docker import service_logs

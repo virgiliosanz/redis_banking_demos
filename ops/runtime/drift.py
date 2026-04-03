@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-
 from ..config import Settings
 from ..reporting import write_text_report
 from ..services import compose_service_name, wait_for_service_keys
