@@ -20,21 +20,10 @@ def _smoke_status(context: dict[str, object], smoke_name: str) -> str:
     return "unknown"
 
 
-def build_reactive_incidents(
-    context: dict[str, object],
-    *,
-    editorial_drift: str = "unknown",
-    platform_drift: str = "unknown",
+def _check_host_incidents(
+    host: dict[str, object],
 ) -> list[ReactiveIncident]:
-    host = context["host"]["checks"]
-    runtime = context["runtime"]
-    app = context["app"]["checks"]
-    mysql = context["mysql"]["databases"]
-    elastic = context["elastic"]
-    cron = context["cron"]
-
     incidents: list[ReactiveIncident] = []
-
     for check_name in ("docker_daemon", "memory", "disk", "load_average", "iowait"):
         row = host[check_name]
         status = row["status"]
@@ -60,8 +49,14 @@ def build_reactive_incidents(
                 summary=summary,
             )
         )
+    return incidents
 
-    service_map = context["service_map"]
+
+def _check_container_incidents(
+    runtime: dict[str, object],
+    service_map: dict[str, str],
+) -> list[ReactiveIncident]:
+    incidents: list[ReactiveIncident] = []
     for row in runtime["containers"]:
         health_status = row["health_status"]
         service = service_map.get(row["container_name"])
@@ -101,7 +96,14 @@ def build_reactive_incidents(
                 pattern=" 5\\d\\d ",
             )
         )
+    return incidents
 
+
+def _check_smoke_incidents(
+    context: dict[str, object],
+    app: dict[str, object],
+) -> list[ReactiveIncident]:
+    incidents: list[ReactiveIncident] = []
     if _smoke_status(context, "routing") != "ok":
         incidents.append(
             ReactiveIncident(
@@ -151,7 +153,13 @@ def build_reactive_incidents(
                 summary="smoke-search falla en la capa publica",
             )
         )
+    return incidents
 
+
+def _check_mysql_incidents(
+    mysql: list[dict[str, object]],
+) -> list[ReactiveIncident]:
+    incidents: list[ReactiveIncident] = []
     for row in mysql:
         service = row["service"]
         if row["ping"]["status"] != "ok":
@@ -178,7 +186,13 @@ def build_reactive_incidents(
                     ),
                 )
             )
+    return incidents
 
+
+def _check_elastic_incidents(
+    elastic: dict[str, object],
+) -> list[ReactiveIncident]:
+    incidents: list[ReactiveIncident] = []
     if elastic["alias"]["status"] != "ok":
         incidents.append(
             ReactiveIncident(
@@ -188,7 +202,16 @@ def build_reactive_incidents(
                 summary="alias de lectura de Elasticsearch ausente",
             )
         )
+    return incidents
 
+
+def _check_cron_incidents(
+    cron: dict[str, object],
+    *,
+    editorial_drift: str = "unknown",
+    platform_drift: str = "unknown",
+) -> list[ReactiveIncident]:
+    incidents: list[ReactiveIncident] = []
     delayed_jobs = [row["job_name"] for row in cron["jobs"] if row["status"] in {"warning", "critical"}]
     if delayed_jobs:
         severity = "critical" if any(row["status"] == "critical" for row in cron["jobs"]) else "warning"
@@ -223,5 +246,29 @@ def build_reactive_incidents(
                 summary=f"drift detectado entre live y archive: editorial={editorial_drift}, platform={platform_drift}",
             )
         )
+    return incidents
 
+
+def build_reactive_incidents(
+    context: dict[str, object],
+    *,
+    editorial_drift: str = "unknown",
+    platform_drift: str = "unknown",
+) -> list[ReactiveIncident]:
+    host = context["host"]["checks"]
+    runtime = context["runtime"]
+    app = context["app"]["checks"]
+    mysql = context["mysql"]["databases"]
+    elastic = context["elastic"]
+    cron = context["cron"]
+
+    incidents: list[ReactiveIncident] = []
+    incidents.extend(_check_host_incidents(host))
+    incidents.extend(_check_container_incidents(runtime, context["service_map"]))
+    incidents.extend(_check_smoke_incidents(context, app))
+    incidents.extend(_check_mysql_incidents(mysql))
+    incidents.extend(_check_elastic_incidents(elastic))
+    incidents.extend(
+        _check_cron_incidents(cron, editorial_drift=editorial_drift, platform_drift=platform_drift)
+    )
     return incidents
