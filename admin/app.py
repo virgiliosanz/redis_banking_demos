@@ -6,7 +6,6 @@ Entry point: python -m admin.app
 from __future__ import annotations
 
 import json
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,8 +14,6 @@ from flask import Flask, render_template, jsonify, request
 from .config import ADMIN_PORT, ADMIN_HOST, DEBUG
 from .runner import run_cli
 from . import containers
-from . import history
-from . import history_bp
 from . import reports
 from . import diagnostics_bp
 from . import crontab_bp
@@ -40,7 +37,6 @@ def create_app() -> Flask:
     # Register blueprints
     app.register_blueprint(containers.bp)
     app.register_blueprint(reports.bp)
-    app.register_blueprint(history_bp.bp)
     app.register_blueprint(diagnostics_bp.bp)
 
     @app.route("/")
@@ -107,21 +103,7 @@ def create_app() -> Flask:
             return jsonify({"error": "No command provided"}), 400
 
         timeout = data.get("timeout", 120)
-        t0 = time.monotonic()
         result = run_cli(args, timeout=timeout)
-        elapsed = time.monotonic() - t0
-        # Only log ops CLI commands in history to avoid pollution
-        if (
-            len(result.command) >= 1
-            and result.command[0] in ("python3", "python")
-            and any("ops.cli.ia_ops" in arg for arg in result.command)
-        ):
-            history.save_entry(
-                command=result.command,
-                returncode=result.returncode,
-                duration_seconds=elapsed,
-                success=result.success,
-            )
         return jsonify({
             "command": result.command,
             "returncode": result.returncode,
