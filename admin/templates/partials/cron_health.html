@@ -69,9 +69,9 @@
                 <td>{{ job.source }}</td>
                 <td>
                     {% if job.last_success_epoch %}
-                    {{ job.last_success_epoch }}
+                    <span class="epoch-ago" data-epoch="{{ job.last_success_epoch }}">{{ job.last_success_epoch }}</span>
                     {% else %}
-                    <span class="has-text-grey">--</span>
+                    <span class="has-text-grey">Nunca</span>
                     {% endif %}
                 </td>
                 <td>
