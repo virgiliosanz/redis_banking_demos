@@ -36,6 +36,9 @@
         <div class="column is-narrow">
             <label class="label">Rango temporal</label>
             <div class="buttons has-addons" id="rangeSelector">
+                <button class="button is-small" data-range="5m">5m</button>
+                <button class="button is-small" data-range="15m">15m</button>
+                <button class="button is-small" data-range="30m">30m</button>
                 <button class="button is-small is-info is-selected" data-range="1h">1h</button>
                 <button class="button is-small" data-range="6h">6h</button>
                 <button class="button is-small" data-range="24h">24h</button>
@@ -48,7 +51,14 @@
             <div class="select is-small">
                 <select id="sistemaFilter">
                     <option value="host" selected>Host</option>
-                    <option value="all_containers">Todos los contenedores</option>
+                    <option value="container:n9-lb-nginx">n9-lb-nginx</option>
+                    <option value="container:n9-fe-live">n9-fe-live</option>
+                    <option value="container:n9-fe-archive">n9-fe-archive</option>
+                    <option value="container:n9-be-admin">n9-be-admin</option>
+                    <option value="container:n9-db-live">n9-db-live</option>
+                    <option value="container:n9-db-archive">n9-db-archive</option>
+                    <option value="container:n9-elastic">n9-elastic</option>
+                    <option value="container:n9-cron-master">n9-cron-master</option>
                 </select>
             </div>
         </div>
@@ -81,6 +91,7 @@
 </div>
 
 <!-- Charts area -->
+<h3 class="title is-4" id="chartsTitle">Host</h3>
 <div id="chartsArea">
     <div class="notification is-info is-light" id="loadingMsg">
         <span class="icon"><i class="fas fa-spinner fa-spin"></i></span>
@@ -147,59 +158,35 @@
         return bytesPerSec.toFixed(1) + ' B/s';
     }
 
-    /** Extract unique container names from metric keys like containers.n9-lb-nginx.cpu_percent */
-    function extractContainerNames(metrics) {
-        var names = new Set();
-        Object.keys(metrics).forEach(function(key) {
-            var m = key.match(/^containers\.([^.]+)\./);
-            if (m) names.add(m[1]);
-        });
-        return Array.from(names).sort();
-    }
-
-    /** Populate the Sistema filter dropdown with dynamic container names */
-    function populateContainerOptions(metrics) {
-        var sel = document.getElementById('sistemaFilter');
-        // Remove old dynamic options (keep first two: Host, Todos los contenedores)
-        while (sel.options.length > 2) sel.remove(2);
-        var names = extractContainerNames(metrics);
-        names.forEach(function(name) {
-            var opt = document.createElement('option');
-            opt.value = 'container:' + name;
-            opt.textContent = name;
-            sel.appendChild(opt);
-        });
-    }
-
-    /** Filter metrics based on current tab and filter selection */
-    function filterMetrics(allMetrics) {
+    /** Filter container metrics by container name prefix */
+    function filterContainerMetrics(metrics, containerName) {
         var filtered = {};
+        var prefix = containerName + '.';
+        Object.keys(metrics).forEach(function(k) {
+            if (k.startsWith(prefix)) filtered[k] = metrics[k];
+        });
+        return filtered;
+    }
+
+    /** Update the chart title heading based on current tab and filter */
+    function updateChartTitle() {
+        var el = document.getElementById('chartsTitle');
         if (currentTab === 'sistema') {
             var filter = document.getElementById('sistemaFilter').value;
             if (filter === 'host') {
-                Object.keys(allMetrics).forEach(function(k) {
-                    if (!k.startsWith('containers.')) filtered[k] = allMetrics[k];
-                });
-            } else if (filter === 'all_containers') {
-                Object.keys(allMetrics).forEach(function(k) {
-                    if (k.startsWith('containers.')) filtered[k] = allMetrics[k];
-                });
+                el.textContent = 'Host';
             } else if (filter.startsWith('container:')) {
-                var cname = filter.substring('container:'.length);
-                var prefix = 'containers.' + cname + '.';
-                Object.keys(allMetrics).forEach(function(k) {
-                    if (k.startsWith(prefix)) filtered[k] = allMetrics[k];
-                });
+                el.textContent = 'Contenedor: ' + filter.substring('container:'.length);
             }
         } else {
             var svcFilter = document.getElementById('serviciosFilter').value;
             if (svcFilter === 'all') {
-                filtered = allMetrics;
+                el.textContent = 'Todos los servicios';
             } else {
-                filtered = allMetrics;
+                var labels = {nginx:'Nginx', mysql:'MySQL', elastic:'Elastic', phpfpm:'PHP-FPM'};
+                el.textContent = labels[svcFilter] || svcFilter;
             }
         }
-        return filtered;
     }
 
     function renderCharts(metrics) {
@@ -282,13 +269,27 @@
         loading.style.display = '';
         document.getElementById('emptyMsg').style.display = 'none';
 
-        var groups = TAB_GROUPS[currentTab];
+        updateChartTitle();
 
-        // For servicios tab with a specific filter, fetch only that group
-        if (currentTab === 'servicios') {
+        var groups;
+        var containerFilter = null;
+
+        if (currentTab === 'sistema') {
+            var filter = document.getElementById('sistemaFilter').value;
+            if (filter === 'host') {
+                groups = ['host'];
+            } else if (filter.startsWith('container:')) {
+                groups = ['containers'];
+                containerFilter = filter.substring('container:'.length);
+            } else {
+                groups = ['host'];
+            }
+        } else {
             var svcFilter = document.getElementById('serviciosFilter').value;
             if (svcFilter !== 'all') {
                 groups = [svcFilter];
+            } else {
+                groups = TAB_GROUPS[currentTab];
             }
         }
 
@@ -310,14 +311,12 @@
                     }
                 });
 
-                // For sistema tab, populate container dropdown and apply filter
-                if (currentTab === 'sistema') {
-                    populateContainerOptions(allMetrics);
-                    var filtered = filterMetrics(allMetrics);
-                    renderCharts(filtered);
-                } else {
-                    renderCharts(allMetrics);
+                // Apply container filter if needed
+                if (containerFilter) {
+                    allMetrics = filterContainerMetrics(allMetrics, containerFilter);
                 }
+
+                renderCharts(allMetrics);
             })
             .catch(function(err) {
                 loading.style.display = 'none';

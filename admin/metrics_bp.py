@@ -16,6 +16,9 @@ from ops.metrics.storage import MetricsStore
 bp = Blueprint("metrics", __name__, url_prefix="/metrics")
 
 _RANGE_MAP = {
+    "5m": 5,
+    "15m": 15,
+    "30m": 30,
     "1h": 60,
     "6h": 360,
     "24h": 1440,
