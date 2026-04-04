@@ -20,6 +20,7 @@ from . import crontab_bp
 from . import rollover_bp
 from . import dashboard_bp
 from . import metrics_bp
+from . import health_bp
 
 
 def create_app() -> Flask:
@@ -156,6 +157,7 @@ def create_app() -> Flask:
     app.register_blueprint(rollover_bp.bp)
     app.register_blueprint(dashboard_bp.bp)
     app.register_blueprint(metrics_bp.bp)
+    app.register_blueprint(health_bp.bp)
 
     return app
 

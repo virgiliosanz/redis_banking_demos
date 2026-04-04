@@ -1,6 +1,42 @@
 {% extends "base.html" %}
 {% block title %}Panel{% endblock %}
 
+{% block extra_head %}
+<style>
+    .health-section { margin-bottom: 1.5rem; }
+    .health-section .title.is-5 { margin-bottom: 0.75rem; }
+    .svc-pill {
+        display: inline-flex; align-items: center; gap: 0.3rem;
+        padding: 0.35rem 0.7rem; border-radius: 999px; font-size: 0.8rem;
+        font-weight: 600; margin: 0.2rem;
+    }
+    .svc-pill.ok { background: #48c78e22; color: #257953; border: 1px solid #48c78e; }
+    .svc-pill.warning { background: #ffe08a33; color: #946c00; border: 1px solid #ffe08a; }
+    .svc-pill.critical { background: #f1466833; color: #cc0f35; border: 1px solid #f14668; }
+    .svc-pill.unknown { background: #b5b5b533; color: #7a7a7a; border: 1px solid #b5b5b5; }
+    .svc-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .svc-dot.ok { background: #48c78e; }
+    .svc-dot.warning { background: #ffe08a; }
+    .svc-dot.critical { background: #f14668; }
+    .svc-dot.unknown { background: #b5b5b5; }
+    .sparkline-box { background: #fafafa; border-radius: 8px; padding: 0.5rem; text-align: center; }
+    .sparkline-box canvas { max-height: 50px; }
+    .sparkline-label { font-size: 0.75rem; color: #7a7a7a; margin-bottom: 0.25rem; }
+    .incident-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid #f0f0f0; font-size: 0.85rem; }
+    .incident-row:last-child { border-bottom: none; }
+    .sev-badge { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 600; text-transform: uppercase; }
+    .sev-badge.warning { background: #ffe08a; color: #946c00; }
+    .sev-badge.critical { background: #f14668; color: #fff; }
+    .sev-badge.ok { background: #48c78e; color: #fff; }
+    .cron-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid #f0f0f0; font-size: 0.85rem; }
+    .cron-row:last-child { border-bottom: none; }
+    .cron-age { color: #7a7a7a; font-size: 0.75rem; }
+    .secondary-cards .card { font-size: 0.9rem; }
+    .secondary-cards .card-header-title { font-size: 0.9rem; }
+    .loading-placeholder { text-align: center; padding: 1rem; color: #b5b5b5; }
+</style>
+{% endblock %}
+
 {% block content %}
 <h1 class="title">
     <span class="icon-text">
@@ -10,162 +46,240 @@
 </h1>
 <h2 class="subtitle">Panel de administracion - nuevecuatrouno</h2>
 
-<div class="columns is-multiline">
+<!-- Row 1: Service semaphores -->
+<div class="health-section">
+    <p class="title is-5"><span class="icon"><i class="fas fa-server"></i></span> Servicios</p>
+    <div id="svc-semaphores" class="loading-placeholder">
+        <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span> Cargando...
+    </div>
+</div>
 
-    <!-- Contenedores -->
-    <div class="column is-half-tablet is-one-third-desktop">
-        <div class="card">
-            <header class="card-header">
-                <p class="card-header-title">
-                    <span class="icon"><i class="fas fa-cubes"></i></span>
-                    Contenedores
-                </p>
-            </header>
-            <div class="card-content">
-                <div class="content" id="card-containers">
-                    <p class="has-text-centered">
-                        <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span>
-                        Cargando...
-                    </p>
-                </div>
+<!-- Row 2: Sparklines -->
+<div class="health-section">
+    <p class="title is-5"><span class="icon"><i class="fas fa-chart-line"></i></span> Metricas (2h)</p>
+    <div class="columns is-mobile is-multiline" id="sparklines-row">
+        <div class="column is-3-desktop is-6-mobile">
+            <div class="sparkline-box">
+                <div class="sparkline-label">CPU %</div>
+                <canvas id="spark-cpu"></canvas>
             </div>
-            <footer class="card-footer">
-                <a class="card-footer-item" href="/containers/">Ver contenedores</a>
-            </footer>
+        </div>
+        <div class="column is-3-desktop is-6-mobile">
+            <div class="sparkline-box">
+                <div class="sparkline-label">Memoria %</div>
+                <canvas id="spark-mem"></canvas>
+            </div>
+        </div>
+        <div class="column is-3-desktop is-6-mobile">
+            <div class="sparkline-box">
+                <div class="sparkline-label">Load avg</div>
+                <canvas id="spark-load"></canvas>
+            </div>
+        </div>
+        <div class="column is-3-desktop is-6-mobile">
+            <div class="sparkline-box">
+                <div class="sparkline-label">Net I/O KB/s</div>
+                <canvas id="spark-net"></canvas>
+            </div>
         </div>
     </div>
+</div>
 
-    <!-- Diagnostico -->
-    <div class="column is-half-tablet is-one-third-desktop">
+<!-- Row 3: Recent incidents -->
+<div class="health-section">
+    <p class="title is-5"><span class="icon"><i class="fas fa-exclamation-triangle"></i></span> Incidentes recientes</p>
+    <div id="incidents-list" class="loading-placeholder">
+        <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span> Cargando...
+    </div>
+</div>
+
+<!-- Row 4: Cron job status -->
+<div class="health-section">
+    <p class="title is-5"><span class="icon"><i class="fas fa-clock"></i></span> Cron jobs</p>
+    <div id="cron-status" class="loading-placeholder">
+        <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span> Cargando...
+    </div>
+</div>
+
+<!-- Secondary cards -->
+<hr>
+<div class="columns is-multiline secondary-cards">
+    <div class="column is-half">
         <div class="card">
             <header class="card-header">
-                <p class="card-header-title">
-                    <span class="icon"><i class="fas fa-stethoscope"></i></span>
-                    Diagnostico
-                </p>
+                <p class="card-header-title"><span class="icon"><i class="fas fa-cubes"></i></span> Contenedores</p>
             </header>
-            <div class="card-content">
-                <div class="content" id="card-diagnostics">
-                    <p class="has-text-centered">
-                        <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span>
-                        Cargando...
-                    </p>
-                </div>
-            </div>
-            <footer class="card-footer">
-                <a href="/diagnostics" class="card-footer-item">Ir a Diagnostico</a>
-            </footer>
+            <div class="card-content"><div class="content" id="card-containers"><p class="loading-placeholder"><span class="icon"><i class="fas fa-spinner fa-pulse"></i></span> Cargando...</p></div></div>
+            <footer class="card-footer"><a class="card-footer-item" href="/containers/">Ver contenedores</a></footer>
         </div>
     </div>
-
-    <!-- Sincronizacion -->
-    <div class="column is-half-tablet is-one-third-desktop">
+    <div class="column is-half">
         <div class="card">
             <header class="card-header">
-                <p class="card-header-title">
-                    <span class="icon"><i class="fas fa-sync-alt"></i></span>
-                    Sincronizacion
-                </p>
+                <p class="card-header-title"><span class="icon"><i class="fas fa-stethoscope"></i></span> Diagnostico</p>
             </header>
-            <div class="card-content">
-                <div class="content" id="card-sync">
-                    <p class="has-text-centered">
-                        <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span>
-                        Cargando...
-                    </p>
-                </div>
-            </div>
-            <footer class="card-footer">
-                <a href="/sync/" class="card-footer-item">Ir a Sincronizacion</a>
-            </footer>
+            <div class="card-content"><div class="content" id="card-diagnostics"><p class="loading-placeholder"><span class="icon"><i class="fas fa-spinner fa-pulse"></i></span> Cargando...</p></div></div>
+            <footer class="card-footer"><a href="/diagnostics" class="card-footer-item">Ir a Diagnostico</a></footer>
         </div>
     </div>
-
-    <!-- Rollover -->
-    <div class="column is-half-tablet is-one-third-desktop">
+    <div class="column is-half">
         <div class="card">
             <header class="card-header">
-                <p class="card-header-title">
-                    <span class="icon"><i class="fas fa-calendar-alt"></i></span>
-                    Rollover
-                </p>
+                <p class="card-header-title"><span class="icon"><i class="fas fa-sync-alt"></i></span> Sincronizacion</p>
             </header>
-            <div class="card-content">
-                <div class="content">
-                    <ul>
-                        <li>Rollover de contenido anual</li>
-                        <li>Modos: report-only / dry-run / execute</li>
-                    </ul>
-                </div>
-            </div>
-            <footer class="card-footer">
-                <a href="/rollover/" class="card-footer-item">Ir a Rollover</a>
-            </footer>
+            <div class="card-content"><div class="content" id="card-sync"><p class="loading-placeholder"><span class="icon"><i class="fas fa-spinner fa-pulse"></i></span> Cargando...</p></div></div>
+            <footer class="card-footer"><a href="/sync/" class="card-footer-item">Ir a Sincronizacion</a></footer>
         </div>
     </div>
-
-    <!-- Crontab -->
-    <div class="column is-half-tablet is-one-third-desktop">
+    <div class="column is-half">
         <div class="card">
             <header class="card-header">
-                <p class="card-header-title">
-                    <span class="icon"><i class="fas fa-clock"></i></span>
-                    Crontab
-                </p>
+                <p class="card-header-title"><span class="icon"><i class="fas fa-calendar-alt"></i></span> Rollover</p>
             </header>
-            <div class="card-content">
-                <div class="content">
-                    <ul>
-                        <li>Instalar/desinstalar crons</li>
-                        <li>Renderizar bloques de crontab</li>
-                        <li>Sync, nightly, reactive</li>
-                    </ul>
-                </div>
-            </div>
-            <footer class="card-footer">
-                <a href="/crontab/" class="card-footer-item">Ir a Crontab</a>
-            </footer>
+            <div class="card-content"><div class="content"><ul><li>Rollover de contenido anual</li><li>Modos: report-only / dry-run / execute</li></ul></div></div>
+            <footer class="card-footer"><a href="/rollover/" class="card-footer-item">Ir a Rollover</a></footer>
         </div>
     </div>
-
+    <div class="column is-half">
+        <div class="card">
+            <header class="card-header">
+                <p class="card-header-title"><span class="icon"><i class="fas fa-clock"></i></span> Crontab</p>
+            </header>
+            <div class="card-content"><div class="content"><ul><li>Instalar/desinstalar crons</li><li>Renderizar bloques de crontab</li></ul></div></div>
+            <footer class="card-footer"><a href="/crontab/" class="card-footer-item">Ir a Crontab</a></footer>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 'use strict';
 
-function setCardError(el) {
-    el.innerHTML = '<p class="has-text-grey">' +
-        '<span class="icon"><i class="fas fa-exclamation-circle"></i></span> ' +
-        'No disponible</p>';
+/* ── Helpers ────────────────────────────────────────── */
+function setUnavailable(el) {
+    el.innerHTML = '<p class="has-text-grey"><span class="icon"><i class="fas fa-exclamation-circle"></i></span> No disponible</p>';
+}
+function truncateText(t, n) { return t.length <= n ? t : t.substring(0, n) + '...'; }
+
+function formatAge(minutes) {
+    if (minutes == null) return '—';
+    if (minutes < 60) return Math.round(minutes) + ' min';
+    if (minutes < 1440) return Math.round(minutes / 60) + ' h';
+    return Math.round(minutes / 1440) + ' d';
 }
 
+/* ── Row 1: Service semaphores ─────────────────────── */
+function renderServices(services) {
+    var el = document.getElementById('svc-semaphores');
+    if (!services) { setUnavailable(el); return; }
+    el.innerHTML = services.map(function(s) {
+        return '<span class="svc-pill ' + s.status + '">' +
+            '<span class="svc-dot ' + s.status + '"></span>' +
+            s.name + '</span>';
+    }).join('');
+}
+
+/* ── Row 2: Sparklines ─────────────────────────────── */
+var sparkCharts = {};
+function makeSparkline(canvasId, data, color) {
+    var ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    if (sparkCharts[canvasId]) sparkCharts[canvasId].destroy();
+    sparkCharts[canvasId] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(function(_, i) { return i; }),
+            datasets: [{
+                data: data,
+                borderColor: color || '#3273dc',
+                borderWidth: 1.5,
+                pointRadius: 0,
+                fill: true,
+                backgroundColor: (color || '#3273dc') + '22',
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            scales: {
+                x: { display: false },
+                y: { display: false }
+            },
+            animation: false
+        }
+    });
+}
+function loadSparklines() {
+    fetch('/metrics/api/data?range=1h&group=host')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var m = data.metrics || {};
+            var cpuData = (m.cpu_percent || []).map(function(p) { return p.value; });
+            var memData = (m.mem_percent || []).map(function(p) { return p.value; });
+            var loadData = (m.load_1 || m.load_average || []).map(function(p) { return p.value; });
+            var netData = (m.net_bytes_sent || m.net_io_sent || []).map(function(p) { return p.value / 1024; });
+            makeSparkline('spark-cpu', cpuData.length ? cpuData : [0], '#3273dc');
+            makeSparkline('spark-mem', memData.length ? memData : [0], '#48c78e');
+            makeSparkline('spark-load', loadData.length ? loadData : [0], '#ffe08a');
+            makeSparkline('spark-net', netData.length ? netData : [0], '#f14668');
+        })
+        .catch(function() {
+            ['spark-cpu','spark-mem','spark-load','spark-net'].forEach(function(id) {
+                var p = document.getElementById(id);
+                if (p && p.parentNode) p.parentNode.innerHTML += '<p class="has-text-grey is-size-7">No disponible</p>';
+            });
+        });
+}
+
+/* ── Row 3: Incidents ──────────────────────────────── */
+function renderIncidents(incidents) {
+    var el = document.getElementById('incidents-list');
+    if (!incidents || incidents.length === 0) {
+        el.innerHTML = '<p class="has-text-grey"><span class="icon"><i class="fas fa-check-circle"></i></span> Sin incidentes recientes</p>';
+        return;
+    }
+    el.innerHTML = incidents.map(function(inc) {
+        return '<div class="incident-row">' +
+            '<span class="sev-badge ' + inc.severity + '">' + inc.severity + '</span>' +
+            '<strong>' + inc.service + '</strong> ' +
+            '<span>' + truncateText(inc.summary, 80) + '</span>' +
+            '<span class="cron-age" style="margin-left:auto;">' + (inc.last_sent_at || '') + '</span>' +
+            '</div>';
+    }).join('');
+}
+
+/* ── Row 4: Cron status ────────────────────────────── */
+function renderCronJobs(jobs) {
+    var el = document.getElementById('cron-status');
+    if (!jobs || jobs.length === 0) { setUnavailable(el); return; }
+    el.innerHTML = jobs.map(function(j) {
+        return '<div class="cron-row">' +
+            '<span class="svc-dot ' + j.status + '"></span>' +
+            '<strong>' + j.label + '</strong>' +
+            '<span class="cron-age">(' + formatAge(j.age_minutes) + ')</span>' +
+            '</div>';
+    }).join('');
+}
+
+/* ── Secondary cards (kept from original) ──────────── */
 function loadContainers() {
     var el = document.getElementById('card-containers');
     fetch('/containers/api/status')
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (data.error || !data.services) { setCardError(el); return; }
+            if (data.error || !data.services) { setUnavailable(el); return; }
             var total = data.services.length;
-            var running = data.services.filter(function(s) {
-                return s.State === 'running';
-            }).length;
+            var running = data.services.filter(function(s) { return s.State === 'running'; }).length;
             var allUp = running === total && total > 0;
             var tagClass = allUp ? 'is-success' : 'is-danger';
-            var icon = allUp ? 'fa-check-circle' : 'fa-times-circle';
-            el.innerHTML =
-                '<p><span class="tag ' + tagClass + ' is-medium">' +
-                '<span class="icon"><i class="fas ' + icon + '"></i></span>&nbsp;' +
+            el.innerHTML = '<p><span class="tag ' + tagClass + ' is-medium">' +
                 running + '/' + total + ' en ejecucion</span></p>' +
                 '<p class="is-size-7 has-text-grey mt-2">Servicios Docker Compose</p>';
         })
-        .catch(function() { setCardError(el); });
-}
-
-function truncateText(text, maxLen) {
-    if (text.length <= maxLen) return text;
-    return text.substring(0, maxLen) + '...';
+        .catch(function() { setUnavailable(el); });
 }
 
 function loadDiagnostics() {
@@ -173,68 +287,14 @@ function loadDiagnostics() {
     fetch('/api/latest-nightly')
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (data.error) { setCardError(el); return; }
-            var sevMap = {
-                'ok': 'is-success', 'warning': 'is-warning', 'critical': 'is-danger'
-            };
-            var iconMap = {
-                'ok': 'fa-check-circle', 'warning': 'fa-exclamation-triangle',
-                'critical': 'fa-times-circle'
-            };
-            var findingSevMap = {
-                'warning': 'is-warning', 'error': 'is-danger', 'critical': 'is-danger'
-            };
-            var findingIconMap = {
-                'warning': 'fa-exclamation-triangle',
-                'error': 'fa-times-circle',
-                'critical': 'fa-times-circle'
-            };
+            if (data.error) { setUnavailable(el); return; }
+            var sevMap = { 'ok': 'is-success', 'warning': 'is-warning', 'critical': 'is-danger' };
             var tagClass = sevMap[data.severity] || 'is-info';
-            var icon = iconMap[data.severity] || 'fa-info-circle';
-            var reportLink = data.path
-                ? '/reports/?file=' + encodeURIComponent(data.path)
-                : '/reports/';
-
-            var html =
-                '<p><span class="tag ' + tagClass + ' is-medium">' +
-                '<span class="icon"><i class="fas ' + icon + '"></i></span>&nbsp;' +
-                data.severity + '</span></p>';
-
-            var findings = data.findings || [];
-            if (findings.length > 0 && data.severity !== 'ok') {
-                var maxShow = 5;
-                var shown = findings.slice(0, maxShow);
-                html += '<ul class="is-size-7 mt-2" style="list-style:none;margin-left:0;padding-left:0;">';
-                shown.forEach(function(f) {
-                    var fTagClass = findingSevMap[f.severity] || 'is-info';
-                    var fIcon = findingIconMap[f.severity] || 'fa-info-circle';
-                    html += '<li class="mb-1">' +
-                        '<span class="tag ' + fTagClass + ' is-small">' +
-                        '<span class="icon is-small"><i class="fas ' + fIcon + '"></i></span>' +
-                        '</span> ' +
-                        truncateText(f.text, 80) +
-                        '</li>';
-                });
-                html += '</ul>';
-                if (findings.length > maxShow) {
-                    html += '<p class="is-size-7">' +
-                        '<a href="' + reportLink + '" class="has-text-link">' +
-                        'y ' + (findings.length - maxShow) + ' mas...' +
-                        '</a></p>';
-                }
-            } else {
-                html += '<p class="is-size-7 mt-2">' + (data.summary || '') + '</p>';
-            }
-
-            html += '<p class="is-size-7 mt-1">' +
-                '<a href="' + reportLink + '" class="has-text-link">' +
-                '<span class="icon is-small"><i class="fas fa-calendar"></i></span> ' +
-                data.date +
-                ' <span class="icon is-small"><i class="fas fa-external-link-alt"></i></span>' +
-                '</a></p>';
-            el.innerHTML = html;
+            var reportLink = data.path ? '/reports/?file=' + encodeURIComponent(data.path) : '/reports/';
+            el.innerHTML = '<p><span class="tag ' + tagClass + ' is-medium">' + data.severity + '</span></p>' +
+                '<p class="is-size-7 mt-1"><a href="' + reportLink + '" class="has-text-link">' + data.date + '</a></p>';
         })
-        .catch(function() { setCardError(el); });
+        .catch(function() { setUnavailable(el); });
 }
 
 function loadSync() {
@@ -242,64 +302,43 @@ function loadSync() {
     fetch('/api/latest-drift')
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (data.error) { setCardError(el); return; }
-            var hasDrift = data.editorial_drift === 'yes' ||
-                           data.platform_drift === 'yes';
+            if (data.error) { setUnavailable(el); return; }
+            var hasDrift = data.editorial_drift === 'yes' || data.platform_drift === 'yes';
             var tagClass = hasDrift ? 'is-danger' : 'is-success';
-            var icon = hasDrift ? 'fa-exclamation-triangle' : 'fa-check-circle';
             var label = hasDrift ? 'Drift detectado' : 'En sync';
-            var driftLink = data.path
-                ? '/reports/?file=' + encodeURIComponent(data.path)
-                : '/reports/';
-
-            var html =
-                '<p><span class="tag ' + tagClass + ' is-medium">' +
-                '<span class="icon"><i class="fas ' + icon + '"></i></span>&nbsp;' +
-                label + '</span></p>';
-
-            if (hasDrift) {
-                html += '<div class="is-size-7 mt-2">';
-                var ed = data.editorial_details || {};
-                var pl = data.platform_details || {};
-
-                if (data.editorial_drift === 'yes') {
-                    var edBrief = ed.brief || (ed.count + ' diferencias');
-                    html += '<p><span class="tag is-warning is-small">' +
-                        '<span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span>' +
-                        '</span> Editorial: ' + truncateText(edBrief, 60) + '</p>';
-                } else {
-                    html += '<p><span class="tag is-success is-small">' +
-                        '<span class="icon is-small"><i class="fas fa-check-circle"></i></span>' +
-                        '</span> Editorial: en sync</p>';
-                }
-                if (data.platform_drift === 'yes') {
-                    var plBrief = pl.brief || (pl.count + ' diferencias');
-                    html += '<p><span class="tag is-warning is-small">' +
-                        '<span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span>' +
-                        '</span> Platform: ' + truncateText(plBrief, 60) + '</p>';
-                } else {
-                    html += '<p><span class="tag is-success is-small">' +
-                        '<span class="icon is-small"><i class="fas fa-check-circle"></i></span>' +
-                        '</span> Platform: en sync</p>';
-                }
-                html += '</div>';
-            }
-
-            html += '<p class="is-size-7 mt-1">' +
-                '<a href="' + driftLink + '" class="has-text-link">' +
-                '<span class="icon is-small"><i class="fas fa-calendar"></i></span> ' +
-                data.date +
-                ' <span class="icon is-small"><i class="fas fa-external-link-alt"></i></span>' +
-                '</a></p>';
-            el.innerHTML = html;
+            el.innerHTML = '<p><span class="tag ' + tagClass + ' is-medium">' + label + '</span></p>' +
+                '<p class="is-size-7 mt-1">' + data.date + '</p>';
         })
-        .catch(function() { setCardError(el); });
+        .catch(function() { setUnavailable(el); });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+/* ── Main load + auto-refresh ──────────────────────── */
+function loadHealthSummary() {
+    fetch('/api/health-summary')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            renderServices(data.services);
+            renderIncidents(data.incidents);
+            renderCronJobs(data.cron_jobs);
+        })
+        .catch(function() {
+            setUnavailable(document.getElementById('svc-semaphores'));
+            setUnavailable(document.getElementById('incidents-list'));
+            setUnavailable(document.getElementById('cron-status'));
+        });
+}
+
+function loadAll() {
+    loadHealthSummary();
+    loadSparklines();
     loadContainers();
     loadDiagnostics();
     loadSync();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadAll();
+    setInterval(loadAll, 60000);
 });
 </script>
 {% endblock %}

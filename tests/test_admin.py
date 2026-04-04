@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import unittest
 from pathlib import Path
@@ -438,3 +439,142 @@ class TestMetricsApi(unittest.TestCase):
         self.assertIn("iso", point)
         self.assertIn("ts", point)
         self.assertIn("value", point)
+
+
+# ---------------------------------------------------------------------------
+# health_bp.py tests
+# ---------------------------------------------------------------------------
+
+class TestHealthSummaryEndpoint(unittest.TestCase):
+    """Test the /api/health-summary endpoint."""
+
+    def setUp(self) -> None:
+        self.app = create_app()
+        self.app.config["TESTING"] = True
+        self.client = self.app.test_client()
+        self._patcher = mock.patch("admin.runner.subprocess.run")
+        self.mock_run = self._patcher.start()
+        self.mock_run.return_value = subprocess.CompletedProcess(
+            args=["docker"], returncode=0, stdout="", stderr=""
+        )
+
+    def tearDown(self) -> None:
+        self._patcher.stop()
+
+    def test_returns_200(self) -> None:
+        resp = self.client.get("/api/health-summary")
+        self.assertEqual(resp.status_code, 200)
+
+    def test_response_has_required_keys(self) -> None:
+        resp = self.client.get("/api/health-summary")
+        data = resp.get_json()
+        self.assertIn("timestamp", data)
+        self.assertIn("services", data)
+        self.assertIn("incidents", data)
+        self.assertIn("cron_jobs", data)
+
+    def test_services_list_has_expected_entries(self) -> None:
+        self.mock_run.return_value = subprocess.CompletedProcess(
+            args=["docker"], returncode=0,
+            stdout='{"Service":"lb-nginx","State":"running","Health":"healthy"}\n'
+                   '{"Service":"fe-live","State":"running","Health":""}\n',
+            stderr=""
+        )
+        resp = self.client.get("/api/health-summary")
+        data = resp.get_json()
+        services = data["services"]
+        self.assertIsInstance(services, list)
+        # Should have all expected services
+        names = [s["name"] for s in services]
+        self.assertIn("lb-nginx", names)
+        self.assertIn("fe-live", names)
+        self.assertIn("elastic", names)
+        # lb-nginx should be ok (running + healthy)
+        lb = next(s for s in services if s["name"] == "lb-nginx")
+        self.assertEqual(lb["status"], "ok")
+        # fe-live should be ok (running + empty health)
+        fe = next(s for s in services if s["name"] == "fe-live")
+        self.assertEqual(fe["status"], "ok")
+
+    def test_services_unknown_when_not_in_compose(self) -> None:
+        self.mock_run.return_value = subprocess.CompletedProcess(
+            args=["docker"], returncode=0, stdout="", stderr=""
+        )
+        resp = self.client.get("/api/health-summary")
+        data = resp.get_json()
+        elastic = next(s for s in data["services"] if s["name"] == "elastic")
+        self.assertEqual(elastic["status"], "unknown")
+
+    def test_services_none_when_docker_fails(self) -> None:
+        self.mock_run.side_effect = Exception("docker not available")
+        resp = self.client.get("/api/health-summary")
+        data = resp.get_json()
+        self.assertIsNone(data["services"])
+
+    def test_incidents_empty_when_no_state_file(self) -> None:
+        resp = self.client.get("/api/health-summary")
+        data = resp.get_json()
+        self.assertEqual(data["incidents"], [])
+
+    def test_incidents_from_state_file(self) -> None:
+        import tempfile, os
+        state_content = json.dumps({
+            "incidents": {
+                "test-key": {
+                    "service": "lb-nginx",
+                    "severity": "warning",
+                    "summary": "test issue",
+                    "last_sent_at": "2026-04-04T10:00:00Z"
+                }
+            }
+        })
+        # Patch the report dir to point to a temp dir
+        tmpdir = tempfile.mkdtemp()
+        report_dir = Path(tmpdir)
+        state_file = report_dir / "reactive-watch-state.json"
+        state_file.write_text(state_content, encoding="utf-8")
+        try:
+            with mock.patch("admin.health_bp._REPORT_DIR_IAOPS", report_dir):
+                resp = self.client.get("/api/health-summary")
+            data = resp.get_json()
+            self.assertEqual(len(data["incidents"]), 1)
+            self.assertEqual(data["incidents"][0]["service"], "lb-nginx")
+            self.assertEqual(data["incidents"][0]["severity"], "warning")
+        finally:
+            state_file.unlink()
+            os.rmdir(tmpdir)
+
+    def test_cron_jobs_has_expected_labels(self) -> None:
+        resp = self.client.get("/api/health-summary")
+        data = resp.get_json()
+        labels = [j["label"] for j in data["cron_jobs"]]
+        self.assertIn("nightly", labels)
+        self.assertIn("reactive", labels)
+        self.assertIn("sync", labels)
+        self.assertIn("metrics", labels)
+        self.assertIn("cleanup", labels)
+
+    def test_cron_jobs_unknown_without_heartbeats(self) -> None:
+        resp = self.client.get("/api/health-summary")
+        data = resp.get_json()
+        for job in data["cron_jobs"]:
+            self.assertEqual(job["status"], "unknown")
+            self.assertIsNone(job["age_minutes"])
+
+    def test_cron_jobs_with_mocked_heartbeat(self) -> None:
+        """Test cron jobs section with mocked _collect_cron_health."""
+        with mock.patch("admin.health_bp._collect_cron_health") as mock_fn:
+            mock_fn.return_value = [
+                {"label": "metrics", "job_name": "collect-metrics",
+                 "age_minutes": 2.0, "warning_minutes": 5,
+                 "critical_minutes": 15, "status": "ok"},
+                {"label": "nightly", "job_name": "nightly-auditor",
+                 "age_minutes": 2000.0, "warning_minutes": 1440,
+                 "critical_minutes": 2880, "status": "warning"},
+            ]
+            resp = self.client.get("/api/health-summary")
+            data = resp.get_json()
+            metrics_job = next(j for j in data["cron_jobs"] if j["label"] == "metrics")
+            self.assertEqual(metrics_job["status"], "ok")
+            nightly_job = next(j for j in data["cron_jobs"] if j["label"] == "nightly")
+            self.assertEqual(nightly_job["status"], "warning")
