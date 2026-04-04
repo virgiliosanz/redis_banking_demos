@@ -114,15 +114,16 @@ def _collect_cron_health() -> list[dict]:
     now = datetime.now(timezone.utc).timestamp()
     jobs = []
     for label, (job_name, warn_min, crit_min) in _CRON_JOBS.items():
-        hb_file = heartbeat_dir / f"{job_name}.json"
+        hb_file = heartbeat_dir / f"{job_name}.success"
         age_minutes = None
         if hb_file.is_file():
             try:
-                hb = json.loads(hb_file.read_text(encoding="utf-8"))
-                last_epoch = hb.get("last_success_epoch")
-                if isinstance(last_epoch, (int, float)) and last_epoch > 0:
-                    age_minutes = round((now - last_epoch) / 60, 1)
-            except (json.JSONDecodeError, OSError):
+                raw = hb_file.read_text(encoding="utf-8").strip()
+                if raw.isdigit():
+                    last_epoch = int(raw)
+                    if last_epoch > 0:
+                        age_minutes = round((now - last_epoch) / 60, 1)
+            except OSError:
                 pass
 
         if age_minutes is None:

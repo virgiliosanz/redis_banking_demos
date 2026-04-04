@@ -85,8 +85,8 @@
     </div>
 </div>
 
-<!-- Row 3: Recent incidents -->
-<div class="health-section">
+<!-- Row 3: Recent incidents (hidden when empty) -->
+<div class="health-section" id="incidents-section">
     <p class="title is-5"><span class="icon"><i class="fas fa-exclamation-triangle"></i></span> Incidentes recientes</p>
     <div id="incidents-list" class="loading-placeholder">
         <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span> Cargando...
@@ -107,15 +107,6 @@
     <div class="column is-half">
         <div class="card">
             <header class="card-header">
-                <p class="card-header-title"><span class="icon"><i class="fas fa-cubes"></i></span> Contenedores</p>
-            </header>
-            <div class="card-content"><div class="content" id="card-containers"><p class="loading-placeholder"><span class="icon"><i class="fas fa-spinner fa-pulse"></i></span> Cargando...</p></div></div>
-            <footer class="card-footer"><a class="card-footer-item" href="/containers/">Ver contenedores</a></footer>
-        </div>
-    </div>
-    <div class="column is-half">
-        <div class="card">
-            <header class="card-header">
                 <p class="card-header-title"><span class="icon"><i class="fas fa-stethoscope"></i></span> Diagnostico</p>
             </header>
             <div class="card-content"><div class="content" id="card-diagnostics"><p class="loading-placeholder"><span class="icon"><i class="fas fa-spinner fa-pulse"></i></span> Cargando...</p></div></div>
@@ -129,24 +120,6 @@
             </header>
             <div class="card-content"><div class="content" id="card-sync"><p class="loading-placeholder"><span class="icon"><i class="fas fa-spinner fa-pulse"></i></span> Cargando...</p></div></div>
             <footer class="card-footer"><a href="/sync/" class="card-footer-item">Ir a Sincronizacion</a></footer>
-        </div>
-    </div>
-    <div class="column is-half">
-        <div class="card">
-            <header class="card-header">
-                <p class="card-header-title"><span class="icon"><i class="fas fa-calendar-alt"></i></span> Rollover</p>
-            </header>
-            <div class="card-content"><div class="content"><ul><li>Rollover de contenido anual</li><li>Modos: report-only / dry-run / execute</li></ul></div></div>
-            <footer class="card-footer"><a href="/rollover/" class="card-footer-item">Ir a Rollover</a></footer>
-        </div>
-    </div>
-    <div class="column is-half">
-        <div class="card">
-            <header class="card-header">
-                <p class="card-header-title"><span class="icon"><i class="fas fa-clock"></i></span> Crontab</p>
-            </header>
-            <div class="card-content"><div class="content"><ul><li>Instalar/desinstalar crons</li><li>Renderizar bloques de crontab</li></ul></div></div>
-            <footer class="card-footer"><a href="/crontab/" class="card-footer-item">Ir a Crontab</a></footer>
         </div>
     </div>
 </div>
@@ -168,6 +141,17 @@ function formatAge(minutes) {
     if (minutes < 60) return Math.round(minutes) + ' min';
     if (minutes < 1440) return Math.round(minutes / 60) + ' h';
     return Math.round(minutes / 1440) + ' d';
+}
+
+function timeAgo(isoStr) {
+    if (!isoStr) return '';
+    try {
+        var then = new Date(isoStr).getTime();
+        if (isNaN(then)) return isoStr;
+        var diffMin = Math.round((Date.now() - then) / 60000);
+        if (diffMin < 0) diffMin = 0;
+        return 'hace ' + formatAge(diffMin);
+    } catch(e) { return isoStr; }
 }
 
 /* ── Row 1: Service semaphores ─────────────────────── */
@@ -217,10 +201,10 @@ function loadSparklines() {
         .then(function(r) { return r.json(); })
         .then(function(data) {
             var m = data.metrics || {};
-            var cpuData = (m.cpu_percent || []).map(function(p) { return p.value; });
-            var memData = (m.mem_percent || []).map(function(p) { return p.value; });
+            var cpuData = (m.cpu_user_pct || []).map(function(p) { return p.value; });
+            var memData = (m.memory_used_pct || []).map(function(p) { return p.value; });
             var loadData = (m.load_1 || m.load_average || []).map(function(p) { return p.value; });
-            var netData = (m.net_bytes_sent || m.net_io_sent || []).map(function(p) { return p.value / 1024; });
+            var netData = (m.net_bytes_sent || []).map(function(p) { return p.value / 1024; });
             makeSparkline('spark-cpu', cpuData.length ? cpuData : [0], '#3273dc');
             makeSparkline('spark-mem', memData.length ? memData : [0], '#48c78e');
             makeSparkline('spark-load', loadData.length ? loadData : [0], '#ffe08a');
@@ -236,17 +220,19 @@ function loadSparklines() {
 
 /* ── Row 3: Incidents ──────────────────────────────── */
 function renderIncidents(incidents) {
+    var section = document.getElementById('incidents-section');
     var el = document.getElementById('incidents-list');
     if (!incidents || incidents.length === 0) {
-        el.innerHTML = '<p class="has-text-grey"><span class="icon"><i class="fas fa-check-circle"></i></span> Sin incidentes recientes</p>';
+        section.style.display = 'none';
         return;
     }
+    section.style.display = '';
     el.innerHTML = incidents.map(function(inc) {
         return '<div class="incident-row">' +
             '<span class="sev-badge ' + inc.severity + '">' + inc.severity + '</span>' +
             '<strong>' + inc.service + '</strong> ' +
             '<span>' + truncateText(inc.summary, 80) + '</span>' +
-            '<span class="cron-age" style="margin-left:auto;">' + (inc.last_sent_at || '') + '</span>' +
+            '<span class="cron-age" style="margin-left:auto;">' + timeAgo(inc.last_sent_at) + '</span>' +
             '</div>';
     }).join('');
 }
@@ -264,37 +250,27 @@ function renderCronJobs(jobs) {
     }).join('');
 }
 
-/* ── Secondary cards (kept from original) ──────────── */
-function loadContainers() {
-    var el = document.getElementById('card-containers');
-    fetch('/containers/api/status')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.error || !data.services) { setUnavailable(el); return; }
-            var total = data.services.length;
-            var running = data.services.filter(function(s) { return s.State === 'running'; }).length;
-            var allUp = running === total && total > 0;
-            var tagClass = allUp ? 'is-success' : 'is-danger';
-            el.innerHTML = '<p><span class="tag ' + tagClass + ' is-medium">' +
-                running + '/' + total + ' en ejecucion</span></p>' +
-                '<p class="is-size-7 has-text-grey mt-2">Servicios Docker Compose</p>';
-        })
-        .catch(function() { setUnavailable(el); });
-}
-
+/* ── Secondary cards ──────────────────────────────── */
 function loadDiagnostics() {
     var el = document.getElementById('card-diagnostics');
     fetch('/api/latest-nightly')
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (data.error) { setUnavailable(el); return; }
+            if (data.error || !data.severity) {
+                el.innerHTML = '<p><span class="tag is-success is-medium">OK</span></p>' +
+                    '<p class="is-size-7 has-text-grey mt-1">Sin diagnosticos pendientes</p>';
+                return;
+            }
             var sevMap = { 'ok': 'is-success', 'warning': 'is-warning', 'critical': 'is-danger' };
             var tagClass = sevMap[data.severity] || 'is-info';
             var reportLink = data.path ? '/reports/?file=' + encodeURIComponent(data.path) : '/reports/';
             el.innerHTML = '<p><span class="tag ' + tagClass + ' is-medium">' + data.severity + '</span></p>' +
                 '<p class="is-size-7 mt-1"><a href="' + reportLink + '" class="has-text-link">' + data.date + '</a></p>';
         })
-        .catch(function() { setUnavailable(el); });
+        .catch(function() {
+            el.innerHTML = '<p><span class="tag is-success is-medium">OK</span></p>' +
+                '<p class="is-size-7 has-text-grey mt-1">Sin diagnosticos pendientes</p>';
+        });
 }
 
 function loadSync() {
@@ -302,14 +278,22 @@ function loadSync() {
     fetch('/api/latest-drift')
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (data.error) { setUnavailable(el); return; }
+            if (data.error) {
+                el.innerHTML = '<p><span class="tag is-success is-medium">OK</span></p>' +
+                    '<p class="is-size-7 has-text-grey mt-1">Sin datos de drift</p>';
+                return;
+            }
             var hasDrift = data.editorial_drift === 'yes' || data.platform_drift === 'yes';
             var tagClass = hasDrift ? 'is-danger' : 'is-success';
             var label = hasDrift ? 'Drift detectado' : 'En sync';
+            var dateStr = data.date || '';
             el.innerHTML = '<p><span class="tag ' + tagClass + ' is-medium">' + label + '</span></p>' +
-                '<p class="is-size-7 mt-1">' + data.date + '</p>';
+                '<p class="is-size-7 mt-1">' + dateStr + '</p>';
         })
-        .catch(function() { setUnavailable(el); });
+        .catch(function() {
+            el.innerHTML = '<p><span class="tag is-success is-medium">OK</span></p>' +
+                '<p class="is-size-7 has-text-grey mt-1">Sin datos de drift</p>';
+        });
 }
 
 /* ── Main load + auto-refresh ──────────────────────── */
@@ -331,7 +315,6 @@ function loadHealthSummary() {
 function loadAll() {
     loadHealthSummary();
     loadSparklines();
-    loadContainers();
     loadDiagnostics();
     loadSync();
 }

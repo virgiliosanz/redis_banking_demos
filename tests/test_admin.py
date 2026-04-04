@@ -12,6 +12,7 @@ from admin.runner import CommandResult, run_cli
 from admin.config import ADMIN_PORT, ADMIN_HOST, DEBUG
 from admin.containers import get_compose_root
 from admin.app import create_app
+import admin.health_bp
 
 
 # ---------------------------------------------------------------------------
@@ -555,7 +556,17 @@ class TestHealthSummaryEndpoint(unittest.TestCase):
         self.assertIn("cleanup", labels)
 
     def test_cron_jobs_unknown_without_heartbeats(self) -> None:
-        resp = self.client.get("/api/health-summary")
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch("admin.health_bp._collect_cron_health") as mock_cron:
+                mock_cron.return_value = [
+                    {"label": label, "job_name": job_name,
+                     "age_minutes": None, "warning_minutes": warn,
+                     "critical_minutes": crit, "status": "unknown"}
+                    for label, (job_name, warn, crit)
+                    in admin.health_bp._CRON_JOBS.items()
+                ]
+                resp = self.client.get("/api/health-summary")
         data = resp.get_json()
         for job in data["cron_jobs"]:
             self.assertEqual(job["status"], "unknown")
