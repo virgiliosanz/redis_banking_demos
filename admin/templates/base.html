@@ -1,6 +1,13 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <script>
+        // Apply saved theme immediately to prevent flash of wrong theme
+        (function() {
+            var theme = localStorage.getItem('admin-theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Panel de administracion{% endblock %} - nuevecuatrouno</title>
@@ -22,6 +29,17 @@
         }
         .card-header-title .icon {
             margin-right: 0.5rem;
+        }
+        /* Dark mode overrides */
+        [data-theme="dark"] .output-box {
+            background: #0d0d1a;
+        }
+        #themeToggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            padding: 0.5rem;
         }
     </style>
     {% block extra_head %}{% endblock %}
@@ -70,6 +88,15 @@
                     <span class="icon"><i class="fas fa-folder-open"></i></span>
                     <span>Reportes</span>
                 </a>
+            </div>
+        </div>
+        <div class="navbar-end">
+            <div class="navbar-item">
+                <button id="themeToggle" class="has-text-white" title="Cambiar tema" aria-label="Cambiar tema">
+                    <span class="icon">
+                        <i class="fas fa-moon" id="themeIcon"></i>
+                    </span>
+                </button>
             </div>
         </div>
     </nav>

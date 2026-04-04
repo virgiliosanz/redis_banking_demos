@@ -111,3 +111,62 @@ var AdminReports = (function() {
     };
 
 })();
+
+/**
+ * AdminTheme — dark/light mode toggle with localStorage persistence.
+ */
+var AdminTheme = (function() {
+
+    function getCurrentTheme() {
+        return document.documentElement.getAttribute('data-theme') || 'light';
+    }
+
+    function setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('admin-theme', theme);
+        updateIcon(theme);
+        // Dispatch event so charts and other components can react
+        document.dispatchEvent(new CustomEvent('themechange', { detail: { theme: theme } }));
+    }
+
+    function updateIcon(theme) {
+        var icon = document.getElementById('themeIcon');
+        if (!icon) return;
+        if (theme === 'dark') {
+            icon.classList.remove('fa-moon');
+            icon.classList.add('fa-sun');
+        } else {
+            icon.classList.remove('fa-sun');
+            icon.classList.add('fa-moon');
+        }
+    }
+
+    function toggle() {
+        var current = getCurrentTheme();
+        setTheme(current === 'dark' ? 'light' : 'dark');
+    }
+
+    function init() {
+        var theme = getCurrentTheme();
+        updateIcon(theme);
+
+        var btn = document.getElementById('themeToggle');
+        if (btn) {
+            btn.addEventListener('click', toggle);
+        }
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+    return {
+        getCurrentTheme: getCurrentTheme,
+        setTheme: setTheme,
+        toggle: toggle
+    };
+
+})();
