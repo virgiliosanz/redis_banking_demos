@@ -48,11 +48,11 @@
     <p class="is-size-7 has-text-grey mb-3">{{ db.ping.output }}</p>
 
     {# --- Processlist summary --- #}
-    <div class="box" style="background-color: #f5f5f5;">
+    <div class="box">
         <div class="level mb-2">
             <div class="level-left">
                 <div class="level-item">
-                    <strong class="has-text-dark">Processlist</strong>
+                    <strong>Processlist</strong>
                 </div>
                 <div class="level-item">
                     {% if db.processlist.status == 'ok' %}
@@ -65,7 +65,7 @@
                 </div>
             </div>
         </div>
-        <p class="is-size-7 has-text-dark">
+        <p class="is-size-7">
             {{ db.processlist.warning_count }} queries &ge; {{ db.processlist.warning_seconds }}s
             ({{ db.processlist.critical_count }} critical &ge; {{ db.processlist.critical_seconds }}s)
             &mdash; limit: {{ db.processlist.query_limit }}
@@ -102,8 +102,8 @@
                 <td class="{% if q.time_seconds >= db.processlist.critical_seconds %}has-background-danger has-text-white{% elif q.time_seconds >= db.processlist.warning_seconds %}has-background-warning has-text-dark{% endif %}">
                     {{ q.time_seconds }}
                 </td>
-                <td class="has-text-dark">{{ q.state }}</td>
-                <td><code class="is-size-7 has-text-dark" style="background-color: #f0f0f0;">{{ q.query_excerpt }}</code></td>
+                <td>{{ q.state }}</td>
+                <td><code class="is-size-7">{{ q.query_excerpt }}</code></td>
             </tr>
             {% endfor %}
         </tbody>
