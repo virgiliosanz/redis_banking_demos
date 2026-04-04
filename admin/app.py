@@ -236,7 +236,7 @@ def _describe_container_cron(command: str) -> str:
         return "Mantenimiento de cache"
     if "eval-file" in cmd:
         return "Script PHP interno de WordPress"
-    return "Tarea programada"
+    return "Tarea de WordPress"
 
 
 def create_app() -> Flask:
