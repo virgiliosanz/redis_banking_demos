@@ -21,6 +21,12 @@ from . import containers
 from . import history
 from . import history_bp
 from . import reports
+from . import diagnostics_bp
+
+from ops.config import load_settings
+from ops.collectors.host import collect as collect_host
+from ops.collectors.mysql import collect as collect_mysql
+from ops.collectors.runtime import collect as collect_runtime
 
 
 def _extract_json_blocks(content: str) -> list[tuple[str, dict[str, Any]]]:
@@ -228,6 +234,7 @@ def create_app() -> Flask:
     app.register_blueprint(containers.bp)
     app.register_blueprint(reports.bp)
     app.register_blueprint(history_bp.bp)
+    app.register_blueprint(diagnostics_bp.bp)
 
     @app.route("/")
     def index():
@@ -276,6 +283,81 @@ def create_app() -> Flask:
     @app.route("/diagnostics")
     def diagnostics():
         return render_template("diagnostics.html")
+
+    @app.route("/diagnostics/host")
+    def diagnostics_host():
+        """Render host health using the collector directly."""
+        try:
+            settings = load_settings()
+        except FileNotFoundError:
+            if request.headers.get("Accept") == "application/json":
+                return jsonify({"error": "IA-Ops config not found"}), 500
+            abort(500, description="IA-Ops config not found")
+        data = collect_host(settings)
+        if request.headers.get("Accept") == "application/json":
+            return jsonify(data)
+        standalone = request.args.get("standalone", "0") == "1"
+        return render_template(
+            "partials/host_health.html",
+            data=data,
+            standalone=standalone,
+        )
+
+    @app.route("/diagnostics/mysql")
+    def diagnostics_mysql():
+        """Render MySQL health using the collector directly."""
+        try:
+            settings = load_settings()
+        except FileNotFoundError:
+            if request.headers.get("Accept") == "application/json":
+                return jsonify({"error": "IA-Ops config not found"}), 500
+            abort(500, description="IA-Ops config not found")
+        data = collect_mysql(settings)
+        if request.headers.get("Accept") == "application/json":
+            return jsonify(data)
+        standalone = request.args.get("standalone", "0") == "1"
+        return render_template(
+            "partials/mysql_health.html",
+            data=data,
+            standalone=standalone,
+        )
+
+    @app.route("/diagnostics/runtime")
+    def diagnostics_runtime():
+        """Render Runtime health using the collector directly."""
+        try:
+            settings = load_settings()
+        except FileNotFoundError:
+            if request.headers.get("Accept") == "application/json":
+                return jsonify({"error": "IA-Ops config not found"}), 500
+            standalone = request.args.get("standalone", "0") == "1"
+            return render_template(
+                "partials/runtime_health.html",
+                data=None,
+                error="IA-Ops config not found",
+                standalone=standalone,
+            )
+        try:
+            data = collect_runtime(settings)
+        except Exception as exc:
+            if request.headers.get("Accept") == "application/json":
+                return jsonify({"error": str(exc)}), 500
+            standalone = request.args.get("standalone", "0") == "1"
+            return render_template(
+                "partials/runtime_health.html",
+                data=None,
+                error=str(exc),
+                standalone=standalone,
+            )
+        if request.headers.get("Accept") == "application/json":
+            return jsonify(data)
+        standalone = request.args.get("standalone", "0") == "1"
+        return render_template(
+            "partials/runtime_health.html",
+            data=data,
+            error=None,
+            standalone=standalone,
+        )
 
     @app.route("/sync/editorial")
     def sync_editorial():

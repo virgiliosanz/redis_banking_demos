@@ -1,0 +1,109 @@
+{% if standalone %}
+{% extends "base.html" %}
+{% block title %}MySQL Health{% endblock %}
+{% block content %}
+{% endif %}
+
+<h2 class="title is-4">
+    <span class="icon-text">
+        <span class="icon"><i class="fas fa-database"></i></span>
+        <span>MySQL Health</span>
+    </span>
+</h2>
+<p class="subtitle is-6 has-text-grey">Generado: {{ data.generated_at }}</p>
+
+{% for db in data.databases %}
+<div class="box mb-5">
+    {# --- Header: database name + ping status --- #}
+    <div class="level">
+        <div class="level-left">
+            <div class="level-item">
+                <h3 class="title is-5 mb-0">
+                    <span class="icon-text">
+                        <span class="icon"><i class="fas fa-database"></i></span>
+                        <span>{{ db.service }}</span>
+                    </span>
+                </h3>
+            </div>
+            <div class="level-item">
+                {% if db.ping.status == 'ok' %}
+                <span class="tag is-success">
+                    <span class="icon is-small"><i class="fas fa-check-circle"></i></span>&nbsp;ping ok
+                </span>
+                {% else %}
+                <span class="tag is-danger">
+                    <span class="icon is-small"><i class="fas fa-times-circle"></i></span>&nbsp;ping {{ db.ping.status }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <p class="is-size-7 has-text-grey mb-3">{{ db.ping.output }}</p>
+
+    {# --- Processlist summary --- #}
+    <div class="box has-background-light">
+        <div class="level mb-2">
+            <div class="level-left">
+                <div class="level-item">
+                    <strong>Processlist</strong>
+                </div>
+                <div class="level-item">
+                    {% if db.processlist.status == 'ok' %}
+                    <span class="tag is-success">ok</span>
+                    {% elif db.processlist.status == 'warning' %}
+                    <span class="tag is-warning">warning</span>
+                    {% else %}
+                    <span class="tag is-danger">critical</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <p class="is-size-7">
+            {{ db.processlist.warning_count }} queries &ge; {{ db.processlist.warning_seconds }}s
+            ({{ db.processlist.critical_count }} critical &ge; {{ db.processlist.critical_seconds }}s)
+            &mdash; limit: {{ db.processlist.query_limit }}
+        </p>
+    </div>
+
+    {# --- Slow queries table --- #}
+    {% if db.processlist.queries %}
+    <table class="table is-fullwidth is-striped is-hoverable is-narrow mt-3">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>User</th>
+                <th>DB</th>
+                <th>Command</th>
+                <th>Time (s)</th>
+                <th>State</th>
+                <th>Query</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for q in db.processlist.queries %}
+            <tr>
+                <td>{{ q.id }}</td>
+                <td>{{ q.user }}</td>
+                <td>{{ q.db }}</td>
+                <td>{{ q.command }}</td>
+                <td class="{% if q.time_seconds >= db.processlist.critical_seconds %}has-background-danger has-text-white{% elif q.time_seconds >= db.processlist.warning_seconds %}has-background-warning{% endif %}">
+                    {{ q.time_seconds }}
+                </td>
+                <td>{{ q.state }}</td>
+                <td><code class="is-size-7">{{ q.query_excerpt }}</code></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="notification is-success is-light mt-3">
+        <span class="icon"><i class="fas fa-check-circle"></i></span>
+        <span>No hay queries lentas</span>
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
+
+{% if standalone %}
+{% endblock %}
+{% endif %}
