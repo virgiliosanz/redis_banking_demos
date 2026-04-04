@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Metricas{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+    .chart-container { position: relative; height: 280px; width: 100%; }
+    .metric-card { margin-bottom: 1.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 class="title">
+    <span class="icon-text">
+        <span class="icon"><i class="fas fa-chart-line"></i></span>
+        <span>Metricas operativas</span>
+    </span>
+</h1>
+<h2 class="subtitle">Visualizacion de metricas recogidas por los collectors</h2>
+
+<!-- Controls -->
+<div class="box">
+    <div class="columns is-vcentered">
+        <div class="column is-narrow">
+            <label class="label">Rango temporal</label>
+            <div class="buttons has-addons" id="rangeSelector">
+                <button class="button is-small is-info is-selected" data-range="1h">1h</button>
+                <button class="button is-small" data-range="6h">6h</button>
+                <button class="button is-small" data-range="24h">24h</button>
+            </div>
+        </div>
+        <div class="column is-narrow">
+            <label class="label">Grupo</label>
+            <div class="select is-small">
+                <select id="groupSelector">
+                    <option value="host" selected>Host</option>
+                    <option value="nginx">Nginx</option>
+                    <option value="mysql">MySQL</option>
+                    <option value="elastic">Elastic</option>
+                    <option value="phpfpm">PHP-FPM</option>
+                    <option value="containers">Containers</option>
+                </select>
+            </div>
+        </div>
+        <div class="column is-narrow">
+            <label class="label">Auto-refresh</label>
+            <label class="checkbox">
+                <input type="checkbox" id="autoRefresh"> Cada 60s
+            </label>
+        </div>
+        <div class="column is-narrow">
+            <label class="label">&nbsp;</label>
+            <button class="button is-small is-primary" id="refreshBtn">
+                <span class="icon"><i class="fas fa-sync-alt"></i></span>
+                <span>Actualizar</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Charts area -->
+<div id="chartsArea">
+    <div class="notification is-info is-light" id="loadingMsg">
+        <span class="icon"><i class="fas fa-spinner fa-spin"></i></span>
+        <span>Cargando metricas...</span>
+    </div>
+    <div class="notification is-warning is-light" id="emptyMsg" style="display:none;">
+        <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+        <span>No hay datos para el rango y grupo seleccionados.</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+    const COLORS = [
+        '#3e8ed0','#48c78e','#ffe08a','#f14668','#b86bff',
+        '#ff8c42','#00d1b2','#7957d5','#ff6384','#36a2eb'
+    ];
+    let charts = {};
+    let refreshTimer = null;
+    let currentRange = '1h';
+    let currentGroup = 'host';
+
+    function getColor(i) { return COLORS[i % COLORS.length]; }
+
+    function destroyCharts() {
+        Object.values(charts).forEach(c => c.destroy());
+        charts = {};
+    }
+
+    function renderCharts(data) {
+        const area = document.getElementById('chartsArea');
+        const loading = document.getElementById('loadingMsg');
+        const empty = document.getElementById('emptyMsg');
+        loading.style.display = 'none';
+
+        // Remove old chart cards
+        area.querySelectorAll('.metric-card').forEach(el => el.remove());
+
+        const metricNames = Object.keys(data.metrics || {});
+        if (metricNames.length === 0) {
+            empty.style.display = '';
+            return;
+        }
+        empty.style.display = 'none';
+        destroyCharts();
+
+        metricNames.forEach(function(name, idx) {
+            const card = document.createElement('div');
+            card.className = 'box metric-card';
+            card.innerHTML = '<h3 class="title is-5">' + name + '</h3>' +
+                '<div class="chart-container"><canvas id="chart-' + idx + '"></canvas></div>';
+            area.appendChild(card);
+
+            const points = data.metrics[name];
+            const labels = points.map(p => new Date(p.ts * 1000).toLocaleTimeString());
+            const values = points.map(p => p.value);
+
+            const ctx = document.getElementById('chart-' + idx).getContext('2d');
+            charts[name] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: name,
+                        data: values,
+                        borderColor: getColor(idx),
+                        backgroundColor: getColor(idx) + '22',
+                        fill: true, tension: 0.3, pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { x: { display: true }, y: { beginAtZero: true } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        });
+    }
+
+    function fetchMetrics() {
+        var loading = document.getElementById('loadingMsg');
+        loading.style.display = '';
+        document.getElementById('emptyMsg').style.display = 'none';
+
+        fetch('/metrics/api/data?range=' + currentRange + '&group=' + currentGroup)
+            .then(function(r) { return r.json(); })
+            .then(renderCharts)
+            .catch(function(err) {
+                loading.style.display = 'none';
+                console.error('Metrics fetch error:', err);
+            });
+    }
+
+    // Range buttons
+    document.getElementById('rangeSelector').addEventListener('click', function(e) {
+        var btn = e.target.closest('button[data-range]');
+        if (!btn) return;
+        currentRange = btn.dataset.range;
+        this.querySelectorAll('button').forEach(b => {
+            b.classList.remove('is-info','is-selected');
+        });
+        btn.classList.add('is-info','is-selected');
+        fetchMetrics();
+    });
+
+    // Group selector
+    document.getElementById('groupSelector').addEventListener('change', function() {
+        currentGroup = this.value;
+        fetchMetrics();
+    });
+
+    // Refresh button
+    document.getElementById('refreshBtn').addEventListener('click', fetchMetrics);
+
+    // Auto-refresh
+    document.getElementById('autoRefresh').addEventListener('change', function() {
+        if (this.checked) {
+            refreshTimer = setInterval(fetchMetrics, 60000);
+        } else {
+            clearInterval(refreshTimer);
+            refreshTimer = null;
+        }
+    });
+
+    // Initial load
+    fetchMetrics();
+})();
+</script>
+{% endblock %}

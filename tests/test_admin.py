@@ -311,3 +311,129 @@ class TestApiReadFile(unittest.TestCase):
         self.assertEqual(resp.status_code, 403)
         data = resp.get_json()
         self.assertFalse(data["success"])
+
+
+# ---------------------------------------------------------------------------
+# metrics_bp.py tests
+# ---------------------------------------------------------------------------
+
+class TestMetricsPage(unittest.TestCase):
+    """Test the /metrics/ page renders correctly."""
+
+    def setUp(self) -> None:
+        self.app = create_app()
+        self.app.config["TESTING"] = True
+        self.client = self.app.test_client()
+
+    def test_metrics_page_returns_200(self) -> None:
+        resp = self.client.get("/metrics/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(b"Metricas operativas", resp.data)
+
+    def test_metrics_page_includes_chart_js(self) -> None:
+        resp = self.client.get("/metrics/")
+        self.assertIn(b"chart.js", resp.data)
+
+    def test_metrics_page_includes_range_selector(self) -> None:
+        resp = self.client.get("/metrics/")
+        self.assertIn(b"rangeSelector", resp.data)
+
+    def test_metrics_page_includes_group_selector(self) -> None:
+        resp = self.client.get("/metrics/")
+        self.assertIn(b"groupSelector", resp.data)
+
+
+class TestMetricsApi(unittest.TestCase):
+    """Test the /metrics/api/data endpoint."""
+
+    def setUp(self) -> None:
+        import tempfile
+        self.app = create_app()
+        self.app.config["TESTING"] = True
+        self.client = self.app.test_client()
+        self._tmpdir = tempfile.mkdtemp()
+        self._db_path = Path(self._tmpdir) / "test_metrics.db"
+
+    def tearDown(self) -> None:
+        import shutil
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def _patch_store(self, rows=None):
+        """Patch _get_store to return a store with optional test data."""
+        from ops.metrics.storage import MetricsStore
+        store = MetricsStore(db_path=self._db_path)
+        if rows:
+            for group, metric, value, ts in rows:
+                store.write_sample(group, metric, value, ts=ts)
+        return mock.patch("admin.metrics_bp._get_store", return_value=store)
+
+    def test_api_default_params(self) -> None:
+        import time
+        now = time.time()
+        with self._patch_store([("host", "cpu_percent", 42.0, now)]):
+            resp = self.client.get("/metrics/api/data")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertEqual(data["group"], "host")
+        self.assertEqual(data["range"], "1h")
+        self.assertIn("metrics", data)
+        self.assertIn("cpu_percent", data["metrics"])
+        self.assertEqual(len(data["metrics"]["cpu_percent"]), 1)
+        self.assertAlmostEqual(data["metrics"]["cpu_percent"][0]["value"], 42.0)
+
+    def test_api_invalid_range(self) -> None:
+        resp = self.client.get("/metrics/api/data?range=99h")
+        self.assertEqual(resp.status_code, 400)
+        data = resp.get_json()
+        self.assertIn("error", data)
+
+    def test_api_invalid_group(self) -> None:
+        resp = self.client.get("/metrics/api/data?group=bogus")
+        self.assertEqual(resp.status_code, 400)
+        data = resp.get_json()
+        self.assertIn("error", data)
+
+    def test_api_empty_result(self) -> None:
+        with self._patch_store([]):
+            resp = self.client.get("/metrics/api/data?range=1h&group=nginx")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertEqual(data["metrics"], {})
+
+    def test_api_multiple_metrics(self) -> None:
+        import time
+        now = time.time()
+        rows = [
+            ("host", "cpu_percent", 10.0, now - 30),
+            ("host", "mem_percent", 55.0, now - 30),
+            ("host", "cpu_percent", 12.0, now),
+        ]
+        with self._patch_store(rows):
+            resp = self.client.get("/metrics/api/data?range=1h&group=host")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertIn("cpu_percent", data["metrics"])
+        self.assertIn("mem_percent", data["metrics"])
+        self.assertEqual(len(data["metrics"]["cpu_percent"]), 2)
+        self.assertEqual(len(data["metrics"]["mem_percent"]), 1)
+
+    def test_api_range_6h(self) -> None:
+        import time
+        now = time.time()
+        with self._patch_store([("mysql", "queries_per_sec", 100.0, now)]):
+            resp = self.client.get("/metrics/api/data?range=6h&group=mysql")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertEqual(data["range"], "6h")
+        self.assertEqual(data["group"], "mysql")
+
+    def test_api_response_has_iso_timestamps(self) -> None:
+        import time
+        now = time.time()
+        with self._patch_store([("host", "cpu_percent", 5.0, now)]):
+            resp = self.client.get("/metrics/api/data?range=1h&group=host")
+        data = resp.get_json()
+        point = data["metrics"]["cpu_percent"][0]
+        self.assertIn("iso", point)
+        self.assertIn("ts", point)
+        self.assertIn("value", point)
