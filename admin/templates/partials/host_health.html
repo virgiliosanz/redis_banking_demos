@@ -1,8 +1,7 @@
-{% if standalone %}
-{% extends "base.html" %}
-{% block title %}Host Health{% endblock %}
-{% block content %}
-{% endif %}
+{# status_label: ok→OK, warning→Aviso, critical→Critico #}
+{% macro status_label(s) %}
+{%- if s == 'ok' -%}OK{%- elif s == 'warning' -%}Aviso{%- elif s == 'critical' -%}Critico{%- else -%}{{ s }}{%- endif -%}
+{% endmacro %}
 
 <h2 class="title is-4">
     <span class="icon-text">
@@ -37,9 +36,9 @@
             <div>
                 <p class="heading">Docker</p>
                 {% if data.checks.docker_daemon.status == 'ok' %}
-                <span class="tag is-success"><i class="fas fa-check-circle mr-1"></i> ok</span>
+                <span class="tag is-success"><i class="fas fa-check-circle mr-1"></i> OK</span>
                 {% else %}
-                <span class="tag is-danger"><i class="fas fa-times-circle mr-1"></i> critical</span>
+                <span class="tag is-danger"><i class="fas fa-times-circle mr-1"></i> Critico</span>
                 {% endif %}
             </div>
         </div>
@@ -76,13 +75,18 @@
                 <span class="icon"><i class="fas fa-memory"></i></span>
                 <span>Memory</span>
                 {% set mem = data.checks.memory %}
-                <span class="tag is-{{ 'success' if mem.status == 'ok' else ('warning' if mem.status == 'warning' else 'danger') }} is-light ml-2">{{ mem.status }}</span>
+                <span class="tag is-{{ 'success' if mem.status == 'ok' else ('warning' if mem.status == 'warning' else 'danger') }} is-light ml-2">{{ status_label(mem.status) }}</span>
             </h3>
             {% set mem_used_gb = (mem.used_bytes / 1073741824) | round(1) %}
             {% set mem_total_gb = (mem.total_bytes / 1073741824) | round(1) %}
             <p class="mb-1"><strong>{{ mem.used_pct }}%</strong> ({{ mem_used_gb }} GB / {{ mem_total_gb }} GB)</p>
             <progress class="progress is-{{ 'success' if mem.status == 'ok' else ('warning' if mem.status == 'warning' else 'danger') }}" value="{{ mem.used_pct }}" max="100">{{ mem.used_pct }}%</progress>
             <p class="help">Thresholds: warning {{ mem.thresholds.warning }}% / critical {{ mem.thresholds.critical }}%</p>
+            {% if mem.status == 'warning' %}
+            <p class="help has-text-warning-dark"><span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span> Uso de memoria ({{ mem.used_pct }}%) supera el umbral de aviso ({{ mem.thresholds.warning }}%)</p>
+            {% elif mem.status == 'critical' %}
+            <p class="help has-text-danger"><span class="icon is-small"><i class="fas fa-times-circle"></i></span> Uso de memoria ({{ mem.used_pct }}%) supera el umbral critico ({{ mem.thresholds.critical }}%)</p>
+            {% endif %}
         </div>
     </div>
 
@@ -93,11 +97,16 @@
                 <span class="icon"><i class="fas fa-hdd"></i></span>
                 <span>Disk</span>
                 {% set disk = data.checks.disk %}
-                <span class="tag is-{{ 'success' if disk.status == 'ok' else ('warning' if disk.status == 'warning' else 'danger') }} is-light ml-2">{{ disk.status }}</span>
+                <span class="tag is-{{ 'success' if disk.status == 'ok' else ('warning' if disk.status == 'warning' else 'danger') }} is-light ml-2">{{ status_label(disk.status) }}</span>
             </h3>
             <p class="mb-1"><strong>{{ disk.used_pct }}%</strong> used</p>
             <progress class="progress is-{{ 'success' if disk.status == 'ok' else ('warning' if disk.status == 'warning' else 'danger') }}" value="{{ disk.used_pct }}" max="100">{{ disk.used_pct }}%</progress>
             <p class="help">Thresholds: warning {{ disk.thresholds.warning }}% / critical {{ disk.thresholds.critical }}%</p>
+            {% if disk.status == 'warning' %}
+            <p class="help has-text-warning-dark"><span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span> Uso de disco ({{ disk.used_pct }}%) supera el umbral de aviso ({{ disk.thresholds.warning }}%)</p>
+            {% elif disk.status == 'critical' %}
+            <p class="help has-text-danger"><span class="icon is-small"><i class="fas fa-times-circle"></i></span> Uso de disco ({{ disk.used_pct }}%) supera el umbral critico ({{ disk.thresholds.critical }}%)</p>
+            {% endif %}
         </div>
     </div>
 
@@ -108,7 +117,7 @@
                 <span class="icon"><i class="fas fa-tachometer-alt"></i></span>
                 <span>Load Average</span>
                 {% set load = data.checks.load_average %}
-                <span class="tag is-{{ 'success' if load.status == 'ok' else ('warning' if load.status == 'warning' else 'danger') }} is-light ml-2">{{ load.status }}</span>
+                <span class="tag is-{{ 'success' if load.status == 'ok' else ('warning' if load.status == 'warning' else 'danger') }} is-light ml-2">{{ status_label(load.status) }}</span>
             </h3>
             <table class="table is-fullwidth is-striped is-narrow">
                 <thead><tr><th>1 min</th><th>5 min</th><th>15 min</th><th>CPUs</th></tr></thead>
@@ -119,6 +128,9 @@
                     <td>{{ data.host.logical_cpus }}</td>
                 </tr></tbody>
             </table>
+            {% if load.status != 'ok' %}
+            <p class="help has-text-{{ 'warning-dark' if load.status == 'warning' else 'danger' }}"><span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span> Load average ({{ load.load_1 }}) supera el umbral para {{ data.host.logical_cpus }} CPUs</p>
+            {% endif %}
         </div>
     </div>
 
@@ -130,16 +142,17 @@
             <h3 class="title is-5">
                 <span class="icon"><i class="fas fa-exchange-alt"></i></span>
                 <span>I/O Wait</span>
-                <span class="tag is-{{ 'success' if iowait.status == 'ok' else ('warning' if iowait.status == 'warning' else 'danger') }} is-light ml-2">{{ iowait.status }}</span>
+                <span class="tag is-{{ 'success' if iowait.status == 'ok' else ('warning' if iowait.status == 'warning' else 'danger') }} is-light ml-2">{{ status_label(iowait.status) }}</span>
             </h3>
             <p class="mb-1"><strong>{{ iowait.pct }}%</strong></p>
             <progress class="progress is-{{ 'success' if iowait.status == 'ok' else ('warning' if iowait.status == 'warning' else 'danger') }}" value="{{ iowait.pct }}" max="100">{{ iowait.pct }}%</progress>
             <p class="help">Thresholds: warning {{ iowait.thresholds.warning }}% / critical {{ iowait.thresholds.critical }}%</p>
+            {% if iowait.status == 'warning' %}
+            <p class="help has-text-warning-dark"><span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span> I/O wait ({{ iowait.pct }}%) supera el umbral de aviso ({{ iowait.thresholds.warning }}%)</p>
+            {% elif iowait.status == 'critical' %}
+            <p class="help has-text-danger"><span class="icon is-small"><i class="fas fa-times-circle"></i></span> I/O wait ({{ iowait.pct }}%) supera el umbral critico ({{ iowait.thresholds.critical }}%)</p>
+            {% endif %}
         </div>
     </div>
     {% endif %}
 </div>
-
-{% if standalone %}
-{% endblock %}
-{% endif %}

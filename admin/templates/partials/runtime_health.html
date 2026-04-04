@@ -1,12 +1,6 @@
-{% if standalone %}
-{% extends "base.html" %}
-{% block title %}Runtime Health{% endblock %}
-{% block content %}
-{% endif %}
-
 <h2 class="title is-4">
     <span class="icon-text">
-        <span class="icon"><i class="fas fa-docker"></i></span>
+        <span class="icon"><i class="fas fa-cogs"></i></span>
         <span>Runtime Health</span>
     </span>
 </h2>
@@ -79,9 +73,9 @@
                     <span>{{ label }}</span>
                 </span>
                 {% if check.status == 'ok' %}
-                <span class="tag is-success ml-2">ok</span>
+                <span class="tag is-success ml-2">OK</span>
                 {% else %}
-                <span class="tag is-danger ml-2">{{ check.status }}</span>
+                <span class="tag is-danger ml-2">Critico</span>
                 {% endif %}
             </h3>
             <p><strong>URL:</strong> <code>{{ check.url }}</code></p>
@@ -93,6 +87,9 @@
                 {% endif %}
                 <span class="is-size-7 has-text-grey">(expected: {{ check.expected_http_code }})</span>
             </p>
+            {% if check.status != 'ok' %}
+            <p class="help has-text-danger"><span class="icon is-small"><i class="fas fa-times-circle"></i></span> Esperado HTTP {{ check.expected_http_code }}, recibido {{ check.http_code }}</p>
+            {% endif %}
         </div>
     </div>
     {% endfor %}
@@ -110,11 +107,11 @@
                     <span>{{ label }}</span>
                 </span>
                 {% if check.status == 'ok' %}
-                <span class="tag is-success ml-2">ok</span>
+                <span class="tag is-success ml-2">OK</span>
                 {% elif check.status == 'warning' %}
-                <span class="tag is-warning ml-2">warning</span>
+                <span class="tag is-warning ml-2">Aviso</span>
                 {% else %}
-                <span class="tag is-danger ml-2">{{ check.status }}</span>
+                <span class="tag is-danger ml-2">Critico</span>
                 {% endif %}
             </h3>
             <p class="mb-2"><strong>Count:</strong> {{ check.count }} <span class="is-size-7 has-text-grey">(last {{ check.window_minutes }} min)</span></p>
@@ -135,8 +132,4 @@
     Generated at {{ data.generated_at }}
 </p>
 
-{% endif %}
-
-{% if standalone %}
-{% endblock %}
 {% endif %}

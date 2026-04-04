@@ -1,11 +1,10 @@
-{% if standalone %}{% extends "base.html" %}{% endif %}
 {% macro status_tag(status) %}
 {%- if status in ('green', 'ok') -%}
-<span class="tag is-success">{{ status }}</span>
+<span class="tag is-success">{%- if status == 'green' -%}Saludable{%- else -%}OK{%- endif -%}</span>
 {%- elif status == 'yellow' or status == 'warning' -%}
-<span class="tag is-warning">{{ status }}</span>
+<span class="tag is-warning">{%- if status == 'yellow' -%}Con avisos{%- else -%}Aviso{%- endif -%}</span>
 {%- else -%}
-<span class="tag is-danger">{{ status }}</span>
+<span class="tag is-danger">Critico</span>
 {%- endif -%}
 {% endmacro %}
 
@@ -18,8 +17,6 @@
 <span class="icon has-text-danger"><i class="fas fa-times-circle"></i></span>
 {%- endif -%}
 {% endmacro %}
-
-{% block content %}
 {% if data.error is defined %}
 <div class="notification is-danger">
     <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
@@ -67,6 +64,19 @@
                 <p class="title is-6">{{ cluster.active_shards | default('?') }}</p>
             </div>
         </div>
+        {% if cluster.status | default('unknown') == 'yellow' %}
+        <div class="level-item has-text-centered">
+            <div>
+                <p class="help has-text-warning-dark"><span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span> Cluster en estado yellow -- posibles replicas sin asignar</p>
+            </div>
+        </div>
+        {% elif cluster.status | default('unknown') == 'red' %}
+        <div class="level-item has-text-centered">
+            <div>
+                <p class="help has-text-danger"><span class="icon is-small"><i class="fas fa-times-circle"></i></span> Cluster en estado red -- shards primarios sin asignar</p>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -151,4 +161,3 @@
 {% endif %}
 
 {% endif %}
-{% endblock %}

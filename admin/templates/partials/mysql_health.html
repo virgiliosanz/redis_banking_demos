@@ -1,9 +1,3 @@
-{% if standalone %}
-{% extends "base.html" %}
-{% block title %}MySQL Health{% endblock %}
-{% block content %}
-{% endif %}
-
 <h2 class="title is-4">
     <span class="icon-text">
         <span class="icon"><i class="fas fa-database"></i></span>
@@ -49,11 +43,11 @@
                 </div>
                 <div class="level-item">
                     {% if db.processlist.status == 'ok' %}
-                    <span class="tag is-success">ok</span>
+                    <span class="tag is-success">OK</span>
                     {% elif db.processlist.status == 'warning' %}
-                    <span class="tag is-warning">warning</span>
+                    <span class="tag is-warning">Aviso</span>
                     {% else %}
-                    <span class="tag is-danger">critical</span>
+                    <span class="tag is-danger">Critico</span>
                     {% endif %}
                 </div>
             </div>
@@ -63,6 +57,12 @@
             ({{ db.processlist.critical_count }} critical &ge; {{ db.processlist.critical_seconds }}s)
             &mdash; limit: {{ db.processlist.query_limit }}
         </p>
+        {% if db.processlist.status != 'ok' %}
+        <p class="help has-text-{{ 'warning-dark' if db.processlist.status == 'warning' else 'danger' }}">
+            <span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span>
+            {{ db.processlist.warning_count }} queries lentas ({{ db.processlist.critical_count }} criticas)
+        </p>
+        {% endif %}
     </div>
 
     {# --- Slow queries table --- #}
@@ -104,6 +104,4 @@
 </div>
 {% endfor %}
 
-{% if standalone %}
-{% endblock %}
-{% endif %}
+

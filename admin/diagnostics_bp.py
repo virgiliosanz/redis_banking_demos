@@ -1,10 +1,7 @@
-"""Diagnostics blueprint — rich HTML views for collectors.
+"""Diagnostics blueprint -- rich HTML views for collectors.
 
 Each collector is called directly via Python and rendered through
-a Jinja2 partial template.  Routes support two modes:
-
-* ``?standalone=1`` → full page extending ``base.html``
-* default          → HTML fragment suitable for embedding
+a Jinja2 partial template as an HTML fragment suitable for embedding.
 """
 
 from __future__ import annotations
@@ -33,12 +30,7 @@ def _wants_json() -> bool:
 
 
 def _render(template: str, data: dict[str, Any]):
-    standalone = request.args.get("standalone") == "1"
-    if standalone:
-        return render_template(
-            template, data=data, standalone=True,
-        )
-    return render_template(template, data=data, standalone=False)
+    return render_template(template, data=data)
 
 
 @bp.route("/elastic")

@@ -296,12 +296,7 @@ def create_app() -> Flask:
         data = collect_host(settings)
         if request.headers.get("Accept") == "application/json":
             return jsonify(data)
-        standalone = request.args.get("standalone", "0") == "1"
-        return render_template(
-            "partials/host_health.html",
-            data=data,
-            standalone=standalone,
-        )
+        return render_template("partials/host_health.html", data=data)
 
     @app.route("/diagnostics/mysql")
     def diagnostics_mysql():
@@ -315,12 +310,7 @@ def create_app() -> Flask:
         data = collect_mysql(settings)
         if request.headers.get("Accept") == "application/json":
             return jsonify(data)
-        standalone = request.args.get("standalone", "0") == "1"
-        return render_template(
-            "partials/mysql_health.html",
-            data=data,
-            standalone=standalone,
-        )
+        return render_template("partials/mysql_health.html", data=data)
 
     @app.route("/diagnostics/runtime")
     def diagnostics_runtime():
@@ -330,33 +320,27 @@ def create_app() -> Flask:
         except FileNotFoundError:
             if request.headers.get("Accept") == "application/json":
                 return jsonify({"error": "IA-Ops config not found"}), 500
-            standalone = request.args.get("standalone", "0") == "1"
             return render_template(
                 "partials/runtime_health.html",
                 data=None,
                 error="IA-Ops config not found",
-                standalone=standalone,
             )
         try:
             data = collect_runtime(settings)
         except Exception as exc:
             if request.headers.get("Accept") == "application/json":
                 return jsonify({"error": str(exc)}), 500
-            standalone = request.args.get("standalone", "0") == "1"
             return render_template(
                 "partials/runtime_health.html",
                 data=None,
                 error=str(exc),
-                standalone=standalone,
             )
         if request.headers.get("Accept") == "application/json":
             return jsonify(data)
-        standalone = request.args.get("standalone", "0") == "1"
         return render_template(
             "partials/runtime_health.html",
             data=data,
             error=None,
-            standalone=standalone,
         )
 
     @app.route("/sync/editorial")
