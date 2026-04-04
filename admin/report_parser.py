@@ -112,6 +112,8 @@ def collect_non_ok_checks(
                         "text": f"{section}: {svc} {sub_key} = {sub['status']}",
                     })
 
+    return findings
+
 
 def parse_nightly_findings(content: str) -> list[dict[str, str]]:
     """Extract findings from a nightly auditor markdown report."""
