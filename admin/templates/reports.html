@@ -20,14 +20,32 @@
     .file-row:hover { background: #f5f5f5; }
     .card { margin-bottom: 1rem; }
     .card-header { cursor: pointer; }
+    .subtype-section { margin-left: 1.5rem; margin-bottom: 0.5rem; }
+    .subtype-header { cursor: pointer; padding: 0.4rem 0; font-weight: 600; color: #363636; }
+    .subtype-header:hover { color: #3273dc; }
+    .toggle-icon { margin-right: 0.4rem; transition: transform 0.15s; }
 </style>
 {% endblock %}
 
 {% block content %}
-<h1 class="title">
-    <span class="icon"><i class="fas fa-folder-open"></i></span>
-    <span>Reportes</span>
-</h1>
+<div class="level">
+    <div class="level-left">
+        <div class="level-item">
+            <h1 class="title">
+                <span class="icon"><i class="fas fa-folder-open"></i></span>
+                <span>Reportes</span>
+            </h1>
+        </div>
+    </div>
+    <div class="level-right">
+        <div class="level-item">
+            <button id="btn-cleanup" class="button is-warning is-outlined" onclick="runCleanup()">
+                <span class="icon"><i class="fas fa-broom"></i></span>
+                <span>Limpiar reportes antiguos (&gt;30 dias)</span>
+            </button>
+        </div>
+    </div>
+</div>
 <p class="subtitle">Reportes generados en runtime/reports/</p>
 
 <div id="reports-loading" class="has-text-centered py-6">
@@ -37,6 +55,7 @@
     No se encontraron reportes.
 </div>
 <div id="reports-error" class="notification is-danger" style="display:none;"></div>
+<div id="cleanup-result" class="notification is-info" style="display:none;"></div>
 <div id="reports-container"></div>
 {% endblock %}
 
@@ -75,7 +94,6 @@
                 var btn = document.createElement('button');
                 btn.className = 'button is-small is-dark mt-2';
                 btn.innerHTML = '<span class="icon"><i class="fas fa-times"></i></span><span>Cerrar</span>';
-
                 btn.onclick = function() { viewer.style.display = 'none'; };
                 viewer.appendChild(pre);
                 viewer.appendChild(btn);
@@ -83,38 +101,78 @@
             .catch(function(e) { viewer.textContent = 'Error: ' + e; });
     }
 
+    function buildFileTable(files, idPrefix) {
+        var table = '<table class="table is-fullwidth is-hoverable is-narrow">' +
+            '<thead><tr><th>Archivo</th><th>Fecha</th><th>Tamano</th></tr></thead><tbody>';
+        files.forEach(function(f, fi) {
+            var vid = idPrefix + '-' + fi;
+            table += '<tr class="file-row" onclick="window.__loadReport(\'' +
+                f.path.replace(/'/g, "\\'") + "','" + vid + "')\">" +
+                '<td><span class="icon"><i class="fas fa-file-alt"></i></span> ' +
+                f.name + '</td><td>' + formatDate(f.modified_timestamp) +
+                '</td><td>' + formatBytes(f.size_bytes) + '</td></tr>' +
+                '<tr id="' + vid + '" style="display:none;"><td colspan="3"></td></tr>';
+        });
+        table += '</tbody></table>';
+        return table;
+    }
+
     function renderCategories(categories) {
         container.innerHTML = '';
         categories.forEach(function(cat, ci) {
             var card = document.createElement('div');
             card.className = 'card';
+
             var header = document.createElement('header');
             header.className = 'card-header';
             header.innerHTML = '<p class="card-header-title">' +
+                '<span class="icon toggle-icon"><i class="fas fa-chevron-right"></i></span>' +
                 '<span class="icon"><i class="fas fa-folder"></i></span>' +
-                '<span>' + cat.name + ' (' + cat.files.length + ')</span></p>' +
+                '<span>' + cat.name + ' (' + cat.total_files + ' reportes)</span></p>' +
                 '<button class="card-header-icon" aria-label="toggle">' +
-                '<span class="icon"><i class="fas fa-angle-down"></i></span></button>';
+                '<span class="icon"><i class="fas fa-chevron-right"></i></span></button>';
+
             var content = document.createElement('div');
             content.className = 'card-content';
-            var table = '<table class="table is-fullwidth is-hoverable is-narrow">' +
-                '<thead><tr><th>Archivo</th><th>Fecha</th><th>Tamano</th></tr></thead><tbody>';
-            cat.files.forEach(function(f, fi) {
-                var vid = 'viewer-' + ci + '-' + fi;
-                table += '<tr class="file-row" onclick="window.__loadReport(\'' +
-                    f.path.replace(/'/g, "\\'") + "','" + vid + "')\">" +
-                    '<td><span class="icon"><i class="fas fa-file-alt"></i></span> ' +
-                    f.name + '</td><td>' + formatDate(f.modified_timestamp) +
-                    '</td><td>' + formatBytes(f.size_bytes) + '</td></tr>' +
-                    '<tr id="' + vid + '" style="display:none;"><td colspan="3"></td></tr>';
-            });
-            table += '</tbody></table>';
-            content.innerHTML = table;
+            content.style.display = 'none';
+
+            var hasSubtypes = cat.subtypes && cat.subtypes.length > 1;
+            var hasSingleEmpty = cat.subtypes && cat.subtypes.length === 1 && cat.subtypes[0].name === '';
+
+            if (!hasSubtypes || hasSingleEmpty) {
+                var allFiles = [];
+                cat.subtypes.forEach(function(st) { allFiles = allFiles.concat(st.files); });
+                content.innerHTML = buildFileTable(allFiles, 'v-' + ci);
+            } else {
+                cat.subtypes.forEach(function(st, si) {
+                    var section = document.createElement('div');
+                    section.className = 'subtype-section';
+                    var stHeader = document.createElement('div');
+                    stHeader.className = 'subtype-header';
+                    stHeader.innerHTML = '<span class="icon toggle-icon"><i class="fas fa-chevron-right"></i></span>' +
+                        st.name + ' (' + st.files.length + ')';
+                    var stBody = document.createElement('div');
+                    stBody.style.display = 'none';
+                    stBody.innerHTML = buildFileTable(st.files, 'v-' + ci + '-' + si);
+                    stHeader.addEventListener('click', function() {
+                        var open = stBody.style.display !== 'none';
+                        stBody.style.display = open ? 'none' : '';
+                        var ico = stHeader.querySelector('.toggle-icon .fas');
+                        ico.className = open ? 'fas fa-chevron-right' : 'fas fa-chevron-down';
+                    });
+                    section.appendChild(stHeader);
+                    section.appendChild(stBody);
+                    content.appendChild(section);
+                });
+            }
+
             header.addEventListener('click', function() {
-                content.style.display = content.style.display === 'none' ? '' : 'none';
-                var icon = header.querySelector('.card-header-icon .fas');
-                icon.classList.toggle('fa-angle-down');
-                icon.classList.toggle('fa-angle-up');
+                var open = content.style.display !== 'none';
+                content.style.display = open ? 'none' : '';
+                var icons = header.querySelectorAll('.toggle-icon .fas, .card-header-icon .fas');
+                for (var i = 0; i < icons.length; i++) {
+                    icons[i].className = open ? 'fas fa-chevron-right' : 'fas fa-chevron-down';
+                }
             });
             card.appendChild(header);
             card.appendChild(content);
@@ -124,23 +182,36 @@
 
     window.__loadReport = loadReport;
 
+    function allFiles(categories) {
+        var result = [];
+        categories.forEach(function(cat) {
+            cat.subtypes.forEach(function(st) {
+                st.files.forEach(function(f) { result.push({cat: cat, file: f}); });
+            });
+        });
+        return result;
+    }
+
     function autoOpenFromQuery(categories) {
         var params = new URLSearchParams(window.location.search);
         var targetFile = params.get('file');
         if (!targetFile) return;
-        for (var ci = 0; ci < categories.length; ci++) {
-            for (var fi = 0; fi < categories[ci].files.length; fi++) {
-                if (categories[ci].files[fi].path === targetFile) {
-                    var vid = 'viewer-' + ci + '-' + fi;
-                    var card = document.getElementById(vid);
-                    if (card) {
-                        card.closest('.card').querySelector('.card-content').style.display = '';
+        var all = allFiles(categories);
+        for (var i = 0; i < all.length; i++) {
+            if (all[i].file.path === targetFile) {
+                var vid = all[i].file.path;
+                var el = document.querySelector('[onclick*="' + CSS.escape(vid) + '"]');
+                if (el) {
+                    var cardContent = el.closest('.card').querySelector('.card-content');
+                    if (cardContent) cardContent.style.display = '';
+                    var subtypeBody = el.closest('.subtype-section');
+                    if (subtypeBody) {
+                        var stBody = subtypeBody.querySelector('div:last-child');
+                        if (stBody) stBody.style.display = '';
                     }
-                    loadReport(targetFile, vid);
-                    var row = document.querySelector('[onclick*="' + vid + '"]');
-                    if (row) row.scrollIntoView({behavior: 'smooth', block: 'center'});
-                    return;
+                    el.scrollIntoView({behavior: 'smooth', block: 'center'});
                 }
+                return;
             }
         }
     }
@@ -161,5 +232,26 @@
             errorBox.style.display = 'block';
         });
 })();
+
+function runCleanup() {
+    var btn = document.getElementById('btn-cleanup');
+    var resultBox = document.getElementById('cleanup-result');
+    btn.classList.add('is-loading');
+    fetch('/reports/api/cleanup')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.classList.remove('is-loading');
+            resultBox.style.display = 'block';
+            resultBox.textContent = 'Limpieza completada: ' + data.deleted +
+                ' eliminados, ' + data.remaining + ' restantes.';
+            if (data.deleted > 0) { location.reload(); }
+        })
+        .catch(function(e) {
+            btn.classList.remove('is-loading');
+            resultBox.className = 'notification is-danger';
+            resultBox.style.display = 'block';
+            resultBox.textContent = 'Error en limpieza: ' + e;
+        });
+}
 </script>
 {% endblock %}

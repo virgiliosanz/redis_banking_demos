@@ -33,6 +33,9 @@ def create_app() -> Flask:
     )
     app.config["DEBUG"] = DEBUG
 
+    # Limpieza de reportes antiguos al arrancar
+    reports.cleanup_old_reports()
+
     # Register blueprints
     app.register_blueprint(containers.bp)
     app.register_blueprint(reports.bp)
