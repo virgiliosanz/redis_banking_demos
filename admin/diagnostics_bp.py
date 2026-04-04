@@ -12,12 +12,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, abort, render_template, jsonify, request
 
 from ops.config import load_settings
 from ops.collectors import elastic as elastic_collector
 from ops.collectors import app as app_collector
 from ops.collectors import cron as cron_collector
+from ops.collectors import host as host_collector
+from ops.collectors import mysql as mysql_collector
+from ops.collectors import runtime as runtime_collector
+
+from .report_parser import parse_nightly_findings, parse_crontab_lines
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +133,7 @@ def cron_health():
             cwd=str(get_compose_root()),
         )
         if result.success:
-            container_crons = _parse_crontab_lines(result.stdout)
+            container_crons = parse_crontab_lines(result.stdout)
         else:
             stderr_lower = (result.stderr or "").lower()
             if "no crontab" in stderr_lower:
@@ -150,28 +155,7 @@ def cron_health():
     )
 
 
-def _parse_crontab_lines(raw: str) -> list[dict[str, str]]:
-    """Parse crontab -l output into structured entries."""
-    entries: list[dict[str, str]] = []
-    for line in raw.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        parts = stripped.split(None, 5)
-        if len(parts) >= 6:
-            entries.append({
-                "schedule": " ".join(parts[:5]),
-                "command": parts[5],
-                "status": "activo",
-            })
-        elif len(parts) >= 1:
-            # Non-standard line (env var, etc.)
-            entries.append({
-                "schedule": "-",
-                "command": stripped,
-                "status": "variable",
-            })
-    return entries
+
 
 
 @bp.route("/nightly")
@@ -212,9 +196,7 @@ def nightly_health():
         "resumen": "summary",
     })
 
-    # Reuse the app-level findings parser
-    from admin.app import _parse_nightly_findings
-    findings = _parse_nightly_findings(content)
+    findings = parse_nightly_findings(content)
 
     risks = _parse_list_section(content, "Riesgos")
     actions = _parse_list_section(content, "Acciones recomendadas")
@@ -317,4 +299,70 @@ def sentry_health():
         "partials/sentry_health.html",
         error=None,
         data=data,
+    )
+
+
+
+@bp.route("/host")
+def host_health():
+    """Render host health using the collector directly."""
+    try:
+        settings = _get_settings()
+    except FileNotFoundError:
+        if _wants_json():
+            return jsonify({"error": "IA-Ops config not found"}), 500
+        abort(500, description="IA-Ops config not found")
+    data = host_collector.collect(settings)
+    if _wants_json():
+        return jsonify(data)
+    return _render("partials/host_health.html", data)
+
+
+@bp.route("/mysql")
+def mysql_health():
+    """Render MySQL health using the collector directly."""
+    try:
+        settings = _get_settings()
+    except FileNotFoundError:
+        if _wants_json():
+            return jsonify({"error": "IA-Ops config not found"}), 500
+        abort(500, description="IA-Ops config not found")
+    data = mysql_collector.collect(settings)
+    if _wants_json():
+        return jsonify(data)
+    return _render("partials/mysql_health.html", data)
+
+
+@bp.route("/runtime")
+def runtime_health():
+    """Render Runtime health using the collector directly."""
+    try:
+        settings = _get_settings()
+    except FileNotFoundError:
+        if _wants_json():
+            return jsonify({"error": "IA-Ops config not found"}), 500
+        return render_template(
+            "partials/runtime_health.html",
+            data=None,
+            error="IA-Ops config not found",
+            timestamp=_now_stamp(),
+        )
+    try:
+        data = runtime_collector.collect(settings)
+    except Exception as exc:
+        if _wants_json():
+            return jsonify({"error": str(exc)}), 500
+        return render_template(
+            "partials/runtime_health.html",
+            data=None,
+            error=str(exc),
+            timestamp=_now_stamp(),
+        )
+    if _wants_json():
+        return jsonify(data)
+    return render_template(
+        "partials/runtime_health.html",
+        data=data,
+        error=None,
+        timestamp=_now_stamp(),
     )
