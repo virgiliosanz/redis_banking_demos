@@ -19,7 +19,11 @@ _RANGE_MAP = {
     "1h": 60,
     "6h": 360,
     "24h": 1440,
+    "7d": 7 * 24 * 60,
 }
+
+# Ranges that require the extended (raw + hourly) query path.
+_EXTENDED_RANGES = {"7d"}
 
 VALID_GROUPS = {"host", "nginx", "mysql", "elastic", "phpfpm", "containers"}
 
@@ -70,7 +74,10 @@ def api_metrics():
 
     try:
         store = _get_store()
-        rows = store.query(group, range_minutes)
+        if range_key in _EXTENDED_RANGES:
+            rows = store.query_extended(group, range_minutes)
+        else:
+            rows = store.query(group, range_minutes)
         store.close()
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500

@@ -27,6 +27,7 @@
                 <button class="button is-small is-info is-selected" data-range="1h">1h</button>
                 <button class="button is-small" data-range="6h">6h</button>
                 <button class="button is-small" data-range="24h">24h</button>
+                <button class="button is-small" data-range="7d">7d</button>
             </div>
         </div>
         <div class="column is-narrow">
@@ -90,6 +91,35 @@
         charts = {};
     }
 
+    /** Return true if this metric stores cumulative counters. */
+    function isCounterMetric(name) {
+        return name.endsWith('_bytes') || name.endsWith('_packets');
+    }
+
+    /** Convert cumulative counter samples to per-second rates. */
+    function counterToRate(points) {
+        if (points.length < 2) return { labels: [], values: [] };
+        var labels = [];
+        var values = [];
+        for (var i = 1; i < points.length; i++) {
+            var dt = points[i].ts - points[i - 1].ts;
+            if (dt <= 0) continue;
+            var dv = points[i].value - points[i - 1].value;
+            if (dv < 0) dv = 0; // counter reset
+            labels.push(new Date(points[i].ts * 1000).toLocaleTimeString());
+            values.push(dv / dt);
+        }
+        return { labels: labels, values: values };
+    }
+
+    /** Format bytes/s to human-readable rate string. */
+    function formatRate(bytesPerSec) {
+        if (bytesPerSec >= 1e9) return (bytesPerSec / 1e9).toFixed(2) + ' GB/s';
+        if (bytesPerSec >= 1e6) return (bytesPerSec / 1e6).toFixed(2) + ' MB/s';
+        if (bytesPerSec >= 1e3) return (bytesPerSec / 1e3).toFixed(2) + ' KB/s';
+        return bytesPerSec.toFixed(1) + ' B/s';
+    }
+
     function renderCharts(data) {
         const area = document.getElementById('chartsArea');
         const loading = document.getElementById('loadingMsg');
@@ -108,34 +138,63 @@
         destroyCharts();
 
         metricNames.forEach(function(name, idx) {
+            const points = data.metrics[name];
+            const isCounter = isCounterMetric(name);
+            var labels, values, chartLabel, yUnit;
+
+            if (isCounter) {
+                var rate = counterToRate(points);
+                labels = rate.labels;
+                values = rate.values;
+                yUnit = name.endsWith('_bytes') ? '/s' : ' pkt/s';
+                chartLabel = name + ' (rate)';
+            } else {
+                labels = points.map(p => new Date(p.ts * 1000).toLocaleTimeString());
+                values = points.map(p => p.value);
+                yUnit = '';
+                chartLabel = name;
+            }
+
+            if (labels.length === 0) return;
+
             const card = document.createElement('div');
             card.className = 'box metric-card';
-            card.innerHTML = '<h3 class="title is-5">' + name + '</h3>' +
+            card.innerHTML = '<h3 class="title is-5">' + chartLabel + '</h3>' +
                 '<div class="chart-container"><canvas id="chart-' + idx + '"></canvas></div>';
             area.appendChild(card);
 
-            const points = data.metrics[name];
-            const labels = points.map(p => new Date(p.ts * 1000).toLocaleTimeString());
-            const values = points.map(p => p.value);
-
             const ctx = document.getElementById('chart-' + idx).getContext('2d');
+            var chartOpts = {
+                responsive: true, maintainAspectRatio: false,
+                scales: { x: { display: true }, y: { beginAtZero: true } },
+                plugins: { legend: { display: false } }
+            };
+
+            // For byte-rate metrics, format the tooltip and Y axis
+            if (isCounter && name.endsWith('_bytes')) {
+                chartOpts.scales.y.ticks = {
+                    callback: function(val) { return formatRate(val); }
+                };
+                chartOpts.plugins.tooltip = {
+                    callbacks: {
+                        label: function(ctx) { return chartLabel + ': ' + formatRate(ctx.parsed.y); }
+                    }
+                };
+            }
+
             charts[name] = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: name,
+                        label: chartLabel,
                         data: values,
                         borderColor: getColor(idx),
                         backgroundColor: getColor(idx) + '22',
                         fill: true, tension: 0.3, pointRadius: 2
                     }]
                 },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    scales: { x: { display: true }, y: { beginAtZero: true } },
-                    plugins: { legend: { display: false } }
-                }
+                options: chartOpts
             });
         });
     }
