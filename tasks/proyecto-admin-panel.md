@@ -67,6 +67,9 @@ Panel de administracion web para la plataforma nuevecuatrouno. Permite operar, d
 - Navbar: reordenado a Diagnosticos | Contenedores | Crontab | Sincronizacion | Rollover | Reportes | Historial
 - Crontab: descripcion "Tarea de WordPress" para crons del contenedor
 - UI: idioma unificado a español en toda la interfaz
+- Reportes: agrupacion por sub-tipo basada en patrones de nombre de fichero (Nightly Auditor, Sentry por servicio, Reactive Watch, Crontab por tipo, Editorial/Platform por modo, Drift, Rollover por año)
+- Reportes: 3 niveles colapsables (categoria → sub-tipo → ficheros)
+- Reportes: mapeo de prefijos a nombres legibles en español (SUBTYPE_NAMES)
 
 ## Arquitectura final
 
@@ -82,7 +85,7 @@ Panel de administracion web para la plataforma nuevecuatrouno. Permite operar, d
 | dashboard_bp.py | Blueprint API /api/latest-nightly, /api/latest-drift |
 | crontab_bp.py | Blueprint /crontab/ + API status/container-crons |
 | rollover_bp.py | Blueprint /rollover/ |
-| reports.py | Blueprint /reports/ + API |
+| reports.py | Blueprint /reports/, API, retencion 30 dias, agrupacion por sub-tipo |
 | history.py | Almacenamiento JSON del historial |
 | history_bp.py | Blueprint /history/ |
 | static/js/admin.js | JS compartido: auto-display reportes |
