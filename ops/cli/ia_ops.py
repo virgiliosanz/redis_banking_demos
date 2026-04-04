@@ -9,6 +9,7 @@ from ..config import load_settings
 from ..util.process import run_command
 from ..collectors import host as host_collector
 from ..collectors import logs as logs_collector
+from ..collectors import metrics as metrics_collector
 from ..context import collect_operational_context, load_drift_status
 from ..notifications.telegram import load_telegram_config, send_message
 from ..rollover import content_year as rollover_content_year
@@ -138,6 +139,18 @@ def cmd_collect_app(_: argparse.Namespace) -> int:
 
 def cmd_collect_mysql(_: argparse.Namespace) -> int:
     _print_json(collect_operational_context(load_settings())["mysql"])
+    return 0
+
+
+def cmd_collect_metrics(_: argparse.Namespace) -> int:
+    settings = load_settings()
+    from ..metrics.storage import MetricsStore
+    store = MetricsStore()
+    try:
+        result = metrics_collector.collect_and_store(settings, store)
+    finally:
+        store.close()
+    _print_json(result)
     return 0
 
 
@@ -375,6 +388,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("collect-runtime-health").set_defaults(func=cmd_collect_runtime)
     subparsers.add_parser("collect-app-health").set_defaults(func=cmd_collect_app)
     subparsers.add_parser("collect-mysql-health").set_defaults(func=cmd_collect_mysql)
+
+    subparsers.add_parser("collect-metrics").set_defaults(func=cmd_collect_metrics)
 
     collect_logs = subparsers.add_parser("collect-service-logs")
     collect_logs.add_argument("service")
