@@ -578,3 +578,190 @@ class TestHealthSummaryEndpoint(unittest.TestCase):
             self.assertEqual(metrics_job["status"], "ok")
             nightly_job = next(j for j in data["cron_jobs"] if j["label"] == "nightly")
             self.assertEqual(nightly_job["status"], "warning")
+
+
+# ---------------------------------------------------------------------------
+# capacity_bp.py tests
+# ---------------------------------------------------------------------------
+
+class TestLinearRegression(unittest.TestCase):
+    """Test the linear regression helper."""
+
+    def test_two_points(self) -> None:
+        from admin.capacity_bp import linear_regression
+        result = linear_regression([(0.0, 10.0), (1.0, 20.0)])
+        self.assertIsNotNone(result)
+        slope, intercept = result
+        self.assertAlmostEqual(slope, 10.0)
+        self.assertAlmostEqual(intercept, 10.0)
+
+    def test_single_point_returns_none(self) -> None:
+        from admin.capacity_bp import linear_regression
+        self.assertIsNone(linear_regression([(0.0, 5.0)]))
+
+    def test_empty_returns_none(self) -> None:
+        from admin.capacity_bp import linear_regression
+        self.assertIsNone(linear_regression([]))
+
+    def test_flat_line(self) -> None:
+        from admin.capacity_bp import linear_regression
+        result = linear_regression([(0.0, 5.0), (1.0, 5.0), (2.0, 5.0)])
+        self.assertIsNotNone(result)
+        slope, intercept = result
+        self.assertAlmostEqual(slope, 0.0)
+        self.assertAlmostEqual(intercept, 5.0)
+
+    def test_identical_x_returns_none(self) -> None:
+        from admin.capacity_bp import linear_regression
+        self.assertIsNone(linear_regression([(1.0, 2.0), (1.0, 3.0)]))
+
+    def test_multiple_points(self) -> None:
+        from admin.capacity_bp import linear_regression
+        # y = 2x + 1
+        pts = [(0.0, 1.0), (1.0, 3.0), (2.0, 5.0), (3.0, 7.0)]
+        result = linear_regression(pts)
+        slope, intercept = result
+        self.assertAlmostEqual(slope, 2.0)
+        self.assertAlmostEqual(intercept, 1.0)
+
+
+class TestDaysUntilThreshold(unittest.TestCase):
+    """Test the days_until_threshold helper."""
+
+    def test_positive_slope(self) -> None:
+        from admin.capacity_bp import days_until_threshold
+        # y = 2x + 50, threshold=90 -> x=20, last_x=5 -> 15 days
+        result = days_until_threshold(2.0, 50.0, 5.0, 90.0)
+        self.assertAlmostEqual(result, 15.0)
+
+    def test_negative_slope_returns_none(self) -> None:
+        from admin.capacity_bp import days_until_threshold
+        self.assertIsNone(days_until_threshold(-1.0, 50.0, 5.0, 90.0))
+
+    def test_zero_slope_returns_none(self) -> None:
+        from admin.capacity_bp import days_until_threshold
+        self.assertIsNone(days_until_threshold(0.0, 50.0, 5.0, 90.0))
+
+    def test_already_exceeded(self) -> None:
+        from admin.capacity_bp import days_until_threshold
+        # y = 2*10 + 75 = 95 >= 90
+        result = days_until_threshold(2.0, 75.0, 10.0, 90.0)
+        self.assertEqual(result, 0.0)
+
+
+class TestComputeDailyAverages(unittest.TestCase):
+    """Test the daily averages computation."""
+
+    def test_empty_rows(self) -> None:
+        from admin.capacity_bp import _compute_daily_averages
+        self.assertEqual(_compute_daily_averages([], "cpu"), [])
+
+    def test_no_matching_metric(self) -> None:
+        from admin.capacity_bp import _compute_daily_averages
+        rows = [(1000.0, "other_metric", 5.0)]
+        self.assertEqual(_compute_daily_averages(rows, "cpu"), [])
+
+    def test_single_day(self) -> None:
+        from admin.capacity_bp import _compute_daily_averages
+        base = 1000000.0
+        rows = [
+            (base, "cpu", 10.0),
+            (base + 3600, "cpu", 20.0),
+            (base + 7200, "cpu", 30.0),
+        ]
+        result = _compute_daily_averages(rows, "cpu")
+        self.assertEqual(len(result), 1)
+        self.assertAlmostEqual(result[0][1], 20.0)
+
+    def test_multiple_days(self) -> None:
+        from admin.capacity_bp import _compute_daily_averages
+        base = 1000000.0
+        rows = [
+            (base, "cpu", 10.0),
+            (base + 86400, "cpu", 20.0),
+            (base + 86400 * 2, "cpu", 30.0),
+        ]
+        result = _compute_daily_averages(rows, "cpu")
+        self.assertEqual(len(result), 3)
+        self.assertAlmostEqual(result[0][0], 0.0)
+        self.assertAlmostEqual(result[1][0], 1.0)
+        self.assertAlmostEqual(result[2][0], 2.0)
+
+
+class TestCapacityPage(unittest.TestCase):
+    """Test the /capacity/ page."""
+
+    def setUp(self) -> None:
+        self.app = create_app()
+        self.app.config["TESTING"] = True
+        self.client = self.app.test_client()
+
+    def test_capacity_page_returns_200(self) -> None:
+        resp = self.client.get("/capacity/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(b"Planificacion de capacidad", resp.data)
+
+    def test_capacity_page_includes_chart_js(self) -> None:
+        resp = self.client.get("/capacity/")
+        self.assertIn(b"chart.js", resp.data)
+
+    def test_capacity_navbar_link(self) -> None:
+        resp = self.client.get("/capacity/")
+        self.assertIn(b"Capacidad", resp.data)
+
+
+class TestCapacityApi(unittest.TestCase):
+    """Test the /capacity/api/data endpoint."""
+
+    def setUp(self) -> None:
+        import tempfile
+        self.app = create_app()
+        self.app.config["TESTING"] = True
+        self.client = self.app.test_client()
+        self._tmpdir = tempfile.mkdtemp()
+        self._db_path = Path(self._tmpdir) / "test_cap.db"
+
+    def tearDown(self) -> None:
+        import shutil
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def _patch_store(self, rows=None):
+        from ops.metrics.storage import MetricsStore
+        store = MetricsStore(db_path=self._db_path)
+        if rows:
+            for group, metric, value, ts in rows:
+                store.write_sample(group, metric, value, ts=ts)
+        return mock.patch("admin.capacity_bp._get_store", return_value=store)
+
+    def test_api_returns_metrics_list(self) -> None:
+        with self._patch_store([]):
+            resp = self.client.get("/capacity/api/data")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertIn("metrics", data)
+        self.assertEqual(len(data["metrics"]), 5)
+
+    def test_api_empty_data_has_null_values(self) -> None:
+        with self._patch_store([]):
+            resp = self.client.get("/capacity/api/data")
+        data = resp.get_json()
+        disk = next(m for m in data["metrics"] if m["key"] == "disk")
+        self.assertIsNone(disk["current_value"])
+        self.assertIsNone(disk["slope"])
+        self.assertIsNone(disk["days_until_threshold"])
+
+    def test_api_with_data_returns_projections(self) -> None:
+        import time
+        now = time.time()
+        rows = []
+        for day in range(7):
+            ts = now - (6 - day) * 86400
+            rows.append(("host", "disk_used_pct", 50.0 + day * 2, ts))
+        with self._patch_store(rows):
+            resp = self.client.get("/capacity/api/data")
+        data = resp.get_json()
+        disk = next(m for m in data["metrics"] if m["key"] == "disk")
+        self.assertIsNotNone(disk["current_value"])
+        self.assertIsNotNone(disk["slope"])
+        self.assertGreater(disk["slope"], 0)
+        self.assertIsNotNone(disk["days_until_threshold"])

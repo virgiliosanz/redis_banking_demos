@@ -21,6 +21,7 @@ from . import rollover_bp
 from . import dashboard_bp
 from . import metrics_bp
 from . import health_bp
+from . import capacity_bp
 
 
 def create_app() -> Flask:
@@ -158,6 +159,7 @@ def create_app() -> Flask:
     app.register_blueprint(dashboard_bp.bp)
     app.register_blueprint(metrics_bp.bp)
     app.register_blueprint(health_bp.bp)
+    app.register_blueprint(capacity_bp.bp)
 
     return app
 
