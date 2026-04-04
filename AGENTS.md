@@ -115,7 +115,8 @@ Si algo no se ha podido validar, se debe decir de forma explicita.
 | `ops/sync/` | Sincronizacion editorial y de plataforma entre live y archive |
 | `ops/rollover/` | Rollover anual de contenido live a archive |
 | `ops/util/` | Helpers base: docker, process, http, json, thresholds, time |
-| `tests/` | Tests unitarios del paquete `ops/` (95 tests, sin dependencia de Docker) |
+| `admin/` | Panel de administracion Flask: blueprints, templates Jinja2, runners, historial |
+| `tests/` | Tests unitarios del paquete `ops/` (173 tests, sin dependencia de Docker) |
 | `scripts/` | Bootstrap, smoke tests, checks de calidad, wrappers shell para `ops/` |
 | `scripts/internal/` | Scripts PHP internos ejecutados via `wp eval-file` desde `cron-master` |
 | `config/` | Configuracion no sensible: env de IA-Ops, routing cutover |

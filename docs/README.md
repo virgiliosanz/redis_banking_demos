@@ -17,7 +17,10 @@ El historico de trabajo y los planes de proyecto viven en `tasks/`.
 - checks MySQL en solo lectura con `ping` y processlist largo para `db-live` y `db-archive`
 - drift `live/archive` con resumen accionable para editorial y plataforma
 - baseline reproducible de calidad para Python, shell, PHP y `docker compose`
-- 135 tests unitarios cubriendo 24 de 28 modulos Python
+- 173 tests unitarios cubriendo 24 de 28 modulos Python
+- panel de administracion web (Flask) para operacion, diagnostico y monitorizacion
+- collectors con templates ricos (Host, Runtime, MySQL, Elastic, App, Cron)
+- explorador de reportes y historial de ejecuciones
 - dispatch table en `sentry.py` para extender diagnosticos sin tocar el core
 - heartbeat writing consolidado entre sync y rollover
 - build_reactive_incidents refactorizado en sub-funciones por dominio para mantenibilidad
@@ -36,6 +39,7 @@ El historico de trabajo y los planes de proyecto viven en `tasks/`.
 | `DB-Archive` | MySQL de contenido historico |
 | `Elastic` | busqueda comun con indices separados |
 | `Cron-Master` | `wp-cli`, syncs, rollover y jobs programados |
+| `Admin Panel` | panel web Flask para operacion y diagnostico |
 
 ## Routing vigente
 - `nuevecuatrouno.test` sirve el frontend publico y el admin de `live`
@@ -54,9 +58,16 @@ La frontera anual real del balanceador ya no esta hardcodeada: sale de `config/r
 - sync editorial y de plataforma con drift report accionable
 - auditoria nocturna programable con `cron`
 - agente reactivo programable con `cron`, deduplicacion y salida a Telegram
-- baseline reproducible de calidad: `./scripts/check-quality.sh` (135 tests, shellcheck, php -l, py_compile, compose config)
+- baseline reproducible de calidad: `./scripts/check-quality.sh` (173 tests, shellcheck, php -l, py_compile, compose config)
 - gestion de crontabs refactorizada con helpers genericos reutilizables
 - compose_exec con soporte stdin para operaciones Docker que requieren piping de ficheros
+- panel de administracion web en http://localhost:9941 con dashboard de estado en tiempo real
+- diagnosticos por tab con templates ricos (Host, Runtime, MySQL, Elastic, App, Cron, Nightly, Sentry)
+- explorador de reportes con visualizacion inline
+- historial de ejecuciones de comandos operativos
+- gestion de crontabs (host e inspeccion de contenedor) desde la UI
+- sincronizacion editorial, plataforma y drift desde interfaz unificada
+- endpoint /health para monitorizacion del panel
 
 ## Limites actuales
 - laboratorio local, no produccion

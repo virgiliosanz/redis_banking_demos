@@ -135,6 +135,7 @@ Notas:
 - Admin `archive`: `http://archive.nuevecuatrouno.test/wp-admin/`
 - Login `live`: `http://nuevecuatrouno.test/wp-login.php`
 - Login `archive`: `http://archive.nuevecuatrouno.test/wp-login.php`
+- Admin Panel: `http://localhost:9941`
 
 ### Accesos administrativos de laboratorio
 - `live`: `http://nuevecuatrouno.test/wp-admin/`
@@ -186,7 +187,20 @@ docker compose ps
 - `GET /wp-login.php` responde `200`.
 - `GET /?s=rioja-laboratorio` devuelve resultados mixtos con permalinks canonicos.
 
-## 5. Resultado esperado
+## 5. Panel de administracion
+
+El panel de administracion web se levanta con:
+
+```sh
+python3 -m admin
+```
+
+- Accesible en `http://localhost:9941`
+- Funcionalidades: dashboard con estado real, diagnosticos por collector, gestion de contenedores, sincronizacion, rollover, crontabs, reportes, historial
+- No requiere autenticacion (acceso restringido por firewall/red local)
+- Endpoint de salud: `GET /health`
+
+## 6. Resultado esperado
 - Todos los contenedores en estado `healthy`
 - `nuevecuatrouno.test/healthz` responde `200 ok`
 - `archive.nuevecuatrouno.test/healthz` responde `200 ok`
@@ -199,7 +213,7 @@ docker compose ps
 - La busqueda en `live` encuentra contenido de `live` y `archive` con enlaces canonicos, no `?p=<id>`
 - `uploads` se comparte y la cache queda aislada por contexto
 
-## 6. Rollback local
+## 7. Rollback local
 ### Rollback de configuracion del repo
 Volver al ultimo commit estable deseado y recrear el stack:
 
@@ -222,7 +236,7 @@ docker compose down
 docker compose up -d
 ```
 
-## 7. Notas operativas
+## 8. Notas operativas
 - `./.secrets/` no se versiona y es solo para esta POC local.
 - `./runtime/` es descartable y se puede regenerar con los scripts de bootstrap.
 - El stack actual usa WordPress real, no stubs PHP.
