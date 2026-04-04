@@ -148,7 +148,8 @@ class MetricsStoreTests(unittest.TestCase):
 
     def test_aggregate_downsamples_old_data(self) -> None:
         now = time.time()
-        base_ts = now - 48 * 3600  # 48h ago, well past default 24h threshold
+        # Align to start-of-hour so all 3 samples land in the same bucket
+        base_ts = (now - 48 * 3600) // 3600 * 3600  # 48h ago, truncated to hour
         # Insert 3 samples in the same hour
         self.store.write_sample("host", "cpu", 10.0, ts=base_ts)
         self.store.write_sample("host", "cpu", 20.0, ts=base_ts + 60)
@@ -182,7 +183,7 @@ class MetricsStoreTests(unittest.TestCase):
 
     def test_aggregate_groups_by_metric(self) -> None:
         now = time.time()
-        base_ts = now - 48 * 3600
+        base_ts = (now - 48 * 3600) // 3600 * 3600
         self.store.write_sample("host", "cpu", 10.0, ts=base_ts)
         self.store.write_sample("host", "mem", 80.0, ts=base_ts)
 
@@ -216,7 +217,7 @@ class MetricsStoreTests(unittest.TestCase):
 
     def test_query_extended_returns_hourly_for_old(self) -> None:
         now = time.time()
-        base_ts = now - 48 * 3600
+        base_ts = (now - 48 * 3600) // 3600 * 3600
         self.store.write_sample("host", "cpu", 10.0, ts=base_ts)
         self.store.write_sample("host", "cpu", 30.0, ts=base_ts + 60)
 
@@ -229,7 +230,7 @@ class MetricsStoreTests(unittest.TestCase):
 
     def test_query_extended_merges_raw_and_hourly(self) -> None:
         now = time.time()
-        base_ts = now - 48 * 3600
+        base_ts = (now - 48 * 3600) // 3600 * 3600
 
         # Old data (will be aggregated)
         self.store.write_sample("host", "cpu", 10.0, ts=base_ts)
@@ -246,7 +247,7 @@ class MetricsStoreTests(unittest.TestCase):
 
     def test_query_extended_prefix_matching(self) -> None:
         now = time.time()
-        base_ts = now - 48 * 3600
+        base_ts = (now - 48 * 3600) // 3600 * 3600
         self.store.write_sample("mysql.db-live", "threads", 5.0, ts=base_ts)
         self.store.aggregate()
 
