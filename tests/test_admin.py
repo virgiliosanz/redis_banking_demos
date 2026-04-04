@@ -131,16 +131,8 @@ class TestAppRoutes(unittest.TestCase):
         resp = self.client.get("/diagnostics")
         self.assertEqual(resp.status_code, 200)
 
-    def test_sync_editorial(self) -> None:
-        resp = self.client.get("/sync/editorial")
-        self.assertEqual(resp.status_code, 200)
-
-    def test_sync_platform(self) -> None:
-        resp = self.client.get("/sync/platform")
-        self.assertEqual(resp.status_code, 200)
-
-    def test_sync_drift(self) -> None:
-        resp = self.client.get("/sync/drift")
+    def test_sync_page(self) -> None:
+        resp = self.client.get("/sync/")
         self.assertEqual(resp.status_code, 200)
 
     def test_rollover(self) -> None:

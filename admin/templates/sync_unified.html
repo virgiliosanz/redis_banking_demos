@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+{% block title %}Sync{% endblock %}
+
+{% block content %}
+<h1 class="title">
+    <span class="icon-text">
+        <span class="icon"><i class="fas fa-sync-alt"></i></span>
+        <span>Sincronizacion</span>
+    </span>
+</h1>
+<h2 class="subtitle">Operaciones de sincronizacion entre live y archive</h2>
+
+<!-- Section: Sync Editorial -->
+<div class="box" id="section-editorial">
+    <h3 class="title is-4">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-users"></i></span>
+            <span>Sync Editorial Users</span>
+        </span>
+    </h3>
+    <p class="subtitle is-6">Sincronizar usuarios editoriales entre live y archive</p>
+    <form class="sync-form" data-command="sync-editorial-users" data-section="editorial" data-has-mode="true">
+        <div class="field">
+            <label class="label">Modo</label>
+            <div class="control">
+                <div class="select is-fullwidth">
+                    <select class="mode-select" name="mode">
+                        <option value="report-only">report-only (solo lectura)</option>
+                        <option value="dry-run">dry-run (simulacion)</option>
+                        <option value="apply">apply (ejecutar cambios)</option>
+                    </select>
+                </div>
+            </div>
+            <p class="help mode-help">
+                <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
+                Compara usuarios/configuracion entre live y archive. Solo lectura, sin cambios.
+            </p>
+        </div>
+        <div class="field">
+            <div class="control">
+                <button type="submit" class="button is-primary run-btn">
+                    <span class="icon"><i class="fas fa-play"></i></span>
+                    <span>Ejecutar</span>
+                </button>
+            </div>
+        </div>
+    </form>
+    <div class="output-container mt-4" style="display: none;">
+        <h4 class="title is-5">
+            <span class="icon-text">
+                <span class="icon"><i class="fas fa-terminal"></i></span>
+                <span>Salida</span>
+            </span>
+        </h4>
+        <pre class="output-box output-pre"></pre>
+        <button class="button is-small is-info mt-2 clear-btn">
+            <span class="icon"><i class="fas fa-eraser"></i></span>
+            <span>Limpiar</span>
+        </button>
+    </div>
+</div>
+
+<!-- Section: Sync Platform -->
+<div class="box" id="section-platform">
+    <h3 class="title is-4">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-cogs"></i></span>
+            <span>Sync Platform Config</span>
+        </span>
+    </h3>
+    <p class="subtitle is-6">Sincronizar configuracion de plataforma entre live y archive</p>
+    <form class="sync-form" data-command="sync-platform-config" data-section="platform" data-has-mode="true">
+        <div class="field">
+            <label class="label">Modo</label>
+            <div class="control">
+                <div class="select is-fullwidth">
+                    <select class="mode-select" name="mode">
+                        <option value="report-only">report-only (solo lectura)</option>
+                        <option value="dry-run">dry-run (simulacion)</option>
+                        <option value="apply">apply (ejecutar cambios)</option>
+                    </select>
+                </div>
+            </div>
+            <p class="help mode-help">
+                <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
+                Compara usuarios/configuracion entre live y archive. Solo lectura, sin cambios.
+            </p>
+        </div>
+        <div class="field">
+            <div class="control">
+                <button type="submit" class="button is-primary run-btn">
+                    <span class="icon"><i class="fas fa-play"></i></span>
+                    <span>Ejecutar</span>
+                </button>
+            </div>
+        </div>
+    </form>
+    <div class="output-container mt-4" style="display: none;">
+        <h4 class="title is-5">
+            <span class="icon-text">
+                <span class="icon"><i class="fas fa-terminal"></i></span>
+                <span>Salida</span>
+            </span>
+        </h4>
+        <pre class="output-box output-pre"></pre>
+        <button class="button is-small is-info mt-2 clear-btn">
+            <span class="icon"><i class="fas fa-eraser"></i></span>
+            <span>Limpiar</span>
+        </button>
+    </div>
+</div>
+
+<!-- Section: Drift Report -->
+<div class="box" id="section-drift">
+    <h3 class="title is-4">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-exchange-alt"></i></span>
+            <span>Drift Report</span>
+        </span>
+    </h3>
+    <p class="subtitle is-6">Reporte de desviaciones entre live y archive</p>
+    <form class="sync-form" data-command="report-live-archive-sync-drift" data-section="drift" data-has-mode="false">
+        <p class="help mb-3">
+            <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
+            Compara estado actual entre live y archive. Solo lectura.
+        </p>
+        <div class="field">
+            <div class="control">
+                <button type="submit" class="button is-primary run-btn">
+                    <span class="icon"><i class="fas fa-play"></i></span>
+                    <span>Ejecutar</span>
+                </button>
+            </div>
+        </div>
+    </form>
+    <div class="output-container mt-4" style="display: none;">
+        <h4 class="title is-5">
+            <span class="icon-text">
+                <span class="icon"><i class="fas fa-terminal"></i></span>
+                <span>Salida</span>
+            </span>
+        </h4>
+        <pre class="output-box output-pre"></pre>
+        <button class="button is-small is-info mt-2 clear-btn">
+            <span class="icon"><i class="fas fa-eraser"></i></span>
+            <span>Limpiar</span>
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+'use strict';
+
+var MODE_DESCRIPTIONS = {
+    'report-only': '<span class="icon is-small"><i class="fas fa-shield-alt"></i></span> Compara usuarios/configuracion entre live y archive. Solo lectura, sin cambios.',
+    'dry-run': '<span class="icon is-small"><i class="fas fa-shield-alt"></i></span> Simula los cambios que se aplicarian. No modifica nada.',
+    'apply': '<span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span> Aplica cambios reales en la instancia destino. Irreversible sin backup previo.'
+};
+
+var modal = document.getElementById('confirmModal');
+var confirmBtn = document.getElementById('confirmBtn');
+var cancelBtn = document.getElementById('cancelBtn');
+var modalCloseBtn = document.getElementById('modalCloseBtn');
+var pendingForm = null;
+
+function showModal() { modal.classList.add('is-active'); }
+function hideModal() { modal.classList.remove('is-active'); pendingForm = null; }
+
+cancelBtn.addEventListener('click', hideModal);
+modalCloseBtn.addEventListener('click', hideModal);
+
+confirmBtn.addEventListener('click', function() {
+    hideModal();
+    if (pendingForm) {
+        executeSection(pendingForm);
+    }
+});
+
+function executeSection(form) {
+    var command = form.dataset.command;
+    var section = form.dataset.section;
+    var hasMode = form.dataset.hasMode === 'true';
+    var modeSelect = hasMode ? form.querySelector('.mode-select') : null;
+    var mode = modeSelect ? modeSelect.value : null;
+    var btn = form.querySelector('.run-btn');
+    var box = document.getElementById('section-' + section);
+    var outputContainer = box.querySelector('.output-container');
+    var outputPre = box.querySelector('.output-pre');
+
+    var args = ['python3', '-m', 'ops.cli.ia_ops', command];
+    if (hasMode && mode) {
+        args.push('--mode', mode);
+    }
+
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+    outputContainer.style.display = 'block';
+    outputPre.textContent = 'Ejecutando comando...\n$ ' + args.join(' ') + '\n\n';
+
+    fetch('/api/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ args: args, timeout: 300 })
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
+        var output = '';
+        if (data.stdout) output += data.stdout;
+        if (data.stderr) output += '\n' + data.stderr;
+        if (!output) output = '(sin salida)';
+
+        var prefix = '$ ' + args.join(' ') + '\n\n';
+        var suffix = '\n\nCodigo de salida: ' + data.returncode;
+        outputPre.textContent = prefix + output + suffix;
+        outputPre.scrollTop = outputPre.scrollHeight;
+
+        /* Report auto-display per section */
+        if (data.success) {
+            var reportPath = AdminReports.detectReportPath(data.stdout);
+            if (reportPath) {
+                var existingReport = box.querySelector('.report-container');
+                if (existingReport) existingReport.remove();
+
+                var rc = document.createElement('div');
+                rc.className = 'box mt-4 report-container';
+                rc.style.background = '#f5f5f5';
+
+                var rh = document.createElement('h4');
+                rh.className = 'title is-5';
+                rh.innerHTML =
+                    '<span class="icon-text">' +
+                    '<span class="icon"><i class="fas fa-file-alt"></i></span>' +
+                    '<span>Contenido del reporte:</span></span>';
+                rc.appendChild(rh);
+
+                var loading = document.createElement('p');
+                loading.textContent = 'Cargando reporte...';
+                rc.appendChild(loading);
+                box.appendChild(rc);
+
+                fetch('/api/read-file?path=' + encodeURIComponent(reportPath))
+                    .then(function(resp) { return resp.json(); })
+                    .then(function(fdata) {
+                        loading.remove();
+                        if (!fdata.success) {
+                            var err = document.createElement('p');
+                            err.className = 'has-text-danger';
+                            err.textContent = 'No se pudo leer el reporte: ' + (fdata.error || 'error desconocido');
+                            rc.appendChild(err);
+                            return;
+                        }
+                        var pre = document.createElement('pre');
+                        pre.className = 'output-box';
+                        if (reportPath.endsWith('.json')) {
+                            try { pre.textContent = JSON.stringify(JSON.parse(fdata.content), null, 2); }
+                            catch (_e) { pre.textContent = fdata.content; }
+                        } else {
+                            pre.textContent = fdata.content;
+                        }
+                        pre.style.background = '#1a2e1a';
+                        rc.appendChild(pre);
+                        var closeBtn = document.createElement('button');
+                        closeBtn.className = 'button is-small is-light mt-3';
+                        closeBtn.innerHTML =
+                            '<span class="icon"><i class="fas fa-times"></i></span>' +
+                            '<span>Cerrar reporte</span>';
+                        closeBtn.addEventListener('click', function() { rc.remove(); });
+                        rc.appendChild(closeBtn);
+                    })
+                    .catch(function(err) {
+                        loading.textContent = 'Error de red al cargar reporte: ' + err.message;
+                        loading.className = 'has-text-danger';
+                    });
+            }
+        }
+    })
+    .catch(function(error) {
+        outputPre.textContent = 'Error: ' + error.message;
+    })
+    .finally(function() {
+        btn.disabled = false;
+        btn.classList.remove('is-loading');
+    });
+}
+
+/* Wire up mode selectors */
+document.querySelectorAll('.mode-select').forEach(function(sel) {
+    sel.addEventListener('change', function() {
+        var helpEl = this.closest('.field').querySelector('.mode-help');
+        if (helpEl) {
+            helpEl.innerHTML = MODE_DESCRIPTIONS[this.value] || '';
+        }
+    });
+});
+
+/* Wire up forms */
+document.querySelectorAll('.sync-form').forEach(function(form) {
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var hasMode = form.dataset.hasMode === 'true';
+        var modeSelect = hasMode ? form.querySelector('.mode-select') : null;
+        var mode = modeSelect ? modeSelect.value : null;
+
+        if (mode === 'apply') {
+            pendingForm = form;
+            showModal();
+        } else {
+            executeSection(form);
+        }
+    });
+});
+
+/* Wire up clear buttons */
+document.querySelectorAll('.clear-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var container = btn.closest('.output-container');
+        container.querySelector('.output-pre').textContent = '';
+        container.style.display = 'none';
+        var report = container.parentElement.querySelector('.report-container');
+        if (report) report.remove();
+    });
+});
+</script>
+{% endblock %}
