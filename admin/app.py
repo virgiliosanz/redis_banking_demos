@@ -221,6 +221,24 @@ def _parse_drift_details(content: str) -> dict[str, dict[str, Any]]:
     return {"editorial": editorial, "platform": platform}
 
 
+def _describe_container_cron(command: str) -> str:
+    """Return a human-readable description for a container cron command."""
+    cmd = command.lower()
+    if "wp cron" in cmd or "wp-cron" in cmd:
+        return "Procesamiento de tareas programadas de WordPress"
+    if "snapshot" in cmd:
+        return "Snapshot de contenido editorial"
+    if "sync" in cmd:
+        return "Sincronizacion programada"
+    if "backup" in cmd:
+        return "Copia de seguridad programada"
+    if "cache" in cmd or "flush" in cmd:
+        return "Mantenimiento de cache"
+    if "eval-file" in cmd:
+        return "Script PHP interno de WordPress"
+    return "Tarea programada"
+
+
 def create_app() -> Flask:
     """Create and configure the Flask application."""
     app = Flask(
@@ -630,16 +648,19 @@ def create_crontab_blueprint() -> Blueprint:
                 continue
             parts = stripped.split(None, 5)
             if len(parts) >= 6:
+                command = parts[5]
                 entries.append({
                     "schedule": " ".join(parts[:5]),
-                    "command": parts[5],
+                    "command": command,
                     "status": "activo",
+                    "description": _describe_container_cron(command),
                 })
             elif len(parts) >= 1:
                 entries.append({
                     "schedule": "-",
                     "command": stripped,
                     "status": "variable",
+                    "description": _describe_container_cron(stripped),
                 })
 
         return jsonify({"entries": entries, "error": ""})

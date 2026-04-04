@@ -10,92 +10,65 @@
 </h1>
 <h2 class="subtitle">Estado y gestion de cron jobs</h2>
 
-<!-- Nightly Auditor -->
-<div class="box" id="section-nightly">
-    <div class="is-flex is-align-items-center mb-3">
-        <h3 class="title is-5 mb-0 mr-3">
-            <span class="icon-text">
-                <span class="icon"><i class="fas fa-moon"></i></span>
-                <span>Nightly Auditor</span>
-            </span>
-        </h3>
-        <span class="tag" id="badge-nightly">
-            <span class="icon is-small"><i class="fas fa-spinner fa-spin"></i></span>
+<!-- Seccion 1: Crons del host (IA-Ops) -->
+<div class="box">
+    <h3 class="title is-5">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-server"></i></span>
+            <span>Crons del host (IA-Ops)</span>
         </span>
+    </h3>
+    <div id="host-crons-loading" class="has-text-centered py-4">
+        <span class="icon is-large"><i class="fas fa-spinner fa-pulse fa-2x"></i></span>
+        <p class="mt-2">Cargando estado de crons...</p>
     </div>
-    <div id="status-nightly"></div>
-    <p class="help mt-3">
-        <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
-        Auditoria nocturna programada. Genera un reporte de salud, capacidad y riesgos operativos.
-    </p>
+    <table class="table is-fullwidth is-striped is-hoverable" id="host-crons-table" style="display: none;">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Horario</th>
+                <th>Descripcion</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="host-crons-body"></tbody>
+    </table>
 </div>
 
-<!-- Reactive Watch -->
-<div class="box" id="section-reactive">
-    <div class="is-flex is-align-items-center mb-3">
-        <h3 class="title is-5 mb-0 mr-3">
+<!-- Seccion 2: Crons del contenedor (cron-master) -->
+<div class="box">
+    <div class="is-flex is-align-items-center is-justify-content-space-between mb-3">
+        <h3 class="title is-5 mb-0">
             <span class="icon-text">
-                <span class="icon"><i class="fas fa-heartbeat"></i></span>
-                <span>Reactive Watch</span>
-            </span>
-        </h3>
-        <span class="tag" id="badge-reactive">
-            <span class="icon is-small"><i class="fas fa-spinner fa-spin"></i></span>
-        </span>
-    </div>
-    <div id="status-reactive"></div>
-    <p class="help mt-3">
-        <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
-        Watch reactivo cada 5 min. Detecta incidentes, aplica cooldown y lanza Sentry Agent si procede.
-    </p>
-</div>
-
-<!-- Sync Jobs -->
-<div class="box" id="section-sync">
-    <div class="is-flex is-align-items-center mb-3">
-        <h3 class="title is-5 mb-0 mr-3">
-            <span class="icon-text">
-                <span class="icon"><i class="fas fa-sync-alt"></i></span>
-                <span>Sync Jobs</span>
-            </span>
-        </h3>
-        <span class="tag" id="badge-sync">
-            <span class="icon is-small"><i class="fas fa-spinner fa-spin"></i></span>
-        </span>
-    </div>
-    <div id="status-sync"></div>
-    <p class="help mt-3">
-        <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
-        Sincronizacion editorial y de plataforma entre live y archive.
-    </p>
-</div>
-
-<!-- Crons del contenedor -->
-<div class="box" id="section-container-crons">
-    <div class="is-flex is-align-items-center mb-3">
-        <h3 class="title is-5 mb-0 mr-3">
-            <span class="icon-text">
-                <span class="icon"><i class="fas fa-box"></i></span>
+                <span class="icon"><i class="fas fa-cube"></i></span>
                 <span>Crons del contenedor (cron-master)</span>
             </span>
         </h3>
-        <button class="button is-small is-light ml-3" id="refreshContainerCrons" title="Actualizar">
+        <button class="button is-small is-light" id="refreshContainerCrons" title="Actualizar">
             <span class="icon"><i class="fas fa-sync-alt"></i></span>
             <span>Actualizar</span>
         </button>
     </div>
-    <p class="help mb-3">
-        <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
-        Estos crons se ejecutan dentro del contenedor cron-master y gestionan tareas WordPress internas.
-    </p>
     <div id="container-crons-loading" class="has-text-centered py-4">
         <span class="icon is-large"><i class="fas fa-spinner fa-pulse fa-2x"></i></span>
         <p class="mt-2">Cargando crons del contenedor...</p>
     </div>
     <div id="container-crons-error" class="notification is-warning" style="display: none;"></div>
-    <div id="container-crons-table" style="display: none;"></div>
+    <table class="table is-fullwidth is-striped is-hoverable" id="container-crons-table" style="display: none;">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Horario</th>
+                <th>Descripcion</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody id="container-crons-body"></tbody>
+    </table>
 </div>
 
+<!-- Salida compartida -->
 <div class="box" id="outputContainer" style="display: none;">
     <h3 class="title is-5">
         <span class="icon-text">
@@ -140,6 +113,7 @@
     var JOBS = {
         nightly: {
             label: 'Nightly Auditor',
+            description: 'Auditoria nocturna de salud, capacidad y riesgos operativos',
             installCmd: 'install-nightly-crontab',
             removeCmd: 'remove-nightly-crontab',
             runButtons: [
@@ -148,6 +122,7 @@
         },
         reactive: {
             label: 'Reactive Watch',
+            description: 'Deteccion reactiva de incidentes cada 5 minutos con cooldown',
             installCmd: 'install-reactive-crontab',
             removeCmd: 'remove-reactive-crontab',
             runButtons: [
@@ -156,6 +131,7 @@
         },
         sync: {
             label: 'Sync Jobs',
+            description: 'Sincronizacion editorial y de plataforma entre live y archive',
             installCmd: 'install-sync-crontab',
             removeCmd: 'remove-sync-crontab',
             runButtons: [
@@ -197,82 +173,93 @@
         }
     });
 
-    function renderSection(key, data) {
-        var job = JOBS[key];
-        var badge = document.getElementById('badge-' + key);
-        var container = document.getElementById('status-' + key);
-        var installed = data && data.installed;
-
-        if (installed) {
-            badge.className = 'tag is-success';
-            badge.innerHTML = '<span class="icon is-small has-text-success"><i class="fas fa-check-circle"></i></span>&nbsp;Instalado';
-        } else {
-            badge.className = 'tag is-warning';
-            badge.innerHTML = '<span class="icon is-small has-text-warning"><i class="fas fa-exclamation-triangle"></i></span>&nbsp;No instalado';
-        }
-
-        var html = '';
-        if (installed && data.line) {
-            html += '<pre class="output-box" style="font-size:0.85em;padding:0.75em;margin-bottom:0.75em;">' +
-                escapeHtml(data.line) + '</pre>';
-        } else {
-            html += '<p class="has-text-grey mb-3">Este cron job no esta instalado.</p>';
-        }
-
-        html += '<div class="buttons">';
-        if (installed) {
-            html += '<button class="button is-danger is-outlined" onclick="showConfirmModal(\'' +
-                job.removeCmd + '\', \'desinstalar\', \'' + job.label + '\')">' +
-                '<span class="icon"><i class="fas fa-trash-alt"></i></span>' +
-                '<span>Desinstalar</span></button>';
-        } else {
-            html += '<button class="button is-success" onclick="showConfirmModal(\'' +
-                job.installCmd + '\', \'instalar\', \'' + job.label + '\')">' +
-                '<span class="icon"><i class="fas fa-plus-circle"></i></span>' +
-                '<span>Instalar</span></button>';
-        }
-
-        for (var i = 0; i < job.runButtons.length; i++) {
-            var rb = job.runButtons[i];
-            if (rb.sync) {
-                html += '<button class="button is-warning" onclick="runSyncNow(\'' + rb.cmd + '\')">' +
-                    '<span class="icon"><i class="fas fa-play"></i></span>' +
-                    '<span>' + rb.label + '</span></button>';
-            } else {
-                html += '<button class="button is-warning" onclick="runCrontab(\'' + rb.cmd + '\')">' +
-                    '<span class="icon"><i class="fas fa-play"></i></span>' +
-                    '<span>' + rb.label + '</span></button>';
-            }
-        }
-        html += '</div>';
-
-        if (data && data.error) {
-            html += '<p class="has-text-danger is-size-7 mt-1">' +
-                '<span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span> ' +
-                escapeHtml(data.error) + '</p>';
-        }
-
-        container.innerHTML = html;
-    }
-
     function escapeHtml(text) {
         var div = document.createElement('div');
         div.appendChild(document.createTextNode(text));
         return div.innerHTML;
     }
 
+    function extractSchedule(line) {
+        if (!line) return '-';
+        var parts = line.trim().split(/\s+/);
+        if (parts.length >= 5) return parts.slice(0, 5).join(' ');
+        return '-';
+    }
+
+    function renderHostCrons(data) {
+        var loading = document.getElementById('host-crons-loading');
+        var table = document.getElementById('host-crons-table');
+        var tbody = document.getElementById('host-crons-body');
+        var html = '';
+
+        var keys = ['nightly', 'reactive', 'sync'];
+        for (var i = 0; i < keys.length; i++) {
+            var key = keys[i];
+            var job = JOBS[key];
+            var info = data[key] || { installed: false, line: null };
+            var installed = info && info.installed;
+            var schedule = installed ? extractSchedule(info.line) : '-';
+
+            html += '<tr>';
+            html += '<td><strong>' + escapeHtml(job.label) + '</strong></td>';
+            html += '<td>' + escapeHtml(schedule) + '</td>';
+            html += '<td>' + escapeHtml(job.description) + '</td>';
+
+            if (installed) {
+                html += '<td><span class="tag is-success">Instalado</span></td>';
+            } else {
+                html += '<td><span class="tag is-warning">No instalado</span></td>';
+            }
+
+            html += '<td><div class="buttons are-small">';
+            if (installed) {
+                html += '<button class="button is-danger is-outlined" onclick="showConfirmModal(\'' +
+                    job.removeCmd + '\', \'desinstalar\', \'' + job.label + '\')">' +
+                    '<span class="icon"><i class="fas fa-trash-alt"></i></span>' +
+                    '<span>Desinstalar</span></button>';
+            } else {
+                html += '<button class="button is-success" onclick="showConfirmModal(\'' +
+                    job.installCmd + '\', \'instalar\', \'' + job.label + '\')">' +
+                    '<span class="icon"><i class="fas fa-plus-circle"></i></span>' +
+                    '<span>Instalar</span></button>';
+            }
+            for (var j = 0; j < job.runButtons.length; j++) {
+                var rb = job.runButtons[j];
+                if (rb.sync) {
+                    html += '<button class="button is-warning" onclick="runSyncNow(\'' + rb.cmd + '\')">' +
+                        '<span class="icon"><i class="fas fa-play"></i></span>' +
+                        '<span>' + escapeHtml(rb.label) + '</span></button>';
+                } else {
+                    html += '<button class="button is-warning" onclick="runCrontab(\'' + rb.cmd + '\')">' +
+                        '<span class="icon"><i class="fas fa-play"></i></span>' +
+                        '<span>' + escapeHtml(rb.label) + '</span></button>';
+                }
+            }
+            html += '</div></td>';
+
+            if (info && info.error) {
+                html += '<td><span class="has-text-danger is-size-7">' +
+                    '<span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span> ' +
+                    escapeHtml(info.error) + '</span></td>';
+            }
+
+            html += '</tr>';
+        }
+
+        tbody.innerHTML = html;
+        loading.style.display = 'none';
+        table.style.display = 'table';
+    }
+
     function fetchStatus() {
         fetch('/crontab/api/status')
             .then(function(r) { return r.json(); })
             .then(function(data) {
-                renderSection('nightly', data.nightly || { installed: false, line: null });
-                renderSection('reactive', data.reactive || { installed: false, line: null });
-                renderSection('sync', data.sync || { installed: false, line: null });
+                renderHostCrons(data);
             })
             .catch(function(err) {
-                ['nightly', 'reactive', 'sync'].forEach(function(key) {
-                    renderSection(key, { installed: false, line: null, error: 'Error de red: ' + err.message });
-                });
+                document.getElementById('host-crons-loading').innerHTML =
+                    '<p class="has-text-danger"><span class="icon"><i class="fas fa-exclamation-triangle"></i></span> Error de red: ' + escapeHtml(err.message) + '</p>';
             });
     }
 
@@ -325,27 +312,37 @@
     var containerLoading = document.getElementById('container-crons-loading');
     var containerError = document.getElementById('container-crons-error');
     var containerTable = document.getElementById('container-crons-table');
+    var containerBody = document.getElementById('container-crons-body');
+
+    function cronCommandName(command) {
+        var cmd = command.toLowerCase();
+        if (cmd.indexOf('wp cron') !== -1 || cmd.indexOf('wp-cron') !== -1) return 'WP Cron';
+        if (cmd.indexOf('snapshot') !== -1) return 'Snapshot';
+        if (cmd.indexOf('sync') !== -1) return 'Sync';
+        if (cmd.indexOf('backup') !== -1) return 'Backup';
+        var match = command.match(/\/([^\/\s]+)\s*$/);
+        if (match) return match[1];
+        return 'Cron job';
+    }
 
     function renderContainerCrons(entries) {
         if (!entries || entries.length === 0) {
-            containerTable.innerHTML = '<p class="has-text-grey">No se encontraron entradas de crontab en el contenedor.</p>';
-            containerTable.style.display = 'block';
+            containerBody.innerHTML = '<tr><td colspan="4" class="has-text-grey has-text-centered">No se encontraron entradas de crontab en el contenedor.</td></tr>';
+            containerTable.style.display = 'table';
             return;
         }
-        var html = '<table class="table is-fullwidth is-striped is-hoverable">';
-        html += '<thead><tr><th>Horario</th><th>Comando</th><th>Estado</th></tr></thead><tbody>';
+        var html = '';
         for (var i = 0; i < entries.length; i++) {
             var e = entries[i];
-            var statusTag = e.status === 'activo'
-                ? '<span class="tag is-success">Activo</span>'
-                : '<span class="tag is-info">Variable</span>';
-            html += '<tr><td><code>' + escapeHtml(e.schedule) + '</code></td>' +
-                '<td style="max-width:500px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(e.command) + '"><code>' + escapeHtml(e.command) + '</code></td>' +
-                '<td>' + statusTag + '</td></tr>';
+            html += '<tr>';
+            html += '<td><strong>' + escapeHtml(cronCommandName(e.command)) + '</strong></td>';
+            html += '<td>' + escapeHtml(e.schedule) + '</td>';
+            html += '<td>' + escapeHtml(e.description || 'Tarea programada') + '</td>';
+            html += '<td><span class="tag is-success">Activo</span></td>';
+            html += '</tr>';
         }
-        html += '</tbody></table>';
-        containerTable.innerHTML = html;
-        containerTable.style.display = 'block';
+        containerBody.innerHTML = html;
+        containerTable.style.display = 'table';
     }
 
     function fetchContainerCrons() {

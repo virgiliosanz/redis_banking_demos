@@ -64,7 +64,7 @@
         <tbody>
         {% for job in data.jobs %}
             <tr>
-                <td><code style="background-color: rgba(255,255,255,0.1); color: #b5b5b5; padding: 2px 4px; border-radius: 3px;">{{ job.job_name }}</code></td>
+                <td>{{ job.job_name }}</td>
                 <td>{{ status_tag(job.status) }}</td>
                 <td>{{ job.source }}</td>
                 <td>
@@ -107,7 +107,7 @@
                 {{ status_tag(data.recent_log_errors.status) }}
             </div>
             <div class="level-item">
-                <span>{{ data.recent_log_errors.count }} errores encontrados (patron: <code style="background-color: rgba(255,255,255,0.1); color: #b5b5b5; padding: 2px 4px; border-radius: 3px;">{{ data.recent_log_errors.pattern }}</code>)</span>
+                <span>{{ data.recent_log_errors.count }} errores encontrados (patron: {{ data.recent_log_errors.pattern }})</span>
             </div>
         </div>
     </div>
@@ -122,7 +122,7 @@
 <div class="box">
     <h3 class="title is-5">
         <span class="icon-text">
-            <span class="icon"><i class="fas fa-docker fa-lg"></i></span>
+            <span class="icon"><i class="fas fa-cube fa-lg"></i></span>
             <span>Crontab del contenedor (cron-master)</span>
         </span>
     </h3>
@@ -143,8 +143,8 @@
         <tbody>
         {% for entry in container_crons %}
             <tr>
-                <td><code style="background-color: rgba(255,255,255,0.1); color: #b5b5b5; padding: 2px 4px; border-radius: 3px;">{{ entry.schedule }}</code></td>
-                <td style="max-width: 500px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ entry.command }}"><code style="background-color: rgba(255,255,255,0.1); color: #b5b5b5; padding: 2px 4px; border-radius: 3px;">{{ entry.command }}</code></td>
+                <td>{{ entry.schedule }}</td>
+                <td style="max-width: 500px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ entry.command }}">{{ entry.command }}</td>
                 <td>
                     {% if entry.status == 'activo' %}
                     <span class="tag is-success">Activo</span>
