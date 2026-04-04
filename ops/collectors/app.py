@@ -10,22 +10,40 @@ from ..util.time import utc_timestamp
 
 def _http_check(url: str, *, expected_http_code: int = 200) -> dict[str, object]:
     http_code = get_status_code(url)
+    if http_code == expected_http_code:
+        status = "ok"
+        reason = ""
+    elif http_code == 0:
+        status = "unreachable"
+        reason = "No se pudo conectar al servicio (timeout o conexion rechazada)"
+    else:
+        status = "critical"
+        reason = f"Esperado HTTP {expected_http_code}, recibido {http_code}"
     return {
         "url": url,
         "http_code": http_code,
         "expected_http_code": expected_http_code,
-        "status": "ok" if http_code == expected_http_code else "critical",
+        "status": status,
+        "reason": reason,
     }
 
 
 def _run_smoke(name: str, script: str, *, cwd: Path) -> dict[str, object]:
     result = run_command([script], cwd=cwd, check=False)
-    return {
+    ok = result.returncode == 0
+    entry: dict[str, object] = {
         "name": name,
         "script": script,
         "source": "local_smoke_script",
-        "status": "ok" if result.returncode == 0 else "critical",
+        "status": "ok" if ok else "critical",
     }
+    if not ok:
+        detail = (result.stderr or result.stdout or "").strip()
+        # Limit detail length to avoid bloating the payload
+        if len(detail) > 300:
+            detail = detail[:300] + "..."
+        entry["error_detail"] = detail or f"exit code {result.returncode}"
+    return entry
 
 
 def collect(settings: Settings) -> dict[str, object]:
