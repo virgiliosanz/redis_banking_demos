@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Containers{% endblock %}
+{% block title %}Contenedores{% endblock %}
 
 {% block content %}
 <h1 class="title">
     <span class="icon-text">
         <span class="icon"><i class="fas fa-cubes"></i></span>
-        <span>Containers</span>
+        <span>Contenedores</span>
     </span>
 </h1>
-<h2 class="subtitle">Docker Compose services status and management</h2>
+<h2 class="subtitle">Estado y gestion de servicios Docker Compose</h2>
 
 <div class="box">
     <div class="level">
@@ -16,7 +16,7 @@
             <div class="level-item">
                 <button class="button is-link" id="refreshBtn" title="Muestra el estado actual de los servicios Docker. Solo lectura.">
                     <span class="icon"><i class="fas fa-sync-alt"></i></span>
-                    <span>Refresh</span>
+                    <span>Actualizar</span>
                 </button>
             </div>
         </div>
@@ -24,7 +24,7 @@
             <div class="level-item">
                 <label class="checkbox mr-4" title="Actualiza la tabla cada 30 segundos automaticamente">
                     <input type="checkbox" id="autoRefreshToggle">
-                    Auto-refresh (30s)
+                    Auto-actualizar (30s)
                 </label>
             </div>
             <div class="level-item">
@@ -42,7 +42,7 @@
         <span class="icon is-large">
             <i class="fas fa-spinner fa-pulse fa-2x"></i>
         </span>
-        <p>Loading containers...</p>
+        <p>Cargando contenedores...</p>
     </div>
 
     <div id="tableContainer" class="is-hidden">
@@ -53,10 +53,10 @@
         <table class="table is-fullwidth is-striped is-hoverable">
             <thead>
                 <tr>
-                    <th>Service</th>
-                    <th>State</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th>Servicio</th>
+                    <th>Estado</th>
+                    <th>Detalle</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody id="servicesTable">
@@ -70,15 +70,15 @@
     <div class="modal-background"></div>
     <div class="modal-card">
         <header class="modal-card-head">
-            <p class="modal-card-title" id="confirmTitle">Confirm Action</p>
+            <p class="modal-card-title" id="confirmTitle">Confirmar accion</p>
             <button class="delete" aria-label="close" onclick="closeModal()"></button>
         </header>
         <section class="modal-card-body">
             <p id="confirmMessage"></p>
         </section>
         <footer class="modal-card-foot">
-            <button class="button is-danger" id="confirmBtn">Confirm</button>
-            <button class="button" onclick="closeModal()">Cancel</button>
+            <button class="button is-danger" id="confirmBtn">Confirmar</button>
+            <button class="button" onclick="closeModal()">Cancelar</button>
         </footer>
     </div>
 </div>
@@ -115,7 +115,7 @@ function renderServices(services) {
     tbody.innerHTML = '';
     
     if (services.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="has-text-centered has-text-grey-light">No services found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="has-text-centered has-text-grey-light">No se encontraron servicios</td></tr>';
         return;
     }
     
@@ -146,15 +146,15 @@ function renderServices(services) {
             <div class="buttons">
                 <button class="button is-small is-success" onclick="startService('${serviceName}')" title="Inicia un servicio detenido.">
                     <span class="icon is-small"><i class="fas fa-play"></i></span>
-                    <span>Start</span>
+                    <span>Iniciar</span>
                 </button>
                 <button class="button is-small is-warning" onclick="confirmAction('restart', '${serviceName}')" title="Reinicia el servicio. Causa interrupcion temporal del servicio afectado.">
                     <span class="icon is-small"><i class="fas fa-redo"></i></span>
-                    <span>Restart</span>
+                    <span>Reiniciar</span>
                 </button>
                 <button class="button is-small is-danger" onclick="confirmAction('stop', '${serviceName}')" title="Detiene el servicio. El servicio dejara de responder hasta que se inicie manualmente.">
                     <span class="icon is-small"><i class="fas fa-stop"></i></span>
-                    <span>Stop</span>
+                    <span>Detener</span>
                 </button>
                 <a class="button is-small is-info" href="/containers/${serviceName}/logs" title="Muestra las ultimas lineas de log del servicio. Solo lectura.">
                     <span class="icon is-small"><i class="fas fa-file-alt"></i></span>
@@ -188,7 +188,7 @@ async function loadContainers() {
         document.getElementById('loadingState').classList.add('is-hidden');
         document.getElementById('tableContainer').classList.remove('is-hidden');
     } catch (error) {
-        showError('Failed to load containers: ' + error.message);
+        showError('Error al cargar contenedores: ' + error.message);
         document.getElementById('loadingState').classList.add('is-hidden');
     }
 }
@@ -196,8 +196,9 @@ async function loadContainers() {
 function confirmAction(action, service) {
     currentAction = { action, service };
     const modal = document.getElementById('confirmModal');
-    const title = action.charAt(0).toUpperCase() + action.slice(1) + ' Service';
-    const message = `Are you sure you want to ${action} service "${service}"?`;
+    const actionLabels = {restart: 'Reiniciar', stop: 'Detener'};
+    const title = (actionLabels[action] || action) + ' servicio';
+    const message = `Seguro que deseas ${(actionLabels[action] || action).toLowerCase()} el servicio "${service}"?`;
     
     document.getElementById('confirmTitle').textContent = title;
     document.getElementById('confirmMessage').textContent = message;
@@ -229,10 +230,10 @@ async function executeAction() {
             // Reload containers after successful action
             await loadContainers();
         } else {
-            showError(`Failed to ${action} service: ${data.output || 'Unknown error'}`);
+            showError(`Error al ${action} servicio: ${data.output || 'Error desconocido'}`);
         }
     } catch (error) {
-        showError(`Error executing ${action}: ${error.message}`);
+        showError(`Error al ejecutar ${action}: ${error.message}`);
     } finally {
         buttons.forEach(btn => btn.disabled = false);
     }
@@ -251,10 +252,10 @@ async function startService(service) {
         if (data.success) {
             await loadContainers();
         } else {
-            showError(`Failed to start service: ${data.output || 'Unknown error'}`);
+            showError(`Error al iniciar servicio: ${data.output || 'Error desconocido'}`);
         }
     } catch (error) {
-        showError(`Error starting service: ${error.message}`);
+        showError(`Error al iniciar servicio: ${error.message}`);
     } finally {
         buttons.forEach(btn => btn.disabled = false);
     }

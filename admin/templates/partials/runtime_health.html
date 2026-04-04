@@ -4,7 +4,7 @@
             <h2 class="title is-4 mb-0">
                 <span class="icon-text">
                     <span class="icon"><i class="fas fa-cogs"></i></span>
-                    <span>Runtime Health</span>
+                    <span>Salud del Runtime</span>
                 </span>
             </h2>
         </div>
@@ -18,7 +18,7 @@
         </div>
     </div>
 </div>
-<p class="subtitle is-6">Estado de contenedores, healthz y errores HTTP</p>
+<p class="subtitle is-6">Estado de contenedores, Healthz y errores HTTP</p>
 
 {% if error %}
 <div class="notification is-danger">
@@ -32,17 +32,17 @@
     <h3 class="title is-5">
         <span class="icon-text">
             <span class="icon"><i class="fas fa-cubes"></i></span>
-            <span>Containers</span>
+            <span>Contenedores</span>
         </span>
     </h3>
     <table class="table is-fullwidth is-striped">
         <thead>
             <tr>
-                <th>Container</th>
-                <th>Running</th>
-                <th>Status</th>
-                <th>Health</th>
-                <th>Started At</th>
+                <th>Contenedor</th>
+                <th>En ejecucion</th>
+                <th>Estado</th>
+                <th>Salud</th>
+                <th>Iniciado</th>
             </tr>
         </thead>
         <tbody>
@@ -148,7 +148,7 @@
 
 <p class="is-size-7 has-text-grey mt-2">
     <span class="icon is-small"><i class="fas fa-clock"></i></span>
-    Generated at {{ data.generated_at }}
+    Generado: {{ data.generated_at }}
 </p>
 
 {% endif %}

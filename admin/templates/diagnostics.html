@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Diagnostics{% endblock %}
+{% block title %}Diagnostico{% endblock %}
 
 {% block content %}
 <h1 class="title">
     <span class="icon-text">
         <span class="icon"><i class="fas fa-stethoscope"></i></span>
-        <span>Diagnostics</span>
+        <span>Diagnostico</span>
     </span>
 </h1>
 <h2 class="subtitle">Collectors y agentes de diagnostico</h2>
@@ -15,7 +15,7 @@
     <h3 class="title is-4">
         <span class="icon-text">
             <span class="icon"><i class="fas fa-chart-line"></i></span>
-            <span>Collectors &amp; Agents</span>
+            <span>Collectors y Agentes</span>
         </span>
     </h3>
     <div class="tabs is-boxed is-medium" id="collectorTabs">
@@ -37,7 +37,7 @@
     <h3 class="title is-4">
         <span class="icon-text">
             <span class="icon"><i class="fas fa-terminal"></i></span>
-            <span>Output</span>
+            <span>Salida</span>
         </span>
     </h3>
     <div id="loadingIndicator" class="notification is-info" style="display: none;">
@@ -136,6 +136,7 @@
             'Error al cargar.' +
             ' <button class="button is-small is-danger is-outlined ml-3" id="retryBtn">' +
             '<span class="icon"><i class="fas fa-redo"></i></span><span>Reintentar</span></button></div>';
+
         document.getElementById('retryBtn').addEventListener('click', function() {
             loadTab(tabName);
         });
@@ -165,7 +166,7 @@
         tabContent.innerHTML =
             '<div style="position:relative">' +
             '<button class="button is-small is-light" ' +
-            'style="position:absolute;top:0;right:0;z-index:1" id="refreshBtn" title="Refrescar">' +
+            'style="position:absolute;top:0;right:0;z-index:1" id="refreshBtn" title="Actualizar">' +
             '<span class="icon"><i class="fas fa-sync-alt"></i></span></button>' +
             '<div>' + html + '</div></div>';
         document.getElementById('refreshBtn').addEventListener('click', function() {

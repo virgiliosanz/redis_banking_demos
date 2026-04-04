@@ -19,7 +19,7 @@
             <h2 class="title is-4 mb-0">
                 <span class="icon-text">
                     <span class="icon"><i class="fas fa-globe"></i></span>
-                    <span>App Health</span>
+                    <span>Salud de la App</span>
                 </span>
             </h2>
         </div>
@@ -37,7 +37,7 @@
 {% if data.error is defined %}
 <div class="notification is-danger">
     <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
-    <span>Error collecting App health: {{ data.error }}</span>
+    <span>Error al recopilar salud de la App: {{ data.error }}</span>
 </div>
 {% else %}
 
@@ -47,7 +47,7 @@
     <h3 class="title is-5">
         <span class="icon-text">
             <span class="icon"><i class="fas fa-globe"></i></span>
-            <span>HTTP Checks</span>
+            <span>Comprobaciones HTTP</span>
         </span>
     </h3>
     <div class="columns">
@@ -95,7 +95,7 @@
             <tr>
                 <th>Test</th>
                 <th>Script</th>
-                <th>Result</th>
+                <th>Resultado</th>
             </tr>
         </thead>
         <tbody>
@@ -112,14 +112,14 @@
         </tbody>
     </table>
     {% else %}
-    <p class="has-text-grey">No smoke tests configured.</p>
+    <p class="has-text-grey">No hay smoke tests configurados.</p>
     {% endif %}
 </div>
 
 {% if data.generated_at %}
 <p class="help has-text-grey">
     <span class="icon is-small"><i class="fas fa-clock"></i></span>
-    Generated at {{ data.generated_at }}
+    Generado: {{ data.generated_at }}
 </p>
 {% endif %}
 

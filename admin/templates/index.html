@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
+{% block title %}Panel{% endblock %}
 
 {% block content %}
 <h1 class="title">
     <span class="icon-text">
         <span class="icon"><i class="fas fa-tachometer-alt"></i></span>
-        <span>Dashboard</span>
+        <span>Panel</span>
     </span>
 </h1>
 <h2 class="subtitle">Panel de administracion - nuevecuatrouno</h2>
@@ -53,7 +53,7 @@
                 </div>
             </div>
             <footer class="card-footer">
-                <a href="/diagnostics" class="card-footer-item">Ir a Diagnostics</a>
+                <a href="/diagnostics" class="card-footer-item">Ir a Diagnostico</a>
             </footer>
         </div>
     </div>
@@ -76,7 +76,7 @@
                 </div>
             </div>
             <footer class="card-footer">
-                <a href="/sync/" class="card-footer-item">Ir a Sync</a>
+                <a href="/sync/" class="card-footer-item">Ir a Sincronizacion</a>
             </footer>
         </div>
     </div>
@@ -93,7 +93,7 @@
             <div class="card-content">
                 <div class="content">
                     <ul>
-                        <li>Rollover content year</li>
+                        <li>Rollover de contenido anual</li>
                         <li>Modos: report-only / dry-run / execute</li>
                     </ul>
                 </div>
@@ -117,7 +117,7 @@
                 <div class="content">
                     <ul>
                         <li>Instalar/desinstalar crons</li>
-                        <li>Render crontab blocks</li>
+                        <li>Renderizar bloques de crontab</li>
                         <li>Sync, nightly, reactive</li>
                     </ul>
                 </div>
@@ -157,7 +157,7 @@ function loadContainers() {
             el.innerHTML =
                 '<p><span class="tag ' + tagClass + ' is-medium">' +
                 '<span class="icon"><i class="fas ' + icon + '"></i></span>&nbsp;' +
-                running + '/' + total + ' running</span></p>' +
+                running + '/' + total + ' en ejecucion</span></p>' +
                 '<p class="is-size-7 has-text-grey mt-2">Servicios Docker Compose</p>';
         })
         .catch(function() { setCardError(el); });

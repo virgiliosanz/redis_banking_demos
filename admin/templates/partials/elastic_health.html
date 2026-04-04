@@ -23,7 +23,7 @@
             <h2 class="title is-4 mb-0">
                 <span class="icon-text">
                     <span class="icon"><i class="fas fa-search"></i></span>
-                    <span>Elastic Health</span>
+                    <span>Salud de Elasticsearch</span>
                 </span>
             </h2>
         </div>
@@ -41,7 +41,7 @@
 {% if data.error is defined %}
 <div class="notification is-danger">
     <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
-    <span>Error collecting Elasticsearch health: {{ data.error }}</span>
+    <span>Error al recopilar salud de Elasticsearch: {{ data.error }}</span>
 </div>
 {% else %}
 
@@ -51,7 +51,7 @@
     <h3 class="title is-5">
         <span class="icon-text">
             <span class="icon"><i class="fas fa-heartbeat"></i></span>
-            <span>Cluster Health</span>
+            <span>Salud del Cluster</span>
         </span>
     </h3>
     <div class="level">
@@ -153,7 +153,7 @@
         </tbody>
     </table>
     {% else %}
-    <p class="has-text-grey">No indices found.</p>
+    <p class="has-text-grey">No se encontraron indices.</p>
     {% endif %}
 </div>
 
@@ -185,7 +185,7 @@
     {% else %}
     <div class="notification is-danger is-light">
         <span class="icon"><i class="fas fa-times-circle"></i></span>
-        <span>Alias <strong>{{ alias.alias_name }}</strong> not found.</span>
+        <span>Alias <strong>{{ alias.alias_name }}</strong> no encontrado.</span>
     </div>
     {% endif %}
 </div>
@@ -193,7 +193,7 @@
 {% if data.generated_at %}
 <p class="help has-text-grey">
     <span class="icon is-small"><i class="fas fa-clock"></i></span>
-    Generated at {{ data.generated_at }}
+    Generado: {{ data.generated_at }}
 </p>
 {% endif %}
 

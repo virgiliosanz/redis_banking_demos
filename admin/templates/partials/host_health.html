@@ -9,7 +9,7 @@
             <h2 class="title is-4 mb-0">
                 <span class="icon-text">
                     <span class="icon"><i class="fas fa-server"></i></span>
-                    <span>Host Health</span>
+                    <span>Salud del Host</span>
                 </span>
             </h2>
         </div>
@@ -41,7 +41,7 @@
         </div>
         <div class="level-item has-text-centered">
             <div>
-                <p class="heading">Project</p>
+                <p class="heading">Proyecto</p>
                 <p class="title is-6" style="font-size:0.75rem;">{{ data.host.project_path }}</p>
             </div>
         </div>
@@ -86,7 +86,7 @@
         <div class="box">
             <h3 class="title is-5">
                 <span class="icon"><i class="fas fa-memory"></i></span>
-                <span>Memory</span>
+                <span>Memoria</span>
                 {% set mem = data.checks.memory %}
                 <span class="tag is-{{ 'success' if mem.status == 'ok' else ('warning' if mem.status == 'warning' else 'danger') }} is-light ml-2">{{ status_label(mem.status) }}</span>
             </h3>
@@ -112,7 +112,7 @@
                 {% set disk = data.checks.disk %}
                 <span class="tag is-{{ 'success' if disk.status == 'ok' else ('warning' if disk.status == 'warning' else 'danger') }} is-light ml-2">{{ status_label(disk.status) }}</span>
             </h3>
-            <p class="mb-1"><strong>{{ disk.used_pct }}%</strong> used</p>
+            <p class="mb-1"><strong>{{ disk.used_pct }}%</strong> en uso</p>
             <progress class="progress is-{{ 'success' if disk.status == 'ok' else ('warning' if disk.status == 'warning' else 'danger') }}" value="{{ disk.used_pct }}" max="100">{{ disk.used_pct }}%</progress>
             <p class="help">Thresholds: warning {{ disk.thresholds.warning }}% / critical {{ disk.thresholds.critical }}%</p>
             {% if disk.status == 'warning' %}

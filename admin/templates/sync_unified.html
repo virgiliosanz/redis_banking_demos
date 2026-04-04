@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Sync{% endblock %}
+{% block title %}Sincronizacion{% endblock %}
 
 {% block content %}
 <h1 class="title">
@@ -15,7 +15,7 @@
     <h3 class="title is-4">
         <span class="icon-text">
             <span class="icon"><i class="fas fa-users"></i></span>
-            <span>Sync Editorial Users</span>
+            <span>Sync Editorial</span>
         </span>
     </h3>
     <p class="subtitle is-6">Sincronizar usuarios editoriales entre live y archive</p>
@@ -65,7 +65,7 @@
     <h3 class="title is-4">
         <span class="icon-text">
             <span class="icon"><i class="fas fa-cogs"></i></span>
-            <span>Sync Platform Config</span>
+            <span>Sync Plataforma</span>
         </span>
     </h3>
     <p class="subtitle is-6">Sincronizar configuracion de plataforma entre live y archive</p>
@@ -115,7 +115,7 @@
     <h3 class="title is-4">
         <span class="icon-text">
             <span class="icon"><i class="fas fa-exchange-alt"></i></span>
-            <span>Drift Report</span>
+            <span>Reporte de Drift</span>
         </span>
     </h3>
     <p class="subtitle is-6">Reporte de desviaciones entre live y archive</p>
@@ -232,7 +232,7 @@ function executeSection(form) {
                 rh.innerHTML =
                     '<span class="icon-text">' +
                     '<span class="icon"><i class="fas fa-file-alt"></i></span>' +
-                    '<span>Contenido del reporte:</span></span>';
+                    '<span>Contenido del reporte</span></span>';
                 rc.appendChild(rh);
 
                 var loading = document.createElement('p');

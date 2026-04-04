@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Reports{% endblock %}
+{% block title %}Reportes{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -26,7 +26,7 @@
 {% block content %}
 <h1 class="title">
     <span class="icon"><i class="fas fa-folder-open"></i></span>
-    <span>Reports</span>
+    <span>Reportes</span>
 </h1>
 <p class="subtitle">Reportes generados en runtime/reports/</p>
 
@@ -75,6 +75,7 @@
                 var btn = document.createElement('button');
                 btn.className = 'button is-small is-dark mt-2';
                 btn.innerHTML = '<span class="icon"><i class="fas fa-times"></i></span><span>Cerrar</span>';
+
                 btn.onclick = function() { viewer.style.display = 'none'; };
                 viewer.appendChild(pre);
                 viewer.appendChild(btn);

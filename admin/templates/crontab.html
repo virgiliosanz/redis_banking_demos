@@ -5,7 +5,7 @@
 <h1 class="title">
     <span class="icon-text">
         <span class="icon"><i class="fas fa-clock"></i></span>
-        <span>Crontab Management</span>
+        <span>Gestion de Crontab</span>
     </span>
 </h1>
 <h2 class="subtitle">Estado y gestion de cron jobs</h2>
@@ -117,7 +117,7 @@
             installCmd: 'install-nightly-crontab',
             removeCmd: 'remove-nightly-crontab',
             runButtons: [
-                { label: 'Run Now', cmd: 'run-nightly-auditor', sync: false }
+                { label: 'Ejecutar ahora', cmd: 'run-nightly-auditor', sync: false }
             ]
         },
         reactive: {
@@ -125,7 +125,7 @@
             installCmd: 'install-reactive-crontab',
             removeCmd: 'remove-reactive-crontab',
             runButtons: [
-                { label: 'Run Now', cmd: 'run-reactive-watch', sync: false }
+                { label: 'Ejecutar ahora', cmd: 'run-reactive-watch', sync: false }
             ]
         },
         sync: {
@@ -133,8 +133,8 @@
             installCmd: 'install-sync-crontab',
             removeCmd: 'remove-sync-crontab',
             runButtons: [
-                { label: 'Run Editorial Now', cmd: 'sync-editorial-users', sync: true },
-                { label: 'Run Platform Now', cmd: 'sync-platform-config', sync: true }
+                { label: 'Ejecutar Editorial', cmd: 'sync-editorial-users', sync: true },
+                { label: 'Ejecutar Plataforma', cmd: 'sync-platform-config', sync: true }
             ]
         }
     };
@@ -178,11 +178,11 @@
         var installed = data && data.installed;
 
         if (installed) {
-            badge.className = 'tag is-success is-light';
-            badge.innerHTML = '<span class="icon is-small"><i class="fas fa-check-circle"></i></span>&nbsp;Instalado';
+            badge.className = 'tag is-success';
+            badge.innerHTML = '<span class="icon is-small has-text-success"><i class="fas fa-check-circle"></i></span>&nbsp;Instalado';
         } else {
-            badge.className = 'tag is-light';
-            badge.innerHTML = '<span class="icon is-small"><i class="fas fa-minus-circle"></i></span>&nbsp;No instalado';
+            badge.className = 'tag is-warning';
+            badge.innerHTML = '<span class="icon is-small has-text-warning"><i class="fas fa-exclamation-triangle"></i></span>&nbsp;No instalado';
         }
 
         var html = '';
