@@ -1,0 +1,142 @@
+{% if standalone %}
+{% extends "base.html" %}
+{% block title %}Runtime Health{% endblock %}
+{% block content %}
+{% endif %}
+
+<h2 class="title is-4">
+    <span class="icon-text">
+        <span class="icon"><i class="fas fa-docker"></i></span>
+        <span>Runtime Health</span>
+    </span>
+</h2>
+<p class="subtitle is-6">Estado de contenedores, healthz y errores HTTP</p>
+
+{% if error %}
+<div class="notification is-danger">
+    <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+    <span>{{ error }}</span>
+</div>
+{% else %}
+
+<!-- Containers Table -->
+<div class="box">
+    <h3 class="title is-5">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-cubes"></i></span>
+            <span>Containers</span>
+        </span>
+    </h3>
+    <table class="table is-fullwidth is-striped">
+        <thead>
+            <tr>
+                <th>Container</th>
+                <th>Running</th>
+                <th>Status</th>
+                <th>Health</th>
+                <th>Started At</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in data.containers %}
+            <tr>
+                <td><code>{{ c.container_name }}</code></td>
+                <td>
+                    {% if c.running %}
+                    <span class="icon has-text-success"><i class="fas fa-check-circle"></i></span>
+                    {% else %}
+                    <span class="icon has-text-danger"><i class="fas fa-times-circle"></i></span>
+                    {% endif %}
+                </td>
+                <td>{{ c.status }}</td>
+                <td>
+                    {% if c.health_status == 'healthy' %}
+                    <span class="tag is-success">{{ c.health_status }}</span>
+                    {% elif c.health_status == 'unhealthy' %}
+                    <span class="tag is-danger">{{ c.health_status }}</span>
+                    {% elif c.health_status == 'starting' %}
+                    <span class="tag is-warning">{{ c.health_status }}</span>
+                    {% else %}
+                    <span class="tag is-light">{{ c.health_status }}</span>
+                    {% endif %}
+                </td>
+                <td><span class="is-size-7">{{ c.started_at }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Healthz Checks -->
+<div class="columns">
+    {% for key, label in [('live_healthz', 'Live Healthz'), ('archive_healthz', 'Archive Healthz')] %}
+    {% set check = data.checks[key] %}
+    <div class="column is-half">
+        <div class="box">
+            <h3 class="title is-5">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas fa-heartbeat"></i></span>
+                    <span>{{ label }}</span>
+                </span>
+                {% if check.status == 'ok' %}
+                <span class="tag is-success ml-2">ok</span>
+                {% else %}
+                <span class="tag is-danger ml-2">{{ check.status }}</span>
+                {% endif %}
+            </h3>
+            <p><strong>URL:</strong> <code>{{ check.url }}</code></p>
+            <p><strong>HTTP Code:</strong>
+                {% if check.http_code == check.expected_http_code %}
+                <span class="tag is-success">{{ check.http_code }}</span>
+                {% else %}
+                <span class="tag is-danger">{{ check.http_code }}</span>
+                {% endif %}
+                <span class="is-size-7 has-text-grey">(expected: {{ check.expected_http_code }})</span>
+            </p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- HTTP Error Counts -->
+<div class="columns">
+    {% for key, label, icon in [('lb_nginx_recent_4xx', '4xx Errors', 'fa-exclamation-triangle'), ('lb_nginx_recent_5xx', '5xx Errors', 'fa-times-circle')] %}
+    {% set check = data.checks[key] %}
+    <div class="column is-half">
+        <div class="box">
+            <h3 class="title is-5">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas {{ icon }}"></i></span>
+                    <span>{{ label }}</span>
+                </span>
+                {% if check.status == 'ok' %}
+                <span class="tag is-success ml-2">ok</span>
+                {% elif check.status == 'warning' %}
+                <span class="tag is-warning ml-2">warning</span>
+                {% else %}
+                <span class="tag is-danger ml-2">{{ check.status }}</span>
+                {% endif %}
+            </h3>
+            <p class="mb-2"><strong>Count:</strong> {{ check.count }} <span class="is-size-7 has-text-grey">(last {{ check.window_minutes }} min)</span></p>
+            {% set pct = (check.count / check.critical_threshold * 100) | int if check.critical_threshold > 0 else 0 %}
+            {% set pct = [pct, 100] | min %}
+            <progress class="progress {% if check.status == 'ok' %}is-success{% elif check.status == 'warning' %}is-warning{% else %}is-danger{% endif %}" value="{{ pct }}" max="100">{{ pct }}%</progress>
+            <p class="is-size-7 has-text-grey">
+                <span class="icon is-small"><i class="fas fa-flag"></i></span>
+                Warning: {{ check.warning_threshold }} | Critical: {{ check.critical_threshold }}
+            </p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<p class="is-size-7 has-text-grey mt-2">
+    <span class="icon is-small"><i class="fas fa-clock"></i></span>
+    Generated at {{ data.generated_at }}
+</p>
+
+{% endif %}
+
+{% if standalone %}
+{% endblock %}
+{% endif %}
