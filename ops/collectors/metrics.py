@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
+import platform
 import re
 from pathlib import Path
 from typing import Any
@@ -51,14 +52,138 @@ def _collect_host(settings: Settings, store: MetricsStore) -> None:
 
 
 # ------------------------------------------------------------------
+# Host network metrics
+# ------------------------------------------------------------------
+
+def _collect_host_network(store: MetricsStore) -> None:
+    """Collect cumulative network counters for the host.
+
+    On Linux reads ``/proc/net/dev``; on macOS uses ``netstat -ib``.
+    Stores raw cumulative counters — the dashboard computes rates.
+    """
+    host_os = platform.system()
+    try:
+        if host_os == "Linux":
+            _collect_host_network_linux(store)
+        elif host_os == "Darwin":
+            _collect_host_network_darwin(store)
+        else:
+            logger.debug("host network metrics not supported on %s", host_os)
+    except Exception:
+        logger.warning("host network collector failed", exc_info=True)
+
+
+def _collect_host_network_linux(store: MetricsStore) -> None:
+    """Parse ``/proc/net/dev`` for aggregate network counters."""
+    try:
+        text = Path("/proc/net/dev").read_text(encoding="utf-8")
+    except OSError:
+        logger.warning("/proc/net/dev not available")
+        return
+
+    total_recv_bytes = 0
+    total_sent_bytes = 0
+    total_recv_packets = 0
+    total_sent_packets = 0
+
+    for line in text.strip().splitlines()[2:]:  # skip header lines
+        parts = line.split()
+        if len(parts) < 11:
+            continue
+        iface = parts[0].rstrip(":")
+        if iface == "lo":
+            continue
+        total_recv_bytes += int(parts[1])
+        total_recv_packets += int(parts[2])
+        total_sent_bytes += int(parts[9])
+        total_sent_packets += int(parts[10])
+
+    store.write_sample("host", "net_bytes_recv", float(total_recv_bytes))
+    store.write_sample("host", "net_bytes_sent", float(total_sent_bytes))
+    store.write_sample("host", "net_packets_recv", float(total_recv_packets))
+    store.write_sample("host", "net_packets_sent", float(total_sent_packets))
+
+
+def _collect_host_network_darwin(store: MetricsStore) -> None:
+    """Parse ``netstat -ib`` for aggregate network counters on macOS."""
+    result = run_command(["netstat", "-ib"], check=False)
+    if result.returncode != 0:
+        logger.warning("netstat -ib failed (rc=%d)", result.returncode)
+        return
+
+    total_recv_bytes = 0
+    total_sent_bytes = 0
+    total_recv_packets = 0
+    total_sent_packets = 0
+
+    for line in result.stdout.strip().splitlines()[1:]:  # skip header
+        parts = line.split()
+        if len(parts) < 7:
+            continue
+        iface = parts[0]
+        if iface == "lo0" or iface.startswith("lo"):
+            continue
+        # netstat -ib columns: Name Mtu Network Address Ipkts Ibytes Opkts Obytes
+        # Some lines have fewer columns (link-level entries)
+        try:
+            recv_packets = int(parts[-4])
+            recv_bytes = int(parts[-3])
+            sent_packets = int(parts[-2])
+            sent_bytes = int(parts[-1])
+            total_recv_bytes += recv_bytes
+            total_sent_bytes += sent_bytes
+            total_recv_packets += recv_packets
+            total_sent_packets += sent_packets
+        except (ValueError, IndexError):
+            continue
+
+    store.write_sample("host", "net_bytes_recv", float(total_recv_bytes))
+    store.write_sample("host", "net_bytes_sent", float(total_sent_bytes))
+    store.write_sample("host", "net_packets_recv", float(total_recv_packets))
+    store.write_sample("host", "net_packets_sent", float(total_sent_packets))
+
+
+# ------------------------------------------------------------------
 # Container metrics (docker stats)
 # ------------------------------------------------------------------
 
+_SIZE_UNITS: dict[str, float] = {
+    "B": 1,
+    "KB": 1e3, "KIB": 1024,
+    "MB": 1e6, "MIB": 1024**2,
+    "GB": 1e9, "GIB": 1024**3,
+    "TB": 1e12, "TIB": 1024**4,
+}
+
+
+def _parse_docker_size(raw: str) -> float | None:
+    """Parse a docker size string like ``1.5MB`` or ``832kB`` into bytes."""
+    raw = raw.strip()
+    m = re.match(r"^([0-9.]+)\s*([A-Za-z]+)$", raw)
+    if not m:
+        return None
+    number = float(m.group(1))
+    unit = m.group(2).upper()
+    factor = _SIZE_UNITS.get(unit)
+    if factor is None:
+        return None
+    return number * factor
+
+
+def _parse_net_io(net_io_raw: str) -> tuple[float | None, float | None]:
+    """Parse docker stats NetIO format ``'1.5MB / 3.2MB'`` into (in_bytes, out_bytes)."""
+    parts = net_io_raw.split("/")
+    if len(parts) != 2:
+        return None, None
+    return _parse_docker_size(parts[0]), _parse_docker_size(parts[1])
+
+
 def _collect_containers(store: MetricsStore) -> None:
-    """CPU % and mem % per container via ``docker stats --no-stream``."""
+    """CPU %, mem % and network I/O per container via ``docker stats --no-stream``."""
     try:
         result = run_command(
-            ["docker", "stats", "--no-stream", "--format", "{{.Name}}\t{{.CPUPerc}}\t{{.MemPerc}}"],
+            ["docker", "stats", "--no-stream", "--format",
+             "{{.Name}}\t{{.CPUPerc}}\t{{.MemPerc}}\t{{.NetIO}}"],
             check=False,
         )
         if result.returncode != 0:
@@ -70,15 +195,21 @@ def _collect_containers(store: MetricsStore) -> None:
 
     for line in result.stdout.strip().splitlines():
         parts = line.split("\t")
-        if len(parts) != 3:
+        if len(parts) < 3:
             continue
-        name, cpu_raw, mem_raw = parts
-        cpu_val = _parse_pct(cpu_raw)
-        mem_val = _parse_pct(mem_raw)
+        name = parts[0]
+        cpu_val = _parse_pct(parts[1])
+        mem_val = _parse_pct(parts[2])
         if cpu_val is not None:
             store.write_sample("containers", f"{name}.cpu_pct", cpu_val)
         if mem_val is not None:
             store.write_sample("containers", f"{name}.mem_pct", mem_val)
+        if len(parts) >= 4:
+            net_in, net_out = _parse_net_io(parts[3])
+            if net_in is not None:
+                store.write_sample("containers", f"{name}.net_in_bytes", net_in)
+            if net_out is not None:
+                store.write_sample("containers", f"{name}.net_out_bytes", net_out)
 
 
 # ------------------------------------------------------------------
@@ -339,6 +470,7 @@ def collect_and_store(settings: Settings, store: MetricsStore) -> dict[str, Any]
     proxy = _CountingStore()
 
     _collect_host(settings, proxy)  # type: ignore[arg-type]
+    _collect_host_network(proxy)  # type: ignore[arg-type]
     _collect_containers(proxy)  # type: ignore[arg-type]
     _collect_elastic(settings, proxy)  # type: ignore[arg-type]
     _collect_mysql(settings, proxy)  # type: ignore[arg-type]

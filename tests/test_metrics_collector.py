@@ -12,9 +12,12 @@ from ops.collectors.metrics import (
     _collect_containers,
     _collect_elastic,
     _collect_host,
+    _collect_host_network,
     _collect_mysql,
     _collect_nginx,
     _collect_phpfpm,
+    _parse_docker_size,
+    _parse_net_io,
     _parse_pct,
     collect_and_store,
 )
@@ -77,6 +80,81 @@ class TestCollectHost(unittest.TestCase):
         self.assertEqual(self.store.query("host", 60), [])
 
 
+class TestParseDockerSize(unittest.TestCase):
+    def test_megabytes(self) -> None:
+        self.assertAlmostEqual(_parse_docker_size("1.5MB"), 1.5e6)
+
+    def test_kilobytes(self) -> None:
+        self.assertAlmostEqual(_parse_docker_size("832kB"), 832e3)
+
+    def test_gigabytes(self) -> None:
+        self.assertAlmostEqual(_parse_docker_size("2.1GB"), 2.1e9)
+
+    def test_bytes(self) -> None:
+        self.assertAlmostEqual(_parse_docker_size("500B"), 500.0)
+
+    def test_invalid(self) -> None:
+        self.assertIsNone(_parse_docker_size("--"))
+
+    def test_empty(self) -> None:
+        self.assertIsNone(_parse_docker_size(""))
+
+
+class TestParseNetIo(unittest.TestCase):
+    def test_normal(self) -> None:
+        net_in, net_out = _parse_net_io("1.5MB / 3.2MB")
+        self.assertAlmostEqual(net_in, 1.5e6)
+        self.assertAlmostEqual(net_out, 3.2e6)
+
+    def test_kilobytes(self) -> None:
+        net_in, net_out = _parse_net_io("832kB / 1.2GB")
+        self.assertAlmostEqual(net_in, 832e3)
+        self.assertAlmostEqual(net_out, 1.2e9)
+
+    def test_invalid(self) -> None:
+        self.assertEqual(_parse_net_io("--"), (None, None))
+
+
+class TestCollectHostNetwork(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.store = _make_store(self._tmpdir.name)
+
+    def tearDown(self) -> None:
+        self.store.close()
+        self._tmpdir.cleanup()
+
+    @patch("ops.collectors.metrics.platform.system", return_value="Linux")
+    @patch("ops.collectors.metrics.Path.read_text")
+    def test_linux_proc_net_dev(self, mock_read: MagicMock, _mock_sys: MagicMock) -> None:
+        mock_read.return_value = (
+            "Inter-|   Receive                                                |  Transmit\n"
+            " face |bytes    packets errs drop fifo frame compressed multicast|"
+            "bytes    packets errs drop fifo colls carrier compressed\n"
+            "    lo: 1000  10    0    0    0     0          0         0  1000  10    0    0    0     0       0          0\n"
+            "  eth0: 5000  50    0    0    0     0          0         0  3000  30    0    0    0     0       0          0\n"
+            "  eth1: 2000  20    0    0    0     0          0         0  1000  10    0    0    0     0       0          0\n"
+        )
+        _collect_host_network(self.store)
+        rows = self.store.query("host", 60)
+        metrics = {name: val for _, name, val in rows}
+        self.assertAlmostEqual(metrics["net_bytes_recv"], 7000.0)
+        self.assertAlmostEqual(metrics["net_bytes_sent"], 4000.0)
+        self.assertAlmostEqual(metrics["net_packets_recv"], 70.0)
+        self.assertAlmostEqual(metrics["net_packets_sent"], 40.0)
+
+    @patch("ops.collectors.metrics.platform.system", return_value="Linux")
+    @patch("ops.collectors.metrics.Path.read_text", side_effect=OSError("no proc"))
+    def test_linux_proc_unavailable(self, _mock_read: MagicMock, _mock_sys: MagicMock) -> None:
+        _collect_host_network(self.store)
+        self.assertEqual(self.store.query("host", 60), [])
+
+    @patch("ops.collectors.metrics.platform.system", return_value="Windows")
+    def test_unsupported_os(self, _mock_sys: MagicMock) -> None:
+        _collect_host_network(self.store)
+        self.assertEqual(self.store.query("host", 60), [])
+
+
 class TestCollectContainers(unittest.TestCase):
     def setUp(self) -> None:
         self._tmpdir = tempfile.TemporaryDirectory()
@@ -90,7 +168,7 @@ class TestCollectContainers(unittest.TestCase):
     def test_parses_docker_stats(self, mock_run: MagicMock) -> None:
         mock_run.return_value = CommandResult(
             args=[], returncode=0,
-            stdout="n9-fe-live\t12.50%\t3.20%\nn9-db-live\t0.80%\t25.10%\n",
+            stdout="n9-fe-live\t12.50%\t3.20%\t1.5MB / 3.2MB\nn9-db-live\t0.80%\t25.10%\t832kB / 500kB\n",
             stderr="",
         )
         _collect_containers(self.store)
@@ -98,6 +176,10 @@ class TestCollectContainers(unittest.TestCase):
         metrics = {name: val for _, name, val in rows}
         self.assertAlmostEqual(metrics["n9-fe-live.cpu_pct"], 12.5)
         self.assertAlmostEqual(metrics["n9-db-live.mem_pct"], 25.1)
+        self.assertAlmostEqual(metrics["n9-fe-live.net_in_bytes"], 1.5e6)
+        self.assertAlmostEqual(metrics["n9-fe-live.net_out_bytes"], 3.2e6)
+        self.assertAlmostEqual(metrics["n9-db-live.net_in_bytes"], 832e3)
+        self.assertAlmostEqual(metrics["n9-db-live.net_out_bytes"], 500e3)
 
     @patch("ops.collectors.metrics.run_command")
     def test_handles_docker_failure(self, mock_run: MagicMock) -> None:
@@ -262,9 +344,11 @@ class TestCollectAndStore(unittest.TestCase):
     @patch("ops.collectors.metrics._collect_mysql")
     @patch("ops.collectors.metrics._collect_elastic")
     @patch("ops.collectors.metrics._collect_containers")
+    @patch("ops.collectors.metrics._collect_host_network")
     @patch("ops.collectors.metrics._collect_host")
     def test_orchestrates_all_collectors(
-        self, mock_host: MagicMock, mock_containers: MagicMock,
+        self, mock_host: MagicMock, mock_host_net: MagicMock,
+        mock_containers: MagicMock,
         mock_elastic: MagicMock, mock_mysql: MagicMock,
         mock_nginx: MagicMock, mock_phpfpm: MagicMock,
     ) -> None:
@@ -289,9 +373,11 @@ class TestCollectAndStore(unittest.TestCase):
     @patch("ops.collectors.metrics._collect_mysql")
     @patch("ops.collectors.metrics._collect_elastic")
     @patch("ops.collectors.metrics._collect_containers")
+    @patch("ops.collectors.metrics._collect_host_network")
     @patch("ops.collectors.metrics._collect_host")
     def test_purge_runs(
-        self, mock_host: MagicMock, mock_containers: MagicMock,
+        self, mock_host: MagicMock, mock_host_net: MagicMock,
+        mock_containers: MagicMock,
         mock_elastic: MagicMock, mock_mysql: MagicMock,
         mock_nginx: MagicMock, mock_phpfpm: MagicMock,
     ) -> None:
