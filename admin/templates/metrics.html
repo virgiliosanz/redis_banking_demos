@@ -66,8 +66,7 @@
             <label class="label">Servicio</label>
             <div class="select is-small">
                 <select id="serviciosFilter">
-                    <option value="all" selected>Todos</option>
-                    <option value="nginx">Nginx</option>
+                    <option value="nginx" selected>Nginx</option>
                     <option value="mysql">MySQL</option>
                     <option value="elastic">Elastic</option>
                     <option value="phpfpm">PHP-FPM</option>
@@ -180,12 +179,8 @@
             }
         } else {
             var svcFilter = document.getElementById('serviciosFilter').value;
-            if (svcFilter === 'all') {
-                el.textContent = 'Todos los servicios';
-            } else {
-                var labels = {nginx:'Nginx', mysql:'MySQL', elastic:'Elastic', phpfpm:'PHP-FPM'};
-                el.textContent = labels[svcFilter] || svcFilter;
-            }
+            var labels = {nginx:'Nginx', mysql:'MySQL', elastic:'Elastic', phpfpm:'PHP-FPM'};
+            el.textContent = labels[svcFilter] || svcFilter;
         }
     }
 
@@ -286,11 +281,7 @@
             }
         } else {
             var svcFilter = document.getElementById('serviciosFilter').value;
-            if (svcFilter !== 'all') {
-                groups = [svcFilter];
-            } else {
-                groups = TAB_GROUPS[currentTab];
-            }
+            groups = [svcFilter];
         }
 
         // Fetch all relevant groups in parallel
