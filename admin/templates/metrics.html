@@ -18,28 +18,49 @@
 </h1>
 <h2 class="subtitle">Visualizacion de metricas recogidas por los collectors</h2>
 
+<!-- Tabs -->
+<div class="tabs is-boxed is-medium" id="metricsTabs">
+    <ul>
+        <li class="is-active" data-tab="sistema">
+            <a><span class="icon"><i class="fas fa-server"></i></span><span>Sistema</span></a>
+        </li>
+        <li data-tab="servicios">
+            <a><span class="icon"><i class="fas fa-cogs"></i></span><span>Servicios</span></a>
+        </li>
+    </ul>
+</div>
+
 <!-- Controls -->
 <div class="box">
-    <div class="columns is-vcentered">
+    <div class="columns is-vcentered is-multiline">
         <div class="column is-narrow">
             <label class="label">Rango temporal</label>
             <div class="buttons has-addons" id="rangeSelector">
                 <button class="button is-small is-info is-selected" data-range="1h">1h</button>
                 <button class="button is-small" data-range="6h">6h</button>
                 <button class="button is-small" data-range="24h">24h</button>
+                <button class="button is-small" data-range="3d">3d</button>
                 <button class="button is-small" data-range="7d">7d</button>
             </div>
         </div>
-        <div class="column is-narrow">
-            <label class="label">Grupo</label>
+        <div class="column is-narrow" id="sistemaFilterCol">
+            <label class="label">Fuente</label>
             <div class="select is-small">
-                <select id="groupSelector">
+                <select id="sistemaFilter">
                     <option value="host" selected>Host</option>
+                    <option value="all_containers">Todos los contenedores</option>
+                </select>
+            </div>
+        </div>
+        <div class="column is-narrow" id="serviciosFilterCol" style="display:none;">
+            <label class="label">Servicio</label>
+            <div class="select is-small">
+                <select id="serviciosFilter">
+                    <option value="all" selected>Todos</option>
                     <option value="nginx">Nginx</option>
                     <option value="mysql">MySQL</option>
                     <option value="elastic">Elastic</option>
                     <option value="phpfpm">PHP-FPM</option>
-                    <option value="containers">Containers</option>
                 </select>
             </div>
         </div>
@@ -82,7 +103,16 @@
     let charts = {};
     let refreshTimer = null;
     let currentRange = '1h';
-    let currentGroup = 'host';
+    let currentTab = 'sistema';
+
+    // Mapping: tab -> groups to fetch
+    const TAB_GROUPS = {
+        sistema: ['host', 'containers'],
+        servicios: ['nginx', 'mysql', 'elastic', 'phpfpm']
+    };
+    const SERVICE_LABELS = {
+        nginx: 'Nginx', mysql: 'MySQL', elastic: 'Elastic', phpfpm: 'PHP-FPM'
+    };
 
     function getColor(i) { return COLORS[i % COLORS.length]; }
 
@@ -91,12 +121,10 @@
         charts = {};
     }
 
-    /** Return true if this metric stores cumulative counters. */
     function isCounterMetric(name) {
         return name.endsWith('_bytes') || name.endsWith('_packets');
     }
 
-    /** Convert cumulative counter samples to per-second rates. */
     function counterToRate(points) {
         if (points.length < 2) return { labels: [], values: [] };
         var labels = [];
@@ -105,14 +133,13 @@
             var dt = points[i].ts - points[i - 1].ts;
             if (dt <= 0) continue;
             var dv = points[i].value - points[i - 1].value;
-            if (dv < 0) dv = 0; // counter reset
+            if (dv < 0) dv = 0;
             labels.push(new Date(points[i].ts * 1000).toLocaleTimeString());
             values.push(dv / dt);
         }
         return { labels: labels, values: values };
     }
 
-    /** Format bytes/s to human-readable rate string. */
     function formatRate(bytesPerSec) {
         if (bytesPerSec >= 1e9) return (bytesPerSec / 1e9).toFixed(2) + ' GB/s';
         if (bytesPerSec >= 1e6) return (bytesPerSec / 1e6).toFixed(2) + ' MB/s';
@@ -120,16 +147,70 @@
         return bytesPerSec.toFixed(1) + ' B/s';
     }
 
-    function renderCharts(data) {
+    /** Extract unique container names from metric keys like containers.n9-lb-nginx.cpu_percent */
+    function extractContainerNames(metrics) {
+        var names = new Set();
+        Object.keys(metrics).forEach(function(key) {
+            var m = key.match(/^containers\.([^.]+)\./);
+            if (m) names.add(m[1]);
+        });
+        return Array.from(names).sort();
+    }
+
+    /** Populate the Sistema filter dropdown with dynamic container names */
+    function populateContainerOptions(metrics) {
+        var sel = document.getElementById('sistemaFilter');
+        // Remove old dynamic options (keep first two: Host, Todos los contenedores)
+        while (sel.options.length > 2) sel.remove(2);
+        var names = extractContainerNames(metrics);
+        names.forEach(function(name) {
+            var opt = document.createElement('option');
+            opt.value = 'container:' + name;
+            opt.textContent = name;
+            sel.appendChild(opt);
+        });
+    }
+
+    /** Filter metrics based on current tab and filter selection */
+    function filterMetrics(allMetrics) {
+        var filtered = {};
+        if (currentTab === 'sistema') {
+            var filter = document.getElementById('sistemaFilter').value;
+            if (filter === 'host') {
+                Object.keys(allMetrics).forEach(function(k) {
+                    if (!k.startsWith('containers.')) filtered[k] = allMetrics[k];
+                });
+            } else if (filter === 'all_containers') {
+                Object.keys(allMetrics).forEach(function(k) {
+                    if (k.startsWith('containers.')) filtered[k] = allMetrics[k];
+                });
+            } else if (filter.startsWith('container:')) {
+                var cname = filter.substring('container:'.length);
+                var prefix = 'containers.' + cname + '.';
+                Object.keys(allMetrics).forEach(function(k) {
+                    if (k.startsWith(prefix)) filtered[k] = allMetrics[k];
+                });
+            }
+        } else {
+            var svcFilter = document.getElementById('serviciosFilter').value;
+            if (svcFilter === 'all') {
+                filtered = allMetrics;
+            } else {
+                filtered = allMetrics;
+            }
+        }
+        return filtered;
+    }
+
+    function renderCharts(metrics) {
         const area = document.getElementById('chartsArea');
         const loading = document.getElementById('loadingMsg');
         const empty = document.getElementById('emptyMsg');
         loading.style.display = 'none';
 
-        // Remove old chart cards
         area.querySelectorAll('.metric-card').forEach(el => el.remove());
 
-        const metricNames = Object.keys(data.metrics || {});
+        const metricNames = Object.keys(metrics);
         if (metricNames.length === 0) {
             empty.style.display = '';
             return;
@@ -138,20 +219,18 @@
         destroyCharts();
 
         metricNames.forEach(function(name, idx) {
-            const points = data.metrics[name];
+            const points = metrics[name];
             const isCounter = isCounterMetric(name);
-            var labels, values, chartLabel, yUnit;
+            var labels, values, chartLabel;
 
             if (isCounter) {
                 var rate = counterToRate(points);
                 labels = rate.labels;
                 values = rate.values;
-                yUnit = name.endsWith('_bytes') ? '/s' : ' pkt/s';
                 chartLabel = name + ' (rate)';
             } else {
                 labels = points.map(p => new Date(p.ts * 1000).toLocaleTimeString());
                 values = points.map(p => p.value);
-                yUnit = '';
                 chartLabel = name;
             }
 
@@ -170,14 +249,13 @@
                 plugins: { legend: { display: false } }
             };
 
-            // For byte-rate metrics, format the tooltip and Y axis
             if (isCounter && name.endsWith('_bytes')) {
                 chartOpts.scales.y.ticks = {
                     callback: function(val) { return formatRate(val); }
                 };
                 chartOpts.plugins.tooltip = {
                     callbacks: {
-                        label: function(ctx) { return chartLabel + ': ' + formatRate(ctx.parsed.y); }
+                        label: function(c) { return chartLabel + ': ' + formatRate(c.parsed.y); }
                     }
                 };
             }
@@ -204,14 +282,65 @@
         loading.style.display = '';
         document.getElementById('emptyMsg').style.display = 'none';
 
-        fetch('/metrics/api/data?range=' + currentRange + '&group=' + currentGroup)
-            .then(function(r) { return r.json(); })
-            .then(renderCharts)
+        var groups = TAB_GROUPS[currentTab];
+
+        // For servicios tab with a specific filter, fetch only that group
+        if (currentTab === 'servicios') {
+            var svcFilter = document.getElementById('serviciosFilter').value;
+            if (svcFilter !== 'all') {
+                groups = [svcFilter];
+            }
+        }
+
+        // Fetch all relevant groups in parallel
+        var promises = groups.map(function(g) {
+            return fetch('/metrics/api/data?range=' + currentRange + '&group=' + g)
+                .then(function(r) { return r.json(); });
+        });
+
+        Promise.all(promises)
+            .then(function(results) {
+                // Merge all metrics into one object
+                var allMetrics = {};
+                results.forEach(function(data) {
+                    if (data.metrics) {
+                        Object.keys(data.metrics).forEach(function(k) {
+                            allMetrics[k] = data.metrics[k];
+                        });
+                    }
+                });
+
+                // For sistema tab, populate container dropdown and apply filter
+                if (currentTab === 'sistema') {
+                    populateContainerOptions(allMetrics);
+                    var filtered = filterMetrics(allMetrics);
+                    renderCharts(filtered);
+                } else {
+                    renderCharts(allMetrics);
+                }
+            })
             .catch(function(err) {
                 loading.style.display = 'none';
                 console.error('Metrics fetch error:', err);
             });
     }
+
+    // Tab switching
+    document.getElementById('metricsTabs').addEventListener('click', function(e) {
+        var li = e.target.closest('li[data-tab]');
+        if (!li) return;
+        currentTab = li.dataset.tab;
+        this.querySelectorAll('li').forEach(function(l) { l.classList.remove('is-active'); });
+        li.classList.add('is-active');
+
+        // Toggle filter columns
+        document.getElementById('sistemaFilterCol').style.display =
+            currentTab === 'sistema' ? '' : 'none';
+        document.getElementById('serviciosFilterCol').style.display =
+            currentTab === 'servicios' ? '' : 'none';
+
+        fetchMetrics();
+    });
 
     // Range buttons
     document.getElementById('rangeSelector').addEventListener('click', function(e) {
@@ -225,9 +354,13 @@
         fetchMetrics();
     });
 
-    // Group selector
-    document.getElementById('groupSelector').addEventListener('change', function() {
-        currentGroup = this.value;
+    // Sistema filter
+    document.getElementById('sistemaFilter').addEventListener('change', function() {
+        fetchMetrics();
+    });
+
+    // Servicios filter
+    document.getElementById('serviciosFilter').addEventListener('change', function() {
         fetchMetrics();
     });
 

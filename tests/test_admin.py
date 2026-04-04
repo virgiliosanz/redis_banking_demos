@@ -340,7 +340,8 @@ class TestMetricsPage(unittest.TestCase):
 
     def test_metrics_page_includes_group_selector(self) -> None:
         resp = self.client.get("/metrics/")
-        self.assertIn(b"groupSelector", resp.data)
+        self.assertIn(b"sistemaFilter", resp.data)
+        self.assertIn(b"serviciosFilter", resp.data)
 
 
 class TestMetricsApi(unittest.TestCase):

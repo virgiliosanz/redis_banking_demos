@@ -19,11 +19,12 @@ _RANGE_MAP = {
     "1h": 60,
     "6h": 360,
     "24h": 1440,
+    "3d": 3 * 24 * 60,
     "7d": 7 * 24 * 60,
 }
 
 # Ranges that require the extended (raw + hourly) query path.
-_EXTENDED_RANGES = {"7d"}
+_EXTENDED_RANGES = {"3d", "7d"}
 
 VALID_GROUPS = {"host", "nginx", "mysql", "elastic", "phpfpm", "containers"}
 
