@@ -214,19 +214,38 @@ class TestCollectPhpfpm(unittest.TestCase):
 
     @patch("ops.collectors.metrics.compose_exec")
     def test_parses_fpm_status(self, mock_exec: MagicMock) -> None:
+        """PHP-FPM status is fetched via curl on lb-nginx, not cgi-fcgi."""
         body = (
-            'Content-Type: application/json\r\n\r\n'
             '{"active processes":4,"idle processes":6,'
             '"listen queue":0,"max listen queue":2,'
             '"slow requests":1,"total processes":10}'
         )
-        mock_exec.return_value = CommandResult(args=[], returncode=0, stdout=body, stderr="")
+
+        def side_effect(service, cmd, cwd=None, check=True):
+            # All calls should go through lb-nginx (or its compose name)
+            cmd_str = " ".join(cmd)
+            if "/fpm-status-live" in cmd_str:
+                return CommandResult(args=[], returncode=0, stdout=body, stderr="")
+            # Other pools return failure for simplicity
+            return CommandResult(args=[], returncode=7, stdout="", stderr="")
+
+        mock_exec.side_effect = side_effect
         _collect_phpfpm(_settings(), self.store)
         rows = self.store.query("phpfpm.fe-live", 60)
         metrics = {name: val for _, name, val in rows}
         self.assertAlmostEqual(metrics["active_processes"], 4.0)
         self.assertAlmostEqual(metrics["idle_processes"], 6.0)
         self.assertAlmostEqual(metrics["slow_requests"], 1.0)
+
+    @patch("ops.collectors.metrics.compose_exec")
+    def test_phpfpm_uses_nginx_container(self, mock_exec: MagicMock) -> None:
+        """Verify that compose_exec is called on lb-nginx, not on PHP containers."""
+        mock_exec.return_value = CommandResult(args=[], returncode=7, stdout="", stderr="")
+        _collect_phpfpm(_settings(), self.store)
+        for call_args in mock_exec.call_args_list:
+            service_arg = call_args[0][0]
+            self.assertNotIn(service_arg, ("fe-live", "fe-archive", "be-admin"),
+                             "PHP-FPM status must be fetched via lb-nginx, not directly")
 
 
 class TestCollectAndStore(unittest.TestCase):

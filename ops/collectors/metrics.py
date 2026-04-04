@@ -188,7 +188,12 @@ def _collect_mysql(settings: Settings, store: MetricsStore) -> None:
 # ------------------------------------------------------------------
 
 def _collect_nginx(settings: Settings, store: MetricsStore) -> None:
-    """Parse nginx stub_status for active connections and request counts."""
+    """Parse nginx stub_status for active connections and request counts.
+
+    Requires ``stub_status`` enabled in the nginx config (``/nginx_status``
+    location).  After any config change run ``nginx -s reload`` inside the
+    lb-nginx container so the endpoint becomes available.
+    """
     cwd = settings.project_root.resolve()
     nginx_service = compose_service_name("lb-nginx")
 
@@ -236,24 +241,30 @@ def _collect_nginx(settings: Settings, store: MetricsStore) -> None:
 # PHP-FPM metrics
 # ------------------------------------------------------------------
 
-_PHPFPM_SERVICES = ("fe-live", "fe-archive", "be-admin")
+# Mapping: service key → nginx location path for its FPM status endpoint.
+_PHPFPM_SERVICES: dict[str, str] = {
+    "fe-live": "/fpm-status-live",
+    "fe-archive": "/fpm-status-archive",
+    "be-admin": "/fpm-status-admin",
+}
 
 
 def _collect_phpfpm(settings: Settings, store: MetricsStore) -> None:
-    """Read PHP-FPM /status?json via cgi-fcgi inside each PHP container."""
-    cwd = settings.project_root.resolve()
+    """Read PHP-FPM status via ``curl`` on the lb-nginx container.
 
-    for service in _PHPFPM_SERVICES:
+    Each pool exposes a ``/fpm-status-*?json`` endpoint through nginx,
+    so there is no need for ``cgi-fcgi`` inside the PHP containers.
+    """
+    cwd = settings.project_root.resolve()
+    nginx_service = compose_service_name("lb-nginx")
+
+    for service, status_path in _PHPFPM_SERVICES.items():
         group = f"phpfpm.{service}"
+        url = f"http://127.0.0.1{status_path}?json"
         try:
             result = compose_exec(
-                service,
-                [
-                    "sh", "-lc",
-                    "SCRIPT_NAME=/status SCRIPT_FILENAME=/status "
-                    "REQUEST_METHOD=GET QUERY_STRING=json "
-                    "cgi-fcgi -bind -connect 127.0.0.1:9000",
-                ],
+                nginx_service,
+                ["sh", "-lc", f"curl -fsS {url}"],
                 cwd=cwd, check=False,
             )
         except Exception:
@@ -264,13 +275,12 @@ def _collect_phpfpm(settings: Settings, store: MetricsStore) -> None:
             logger.debug("phpfpm %s status not available (rc=%d)", service, result.returncode)
             continue
 
-        # Response includes HTTP headers followed by JSON body
-        body = result.stdout
-        json_start = body.find("{")
-        if json_start == -1:
+        # Response is direct JSON from nginx (no CGI headers)
+        body = result.stdout.strip()
+        if not body:
             continue
         try:
-            data = json.loads(body[json_start:])
+            data = json.loads(body)
         except (json.JSONDecodeError, TypeError):
             logger.warning("phpfpm %s status parse error", service)
             continue
