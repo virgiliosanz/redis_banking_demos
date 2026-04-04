@@ -10,141 +10,173 @@
 </h1>
 <h2 class="subtitle">Operaciones de sincronizacion entre live y archive</h2>
 
-<!-- Section: Sync Editorial -->
-<div class="box" id="section-editorial">
-    <h3 class="title is-4">
-        <span class="icon-text">
-            <span class="icon"><i class="fas fa-users"></i></span>
-            <span>Sync Editorial</span>
-        </span>
-    </h3>
-    <p class="subtitle is-6">Sincronizar usuarios editoriales entre live y archive</p>
-    <form class="sync-form" data-command="sync-editorial-users" data-section="editorial" data-has-mode="true">
-        <div class="field">
-            <label class="label">Modo</label>
-            <div class="control">
-                <div class="select is-fullwidth">
-                    <select class="mode-select" name="mode">
-                        <option value="report-only">report-only (solo lectura)</option>
-                        <option value="dry-run">dry-run (simulacion)</option>
-                        <option value="apply">apply (ejecutar cambios)</option>
-                    </select>
+<div class="columns">
+    <!-- Column: Sync Editorial -->
+    <div class="column" id="section-editorial">
+        <div class="box">
+            <h3 class="title is-4">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas fa-users"></i></span>
+                    <span>Sync Editorial</span>
+                </span>
+            </h3>
+            <form class="sync-form" data-command="sync-editorial-users" data-section="editorial" data-has-mode="true">
+                <div class="field">
+                    <label class="label">Modo</label>
+                    <div class="control">
+                        <div class="select is-fullwidth">
+                            <select class="mode-select" name="mode">
+                                <option value="report-only">report-only (solo lectura)</option>
+                                <option value="dry-run">dry-run (simulacion)</option>
+                                <option value="apply">apply (ejecutar cambios)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p class="help mode-help">
+                        <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
+                        Compara usuarios/configuracion entre live y archive. Solo lectura, sin cambios.
+                    </p>
                 </div>
-            </div>
-            <p class="help mode-help">
-                <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
-                Compara usuarios/configuracion entre live y archive. Solo lectura, sin cambios.
-            </p>
-        </div>
-        <div class="field">
-            <div class="control">
-                <button type="submit" class="button is-primary run-btn">
-                    <span class="icon"><i class="fas fa-play"></i></span>
-                    <span>Ejecutar</span>
+                <div class="field">
+                    <div class="control">
+                        <button type="submit" class="button is-primary run-btn">
+                            <span class="icon"><i class="fas fa-play"></i></span>
+                            <span>Ejecutar</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+            <div class="output-container mt-4" style="display: none;">
+                <h4 class="title is-6">
+                    <span class="icon-text">
+                        <span class="icon"><i class="fas fa-terminal"></i></span>
+                        <span>Salida</span>
+                    </span>
+                </h4>
+                <pre class="output-box output-pre" style="max-height: 400px; overflow-y: auto;"></pre>
+                <button class="button is-small is-info mt-2 clear-btn">
+                    <span class="icon"><i class="fas fa-eraser"></i></span>
+                    <span>Limpiar</span>
                 </button>
             </div>
         </div>
-    </form>
-    <div class="output-container mt-4" style="display: none;">
-        <h4 class="title is-5">
-            <span class="icon-text">
-                <span class="icon"><i class="fas fa-terminal"></i></span>
-                <span>Salida</span>
-            </span>
-        </h4>
-        <pre class="output-box output-pre"></pre>
-        <button class="button is-small is-info mt-2 clear-btn">
-            <span class="icon"><i class="fas fa-eraser"></i></span>
-            <span>Limpiar</span>
-        </button>
+    </div>
+
+    <!-- Column: Sync Platform -->
+    <div class="column" id="section-platform">
+        <div class="box">
+            <h3 class="title is-4">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas fa-cogs"></i></span>
+                    <span>Sync Plataforma</span>
+                </span>
+            </h3>
+            <form class="sync-form" data-command="sync-platform-config" data-section="platform" data-has-mode="true">
+                <div class="field">
+                    <label class="label">Modo</label>
+                    <div class="control">
+                        <div class="select is-fullwidth">
+                            <select class="mode-select" name="mode">
+                                <option value="report-only">report-only (solo lectura)</option>
+                                <option value="dry-run">dry-run (simulacion)</option>
+                                <option value="apply">apply (ejecutar cambios)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p class="help mode-help">
+                        <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
+                        Compara usuarios/configuracion entre live y archive. Solo lectura, sin cambios.
+                    </p>
+                </div>
+                <div class="field">
+                    <div class="control">
+                        <button type="submit" class="button is-primary run-btn">
+                            <span class="icon"><i class="fas fa-play"></i></span>
+                            <span>Ejecutar</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+            <div class="output-container mt-4" style="display: none;">
+                <h4 class="title is-6">
+                    <span class="icon-text">
+                        <span class="icon"><i class="fas fa-terminal"></i></span>
+                        <span>Salida</span>
+                    </span>
+                </h4>
+                <pre class="output-box output-pre" style="max-height: 400px; overflow-y: auto;"></pre>
+                <button class="button is-small is-info mt-2 clear-btn">
+                    <span class="icon"><i class="fas fa-eraser"></i></span>
+                    <span>Limpiar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Column: Drift Report -->
+    <div class="column" id="section-drift">
+        <div class="box">
+            <h3 class="title is-4">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas fa-exchange-alt"></i></span>
+                    <span>Reporte de Drift</span>
+                </span>
+            </h3>
+            <p class="help mb-3">
+                <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
+                Compara estado actual entre live y archive. Solo lectura.
+            </p>
+            <form class="sync-form" data-command="report-live-archive-sync-drift" data-section="drift" data-has-mode="false">
+                <div class="field">
+                    <div class="control">
+                        <button type="submit" class="button is-primary run-btn">
+                            <span class="icon"><i class="fas fa-play"></i></span>
+                            <span>Ejecutar</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+            <div class="output-container mt-4" style="display: none;">
+                <h4 class="title is-6">
+                    <span class="icon-text">
+                        <span class="icon"><i class="fas fa-terminal"></i></span>
+                        <span>Salida</span>
+                    </span>
+                </h4>
+                <pre class="output-box output-pre" style="max-height: 400px; overflow-y: auto;"></pre>
+                <button class="button is-small is-info mt-2 clear-btn">
+                    <span class="icon"><i class="fas fa-eraser"></i></span>
+                    <span>Limpiar</span>
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
-<!-- Section: Sync Platform -->
-<div class="box" id="section-platform">
-    <h3 class="title is-4">
-        <span class="icon-text">
-            <span class="icon"><i class="fas fa-cogs"></i></span>
-            <span>Sync Plataforma</span>
-        </span>
-    </h3>
-    <p class="subtitle is-6">Sincronizar configuracion de plataforma entre live y archive</p>
-    <form class="sync-form" data-command="sync-platform-config" data-section="platform" data-has-mode="true">
-        <div class="field">
-            <label class="label">Modo</label>
-            <div class="control">
-                <div class="select is-fullwidth">
-                    <select class="mode-select" name="mode">
-                        <option value="report-only">report-only (solo lectura)</option>
-                        <option value="dry-run">dry-run (simulacion)</option>
-                        <option value="apply">apply (ejecutar cambios)</option>
-                    </select>
-                </div>
-            </div>
-            <p class="help mode-help">
-                <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
-                Compara usuarios/configuracion entre live y archive. Solo lectura, sin cambios.
+<!-- Confirm modal for apply mode -->
+<div class="modal" id="confirmModal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+                    <span>Confirmar ejecucion</span>
+                </span>
             </p>
-        </div>
-        <div class="field">
-            <div class="control">
-                <button type="submit" class="button is-primary run-btn">
-                    <span class="icon"><i class="fas fa-play"></i></span>
-                    <span>Ejecutar</span>
-                </button>
-            </div>
-        </div>
-    </form>
-    <div class="output-container mt-4" style="display: none;">
-        <h4 class="title is-5">
-            <span class="icon-text">
-                <span class="icon"><i class="fas fa-terminal"></i></span>
-                <span>Salida</span>
-            </span>
-        </h4>
-        <pre class="output-box output-pre"></pre>
-        <button class="button is-small is-info mt-2 clear-btn">
-            <span class="icon"><i class="fas fa-eraser"></i></span>
-            <span>Limpiar</span>
-        </button>
-    </div>
-</div>
-
-<!-- Section: Drift Report -->
-<div class="box" id="section-drift">
-    <h3 class="title is-4">
-        <span class="icon-text">
-            <span class="icon"><i class="fas fa-exchange-alt"></i></span>
-            <span>Reporte de Drift</span>
-        </span>
-    </h3>
-    <p class="subtitle is-6">Reporte de desviaciones entre live y archive</p>
-    <form class="sync-form" data-command="report-live-archive-sync-drift" data-section="drift" data-has-mode="false">
-        <p class="help mb-3">
-            <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
-            Compara estado actual entre live y archive. Solo lectura.
-        </p>
-        <div class="field">
-            <div class="control">
-                <button type="submit" class="button is-primary run-btn">
-                    <span class="icon"><i class="fas fa-play"></i></span>
-                    <span>Ejecutar</span>
-                </button>
-            </div>
-        </div>
-    </form>
-    <div class="output-container mt-4" style="display: none;">
-        <h4 class="title is-5">
-            <span class="icon-text">
-                <span class="icon"><i class="fas fa-terminal"></i></span>
-                <span>Salida</span>
-            </span>
-        </h4>
-        <pre class="output-box output-pre"></pre>
-        <button class="button is-small is-info mt-2 clear-btn">
-            <span class="icon"><i class="fas fa-eraser"></i></span>
-            <span>Limpiar</span>
-        </button>
+            <button class="delete" aria-label="close" id="modalCloseBtn"></button>
+        </header>
+        <section class="modal-card-body">
+            <p>Vas a ejecutar en modo <strong>apply</strong>. Los cambios seran reales e irreversibles sin backup previo.</p>
+            <p class="mt-2">Continuar?</p>
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button is-danger" id="confirmBtn">
+                <span class="icon"><i class="fas fa-check"></i></span>
+                <span>Confirmar</span>
+            </button>
+            <button class="button" id="cancelBtn">Cancelar</button>
+        </footer>
     </div>
 </div>
 {% endblock %}
@@ -172,9 +204,10 @@ cancelBtn.addEventListener('click', hideModal);
 modalCloseBtn.addEventListener('click', hideModal);
 
 confirmBtn.addEventListener('click', function() {
+    var form = pendingForm;
     hideModal();
-    if (pendingForm) {
-        executeSection(pendingForm);
+    if (form) {
+        executeSection(form);
     }
 });
 
@@ -185,7 +218,8 @@ function executeSection(form) {
     var modeSelect = hasMode ? form.querySelector('.mode-select') : null;
     var mode = modeSelect ? modeSelect.value : null;
     var btn = form.querySelector('.run-btn');
-    var box = document.getElementById('section-' + section);
+    var column = document.getElementById('section-' + section);
+    var box = column.querySelector('.box');
     var outputContainer = box.querySelector('.output-container');
     var outputPre = box.querySelector('.output-pre');
 
@@ -260,6 +294,8 @@ function executeSection(form) {
                             pre.textContent = fdata.content;
                         }
                         pre.style.background = '#1a2e1a';
+                        pre.style.maxHeight = '400px';
+                        pre.style.overflowY = 'auto';
                         rc.appendChild(pre);
                         var closeBtn = document.createElement('button');
                         closeBtn.className = 'button is-small is-light mt-3';
