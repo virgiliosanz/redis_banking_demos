@@ -88,13 +88,29 @@
         {% if cluster.status | default('unknown') == 'yellow' %}
         <div class="level-item has-text-centered">
             <div>
-                <p class="help has-text-warning-dark"><span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span> Cluster en estado yellow -- posibles replicas sin asignar</p>
+                <p class="help has-text-warning-light"><span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span>
+                {% if cluster.unassigned_shards is defined and cluster.unassigned_shards > 0 or cluster.relocating_shards is defined and cluster.relocating_shards > 0 or cluster.initializing_shards is defined and cluster.initializing_shards > 0 %}
+                {% set parts = [] %}
+                {% if cluster.unassigned_shards | default(0) > 0 %}{% set _ = parts.append(cluster.unassigned_shards ~ ' shards sin asignar') %}{% endif %}
+                {% if cluster.relocating_shards | default(0) > 0 %}{% set _ = parts.append(cluster.relocating_shards ~ ' relocating') %}{% endif %}
+                {% if cluster.initializing_shards | default(0) > 0 %}{% set _ = parts.append(cluster.initializing_shards ~ ' initializing') %}{% endif %}
+                {{ parts | join(', ') }}
+                {% else %}
+                Cluster en estado yellow -- algunas replicas pueden no estar asignadas
+                {% endif %}
+                </p>
             </div>
         </div>
         {% elif cluster.status | default('unknown') == 'red' %}
         <div class="level-item has-text-centered">
             <div>
-                <p class="help has-text-danger"><span class="icon is-small"><i class="fas fa-times-circle"></i></span> Cluster en estado red -- shards primarios sin asignar</p>
+                <p class="help has-text-danger-light"><span class="icon is-small"><i class="fas fa-times-circle"></i></span>
+                {% if cluster.unassigned_shards is defined and cluster.unassigned_shards > 0 %}
+                {{ cluster.unassigned_shards }} shards sin asignar (incluye primarios)
+                {% else %}
+                Cluster en estado red -- shards primarios sin asignar
+                {% endif %}
+                </p>
             </div>
         </div>
         {% endif %}
@@ -125,7 +141,7 @@
         <tbody>
         {% for idx in data.indices | sort(attribute='index') %}
             <tr>
-                <td><code>{{ idx.index }}</code></td>
+                <td><code style="background-color: rgba(255,255,255,0.1); color: #b5b5b5; padding: 2px 4px; border-radius: 3px;">{{ idx.index }}</code></td>
                 <td>{{ status_tag(idx.health | default('unknown')) }}</td>
                 <td>{{ idx.status | default('') }}</td>
                 <td>{{ idx['docs.count'] | default('0') }}</td>
@@ -147,7 +163,7 @@
     <h3 class="title is-5">
         <span class="icon-text">
             <span class="icon"><i class="fas fa-link"></i></span>
-            <span>Alias: <code>{{ alias.alias_name }}</code></span>
+            <span>Alias: <code style="background-color: rgba(255,255,255,0.1); color: #b5b5b5; padding: 2px 4px; border-radius: 3px;">{{ alias.alias_name }}</code></span>
         </span>
         {{ status_icon(alias.status) }}
     </h3>
@@ -159,7 +175,7 @@
         <tbody>
         {% for row in alias.rows %}
             <tr>
-                <td><code>{{ row.index | default('?') }}</code></td>
+                <td><code style="background-color: rgba(255,255,255,0.1); color: #b5b5b5; padding: 2px 4px; border-radius: 3px;">{{ row.index | default('?') }}</code></td>
                 <td>{{ row.filter | default('-') }}</td>
                 <td>{{ row['routing.index'] | default('-') }}</td>
             </tr>

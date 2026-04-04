@@ -58,8 +58,8 @@
                 <div class="card-content has-text-centered">
                     <p class="title is-6">{{ label }}</p>
                     {{ check_icon(chk.status) }}
-                    <p class="is-size-7 has-text-grey mt-2">
-                        <code>{{ chk.url | default('') }}</code>
+                    <p class="is-size-7 mt-2">
+                        <a href="{{ chk.url | default('#') }}" target="_blank" class="has-text-link-light is-size-7">{{ chk.url | default('') }}</a>
                     </p>
                     <div class="mt-2">
                         <span class="tag {% if chk.http_code == chk.expected_http_code %}is-success{% else %}is-danger{% endif %}">
@@ -102,7 +102,7 @@
         {% for smoke in checks.smoke_scripts %}
             <tr>
                 <td>{{ smoke.name }}</td>
-                <td><code>{{ smoke.script }}</code></td>
+                <td><code style="background-color: rgba(255,255,255,0.1); color: #b5b5b5; padding: 2px 4px; border-radius: 3px;">{{ smoke.script }}</code></td>
                 <td>
                     {{ check_icon(smoke.status) }}
                     {{ http_tag(smoke.status) }}

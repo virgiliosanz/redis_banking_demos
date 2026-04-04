@@ -48,7 +48,7 @@
         <tbody>
             {% for c in data.containers %}
             <tr>
-                <td><code>{{ c.container_name }}</code></td>
+                <td><code style="background-color: rgba(255,255,255,0.1); color: #b5b5b5; padding: 2px 4px; border-radius: 3px;">{{ c.container_name }}</code></td>
                 <td>
                     {% if c.running %}
                     <span class="icon has-text-success"><i class="fas fa-check-circle"></i></span>
@@ -92,7 +92,7 @@
                 <span class="tag is-danger ml-2">Critico</span>
                 {% endif %}
             </h3>
-            <p><strong>URL:</strong> <code>{{ check.url }}</code></p>
+            <p><strong>URL:</strong> <a href="{{ check.url }}" target="_blank" class="has-text-link-light is-size-7">{{ check.url }}</a></p>
             <p><strong>HTTP Code:</strong>
                 {% if check.http_code == check.expected_http_code %}
                 <span class="tag is-success">{{ check.http_code }}</span>
@@ -136,6 +136,11 @@
                 <span class="icon is-small"><i class="fas fa-flag"></i></span>
                 Warning: {{ check.warning_threshold }} | Critical: {{ check.critical_threshold }}
             </p>
+            {% if check.status == 'warning' %}
+            <p class="help has-text-warning-light"><span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span> {{ check.count }} errores en los ultimos {{ check.window_minutes }} minutos (umbral: {{ check.warning_threshold }})</p>
+            {% elif check.status == 'critical' %}
+            <p class="help has-text-danger-light"><span class="icon is-small"><i class="fas fa-times-circle"></i></span> {{ check.count }} errores en los ultimos {{ check.window_minutes }} minutos (umbral: {{ check.critical_threshold }})</p>
+            {% endif %}
         </div>
     </div>
     {% endfor %}
