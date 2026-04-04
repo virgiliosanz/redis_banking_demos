@@ -32,7 +32,7 @@
         <div class="level-item">
             <span class="has-text-grey-light is-size-7">
                 <span class="icon is-small"><i class="fas fa-clock"></i></span>
-                Actualizado: {{ timestamp }}
+                Actualizado: <span class="epoch-ago" data-epoch="{{ timestamp }}">{{ timestamp }}</span>
             </span>
         </div>
     </div>
@@ -193,7 +193,7 @@
 {% if data.generated_at %}
 <p class="help has-text-grey">
     <span class="icon is-small"><i class="fas fa-clock"></i></span>
-    Generado: {{ data.generated_at }}
+    Generado: <span class="epoch-ago" data-epoch="{{ data.generated_at }}">{{ data.generated_at }}</span>
 </p>
 {% endif %}
 

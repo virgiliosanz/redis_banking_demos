@@ -108,39 +108,8 @@
         }
     }
 
-    /* --- Epoch humanizer --- */
-    function timeAgo(epoch) {
-        if (!epoch) return 'Nunca';
-        var now = Math.floor(Date.now() / 1000);
-        var diff = now - epoch;
-        if (diff < 0) diff = 0;
-        if (diff < 60) return 'hace ' + diff + ' segundos';
-        var minutes = Math.floor(diff / 60);
-        if (minutes < 60) return 'hace ' + minutes + (minutes === 1 ? ' minuto' : ' minutos');
-        var hours = Math.floor(minutes / 60);
-        if (hours < 24) return 'hace ' + hours + (hours === 1 ? ' hora' : ' horas');
-        var days = Math.floor(hours / 24);
-        return 'hace ' + days + (days === 1 ? ' dia' : ' dias');
-    }
-
-    function formatAbsolute(epoch) {
-        var d = new Date(epoch * 1000);
-        var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
-        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
-               ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
-    }
-
-    function humanizeEpochs(container) {
-        var spans = container.querySelectorAll('.epoch-ago[data-epoch]');
-        for (var i = 0; i < spans.length; i++) {
-            var ep = parseInt(spans[i].getAttribute('data-epoch'), 10);
-            if (!isNaN(ep)) {
-                spans[i].textContent = timeAgo(ep);
-                spans[i].setAttribute('title', formatAbsolute(ep));
-                spans[i].style.cursor = 'help';
-            }
-        }
-    }
+    /* --- Epoch humanizer (delegated to shared TimeAgo module) --- */
+    var humanizeEpochs = TimeAgo.humanizeEpochs;
 
     /* --- Tab system --- */
     var tabCache = {};

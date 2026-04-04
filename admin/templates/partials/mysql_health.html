@@ -13,7 +13,7 @@
         <div class="level-item">
             <span class="has-text-grey-light is-size-7">
                 <span class="icon is-small"><i class="fas fa-clock"></i></span>
-                Actualizado: {{ timestamp }}
+                Actualizado: <span class="epoch-ago" data-epoch="{{ timestamp }}">{{ timestamp }}</span>
             </span>
         </div>
     </div>
@@ -87,7 +87,7 @@
                 <th>User</th>
                 <th>DB</th>
                 <th>Command</th>
-                <th>Time (s)</th>
+                <th>Duracion</th>
                 <th>State</th>
                 <th>Query</th>
             </tr>
@@ -99,8 +99,8 @@
                 <td>{{ q.user }}</td>
                 <td>{{ q.db }}</td>
                 <td>{{ q.command }}</td>
-                <td class="{% if q.time_seconds >= db.processlist.critical_seconds %}has-background-danger has-text-white{% elif q.time_seconds >= db.processlist.warning_seconds %}has-background-warning has-text-dark{% endif %}">
-                    {{ q.time_seconds }}
+                <td class="{% if q.time_seconds >= db.processlist.critical_seconds %}has-background-danger has-text-white{% elif q.time_seconds >= db.processlist.warning_seconds %}has-background-warning has-text-dark{% endif %}" title="{{ q.time_seconds }}s">
+                    <script>document.write(TimeAgo.humanizeDuration({{ q.time_seconds }}))</script>
                 </td>
                 <td>{{ q.state }}</td>
                 <td><code class="is-size-7" style="background-color: rgba(255,255,255,0.1); color: #b5b5b5; padding: 2px 4px; border-radius: 3px;">{{ q.query_excerpt }}</code></td>
