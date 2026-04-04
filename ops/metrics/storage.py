@@ -126,7 +126,7 @@ class MetricsStore:
         return cur.rowcount
 
     def query_extended(
-        self, group: str, range_minutes: int
+        self, group: str, range_minutes: int, offset_seconds: int = 0
     ) -> List[Tuple[float, str, float]]:
         """Return merged raw + hourly data for *group* over *range_minutes*.
 
@@ -135,26 +135,33 @@ class MetricsStore:
         ``avg_value`` as the value.  Both sets are merged and ordered by
         timestamp.
 
+        Args:
+            offset_seconds: when non-zero the query window is shifted back
+                by this many seconds.  Useful for fetching a historical
+                comparison window (e.g. yesterday's data).
+
         Returns:
             List of ``(ts, metric_name, value)`` tuples ordered by ``ts``.
         """
-        cutoff = time.time() - range_minutes * 60
+        now = time.time()
+        cutoff = now - range_minutes * 60 - offset_seconds
+        upper = now - offset_seconds
 
         # Hourly aggregates for older data
         cur_hourly = self._conn.execute(
             "SELECT ts_hour, metric_name, avg_value FROM samples_hourly "
-            "WHERE (group_name = ? OR group_name LIKE ?) AND ts_hour >= ? "
+            "WHERE (group_name = ? OR group_name LIKE ?) AND ts_hour >= ? AND ts_hour <= ? "
             "ORDER BY ts_hour",
-            (group, group + ".%", cutoff),
+            (group, group + ".%", cutoff, upper),
         )
         hourly_rows = cur_hourly.fetchall()
 
         # Raw samples (whatever is still in the raw table within range)
         cur_raw = self._conn.execute(
             "SELECT ts, metric_name, value FROM samples "
-            "WHERE (group_name = ? OR group_name LIKE ?) AND ts >= ? "
+            "WHERE (group_name = ? OR group_name LIKE ?) AND ts >= ? AND ts <= ? "
             "ORDER BY ts",
-            (group, group + ".%", cutoff),
+            (group, group + ".%", cutoff, upper),
         )
         raw_rows = cur_raw.fetchall()
 

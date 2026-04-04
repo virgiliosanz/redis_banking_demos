@@ -80,6 +80,13 @@
                 <input type="checkbox" id="autoRefresh"> Cada 60s
             </label>
         </div>
+        <div class="column is-narrow" id="compareCol">
+            <label class="label">Comparar</label>
+            <button class="button is-small is-link is-outlined" id="toggleCompare">
+                <span class="icon"><i class="fas fa-calendar-day"></i></span>
+                <span>Comparar con ayer</span>
+            </button>
+        </div>
         <div class="column is-narrow">
             <label class="label">Umbrales</label>
             <button class="button is-small is-warning" id="toggleThresholds">
@@ -123,6 +130,8 @@
     let currentRange = '1h';
     let currentTab = 'sistema';
     let showThresholds = true;
+    let compareYesterday = false;
+    const COMPARABLE_RANGES = ['5m','15m','30m','1h','6h','24h'];
 
     // Threshold definitions: { metricSuffix: { warning, critical } }
     // Uses suffix matching so container metrics (e.g. n9-lb-nginx.cpu_pct) match *.cpu_pct
@@ -148,41 +157,90 @@
         if (!th || !showThresholds) return {};
         var upperBound = Math.max(yMax * 1.1, th.critical * 1.5);
         return {
-            annotation: {
-                annotations: {
-                    warningBand: {
-                        type: 'box',
-                        yMin: th.warning,
-                        yMax: th.critical,
-                        backgroundColor: 'rgba(255, 193, 7, 0.15)',
-                        borderColor: 'rgba(255, 193, 7, 0.4)',
-                        borderWidth: 1,
-                        label: {
-                            display: true,
-                            content: 'Warning',
-                            position: 'start',
-                            color: '#b58900',
-                            font: { size: 10 }
-                        }
-                    },
-                    criticalBand: {
-                        type: 'box',
-                        yMin: th.critical,
-                        yMax: upperBound,
-                        backgroundColor: 'rgba(220, 53, 69, 0.13)',
-                        borderColor: 'rgba(220, 53, 69, 0.4)',
-                        borderWidth: 1,
-                        label: {
-                            display: true,
-                            content: 'Critical',
-                            position: 'start',
-                            color: '#c0392b',
-                            font: { size: 10 }
-                        }
-                    }
+            warningBand: {
+                type: 'box',
+                yMin: th.warning,
+                yMax: th.critical,
+                backgroundColor: 'rgba(255, 193, 7, 0.15)',
+                borderColor: 'rgba(255, 193, 7, 0.4)',
+                borderWidth: 1,
+                label: {
+                    display: true,
+                    content: 'Warning',
+                    position: 'start',
+                    color: '#b58900',
+                    font: { size: 10 }
+                }
+            },
+            criticalBand: {
+                type: 'box',
+                yMin: th.critical,
+                yMax: upperBound,
+                backgroundColor: 'rgba(220, 53, 69, 0.13)',
+                borderColor: 'rgba(220, 53, 69, 0.4)',
+                borderWidth: 1,
+                label: {
+                    display: true,
+                    content: 'Critical',
+                    position: 'start',
+                    color: '#c0392b',
+                    font: { size: 10 }
                 }
             }
         };
+    }
+
+    /** Build vertical line annotations for incidents matching the active group. */
+    function buildIncidentAnnotations(labels, timestamps, incidents, activeGroup) {
+        var annots = {};
+        if (!incidents || incidents.length === 0 || labels.length === 0) return annots;
+
+        // Determine which incident services are relevant for the active group.
+        // "host" incidents and cross-cutting show on all charts.
+        function isRelevant(svc) {
+            if (svc === 'host') return true;
+            if (activeGroup === 'host' || activeGroup === 'containers') return true;
+            return svc === activeGroup;
+        }
+
+        var tsMin = timestamps[0];
+        var tsMax = timestamps[timestamps.length - 1];
+
+        incidents.forEach(function(inc, i) {
+            if (!isRelevant(inc.service)) return;
+            if (inc.timestamp < tsMin || inc.timestamp > tsMax) return;
+
+            // Find closest label index
+            var bestIdx = 0;
+            var bestDiff = Math.abs(timestamps[0] - inc.timestamp);
+            for (var j = 1; j < timestamps.length; j++) {
+                var diff = Math.abs(timestamps[j] - inc.timestamp);
+                if (diff < bestDiff) { bestDiff = diff; bestIdx = j; }
+            }
+
+            var color = inc.severity === 'critical'
+                ? 'rgba(220, 53, 69, 0.8)'
+                : 'rgba(255, 152, 0, 0.8)';
+
+            annots['incident_' + i] = {
+                type: 'line',
+                xMin: labels[bestIdx],
+                xMax: labels[bestIdx],
+                borderColor: color,
+                borderWidth: 2,
+                borderDash: [6, 4],
+                label: {
+                    display: true,
+                    content: inc.summary || (inc.service + ' ' + inc.severity),
+                    position: 'start',
+                    backgroundColor: color,
+                    color: '#fff',
+                    font: { size: 10 },
+                    padding: 3
+                }
+            };
+        });
+        return annots;
     }
 
     // Mapping: tab -> groups to fetch
@@ -273,7 +331,7 @@
         }
     }
 
-    function renderCharts(metrics) {
+    function renderCharts(metrics, yesterdayMetrics, incidents, activeGroup) {
         const area = document.getElementById('chartsArea');
         const loading = document.getElementById('loadingMsg');
         const empty = document.getElementById('emptyMsg');
@@ -294,14 +352,17 @@
             const isCounter = isCounterMetric(name);
             var labels, values, chartLabel;
 
+            var timestamps;
             if (isCounter) {
                 var rate = counterToRate(points);
                 labels = rate.labels;
                 values = rate.values;
+                timestamps = points.slice(1).map(function(p) { return p.ts; });
                 chartLabel = name + ' (rate)';
             } else {
                 labels = points.map(p => new Date(p.ts * 1000).toLocaleTimeString());
                 values = points.map(p => p.value);
+                timestamps = points.map(function(p) { return p.ts; });
                 chartLabel = name;
             }
 
@@ -314,9 +375,54 @@
             area.appendChild(card);
 
             const ctx = document.getElementById('chart-' + idx).getContext('2d');
-            var yMax = Math.max.apply(null, values);
-            var annotations = buildAnnotations(name, yMax);
+
+            // Build datasets array — always includes today
+            var datasets = [{
+                label: chartLabel,
+                data: values,
+                borderColor: getColor(idx),
+                backgroundColor: getColor(idx) + '22',
+                fill: true, tension: 0.3, pointRadius: 2
+            }];
+
+            // Yesterday overlay when available
+            var allValues = values.slice();
+            if (yesterdayMetrics && yesterdayMetrics[name]) {
+                var yPts = yesterdayMetrics[name];
+                var yLabels, yValues;
+                if (isCounter) {
+                    var yRate = counterToRate(yPts);
+                    yLabels = yRate.labels;
+                    yValues = yRate.values;
+                } else {
+                    yLabels = yPts.map(p => new Date(p.ts * 1000).toLocaleTimeString());
+                    yValues = yPts.map(p => p.value);
+                }
+                // Pad to match labels length if needed (Chart.js aligns by index)
+                datasets.push({
+                    label: 'Ayer',
+                    data: yValues,
+                    borderColor: getColor(idx),
+                    backgroundColor: 'transparent',
+                    borderDash: [6, 4],
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0.3,
+                    opacity: 0.5
+                });
+                allValues = allValues.concat(yValues);
+            }
+
+            var yMax = Math.max.apply(null, allValues);
+            var thresholdAnnots = buildAnnotations(name, yMax);
+            var incidentAnnots = buildIncidentAnnotations(labels, timestamps, incidents, activeGroup);
+            var allAnnots = Object.assign({}, thresholdAnnots, incidentAnnots);
             var themeColors = getChartThemeColors();
+            var hasOverlay = datasets.length > 1;
+            var annotationPlugin = Object.keys(allAnnots).length > 0
+                ? { annotation: { annotations: allAnnots } }
+                : {};
             var chartOpts = {
                 responsive: true, maintainAspectRatio: false,
                 scales: {
@@ -331,7 +437,7 @@
                         ticks: { color: themeColors.tickColor }
                     }
                 },
-                plugins: Object.assign({ legend: { display: false } }, annotations)
+                plugins: Object.assign({ legend: { display: hasOverlay } }, annotationPlugin)
             };
 
             if (isCounter && name.endsWith('_bytes')) {
@@ -340,7 +446,7 @@
                 };
                 chartOpts.plugins.tooltip = {
                     callbacks: {
-                        label: function(c) { return chartLabel + ': ' + formatRate(c.parsed.y); }
+                        label: function(c) { return c.dataset.label + ': ' + formatRate(c.parsed.y); }
                     }
                 };
             }
@@ -349,13 +455,7 @@
                 type: 'line',
                 data: {
                     labels: labels,
-                    datasets: [{
-                        label: chartLabel,
-                        data: values,
-                        borderColor: getColor(idx),
-                        backgroundColor: getColor(idx) + '22',
-                        fill: true, tension: 0.3, pointRadius: 2
-                    }]
+                    datasets: datasets
                 },
                 options: chartOpts
             });
@@ -393,8 +493,21 @@
                 .then(function(r) { return r.json(); });
         });
 
-        Promise.all(promises)
-            .then(function(results) {
+        // Optionally fetch yesterday's data for comparison
+        var shouldCompare = compareYesterday && COMPARABLE_RANGES.indexOf(currentRange) !== -1;
+        var yesterdayPromises = [];
+        if (shouldCompare) {
+            yesterdayPromises = groups.map(function(g) {
+                return fetch('/metrics/api/data?range=' + currentRange + '&group=' + g + '&offset_hours=24')
+                    .then(function(r) { return r.json(); });
+            });
+        }
+
+        Promise.all([Promise.all(promises), Promise.all(yesterdayPromises)])
+            .then(function(pair) {
+                var results = pair[0];
+                var yesterdayResults = pair[1];
+
                 // Merge all metrics into one object
                 var allMetrics = {};
                 results.forEach(function(data) {
@@ -405,12 +518,28 @@
                     }
                 });
 
+                // Merge yesterday metrics
+                var allYesterday = null;
+                if (shouldCompare && yesterdayResults.length > 0) {
+                    allYesterday = {};
+                    yesterdayResults.forEach(function(data) {
+                        if (data.metrics) {
+                            Object.keys(data.metrics).forEach(function(k) {
+                                allYesterday[k] = data.metrics[k];
+                            });
+                        }
+                    });
+                }
+
                 // Apply container filter if needed
                 if (containerFilter) {
                     allMetrics = filterContainerMetrics(allMetrics, containerFilter);
+                    if (allYesterday) {
+                        allYesterday = filterContainerMetrics(allYesterday, containerFilter);
+                    }
                 }
 
-                renderCharts(allMetrics);
+                renderCharts(allMetrics, allYesterday);
             })
             .catch(function(err) {
                 loading.style.display = 'none';
@@ -444,6 +573,7 @@
             b.classList.remove('is-info','is-selected');
         });
         btn.classList.add('is-info','is-selected');
+        updateCompareVisibility();
         fetchMetrics();
     });
 
@@ -470,6 +600,40 @@
         }
         fetchMetrics();
     });
+
+    // Compare with yesterday toggle
+    document.getElementById('toggleCompare').addEventListener('click', function() {
+        compareYesterday = !compareYesterday;
+        var btn = this;
+        if (compareYesterday) {
+            btn.classList.remove('is-outlined');
+            btn.classList.add('is-link');
+            btn.querySelector('span:last-child').textContent = 'Comparando con ayer';
+        } else {
+            btn.classList.add('is-outlined');
+            btn.classList.remove('is-link');
+            btn.querySelector('span:last-child').textContent = 'Comparar con ayer';
+        }
+        fetchMetrics();
+    });
+
+    /** Show/hide the compare toggle based on current range */
+    function updateCompareVisibility() {
+        var col = document.getElementById('compareCol');
+        if (COMPARABLE_RANGES.indexOf(currentRange) !== -1) {
+            col.style.display = '';
+        } else {
+            col.style.display = 'none';
+            // Disable comparison when hidden
+            if (compareYesterday) {
+                compareYesterday = false;
+                var btn = document.getElementById('toggleCompare');
+                btn.classList.add('is-outlined');
+                btn.classList.remove('is-link');
+                btn.querySelector('span:last-child').textContent = 'Comparar con ayer';
+            }
+        }
+    }
 
     // Refresh button
     document.getElementById('refreshBtn').addEventListener('click', fetchMetrics);
