@@ -17,6 +17,27 @@
 <span class="icon has-text-danger"><i class="fas fa-times-circle"></i></span>
 {%- endif -%}
 {% endmacro %}
+<div class="level mb-2">
+    <div class="level-left">
+        <div class="level-item">
+            <h2 class="title is-4 mb-0">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas fa-search"></i></span>
+                    <span>Elastic Health</span>
+                </span>
+            </h2>
+        </div>
+    </div>
+    <div class="level-right">
+        <div class="level-item">
+            <span class="has-text-grey-light is-size-7">
+                <span class="icon is-small"><i class="fas fa-clock"></i></span>
+                Actualizado: {{ timestamp }}
+            </span>
+        </div>
+    </div>
+</div>
+
 {% if data.error is defined %}
 <div class="notification is-danger">
     <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>

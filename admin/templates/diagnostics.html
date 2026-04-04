@@ -10,12 +10,12 @@
 </h1>
 <h2 class="subtitle">Collectors y agentes de diagnostico</h2>
 
-<!-- Collector tabs -->
+<!-- Collector + Agent tabs -->
 <div class="box">
     <h3 class="title is-4">
         <span class="icon-text">
             <span class="icon"><i class="fas fa-chart-line"></i></span>
-            <span>Collectors</span>
+            <span>Collectors &amp; Agents</span>
         </span>
     </h3>
     <div class="tabs is-boxed is-medium" id="collectorTabs">
@@ -25,85 +25,14 @@
             <li data-tab="mysql"><a><span class="icon"><i class="fas fa-database"></i></span><span>MySQL</span></a></li>
             <li data-tab="elastic"><a><span class="icon"><i class="fas fa-search"></i></span><span>Elastic</span></a></li>
             <li data-tab="app"><a><span class="icon"><i class="fas fa-globe"></i></span><span>App</span></a></li>
+            <li data-tab="nightly"><a><span class="icon"><i class="fas fa-moon"></i></span><span>Nightly</span></a></li>
+            <li data-tab="sentry"><a><span class="icon"><i class="fas fa-shield-alt"></i></span><span>Sentry</span></a></li>
         </ul>
     </div>
     <div id="tab-content" class="p-4"></div>
 </div>
 
-<!-- Agents section -->
-<div class="columns">
-    <div class="column is-half">
-        <!-- Nightly auditor -->
-        <div class="box">
-            <h3 class="title is-4">
-                <span class="icon-text">
-                    <span class="icon"><i class="fas fa-moon"></i></span>
-                    <span>Nightly Auditor</span>
-                </span>
-            </h3>
-            <p class="subtitle is-6">Auditoria programada de salud operativa</p>
-            <p class="help mb-3">
-                <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
-                Ejecuta auditoria completa de salud del sistema. Solo lectura, genera reporte.
-            </p>
-
-            <form id="nightlyForm">
-                <div class="field">
-                    <button type="submit" class="button is-primary">
-                        <span class="icon"><i class="fas fa-play"></i></span>
-                        <span>Ejecutar</span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="column is-half">
-        <!-- Sentry agent -->
-        <div class="box">
-            <h3 class="title is-4">
-                <span class="icon-text">
-                    <span class="icon"><i class="fas fa-bug"></i></span>
-                    <span>Sentry Agent</span>
-                </span>
-            </h3>
-            <p class="subtitle is-6">Diagnostico reactivo por servicio</p>
-            <p class="help mb-3">
-                <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
-                Ejecuta diagnostico reactivo del servicio seleccionado. Solo lectura.
-            </p>
-
-            <form id="sentryForm">
-                <div class="field">
-                    <label class="label">Servicio</label>
-                    <div class="control">
-                        <div class="select is-fullwidth">
-                            <select name="service" required>
-                                <option value="">-- Seleccionar servicio --</option>
-                                <option value="lb-nginx">lb-nginx</option>
-                                <option value="fe-live">fe-live</option>
-                                <option value="fe-archive">fe-archive</option>
-                                <option value="be-admin">be-admin</option>
-                                <option value="db-live">db-live</option>
-                                <option value="db-archive">db-archive</option>
-                                <option value="elastic">elastic</option>
-                                <option value="cron-master">cron-master</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="field">
-                    <button type="submit" class="button is-primary">
-                        <span class="icon"><i class="fas fa-play"></i></span>
-                        <span>Ejecutar</span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Output section (for Nightly/Sentry) -->
+<!-- Output section (for Nightly/Sentry run commands) -->
 <div class="box" id="outputSection" style="display: none;">
     <h3 class="title is-4">
         <span class="icon-text">
@@ -126,7 +55,7 @@
 (function() {
     'use strict';
 
-    /* --- Nightly / Sentry output (subprocess, unchanged) --- */
+    /* --- Shared output panel for subprocess commands --- */
     var outputSection = document.getElementById('outputSection');
     var outputBox = document.getElementById('outputBox');
     var loadingIndicator = document.getElementById('loadingIndicator');
@@ -150,7 +79,7 @@
         errorBox.style.display = 'block';
     }
 
-    async function runCommand(args) {
+    async function runCommand(args, refreshTab) {
         showLoading();
         try {
             var response = await fetch('/api/run', {
@@ -165,26 +94,20 @@
                 return;
             }
             showOutput(result.stdout || result.stderr || '(sin output)');
-            AdminReports.handleCommandResult(result, outputSection);
+            if (typeof AdminReports !== 'undefined' && AdminReports.handleCommandResult) {
+                AdminReports.handleCommandResult(result, outputSection);
+            }
+            /* Auto-refresh the originating tab after execution */
+            if (refreshTab) {
+                delete tabCache[refreshTab];
+                loadTab(refreshTab);
+            }
         } catch (error) {
             showError('Error de red: ' + error.message);
         }
     }
 
-    document.getElementById('nightlyForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        runCommand(['python3', '-m', 'ops.cli.ia_ops', 'run-nightly-auditor']);
-    });
-
-    document.getElementById('sentryForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        var service = this.querySelector('[name="service"]').value;
-        if (!service) { showError('Debe seleccionar un servicio'); return; }
-        runCommand(['python3', '-m', 'ops.cli.ia_ops', 'run-sentry-agent', '--service', service]);
-    });
-
-    /* --- Collector tabs (lazy-loaded rich templates) --- */
-    var COLLECTORS = ['host', 'runtime', 'mysql', 'elastic', 'app'];
+    /* --- Tab system --- */
     var tabCache = {};
     var tabContent = document.getElementById('tab-content');
     var tabItems = document.querySelectorAll('#collectorTabs li[data-tab]');
@@ -218,6 +141,26 @@
         });
     }
 
+    function bindTabActions(tabName) {
+        /* Nightly: "Ejecutar ahora" button */
+        var nightlyBtn = document.getElementById('runNightlyBtn');
+        if (nightlyBtn) {
+            nightlyBtn.addEventListener('click', function() {
+                runCommand(['python3', '-m', 'ops.cli.ia_ops', 'run-nightly-auditor'], 'nightly');
+            });
+        }
+        /* Sentry: service select + "Ejecutar" button */
+        var sentryBtn = document.getElementById('runSentryBtn');
+        if (sentryBtn) {
+            sentryBtn.addEventListener('click', function() {
+                var sel = document.getElementById('sentryServiceSelect');
+                var service = sel ? sel.value : '';
+                if (!service) { showError('Debe seleccionar un servicio'); return; }
+                runCommand(['python3', '-m', 'ops.cli.ia_ops', 'run-sentry-agent', '--service', service], 'sentry');
+            });
+        }
+    }
+
     function renderCachedContent(html, tabName) {
         tabContent.innerHTML =
             '<div style="position:relative">' +
@@ -229,6 +172,7 @@
             delete tabCache[tabName];
             loadTab(tabName);
         });
+        bindTabActions(tabName);
     }
 
     async function fetchCollector(name) {

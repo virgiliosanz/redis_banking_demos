@@ -296,7 +296,7 @@ def create_app() -> Flask:
         data = collect_host(settings)
         if request.headers.get("Accept") == "application/json":
             return jsonify(data)
-        return render_template("partials/host_health.html", data=data)
+        return render_template("partials/host_health.html", data=data, timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
 
     @app.route("/diagnostics/mysql")
     def diagnostics_mysql():
@@ -310,7 +310,7 @@ def create_app() -> Flask:
         data = collect_mysql(settings)
         if request.headers.get("Accept") == "application/json":
             return jsonify(data)
-        return render_template("partials/mysql_health.html", data=data)
+        return render_template("partials/mysql_health.html", data=data, timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
 
     @app.route("/diagnostics/runtime")
     def diagnostics_runtime():
@@ -324,6 +324,7 @@ def create_app() -> Flask:
                 "partials/runtime_health.html",
                 data=None,
                 error="IA-Ops config not found",
+                timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             )
         try:
             data = collect_runtime(settings)
@@ -334,6 +335,7 @@ def create_app() -> Flask:
                 "partials/runtime_health.html",
                 data=None,
                 error=str(exc),
+                timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             )
         if request.headers.get("Accept") == "application/json":
             return jsonify(data)
@@ -341,6 +343,7 @@ def create_app() -> Flask:
             "partials/runtime_health.html",
             data=data,
             error=None,
+            timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         )
 
     @app.route("/sync/editorial")

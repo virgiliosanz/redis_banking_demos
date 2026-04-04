@@ -7,6 +7,9 @@ a Jinja2 partial template as an HTML fragment suitable for embedding.
 from __future__ import annotations
 
 import logging
+import re
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from flask import Blueprint, render_template, jsonify, request
@@ -19,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint("diagnostics_collectors", __name__, url_prefix="/diagnostics")
 
+_REPORT_DIR = Path(__file__).parent.parent / "runtime" / "reports" / "ia-ops"
+
 
 def _get_settings():
     """Return a Settings instance using the default resolution chain."""
@@ -29,8 +34,39 @@ def _wants_json() -> bool:
     return request.headers.get("Accept", "") == "application/json"
 
 
+def _now_stamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+
 def _render(template: str, data: dict[str, Any]):
-    return render_template(template, data=data)
+    return render_template(template, data=data, timestamp=_now_stamp())
+
+
+def _parse_report_header(content: str, fields: dict[str, str]) -> dict[str, str]:
+    """Extract ``- key: value`` header fields from a markdown report."""
+    result: dict[str, str] = {}
+    for line in content.splitlines()[:15]:
+        for key, attr in fields.items():
+            if line.startswith(f"- {key}:"):
+                result[attr] = line.split(":", 1)[1].strip()
+    return result
+
+
+def _parse_list_section(content: str, heading: str) -> list[str]:
+    """Return list-item texts from a ``## heading`` section."""
+    items: list[str] = []
+    in_section = False
+    for line in content.splitlines():
+        if line.startswith(f"## {heading}"):
+            in_section = True
+            continue
+        if in_section:
+            if line.startswith("## "):
+                break
+            stripped = line.strip()
+            if stripped.startswith("- "):
+                items.append(stripped[2:].strip())
+    return items
 
 
 @bp.route("/elastic")
@@ -65,3 +101,149 @@ def app_health():
     if _wants_json():
         return jsonify(data)
     return _render("partials/app_health.html", data)
+
+
+@bp.route("/nightly")
+def nightly_health():
+    """Last nightly auditor report rendered as rich HTML."""
+    report_dir = _REPORT_DIR
+    if not report_dir.is_dir():
+        return render_template(
+            "partials/nightly_health.html",
+            error="No se encontro el directorio de reportes nightly.",
+            severity=None, summary=None, date=None,
+            filename=None, findings=None, risks=None, actions=None,
+        )
+
+    files = sorted(report_dir.glob("nightly-auditor-*.md"))
+    if not files:
+        return render_template(
+            "partials/nightly_health.html",
+            error="No hay reportes nightly previos.",
+            severity=None, summary=None, date=None,
+            filename=None, findings=None, risks=None, actions=None,
+        )
+
+    latest = files[-1]
+    try:
+        content = latest.read_text(encoding="utf-8")
+    except OSError as exc:
+        return render_template(
+            "partials/nightly_health.html",
+            error=f"Error leyendo reporte: {exc}",
+            severity=None, summary=None, date=None,
+            filename=None, findings=None, risks=None, actions=None,
+        )
+
+    header = _parse_report_header(content, {
+        "generated_at": "date",
+        "severidad_global": "severity",
+        "resumen": "summary",
+    })
+
+    # Reuse the app-level findings parser
+    from admin.app import _parse_nightly_findings
+    findings = _parse_nightly_findings(content)
+
+    risks = _parse_list_section(content, "Riesgos")
+    actions = _parse_list_section(content, "Acciones recomendadas")
+
+    return render_template(
+        "partials/nightly_health.html",
+        error=None,
+        severity=header.get("severity", ""),
+        summary=header.get("summary", ""),
+        date=header.get("date", ""),
+        filename=latest.name,
+        findings=findings,
+        risks=risks,
+        actions=actions,
+    )
+
+
+@bp.route("/sentry")
+def sentry_health():
+    """Last sentry agent report rendered as rich HTML."""
+    report_dir = _REPORT_DIR
+    if not report_dir.is_dir():
+        return render_template(
+            "partials/sentry_health.html",
+            error="No se encontro el directorio de reportes.",
+            data=None,
+        )
+
+    files = sorted(report_dir.glob("sentry-*.md"))
+    if not files:
+        return render_template(
+            "partials/sentry_health.html",
+            error=None,
+            data=None,
+        )
+
+    latest = files[-1]
+    try:
+        content = latest.read_text(encoding="utf-8")
+    except OSError as exc:
+        return render_template(
+            "partials/sentry_health.html",
+            error=f"Error leyendo reporte: {exc}",
+            data=None,
+        )
+
+    header = _parse_report_header(content, {
+        "generated_at": "date",
+        "severidad": "severity",
+        "resumen": "summary",
+        "servicio_afectado": "service",
+    })
+
+    # Extract cause (plain text paragraph after ## Causa probable)
+    cause = ""
+    in_cause = False
+    for line in content.splitlines():
+        if line.startswith("## Causa probable"):
+            in_cause = True
+            continue
+        if in_cause:
+            if line.startswith("## "):
+                break
+            stripped = line.strip()
+            if stripped:
+                cause = stripped
+                break
+
+    # Extract risk
+    risk = ""
+    in_risk = False
+    for line in content.splitlines():
+        if line.startswith("## Riesgo si no se actua"):
+            in_risk = True
+            continue
+        if in_risk:
+            if line.startswith("## "):
+                break
+            stripped = line.strip()
+            if stripped:
+                risk = stripped
+                break
+
+    evidence = _parse_list_section(content, "Evidencias")
+    actions = _parse_list_section(content, "Acciones manuales")
+
+    data = {
+        "date": header.get("date", ""),
+        "severity": header.get("severity", ""),
+        "summary": header.get("summary", ""),
+        "service": header.get("service", ""),
+        "filename": latest.name,
+        "cause": cause,
+        "risk": risk,
+        "evidence": evidence,
+        "actions": actions,
+    }
+
+    return render_template(
+        "partials/sentry_health.html",
+        error=None,
+        data=data,
+    )

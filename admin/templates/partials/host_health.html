@@ -3,13 +3,26 @@
 {%- if s == 'ok' -%}OK{%- elif s == 'warning' -%}Aviso{%- elif s == 'critical' -%}Critico{%- else -%}{{ s }}{%- endif -%}
 {% endmacro %}
 
-<h2 class="title is-4">
-    <span class="icon-text">
-        <span class="icon"><i class="fas fa-server"></i></span>
-        <span>Host Health</span>
-    </span>
-    <span class="tag is-light is-small ml-2">{{ data.generated_at }}</span>
-</h2>
+<div class="level mb-2">
+    <div class="level-left">
+        <div class="level-item">
+            <h2 class="title is-4 mb-0">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas fa-server"></i></span>
+                    <span>Host Health</span>
+                </span>
+            </h2>
+        </div>
+    </div>
+    <div class="level-right">
+        <div class="level-item">
+            <span class="has-text-grey-light is-size-7">
+                <span class="icon is-small"><i class="fas fa-clock"></i></span>
+                Actualizado: {{ data.generated_at }}
+            </span>
+        </div>
+    </div>
+</div>
 
 {# --- System Info bar --- #}
 <div class="box">
