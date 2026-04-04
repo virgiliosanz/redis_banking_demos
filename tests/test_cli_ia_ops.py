@@ -12,6 +12,7 @@ from ops.cli.ia_ops import (
     build_parser,
     cmd_cleanup_data,
     cmd_collect_host,
+    cmd_collect_metrics,
     cmd_collect_service_logs,
     cmd_collect_nightly_context,
     cmd_render_cleanup_crontab,
@@ -197,9 +198,17 @@ class TestCollectServiceLogsParsing(unittest.TestCase):
 class TestCmdCleanupData(unittest.TestCase):
     """cmd_cleanup_data aggregates metrics, purges, and cleans reports."""
 
+    @patch("ops.cli.ia_ops.write_heartbeat")
+    @patch("ops.cli.ia_ops.load_settings")
     @patch("admin.reports.cleanup_old_reports", return_value={"deleted": 3, "remaining": 10})
     @patch("ops.metrics.storage.MetricsStore")
-    def test_cleanup_data_returns_json_summary(self, mock_store_cls, mock_cleanup):
+    def test_cleanup_data_returns_json_summary(self, mock_store_cls, mock_cleanup, mock_load_settings, mock_write_hb):
+        from pathlib import Path
+        mock_settings = MagicMock()
+        mock_settings.get_path.return_value = Path("/tmp/heartbeats")
+        mock_settings.project_root.resolve.return_value = Path("/tmp/project")
+        mock_load_settings.return_value = mock_settings
+
         mock_store = MagicMock()
         mock_store.aggregate.return_value = 42
         mock_store.purge.return_value = 5
@@ -221,9 +230,44 @@ class TestCmdCleanupData(unittest.TestCase):
         mock_store.purge.assert_called_once_with(max_age_hours=24)
         mock_store.close.assert_called_once()
         mock_cleanup.assert_called_once()
+        mock_write_hb.assert_called_once()
+        self.assertEqual(mock_write_hb.call_args[0][1], "cleanup-data")
 
         import json
         output = json.loads(captured.getvalue())
         self.assertEqual(output["aggregated"], 42)
         self.assertEqual(output["purged_metrics"], 5)
         self.assertEqual(output["purged_reports"], 3)
+
+
+class TestCmdCollectMetricsHeartbeat(unittest.TestCase):
+    """cmd_collect_metrics writes a heartbeat on success."""
+
+    @patch("ops.cli.ia_ops.write_heartbeat")
+    @patch("ops.cli.ia_ops.load_settings")
+    @patch("ops.collectors.metrics.collect_and_store", return_value={"samples": 10, "purged": 0})
+    @patch("ops.metrics.storage.MetricsStore")
+    def test_collect_metrics_writes_heartbeat(self, mock_store_cls, mock_collect, mock_load_settings, mock_write_hb):
+        from pathlib import Path
+        mock_settings = MagicMock()
+        mock_settings.get_path.return_value = Path("/tmp/heartbeats")
+        mock_settings.project_root.resolve.return_value = Path("/tmp/project")
+        mock_load_settings.return_value = mock_settings
+
+        mock_store = MagicMock()
+        mock_store_cls.return_value = mock_store
+
+        import io as _io
+        import sys as _sys
+        captured = _io.StringIO()
+        old_stdout = _sys.stdout
+        _sys.stdout = captured
+        try:
+            args = build_parser().parse_args(["collect-metrics"])
+            rc = cmd_collect_metrics(args)
+        finally:
+            _sys.stdout = old_stdout
+
+        self.assertEqual(rc, 0)
+        mock_write_hb.assert_called_once()
+        self.assertEqual(mock_write_hb.call_args[0][1], "collect-metrics")

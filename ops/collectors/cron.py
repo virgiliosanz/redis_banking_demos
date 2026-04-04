@@ -14,6 +14,8 @@ def _job_specs(settings: Settings) -> list[tuple[str, int, int, str]]:
     editorial = settings.get("CRON_JOB_EDITORIAL_SYNC", "sync-editorial-users")
     platform = settings.get("CRON_JOB_PLATFORM_SYNC", "sync-platform-config")
     rollover = settings.get("CRON_JOB_ROLLOVER", "rollover-content-year")
+    metrics_collector = settings.get("CRON_JOB_METRICS_COLLECTOR", "collect-metrics")
+    cleanup_data = settings.get("CRON_JOB_CLEANUP_DATA", "cleanup-data")
 
     return [
         (
@@ -33,6 +35,18 @@ def _job_specs(settings: Settings) -> list[tuple[str, int, int, str]]:
             settings.get_int("CRON_JOB_ROLLOVER_WARNING_MINUTES", 525600),
             settings.get_int("CRON_JOB_ROLLOVER_CRITICAL_MINUTES", 527040),
             settings.get("CRON_JOB_ROLLOVER_MISSING_STATUS", "info"),
+        ),
+        (
+            metrics_collector,
+            settings.get_int("CRON_JOB_METRICS_COLLECTOR_WARNING_MINUTES", 5),
+            settings.get_int("CRON_JOB_METRICS_COLLECTOR_CRITICAL_MINUTES", 15),
+            settings.get("CRON_JOB_METRICS_COLLECTOR_MISSING_STATUS", "warning"),
+        ),
+        (
+            cleanup_data,
+            settings.get_int("CRON_JOB_CLEANUP_DATA_WARNING_MINUTES", 2880),
+            settings.get_int("CRON_JOB_CLEANUP_DATA_CRITICAL_MINUTES", 4320),
+            settings.get("CRON_JOB_CLEANUP_DATA_MISSING_STATUS", "info"),
         ),
     ]
 

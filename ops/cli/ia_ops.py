@@ -17,6 +17,7 @@ from ..reporting import write_json_report, write_text_report
 from ..runtime import nightly as nightly_runtime
 from ..runtime import reactive as reactive_runtime
 from ..runtime import sentry as sentry_runtime
+from ..runtime.heartbeats import write_heartbeat
 from ..scheduling.cron import (
     install_cleanup_crontab,
     install_metrics_collector_crontab,
@@ -156,6 +157,10 @@ def cmd_collect_metrics(_: argparse.Namespace) -> int:
         result = metrics_collector.collect_and_store(settings, store)
     finally:
         store.close()
+    heartbeat_dir = settings.get_path("CRON_HEARTBEAT_DIR", "./runtime/heartbeats")
+    if not heartbeat_dir.is_absolute():
+        heartbeat_dir = settings.project_root.resolve() / heartbeat_dir
+    write_heartbeat(heartbeat_dir, "collect-metrics")
     _print_json(result)
     return 0
 
@@ -287,6 +292,7 @@ def cmd_remove_metrics_crontab(_: argparse.Namespace) -> int:
 
 
 def cmd_cleanup_data(_: argparse.Namespace) -> int:
+    settings = load_settings()
     from ..metrics.storage import MetricsStore
     from admin.reports import cleanup_old_reports
 
@@ -298,6 +304,11 @@ def cmd_cleanup_data(_: argparse.Namespace) -> int:
         store.close()
 
     report_result = cleanup_old_reports()
+
+    heartbeat_dir = settings.get_path("CRON_HEARTBEAT_DIR", "./runtime/heartbeats")
+    if not heartbeat_dir.is_absolute():
+        heartbeat_dir = settings.project_root.resolve() / heartbeat_dir
+    write_heartbeat(heartbeat_dir, "cleanup-data")
 
     payload = {
         "aggregated": aggregated,
