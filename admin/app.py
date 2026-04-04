@@ -346,35 +346,9 @@ def create_app() -> Flask:
             timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         )
 
-    @app.route("/sync/editorial")
-    def sync_editorial():
-        return render_template(
-            "sync.html",
-            page_title="Sync Editorial Users",
-            page_subtitle="Sincronizar usuarios editoriales entre live y archive",
-            command="sync-editorial-users",
-            show_mode_selector=True,
-        )
-
-    @app.route("/sync/platform")
-    def sync_platform():
-        return render_template(
-            "sync.html",
-            page_title="Sync Platform Config",
-            page_subtitle="Sincronizar configuracion de plataforma entre live y archive",
-            command="sync-platform-config",
-            show_mode_selector=True,
-        )
-
-    @app.route("/sync/drift")
-    def sync_drift():
-        return render_template(
-            "sync.html",
-            page_title="Drift Report",
-            page_subtitle="Reporte de desviaciones entre live y archive",
-            command="report-live-archive-sync-drift",
-            show_mode_selector=False,
-        )
+    @app.route("/sync/")
+    def sync_page():
+        return render_template("sync_unified.html")
 
     @app.route("/api/run", methods=["POST"])
     def api_run():
@@ -555,6 +529,69 @@ def create_crontab_blueprint() -> Blueprint:
     @bp.route("/")
     def crontab_page():
         return render_template("crontab.html")
+
+    @bp.route("/api/status")
+    def crontab_api_status():
+        """Check installation status of each managed cron block.
+
+        Reads ``crontab -l`` and checks for the BEGIN/END markers of each
+        managed block.  Returns JSON with ``installed`` flag and the cron
+        lines for each job type.
+        """
+        from ops.scheduling.cron import (
+            MANAGED_BLOCK_NAME,
+            REACTIVE_MANAGED_BLOCK_NAME,
+            SYNC_MANAGED_BLOCK_NAME,
+        )
+
+        blocks = {
+            "nightly": MANAGED_BLOCK_NAME,
+            "reactive": REACTIVE_MANAGED_BLOCK_NAME,
+            "sync": SYNC_MANAGED_BLOCK_NAME,
+        }
+
+        result = run_cli(["crontab", "-l"], timeout=10)
+
+        if not result.success:
+            stderr_lower = (result.stderr or "").lower()
+            stdout_lower = (result.stdout or "").lower()
+            if "no crontab" in stderr_lower or "no crontab" in stdout_lower:
+                crontab_content = ""
+            else:
+                error_msg = result.stderr or result.stdout or "crontab -l failed"
+                return jsonify({
+                    k: {"installed": False, "line": None, "error": error_msg}
+                    for k in blocks
+                })
+        else:
+            crontab_content = result.stdout or ""
+
+        status: dict[str, Any] = {}
+        for key, block_name in blocks.items():
+            begin = f"# BEGIN {block_name}"
+            end = f"# END {block_name}"
+            inside = False
+            cron_lines: list[str] = []
+
+            for line in crontab_content.splitlines():
+                if line.strip() == begin:
+                    inside = True
+                    continue
+                if line.strip() == end:
+                    inside = False
+                    continue
+                if inside and line.strip() and not line.startswith("SHELL=") and not line.startswith("PATH="):
+                    cron_lines.append(line)
+
+            if cron_lines:
+                status[key] = {
+                    "installed": True,
+                    "line": "\n".join(cron_lines),
+                }
+            else:
+                status[key] = {"installed": False, "line": None}
+
+        return jsonify(status)
 
     return bp
 

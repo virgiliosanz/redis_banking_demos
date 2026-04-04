@@ -8,114 +8,65 @@
         <span>Crontab Management</span>
     </span>
 </h1>
-<h2 class="subtitle">Instalar, desinstalar y renderizar crontabs</h2>
+<h2 class="subtitle">Estado y gestion de cron jobs</h2>
 
 <!-- Nightly Auditor -->
-<div class="box">
-    <h3 class="title is-5">
-        <span class="icon-text">
-            <span class="icon"><i class="fas fa-moon"></i></span>
-            <span>Nightly Auditor</span>
+<div class="box" id="section-nightly">
+    <div class="is-flex is-align-items-center mb-3">
+        <h3 class="title is-5 mb-0 mr-3">
+            <span class="icon-text">
+                <span class="icon"><i class="fas fa-moon"></i></span>
+                <span>Nightly Auditor</span>
+            </span>
+        </h3>
+        <span class="tag" id="badge-nightly">
+            <span class="icon is-small"><i class="fas fa-spinner fa-spin"></i></span>
         </span>
-    </h3>
-    <div class="buttons">
-        <button class="button is-success" onclick="runCrontab('render-nightly-crontab')" title="Muestra el bloque crontab que se instalaria. Solo lectura.">
-            <span class="icon"><i class="fas fa-file-code"></i></span>
-            <span>Render</span>
-        </button>
-        <button class="button is-primary" onclick="showConfirmModal('install-nightly-crontab', 'instalar', 'Nightly Auditor')" title="Instala el cron job en el crontab del sistema. Reemplaza entrada anterior si existe.">
-            <span class="icon"><i class="fas fa-plus-circle"></i></span>
-            <span>Install</span>
-        </button>
-        <button class="button is-danger" onclick="showConfirmModal('remove-nightly-crontab', 'desinstalar', 'Nightly Auditor')" title="Elimina el cron job del crontab del sistema.">
-            <span class="icon"><i class="fas fa-trash-alt"></i></span>
-            <span>Remove</span>
-        </button>
-        <button class="button is-warning" onclick="runCrontab('run-nightly-auditor')" title="Ejecuta el Nightly Auditor ahora. Solo lectura, genera reporte.">
-            <span class="icon"><i class="fas fa-play"></i></span>
-            <span>Run Now</span>
-        </button>
     </div>
-    <p class="help">
+    <div id="status-nightly"></div>
+    <p class="help mt-3">
         <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
-        Render: solo lectura.
-        Install: reemplaza entrada anterior si existe.
-        Remove: elimina el cron job del sistema.
-        Run Now: ejecuta el job manualmente.
+        Auditoria nocturna programada. Genera un reporte de salud, capacidad y riesgos operativos.
     </p>
 </div>
 
 <!-- Reactive Watch -->
-<div class="box">
-    <h3 class="title is-5">
-        <span class="icon-text">
-            <span class="icon"><i class="fas fa-heartbeat"></i></span>
-            <span>Reactive Watch</span>
+<div class="box" id="section-reactive">
+    <div class="is-flex is-align-items-center mb-3">
+        <h3 class="title is-5 mb-0 mr-3">
+            <span class="icon-text">
+                <span class="icon"><i class="fas fa-heartbeat"></i></span>
+                <span>Reactive Watch</span>
+            </span>
+        </h3>
+        <span class="tag" id="badge-reactive">
+            <span class="icon is-small"><i class="fas fa-spinner fa-spin"></i></span>
         </span>
-    </h3>
-    <div class="buttons">
-        <button class="button is-success" onclick="runCrontab('render-reactive-crontab')" title="Muestra el bloque crontab que se instalaria. Solo lectura.">
-            <span class="icon"><i class="fas fa-file-code"></i></span>
-            <span>Render</span>
-        </button>
-        <button class="button is-primary" onclick="showConfirmModal('install-reactive-crontab', 'instalar', 'Reactive Watch')" title="Instala el cron job en el crontab del sistema. Reemplaza entrada anterior si existe.">
-            <span class="icon"><i class="fas fa-plus-circle"></i></span>
-            <span>Install</span>
-        </button>
-        <button class="button is-danger" onclick="showConfirmModal('remove-reactive-crontab', 'desinstalar', 'Reactive Watch')" title="Elimina el cron job del crontab del sistema.">
-            <span class="icon"><i class="fas fa-trash-alt"></i></span>
-            <span>Remove</span>
-        </button>
-        <button class="button is-warning" onclick="runCrontab('run-reactive-watch')" title="Ejecuta el watch reactivo ahora. Detecta incidentes activos.">
-            <span class="icon"><i class="fas fa-play"></i></span>
-            <span>Run Now</span>
-        </button>
     </div>
-    <p class="help">
+    <div id="status-reactive"></div>
+    <p class="help mt-3">
         <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
-        Render: solo lectura.
-        Install: reemplaza entrada anterior si existe.
-        Remove: elimina el cron job del sistema.
-        Run Now: ejecuta el job manualmente.
+        Watch reactivo cada 5 min. Detecta incidentes, aplica cooldown y lanza Sentry Agent si procede.
     </p>
 </div>
 
 <!-- Sync Jobs -->
-<div class="box">
-    <h3 class="title is-5">
-        <span class="icon-text">
-            <span class="icon"><i class="fas fa-sync-alt"></i></span>
-            <span>Sync Jobs</span>
+<div class="box" id="section-sync">
+    <div class="is-flex is-align-items-center mb-3">
+        <h3 class="title is-5 mb-0 mr-3">
+            <span class="icon-text">
+                <span class="icon"><i class="fas fa-sync-alt"></i></span>
+                <span>Sync Jobs</span>
+            </span>
+        </h3>
+        <span class="tag" id="badge-sync">
+            <span class="icon is-small"><i class="fas fa-spinner fa-spin"></i></span>
         </span>
-    </h3>
-    <div class="buttons">
-        <button class="button is-success" onclick="runCrontab('render-sync-crontab')" title="Muestra el bloque crontab que se instalaria. Solo lectura.">
-            <span class="icon"><i class="fas fa-file-code"></i></span>
-            <span>Render</span>
-        </button>
-        <button class="button is-primary" onclick="showConfirmModal('install-sync-crontab', 'instalar', 'Sync Jobs')" title="Instala el cron job en el crontab del sistema. Reemplaza entrada anterior si existe.">
-            <span class="icon"><i class="fas fa-plus-circle"></i></span>
-            <span>Install</span>
-        </button>
-        <button class="button is-danger" onclick="showConfirmModal('remove-sync-crontab', 'desinstalar', 'Sync Jobs')" title="Elimina el cron job del crontab del sistema.">
-            <span class="icon"><i class="fas fa-trash-alt"></i></span>
-            <span>Remove</span>
-        </button>
-        <button class="button is-warning" onclick="runSyncNow('sync-editorial-users')" title="Ejecuta sync editorial en modo report-only. Solo lectura.">
-            <span class="icon"><i class="fas fa-play"></i></span>
-            <span>Run Editorial Now</span>
-        </button>
-        <button class="button is-warning" onclick="runSyncNow('sync-platform-config')" title="Ejecuta sync platform en modo report-only. Solo lectura.">
-            <span class="icon"><i class="fas fa-play"></i></span>
-            <span>Run Platform Now</span>
-        </button>
     </div>
-    <p class="help">
+    <div id="status-sync"></div>
+    <p class="help mt-3">
         <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
-        Render: solo lectura.
-        Install: reemplaza entrada anterior si existe.
-        Remove: elimina el cron job del sistema.
-        Run Now: ejecuta el job manualmente.
+        Sincronizacion editorial y de plataforma entre live y archive.
     </p>
 </div>
 
@@ -145,7 +96,7 @@
         <section class="modal-card-body">
             <p class="block">Estas a punto de <strong id="confirmAction"></strong> el crontab de <strong id="confirmCronType"></strong>.</p>
             <p class="block has-text-warning">Esta accion modifica el crontab del sistema.</p>
-            <p class="block">¿Deseas continuar?</p>
+            <p class="block">Deseas continuar?</p>
         </section>
         <footer class="modal-card-foot">
             <button class="button is-primary" id="confirmBtn">
@@ -160,22 +111,48 @@
 
 {% block extra_scripts %}
 <script>
-    const outputContainer = document.getElementById('outputContainer');
-    const outputBox = document.getElementById('output');
-    const modal = document.getElementById('confirmModal');
-    const confirmAction = document.getElementById('confirmAction');
-    const confirmCronType = document.getElementById('confirmCronType');
-    const confirmBtn = document.getElementById('confirmBtn');
-    const cancelBtn = document.getElementById('cancelBtn');
-    const modalCloseBtn = document.getElementById('modalCloseBtn');
+    var JOBS = {
+        nightly: {
+            label: 'Nightly Auditor',
+            installCmd: 'install-nightly-crontab',
+            removeCmd: 'remove-nightly-crontab',
+            runButtons: [
+                { label: 'Run Now', cmd: 'run-nightly-auditor', sync: false }
+            ]
+        },
+        reactive: {
+            label: 'Reactive Watch',
+            installCmd: 'install-reactive-crontab',
+            removeCmd: 'remove-reactive-crontab',
+            runButtons: [
+                { label: 'Run Now', cmd: 'run-reactive-watch', sync: false }
+            ]
+        },
+        sync: {
+            label: 'Sync Jobs',
+            installCmd: 'install-sync-crontab',
+            removeCmd: 'remove-sync-crontab',
+            runButtons: [
+                { label: 'Run Editorial Now', cmd: 'sync-editorial-users', sync: true },
+                { label: 'Run Platform Now', cmd: 'sync-platform-config', sync: true }
+            ]
+        }
+    };
 
-    let pendingCommand = null;
+    var outputContainer = document.getElementById('outputContainer');
+    var outputBox = document.getElementById('output');
+    var modal = document.getElementById('confirmModal');
+    var confirmAction = document.getElementById('confirmAction');
+    var confirmCronType = document.getElementById('confirmCronType');
+    var confirmBtn = document.getElementById('confirmBtn');
+    var cancelBtn = document.getElementById('cancelBtn');
+    var modalCloseBtn = document.getElementById('modalCloseBtn');
+    var pendingCommand = null;
 
     function closeModal() {
         modal.classList.remove('is-active');
         pendingCommand = null;
     }
-
     modalCloseBtn.addEventListener('click', closeModal);
     cancelBtn.addEventListener('click', closeModal);
 
@@ -188,25 +165,104 @@
 
     confirmBtn.addEventListener('click', function() {
         if (pendingCommand) {
-            const cmd = pendingCommand;
+            var cmd = pendingCommand;
             closeModal();
             runCrontab(cmd);
         }
     });
 
+    function renderSection(key, data) {
+        var job = JOBS[key];
+        var badge = document.getElementById('badge-' + key);
+        var container = document.getElementById('status-' + key);
+        var installed = data && data.installed;
+
+        if (installed) {
+            badge.className = 'tag is-success is-light';
+            badge.innerHTML = '<span class="icon is-small"><i class="fas fa-check-circle"></i></span>&nbsp;Instalado';
+        } else {
+            badge.className = 'tag is-light';
+            badge.innerHTML = '<span class="icon is-small"><i class="fas fa-minus-circle"></i></span>&nbsp;No instalado';
+        }
+
+        var html = '';
+        if (installed && data.line) {
+            html += '<pre class="output-box" style="font-size:0.85em;padding:0.75em;margin-bottom:0.75em;">' +
+                escapeHtml(data.line) + '</pre>';
+        } else {
+            html += '<p class="has-text-grey mb-3">Este cron job no esta instalado.</p>';
+        }
+
+        html += '<div class="buttons">';
+        if (installed) {
+            html += '<button class="button is-danger is-outlined" onclick="showConfirmModal(\'' +
+                job.removeCmd + '\', \'desinstalar\', \'' + job.label + '\')">' +
+                '<span class="icon"><i class="fas fa-trash-alt"></i></span>' +
+                '<span>Desinstalar</span></button>';
+        } else {
+            html += '<button class="button is-success" onclick="showConfirmModal(\'' +
+                job.installCmd + '\', \'instalar\', \'' + job.label + '\')">' +
+                '<span class="icon"><i class="fas fa-plus-circle"></i></span>' +
+                '<span>Instalar</span></button>';
+        }
+
+        for (var i = 0; i < job.runButtons.length; i++) {
+            var rb = job.runButtons[i];
+            if (rb.sync) {
+                html += '<button class="button is-warning" onclick="runSyncNow(\'' + rb.cmd + '\')">' +
+                    '<span class="icon"><i class="fas fa-play"></i></span>' +
+                    '<span>' + rb.label + '</span></button>';
+            } else {
+                html += '<button class="button is-warning" onclick="runCrontab(\'' + rb.cmd + '\')">' +
+                    '<span class="icon"><i class="fas fa-play"></i></span>' +
+                    '<span>' + rb.label + '</span></button>';
+            }
+        }
+        html += '</div>';
+
+        if (data && data.error) {
+            html += '<p class="has-text-danger is-size-7 mt-1">' +
+                '<span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span> ' +
+                escapeHtml(data.error) + '</p>';
+        }
+
+        container.innerHTML = html;
+    }
+
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(text));
+        return div.innerHTML;
+    }
+
+    function fetchStatus() {
+        fetch('/crontab/api/status')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                renderSection('nightly', data.nightly || { installed: false, line: null });
+                renderSection('reactive', data.reactive || { installed: false, line: null });
+                renderSection('sync', data.sync || { installed: false, line: null });
+            })
+            .catch(function(err) {
+                ['nightly', 'reactive', 'sync'].forEach(function(key) {
+                    renderSection(key, { installed: false, line: null, error: 'Error de red: ' + err.message });
+                });
+            });
+    }
+
     function runSyncNow(command) {
-        const args = ['python3', '-m', 'ops.cli.ia_ops', command, '--mode', 'report-only'];
+        var args = ['python3', '-m', 'ops.cli.ia_ops', command, '--mode', 'report-only'];
         runWithArgs(command, args);
     }
 
     function runCrontab(command) {
-        const args = ['python3', '-m', 'ops.cli.ia_ops', command];
+        var args = ['python3', '-m', 'ops.cli.ia_ops', command];
         runWithArgs(command, args);
     }
 
     function runWithArgs(command, args) {
-        const buttons = document.querySelectorAll('button');
-        buttons.forEach(btn => btn.disabled = true);
+        var buttons = document.querySelectorAll('button');
+        buttons.forEach(function(btn) { btn.disabled = true; });
 
         outputContainer.style.display = 'block';
         outputBox.textContent = 'Ejecutando ' + command + '...\n';
@@ -216,9 +272,9 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ args: args, timeout: 60 })
         })
-        .then(response => response.json())
-        .then(data => {
-            let output = '';
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            var output = '';
             if (data.stdout) output += data.stdout;
             if (data.stderr) output += '\n--- STDERR ---\n' + data.stderr;
             if (!data.success) {
@@ -227,13 +283,16 @@
             outputBox.textContent = output;
             outputBox.scrollTop = outputBox.scrollHeight;
             AdminReports.handleCommandResult(data, outputContainer);
+            fetchStatus();
         })
-        .catch(err => {
+        .catch(function(err) {
             outputBox.textContent = 'Error de red: ' + err.message;
         })
-        .finally(() => {
-            buttons.forEach(btn => btn.disabled = false);
+        .finally(function() {
+            buttons.forEach(function(btn) { btn.disabled = false; });
         });
     }
+
+    fetchStatus();
 </script>
 {% endblock %}
