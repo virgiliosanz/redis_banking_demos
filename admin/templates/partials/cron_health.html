@@ -56,7 +56,7 @@
                 <th>Estado</th>
                 <th>Fuente</th>
                 <th>Ultimo exito</th>
-                <th>Retraso (min)</th>
+                <th>Retraso</th>
                 <th>Umbral warning</th>
                 <th>Umbral critico</th>
             </tr>
@@ -76,13 +76,13 @@
                 </td>
                 <td>
                     {% if job.delay_minutes is not none %}
-                    {{ job.delay_minutes }}
+                    {% if job.delay_minutes < 60 %}{{ job.delay_minutes }} min{% elif job.delay_minutes < 1440 %}{{ (job.delay_minutes // 60) }}h{% else %}{{ (job.delay_minutes // 1440) }}d{% if (job.delay_minutes % 1440) >= 60 %} {{ ((job.delay_minutes % 1440) // 60) }}h{% endif %}{% endif %}
                     {% else %}
                     <span class="has-text-grey">--</span>
                     {% endif %}
                 </td>
-                <td>{{ job.warning_minutes }}</td>
-                <td>{{ job.critical_minutes }}</td>
+                <td>{% if job.warning_minutes < 60 %}{{ job.warning_minutes }} min{% elif job.warning_minutes < 1440 %}{{ (job.warning_minutes // 60) }}h{% else %}{{ (job.warning_minutes // 1440) }}d{% if (job.warning_minutes % 1440) >= 60 %} {{ ((job.warning_minutes % 1440) // 60) }}h{% endif %}{% endif %}</td>
+                <td>{% if job.critical_minutes < 60 %}{{ job.critical_minutes }} min{% elif job.critical_minutes < 1440 %}{{ (job.critical_minutes // 60) }}h{% else %}{{ (job.critical_minutes // 1440) }}d{% if (job.critical_minutes % 1440) >= 60 %} {{ ((job.critical_minutes % 1440) // 60) }}h{% endif %}{% endif %}</td>
             </tr>
         {% endfor %}
         </tbody>

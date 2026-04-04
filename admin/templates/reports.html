@@ -28,24 +28,10 @@
 {% endblock %}
 
 {% block content %}
-<div class="level">
-    <div class="level-left">
-        <div class="level-item">
-            <h1 class="title">
-                <span class="icon"><i class="fas fa-folder-open"></i></span>
-                <span>Reportes</span>
-            </h1>
-        </div>
-    </div>
-    <div class="level-right">
-        <div class="level-item">
-            <button id="btn-cleanup" class="button is-warning is-outlined" onclick="runCleanup()">
-                <span class="icon"><i class="fas fa-broom"></i></span>
-                <span>Limpiar reportes antiguos (&gt;30 dias)</span>
-            </button>
-        </div>
-    </div>
-</div>
+<h1 class="title">
+    <span class="icon"><i class="fas fa-folder-open"></i></span>
+    <span>Reportes</span>
+</h1>
 <p class="subtitle">Reportes generados en runtime/reports/</p>
 
 <div id="reports-loading" class="has-text-centered py-6">
@@ -55,7 +41,7 @@
     No se encontraron reportes.
 </div>
 <div id="reports-error" class="notification is-danger" style="display:none;"></div>
-<div id="cleanup-result" class="notification is-info" style="display:none;"></div>
+
 <div id="reports-container"></div>
 {% endblock %}
 
@@ -223,26 +209,5 @@
             errorBox.style.display = 'block';
         });
 })();
-
-function runCleanup() {
-    var btn = document.getElementById('btn-cleanup');
-    var resultBox = document.getElementById('cleanup-result');
-    btn.classList.add('is-loading');
-    fetch('/reports/api/cleanup')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            btn.classList.remove('is-loading');
-            resultBox.style.display = 'block';
-            resultBox.textContent = 'Limpieza completada: ' + data.deleted +
-                ' eliminados, ' + data.remaining + ' restantes.';
-            if (data.deleted > 0) { location.reload(); }
-        })
-        .catch(function(e) {
-            btn.classList.remove('is-loading');
-            resultBox.className = 'notification is-danger';
-            resultBox.style.display = 'block';
-            resultBox.textContent = 'Error en limpieza: ' + e;
-        });
-}
 </script>
 {% endblock %}

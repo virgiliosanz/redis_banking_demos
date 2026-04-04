@@ -93,18 +93,18 @@
     </div>
 </div>
 
-<!-- Row 4: Cron job status -->
-<div class="health-section">
-    <p class="title is-5"><span class="icon"><i class="fas fa-clock"></i></span> Cron jobs</p>
-    <div id="cron-status" class="loading-placeholder">
-        <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span> Cargando...
-    </div>
-</div>
-
-<!-- Secondary cards -->
-<hr>
+<!-- Secondary cards: Cron + Diagnostics + Sync -->
 <div class="columns is-multiline secondary-cards">
-    <div class="column is-half">
+    <div class="column is-4">
+        <div class="card">
+            <header class="card-header">
+                <p class="card-header-title"><span class="icon"><i class="fas fa-clock"></i></span> Cron Jobs</p>
+            </header>
+            <div class="card-content"><div class="content" id="cron-status"><p class="loading-placeholder"><span class="icon"><i class="fas fa-spinner fa-pulse"></i></span> Cargando...</p></div></div>
+            <footer class="card-footer"><a href="/diagnostics/cron" class="card-footer-item">Ir a Diagnostico &gt; Cron</a></footer>
+        </div>
+    </div>
+    <div class="column is-4">
         <div class="card">
             <header class="card-header">
                 <p class="card-header-title"><span class="icon"><i class="fas fa-stethoscope"></i></span> Diagnostico</p>
@@ -113,7 +113,7 @@
             <footer class="card-footer"><a href="/diagnostics" class="card-footer-item">Ir a Diagnostico</a></footer>
         </div>
     </div>
-    <div class="column is-half">
+    <div class="column is-4">
         <div class="card">
             <header class="card-header">
                 <p class="card-header-title"><span class="icon"><i class="fas fa-sync-alt"></i></span> Sincronizacion</p>
