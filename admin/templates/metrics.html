@@ -3,6 +3,7 @@
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
 <style>
     .chart-container { position: relative; height: 280px; width: 100%; }
     .metric-card { margin-bottom: 1.5rem; }
@@ -80,6 +81,13 @@
             </label>
         </div>
         <div class="column is-narrow">
+            <label class="label">Umbrales</label>
+            <button class="button is-small is-warning" id="toggleThresholds">
+                <span class="icon"><i class="fas fa-layer-group"></i></span>
+                <span>Mostrar umbrales</span>
+            </button>
+        </div>
+        <div class="column is-narrow">
             <label class="label">&nbsp;</label>
             <button class="button is-small is-primary" id="refreshBtn">
                 <span class="icon"><i class="fas fa-sync-alt"></i></span>
@@ -114,6 +122,68 @@
     let refreshTimer = null;
     let currentRange = '1h';
     let currentTab = 'sistema';
+    let showThresholds = true;
+
+    // Threshold definitions: { metricSuffix: { warning, critical } }
+    // Uses suffix matching so container metrics (e.g. n9-lb-nginx.cpu_pct) match *.cpu_pct
+    const THRESHOLDS = {
+        'cpu_user_pct':       { warning: 70,  critical: 90  },
+        'memory_used_pct':    { warning: 80,  critical: 95  },
+        'disk_used_pct':      { warning: 80,  critical: 95  },
+        'load_1':             { warning: 2.0, critical: 4.0 },
+        'cpu_pct':            { warning: 80,  critical: 95  },
+        'mem_pct':            { warning: 80,  critical: 95  },
+        'heap_used_pct':      { warning: 75,  critical: 90  },
+        'threads_connected':  { warning: 50,  critical: 100 }
+    };
+
+    function getThreshold(metricName) {
+        var parts = metricName.split('.');
+        var suffix = parts[parts.length - 1];
+        return THRESHOLDS[suffix] || null;
+    }
+
+    function buildAnnotations(metricName, yMax) {
+        var th = getThreshold(metricName);
+        if (!th || !showThresholds) return {};
+        var upperBound = Math.max(yMax * 1.1, th.critical * 1.5);
+        return {
+            annotation: {
+                annotations: {
+                    warningBand: {
+                        type: 'box',
+                        yMin: th.warning,
+                        yMax: th.critical,
+                        backgroundColor: 'rgba(255, 193, 7, 0.15)',
+                        borderColor: 'rgba(255, 193, 7, 0.4)',
+                        borderWidth: 1,
+                        label: {
+                            display: true,
+                            content: 'Warning',
+                            position: 'start',
+                            color: '#b58900',
+                            font: { size: 10 }
+                        }
+                    },
+                    criticalBand: {
+                        type: 'box',
+                        yMin: th.critical,
+                        yMax: upperBound,
+                        backgroundColor: 'rgba(220, 53, 69, 0.13)',
+                        borderColor: 'rgba(220, 53, 69, 0.4)',
+                        borderWidth: 1,
+                        label: {
+                            display: true,
+                            content: 'Critical',
+                            position: 'start',
+                            color: '#c0392b',
+                            font: { size: 10 }
+                        }
+                    }
+                }
+            }
+        };
+    }
 
     // Mapping: tab -> groups to fetch
     const TAB_GROUPS = {
@@ -125,6 +195,25 @@
     };
 
     function getColor(i) { return COLORS[i % COLORS.length]; }
+
+    function isDarkMode() {
+        return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+
+    function getChartThemeColors() {
+        if (isDarkMode()) {
+            return {
+                gridColor: 'rgba(255,255,255,0.15)',
+                tickColor: '#ccc',
+                titleColor: '#fff'
+            };
+        }
+        return {
+            gridColor: 'rgba(0,0,0,0.1)',
+            tickColor: '#666',
+            titleColor: '#333'
+        };
+    }
 
     function destroyCharts() {
         Object.values(charts).forEach(c => c.destroy());
@@ -225,10 +314,24 @@
             area.appendChild(card);
 
             const ctx = document.getElementById('chart-' + idx).getContext('2d');
+            var yMax = Math.max.apply(null, values);
+            var annotations = buildAnnotations(name, yMax);
+            var themeColors = getChartThemeColors();
             var chartOpts = {
                 responsive: true, maintainAspectRatio: false,
-                scales: { x: { display: true }, y: { beginAtZero: true } },
-                plugins: { legend: { display: false } }
+                scales: {
+                    x: {
+                        display: true,
+                        grid: { color: themeColors.gridColor },
+                        ticks: { color: themeColors.tickColor }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: themeColors.gridColor },
+                        ticks: { color: themeColors.tickColor }
+                    }
+                },
+                plugins: Object.assign({ legend: { display: false } }, annotations)
             };
 
             if (isCounter && name.endsWith('_bytes')) {
@@ -354,6 +457,20 @@
         fetchMetrics();
     });
 
+    // Threshold toggle
+    document.getElementById('toggleThresholds').addEventListener('click', function() {
+        showThresholds = !showThresholds;
+        var btn = this;
+        if (showThresholds) {
+            btn.classList.remove('is-outlined');
+            btn.querySelector('span:last-child').textContent = 'Mostrar umbrales';
+        } else {
+            btn.classList.add('is-outlined');
+            btn.querySelector('span:last-child').textContent = 'Ocultar umbrales';
+        }
+        fetchMetrics();
+    });
+
     // Refresh button
     document.getElementById('refreshBtn').addEventListener('click', fetchMetrics);
 
@@ -365,6 +482,11 @@
             clearInterval(refreshTimer);
             refreshTimer = null;
         }
+    });
+
+    // Re-render charts when theme changes
+    document.addEventListener('themechange', function() {
+        fetchMetrics();
     });
 
     // Initial load
