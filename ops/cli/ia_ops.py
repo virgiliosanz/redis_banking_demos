@@ -18,12 +18,15 @@ from ..runtime import nightly as nightly_runtime
 from ..runtime import reactive as reactive_runtime
 from ..runtime import sentry as sentry_runtime
 from ..scheduling.cron import (
+    install_metrics_collector_crontab,
     install_nightly_auditor_crontab,
     install_reactive_watch_crontab,
     install_sync_jobs_crontab,
+    remove_metrics_collector_crontab,
     remove_nightly_auditor_crontab,
     remove_reactive_watch_crontab,
     remove_sync_jobs_crontab,
+    render_metrics_collector_block,
     render_nightly_auditor_block,
     render_reactive_watch_block,
     render_sync_jobs_block,
@@ -255,6 +258,31 @@ def cmd_remove_sync_crontab(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_render_metrics_crontab(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    content = render_metrics_collector_block(settings, project_root=project_root, python_bin=args.python_bin)
+    print(content, end="")
+    return 0
+
+
+def cmd_install_metrics_crontab(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    backup_file, crontab_file = install_metrics_collector_crontab(settings, project_root=project_root, python_bin=args.python_bin)
+    print(f"metrics collector cron installed from {crontab_file}")
+    print(f"previous crontab backed up to {backup_file}")
+    return 0
+
+
+def cmd_remove_metrics_crontab(_: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    crontab_file = remove_metrics_collector_crontab(settings, project_root=project_root)
+    print(f"metrics collector cron block removed using {crontab_file}")
+    return 0
+
+
 def cmd_run_nightly(args: argparse.Namespace) -> int:
     settings = load_settings()
     assessment = nightly_runtime.build_nightly_assessment(settings)
@@ -435,6 +463,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     remove_sync = subparsers.add_parser("remove-sync-crontab")
     remove_sync.set_defaults(func=cmd_remove_sync_crontab)
+
+    render_metrics_cron = subparsers.add_parser("render-metrics-crontab")
+    render_metrics_cron.add_argument("--python-bin", default=python_bin_default)
+    render_metrics_cron.set_defaults(func=cmd_render_metrics_crontab)
+
+    install_metrics = subparsers.add_parser("install-metrics-crontab")
+    install_metrics.add_argument("--python-bin", default=python_bin_default)
+    install_metrics.set_defaults(func=cmd_install_metrics_crontab)
+
+    remove_metrics = subparsers.add_parser("remove-metrics-crontab")
+    remove_metrics.set_defaults(func=cmd_remove_metrics_crontab)
 
     telegram_test = subparsers.add_parser("send-telegram-test")
     telegram_test.add_argument("--message")

@@ -12,6 +12,7 @@ from ..util.time import report_stamp
 MANAGED_BLOCK_NAME = "NUEVECUATROUNO_IA_OPS_NIGHTLY"
 REACTIVE_MANAGED_BLOCK_NAME = "NUEVECUATROUNO_IA_OPS_REACTIVE"
 SYNC_MANAGED_BLOCK_NAME = "NUEVECUATROUNO_IA_OPS_SYNC"
+METRICS_MANAGED_BLOCK_NAME = "NUEVECUATROUNO_IA_OPS_METRICS"
 
 
 def _default_path() -> str:
@@ -256,3 +257,38 @@ def remove_reactive_watch_crontab(settings: Settings, *, project_root: Path) -> 
 
 def remove_sync_jobs_crontab(settings: Settings, *, project_root: Path) -> Path:
     return _remove_managed_crontab(settings, project_root=project_root, block_name=SYNC_MANAGED_BLOCK_NAME, file_prefix="sync-remove")
+
+
+def render_metrics_collector_block(settings: Settings, *, project_root: Path, python_bin: str = "python3") -> str:
+    interval_minutes = settings.get_int("METRICS_COLLECTOR_CRON_INTERVAL_MINUTES", 1)
+    config_file = settings.config_file.resolve()
+    log_file = settings.get_path("METRICS_COLLECTOR_LOG_FILE", "./runtime/reports/ia-ops/metrics-collector.cron.log")
+    log_file = (project_root / log_file).resolve() if not log_file.is_absolute() else log_file
+
+    command = (
+        f"cd {project_root} && "
+        f"IA_OPS_CONFIG_FILE={config_file} "
+        f"{python_bin} -m ops.cli.ia_ops collect-metrics >> {log_file} 2>&1"
+    )
+
+    return "\n".join(
+        [
+            f"# BEGIN {METRICS_MANAGED_BLOCK_NAME}",
+            "SHELL=/bin/sh",
+            f"PATH={_default_path()}",
+            f"*/{interval_minutes} * * * * {command}",
+            f"# END {METRICS_MANAGED_BLOCK_NAME}",
+            "",
+        ]
+    )
+
+
+def install_metrics_collector_crontab(settings: Settings, *, project_root: Path, python_bin: str = "python3") -> tuple[Path, Path]:
+    managed_block = render_metrics_collector_block(settings, project_root=project_root, python_bin=python_bin)
+    return _install_managed_crontab(
+        settings, project_root=project_root, block_name=METRICS_MANAGED_BLOCK_NAME, managed_block=managed_block, file_prefix="metrics-install",
+    )
+
+
+def remove_metrics_collector_crontab(settings: Settings, *, project_root: Path) -> Path:
+    return _remove_managed_crontab(settings, project_root=project_root, block_name=METRICS_MANAGED_BLOCK_NAME, file_prefix="metrics-remove")
