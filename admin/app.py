@@ -365,12 +365,18 @@ def create_app() -> Flask:
         t0 = time.monotonic()
         result = run_cli(args, timeout=timeout)
         elapsed = time.monotonic() - t0
-        history.save_entry(
-            command=result.command,
-            returncode=result.returncode,
-            duration_seconds=elapsed,
-            success=result.success,
-        )
+        # Only log ops CLI commands in history to avoid pollution
+        if (
+            len(result.command) >= 1
+            and result.command[0] in ("python3", "python")
+            and any("ops.cli.ia_ops" in arg for arg in result.command)
+        ):
+            history.save_entry(
+                command=result.command,
+                returncode=result.returncode,
+                duration_seconds=elapsed,
+                success=result.success,
+            )
         return jsonify({
             "command": result.command,
             "returncode": result.returncode,
