@@ -136,35 +136,26 @@
             content.className = 'card-content';
             content.style.display = 'none';
 
-            var hasSubtypes = cat.subtypes && cat.subtypes.length > 1;
-            var hasSingleEmpty = cat.subtypes && cat.subtypes.length === 1 && cat.subtypes[0].name === '';
-
-            if (!hasSubtypes || hasSingleEmpty) {
-                var allFiles = [];
-                cat.subtypes.forEach(function(st) { allFiles = allFiles.concat(st.files); });
-                content.innerHTML = buildFileTable(allFiles, 'v-' + ci);
-            } else {
-                cat.subtypes.forEach(function(st, si) {
-                    var section = document.createElement('div');
-                    section.className = 'subtype-section';
-                    var stHeader = document.createElement('div');
-                    stHeader.className = 'subtype-header';
-                    stHeader.innerHTML = '<span class="icon toggle-icon"><i class="fas fa-chevron-right"></i></span>' +
-                        st.name + ' (' + st.files.length + ')';
-                    var stBody = document.createElement('div');
-                    stBody.style.display = 'none';
-                    stBody.innerHTML = buildFileTable(st.files, 'v-' + ci + '-' + si);
-                    stHeader.addEventListener('click', function() {
-                        var open = stBody.style.display !== 'none';
-                        stBody.style.display = open ? 'none' : '';
-                        var ico = stHeader.querySelector('.toggle-icon .fas');
-                        ico.className = open ? 'fas fa-chevron-right' : 'fas fa-chevron-down';
-                    });
-                    section.appendChild(stHeader);
-                    section.appendChild(stBody);
-                    content.appendChild(section);
+            cat.subtypes.forEach(function(st, si) {
+                var section = document.createElement('div');
+                section.className = 'subtype-section';
+                var stHeader = document.createElement('div');
+                stHeader.className = 'subtype-header';
+                stHeader.innerHTML = '<span class="icon toggle-icon"><i class="fas fa-chevron-right"></i></span>' +
+                    st.name + ' (' + st.files.length + ')';
+                var stBody = document.createElement('div');
+                stBody.style.display = 'none';
+                stBody.innerHTML = buildFileTable(st.files, 'v-' + ci + '-' + si);
+                stHeader.addEventListener('click', function() {
+                    var open = stBody.style.display !== 'none';
+                    stBody.style.display = open ? 'none' : '';
+                    var ico = stHeader.querySelector('.toggle-icon .fas');
+                    ico.className = open ? 'fas fa-chevron-right' : 'fas fa-chevron-down';
                 });
-            }
+                section.appendChild(stHeader);
+                section.appendChild(stBody);
+                content.appendChild(section);
+            });
 
             header.addEventListener('click', function() {
                 var open = content.style.display !== 'none';

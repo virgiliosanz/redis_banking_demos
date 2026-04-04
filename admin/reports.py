@@ -25,34 +25,77 @@ REPORTS_DIR = Path(__file__).parent.parent / "runtime" / "reports"
 
 # ---- sub-type detection ----------------------------------------------------
 
-_SYNC_SUBTYPES = [
-    ("editorial-report-only", "Editorial report-only"),
-    ("editorial-dry-run", "Editorial dry-run"),
-    ("editorial-apply", "Editorial apply"),
-    ("platform-report-only", "Platform report-only"),
-    ("platform-dry-run", "Platform dry-run"),
-    ("platform-apply", "Platform apply"),
-    ("drift", "Drift"),
-]
+# Timestamp pattern appended to report filenames: -YYYYMMDDTHHMMSSz or
+# -YYYYMMDDTHHMMSSZ (uppercase/lowercase Z).
+_TS_SUFFIX_RE = re.compile(r"-\d{8}T\d{6}[Zz]$")
 
-_ROLLOVER_YEAR_RE = re.compile(r"(\d{4})")
+# Rollover filenames start with a 4-digit year: e.g. 2025-dry-run-…
+_ROLLOVER_PREFIX_RE = re.compile(r"^(\d{4})-(.*)")
+
+SUBTYPE_NAMES: dict[str, str] = {
+    "nightly-auditor": "Nightly Auditor",
+    "sentry-cron-master": "Sentry: cron-master",
+    "sentry-db-live": "Sentry: db-live",
+    "sentry-db-archive": "Sentry: db-archive",
+    "sentry-fe-live": "Sentry: fe-live",
+    "sentry-fe-archive": "Sentry: fe-archive",
+    "sentry-lb-nginx": "Sentry: lb-nginx",
+    "reactive-watch-state": "Reactive Watch: estado",
+    "reactive-watch": "Reactive Watch: log",
+    "crontab-backup": "Crontab: backup",
+    "crontab-install": "Crontab: instalacion nightly",
+    "crontab-reactive-install": "Crontab: instalacion reactive",
+    "crontab-sync-install": "Crontab: instalacion sync",
+    "editorial-sync-report-only": "Editorial: report-only",
+    "editorial-sync-dry-run": "Editorial: dry-run",
+    "editorial-sync-apply": "Editorial: apply",
+    "platform-sync-report-only": "Platform: report-only",
+    "platform-sync-dry-run": "Platform: dry-run",
+    "platform-sync-apply": "Platform: apply",
+    "live-archive-sync": "Drift live-archive",
+}
+
+
+def _extract_prefix(filename: str) -> str:
+    """Strip extension and timestamp suffix to obtain the sub-type prefix.
+
+    Examples:
+        nightly-auditor-20260403T220052Z.md  -> nightly-auditor
+        reactive-watch.cron.log              -> reactive-watch
+        crontab-backup-20260401T120000Z.txt  -> crontab-backup
+        reactive-watch-state.json            -> reactive-watch-state
+    """
+    # Remove the *last* extension (.md, .json, .txt, .log …)
+    stem = filename
+    while "." in stem:
+        stem, _ = stem.rsplit(".", 1)
+
+    # Remove timestamp suffix if present
+    stem = _TS_SUFFIX_RE.sub("", stem)
+    return stem
 
 
 def _detect_subtype(category: str, filename: str) -> str:
     """Return a human-readable sub-type label for *filename*."""
-    lower = filename.lower()
-    if category == "sync":
-        for prefix, label in _SYNC_SUBTYPES:
-            if prefix in lower:
-                return label
-        return "Otros"
+    prefix = _extract_prefix(filename)
+
+    # Rollover: year-mode pattern (e.g. 2025-dry-run)
     if category == "rollover":
-        m = _ROLLOVER_YEAR_RE.search(filename)
+        m = _ROLLOVER_PREFIX_RE.match(prefix)
         if m:
-            return m.group(1)
+            year, mode = m.group(1), m.group(2)
+            mode_label = mode.replace("-", " ").capitalize() if mode else "Otros"
+            return f"{mode_label} {year}"
         return "Otros"
-    # nightly / ia-ops / any other: single group
-    return ""
+
+    # Lookup in known names; try longest-match first so that
+    # 'reactive-watch-state' matches before 'reactive-watch'.
+    for known in sorted(SUBTYPE_NAMES, key=len, reverse=True):
+        if prefix == known:
+            return SUBTYPE_NAMES[known]
+
+    # Fallback: use the prefix itself as a readable label
+    return prefix if prefix else "Otros"
 
 
 # ---- file info + scanning --------------------------------------------------
