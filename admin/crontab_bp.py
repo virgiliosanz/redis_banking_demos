@@ -29,6 +29,7 @@ def crontab_api_status():
     lines for each job type.
     """
     from ops.scheduling.cron import (
+        CLEANUP_MANAGED_BLOCK_NAME,
         MANAGED_BLOCK_NAME,
         METRICS_MANAGED_BLOCK_NAME,
         REACTIVE_MANAGED_BLOCK_NAME,
@@ -40,6 +41,7 @@ def crontab_api_status():
         "reactive": REACTIVE_MANAGED_BLOCK_NAME,
         "sync": SYNC_MANAGED_BLOCK_NAME,
         "metrics": METRICS_MANAGED_BLOCK_NAME,
+        "cleanup": CLEANUP_MANAGED_BLOCK_NAME,
     }
 
     result = run_cli(["crontab", "-l"], timeout=10)

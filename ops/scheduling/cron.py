@@ -13,6 +13,7 @@ MANAGED_BLOCK_NAME = "NUEVECUATROUNO_IA_OPS_NIGHTLY"
 REACTIVE_MANAGED_BLOCK_NAME = "NUEVECUATROUNO_IA_OPS_REACTIVE"
 SYNC_MANAGED_BLOCK_NAME = "NUEVECUATROUNO_IA_OPS_SYNC"
 METRICS_MANAGED_BLOCK_NAME = "NUEVECUATROUNO_IA_OPS_METRICS"
+CLEANUP_MANAGED_BLOCK_NAME = "NUEVECUATROUNO_IA_OPS_CLEANUP"
 
 
 def _default_path() -> str:
@@ -292,3 +293,39 @@ def install_metrics_collector_crontab(settings: Settings, *, project_root: Path,
 
 def remove_metrics_collector_crontab(settings: Settings, *, project_root: Path) -> Path:
     return _remove_managed_crontab(settings, project_root=project_root, block_name=METRICS_MANAGED_BLOCK_NAME, file_prefix="metrics-remove")
+
+
+def render_cleanup_block(settings: Settings, *, project_root: Path, python_bin: str = "python3") -> str:
+    cron_hour = settings.get_int("CLEANUP_CRON_HOUR", 3)
+    cron_minute = settings.get_int("CLEANUP_CRON_MINUTE", 0)
+    config_file = settings.config_file.resolve()
+    log_file = settings.get_path("CLEANUP_LOG_FILE", "./runtime/reports/ia-ops/cleanup-data.cron.log")
+    log_file = (project_root / log_file).resolve() if not log_file.is_absolute() else log_file
+
+    command = (
+        f"cd {project_root} && "
+        f"IA_OPS_CONFIG_FILE={config_file} "
+        f"{python_bin} -m ops.cli.ia_ops cleanup-data >> {log_file} 2>&1"
+    )
+
+    return "\n".join(
+        [
+            f"# BEGIN {CLEANUP_MANAGED_BLOCK_NAME}",
+            "SHELL=/bin/sh",
+            f"PATH={_default_path()}",
+            f"{cron_minute} {cron_hour} * * * {command}",
+            f"# END {CLEANUP_MANAGED_BLOCK_NAME}",
+            "",
+        ]
+    )
+
+
+def install_cleanup_crontab(settings: Settings, *, project_root: Path, python_bin: str = "python3") -> tuple[Path, Path]:
+    managed_block = render_cleanup_block(settings, project_root=project_root, python_bin=python_bin)
+    return _install_managed_crontab(
+        settings, project_root=project_root, block_name=CLEANUP_MANAGED_BLOCK_NAME, managed_block=managed_block, file_prefix="cleanup-install",
+    )
+
+
+def remove_cleanup_crontab(settings: Settings, *, project_root: Path) -> Path:
+    return _remove_managed_crontab(settings, project_root=project_root, block_name=CLEANUP_MANAGED_BLOCK_NAME, file_prefix="cleanup-remove")

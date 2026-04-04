@@ -18,14 +18,17 @@ from ..runtime import nightly as nightly_runtime
 from ..runtime import reactive as reactive_runtime
 from ..runtime import sentry as sentry_runtime
 from ..scheduling.cron import (
+    install_cleanup_crontab,
     install_metrics_collector_crontab,
     install_nightly_auditor_crontab,
     install_reactive_watch_crontab,
     install_sync_jobs_crontab,
+    remove_cleanup_crontab,
     remove_metrics_collector_crontab,
     remove_nightly_auditor_crontab,
     remove_reactive_watch_crontab,
     remove_sync_jobs_crontab,
+    render_cleanup_block,
     render_metrics_collector_block,
     render_nightly_auditor_block,
     render_reactive_watch_block,
@@ -283,6 +286,53 @@ def cmd_remove_metrics_crontab(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_cleanup_data(_: argparse.Namespace) -> int:
+    from ..metrics.storage import MetricsStore
+    from admin.reports import cleanup_old_reports
+
+    store = MetricsStore()
+    try:
+        aggregated = store.aggregate()
+        purged_metrics = store.purge(max_age_hours=24)
+    finally:
+        store.close()
+
+    report_result = cleanup_old_reports()
+
+    payload = {
+        "aggregated": aggregated,
+        "purged_metrics": purged_metrics,
+        "purged_reports": report_result["deleted"],
+    }
+    _print_json(payload)
+    return 0
+
+
+def cmd_render_cleanup_crontab(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    content = render_cleanup_block(settings, project_root=project_root, python_bin=args.python_bin)
+    print(content, end="")
+    return 0
+
+
+def cmd_install_cleanup_crontab(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    backup_file, crontab_file = install_cleanup_crontab(settings, project_root=project_root, python_bin=args.python_bin)
+    print(f"cleanup cron installed from {crontab_file}")
+    print(f"previous crontab backed up to {backup_file}")
+    return 0
+
+
+def cmd_remove_cleanup_crontab(_: argparse.Namespace) -> int:
+    settings = load_settings()
+    project_root = settings.project_root.resolve()
+    crontab_file = remove_cleanup_crontab(settings, project_root=project_root)
+    print(f"cleanup cron block removed using {crontab_file}")
+    return 0
+
+
 def cmd_run_nightly(args: argparse.Namespace) -> int:
     settings = load_settings()
     assessment = nightly_runtime.build_nightly_assessment(settings)
@@ -474,6 +524,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     remove_metrics = subparsers.add_parser("remove-metrics-crontab")
     remove_metrics.set_defaults(func=cmd_remove_metrics_crontab)
+
+    subparsers.add_parser("cleanup-data").set_defaults(func=cmd_cleanup_data)
+
+    render_cleanup_cron = subparsers.add_parser("render-cleanup-crontab")
+    render_cleanup_cron.add_argument("--python-bin", default=python_bin_default)
+    render_cleanup_cron.set_defaults(func=cmd_render_cleanup_crontab)
+
+    install_cleanup = subparsers.add_parser("install-cleanup-crontab")
+    install_cleanup.add_argument("--python-bin", default=python_bin_default)
+    install_cleanup.set_defaults(func=cmd_install_cleanup_crontab)
+
+    remove_cleanup = subparsers.add_parser("remove-cleanup-crontab")
+    remove_cleanup.set_defaults(func=cmd_remove_cleanup_crontab)
 
     telegram_test = subparsers.add_parser("send-telegram-test")
     telegram_test.add_argument("--message")

@@ -147,6 +147,15 @@
             runButtons: [
                 { label: 'Ejecutar ahora', cmd: 'collect-metrics', sync: false }
             ]
+        },
+        cleanup: {
+            label: 'Data Cleanup',
+            description: 'Agregacion de metricas y limpieza de reportes antiguos (diario 03:00)',
+            installCmd: 'install-cleanup-crontab',
+            removeCmd: 'remove-cleanup-crontab',
+            runButtons: [
+                { label: 'Ejecutar ahora', cmd: 'cleanup-data', sync: false }
+            ]
         }
     };
 
@@ -201,7 +210,7 @@
         var tbody = document.getElementById('host-crons-body');
         var html = '';
 
-        var keys = ['nightly', 'reactive', 'sync', 'metrics'];
+        var keys = ['nightly', 'reactive', 'sync', 'metrics', 'cleanup'];
         for (var i = 0; i < keys.length; i++) {
             var key = keys[i];
             var job = JOBS[key];

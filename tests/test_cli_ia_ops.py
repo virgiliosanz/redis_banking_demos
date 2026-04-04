@@ -6,11 +6,15 @@ import argparse
 import io
 import unittest
 
+from unittest.mock import patch, MagicMock
+
 from ops.cli.ia_ops import (
     build_parser,
+    cmd_cleanup_data,
     cmd_collect_host,
     cmd_collect_service_logs,
     cmd_collect_nightly_context,
+    cmd_render_cleanup_crontab,
     cmd_report_drift,
     cmd_render_nightly_crontab,
     cmd_run_nightly,
@@ -63,6 +67,7 @@ class TestParsingSimpleCollectors(unittest.TestCase):
         "collect-app-health",
         "collect-mysql-health",
         "report-live-archive-sync-drift",
+        "cleanup-data",
     ]
 
     def test_simple_subcommands_parse(self):
@@ -151,6 +156,8 @@ class TestDispatchFunctions(unittest.TestCase):
         "collect-nightly-context": cmd_collect_nightly_context,
         "report-live-archive-sync-drift": cmd_report_drift,
         "render-nightly-crontab": cmd_render_nightly_crontab,
+        "render-cleanup-crontab": cmd_render_cleanup_crontab,
+        "cleanup-data": cmd_cleanup_data,
         "run-nightly-auditor": cmd_run_nightly,
         "run-sentry-agent": (cmd_run_sentry, ["run-sentry-agent", "--service", "x"]),
         "run-reactive-watch": cmd_run_reactive_watch,
@@ -184,3 +191,39 @@ class TestCollectServiceLogsParsing(unittest.TestCase):
         args = parser.parse_args(["collect-service-logs", "nginx", "error"])
         self.assertEqual(args.service, "nginx")
         self.assertEqual(args.pattern, "error")
+
+
+
+class TestCmdCleanupData(unittest.TestCase):
+    """cmd_cleanup_data aggregates metrics, purges, and cleans reports."""
+
+    @patch("admin.reports.cleanup_old_reports", return_value={"deleted": 3, "remaining": 10})
+    @patch("ops.metrics.storage.MetricsStore")
+    def test_cleanup_data_returns_json_summary(self, mock_store_cls, mock_cleanup):
+        mock_store = MagicMock()
+        mock_store.aggregate.return_value = 42
+        mock_store.purge.return_value = 5
+        mock_store_cls.return_value = mock_store
+
+        import io as _io
+        import sys as _sys
+        captured = _io.StringIO()
+        old_stdout = _sys.stdout
+        _sys.stdout = captured
+        try:
+            args = build_parser().parse_args(["cleanup-data"])
+            rc = cmd_cleanup_data(args)
+        finally:
+            _sys.stdout = old_stdout
+
+        self.assertEqual(rc, 0)
+        mock_store.aggregate.assert_called_once()
+        mock_store.purge.assert_called_once_with(max_age_hours=24)
+        mock_store.close.assert_called_once()
+        mock_cleanup.assert_called_once()
+
+        import json
+        output = json.loads(captured.getvalue())
+        self.assertEqual(output["aggregated"], 42)
+        self.assertEqual(output["purged_metrics"], 5)
+        self.assertEqual(output["purged_reports"], 3)

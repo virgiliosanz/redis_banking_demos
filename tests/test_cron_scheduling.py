@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from ops.config import Settings
-from ops.scheduling.cron import remove_nightly_auditor_crontab, render_sync_jobs_block
+from ops.scheduling.cron import remove_nightly_auditor_crontab, render_cleanup_block, render_sync_jobs_block
 
 
 class CronSchedulingTests(unittest.TestCase):
@@ -47,6 +47,28 @@ class CronSchedulingTests(unittest.TestCase):
             self.assertEqual(crontab_file.read_text(encoding="utf-8"), "")
             remove_crontab.assert_called_once_with()
             install_crontab.assert_not_called()
+
+
+    def test_render_cleanup_block_uses_defaults(self) -> None:
+        settings = Settings(config_file=Path("/tmp/ia-ops.env"), values={"PROJECT_ROOT": "."})
+
+        block = render_cleanup_block(settings, project_root=Path("/srv/project"), python_bin="/usr/bin/python3")
+
+        self.assertIn("# BEGIN NUEVECUATROUNO_IA_OPS_CLEANUP", block)
+        self.assertIn("# END NUEVECUATROUNO_IA_OPS_CLEANUP", block)
+        self.assertIn("0 3 * * * cd /srv/project && IA_OPS_CONFIG_FILE=", block)
+        self.assertIn("/usr/bin/python3 -m ops.cli.ia_ops cleanup-data", block)
+        self.assertIn("cleanup-data.cron.log", block)
+
+    def test_render_cleanup_block_custom_schedule(self) -> None:
+        settings = Settings(
+            config_file=Path("/tmp/ia-ops.env"),
+            values={"PROJECT_ROOT": ".", "CLEANUP_CRON_HOUR": "4", "CLEANUP_CRON_MINUTE": "30"},
+        )
+
+        block = render_cleanup_block(settings, project_root=Path("/srv/project"))
+
+        self.assertIn("30 4 * * *", block)
 
 
 if __name__ == "__main__":
