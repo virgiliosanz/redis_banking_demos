@@ -10,48 +10,29 @@
 </h1>
 <h2 class="subtitle">Collectors y agentes de diagnostico</h2>
 
-<div class="columns">
-    <!-- Collectors column -->
-    <div class="column is-half">
-        <div class="box">
-            <h3 class="title is-4">
-                <span class="icon-text">
-                    <span class="icon"><i class="fas fa-chart-line"></i></span>
-                    <span>Collectors</span>
-                </span>
-            </h3>
-            <p class="subtitle is-6">Recoleccion de metricas operativas (output JSON)</p>
-
-            <p class="help mb-3">
-                <span class="icon is-small"><i class="fas fa-shield-alt"></i></span>
-                Recopila metricas operativas del servicio. Solo lectura.
-            </p>
-            <div class="buttons">
-                <button class="button is-info" data-collector="host" title="Recopila metricas operativas del host. Solo lectura.">
-                    <span class="icon"><i class="fas fa-server"></i></span>
-                    <span>Host Health</span>
-                </button>
-                <button class="button is-info" data-collector="runtime" title="Recopila metricas operativas del runtime Docker. Solo lectura.">
-                    <span class="icon"><i class="fas fa-docker"></i></span>
-                    <span>Runtime Health</span>
-                </button>
-                <button class="button is-info" data-collector="mysql" title="Recopila metricas operativas de MySQL. Solo lectura.">
-                    <span class="icon"><i class="fas fa-database"></i></span>
-                    <span>MySQL Health</span>
-                </button>
-                <button class="button is-info" data-collector="elastic" title="Recopila metricas operativas de Elasticsearch. Solo lectura.">
-                    <span class="icon"><i class="fas fa-search"></i></span>
-                    <span>Elastic Health</span>
-                </button>
-                <button class="button is-info" data-collector="app" title="Recopila metricas operativas de la aplicacion. Solo lectura.">
-                    <span class="icon"><i class="fas fa-code"></i></span>
-                    <span>App Health</span>
-                </button>
-            </div>
-        </div>
+<!-- Collector tabs -->
+<div class="box">
+    <h3 class="title is-4">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-chart-line"></i></span>
+            <span>Collectors</span>
+        </span>
+    </h3>
+    <div class="tabs is-boxed is-medium" id="collectorTabs">
+        <ul>
+            <li class="is-active" data-tab="host"><a><span class="icon"><i class="fas fa-server"></i></span><span>Host</span></a></li>
+            <li data-tab="runtime"><a><span class="icon"><i class="fas fa-docker"></i></span><span>Runtime</span></a></li>
+            <li data-tab="mysql"><a><span class="icon"><i class="fas fa-database"></i></span><span>MySQL</span></a></li>
+            <li data-tab="elastic"><a><span class="icon"><i class="fas fa-search"></i></span><span>Elastic</span></a></li>
+            <li data-tab="app"><a><span class="icon"><i class="fas fa-globe"></i></span><span>App</span></a></li>
+            <li data-tab="all"><a><span class="icon"><i class="fas fa-th"></i></span><span>Todos</span></a></li>
+        </ul>
     </div>
+    <div id="tab-content" class="p-4"></div>
+</div>
 
-    <!-- Agents column -->
+<!-- Agents section -->
+<div class="columns">
     <div class="column is-half">
         <!-- Nightly auditor -->
         <div class="box">
@@ -76,7 +57,9 @@
                 </div>
             </form>
         </div>
+    </div>
 
+    <div class="column is-half">
         <!-- Sentry agent -->
         <div class="box">
             <h3 class="title is-4">
@@ -121,7 +104,7 @@
     </div>
 </div>
 
-<!-- Output section -->
+<!-- Output section (for Nightly/Sentry) -->
 <div class="box" id="outputSection" style="display: none;">
     <h3 class="title is-4">
         <span class="icon-text">
@@ -144,10 +127,11 @@
 (function() {
     'use strict';
 
-    const outputSection = document.getElementById('outputSection');
-    const outputBox = document.getElementById('outputBox');
-    const loadingIndicator = document.getElementById('loadingIndicator');
-    const errorBox = document.getElementById('errorBox');
+    /* --- Nightly / Sentry output (subprocess, unchanged) --- */
+    var outputSection = document.getElementById('outputSection');
+    var outputBox = document.getElementById('outputBox');
+    var loadingIndicator = document.getElementById('loadingIndicator');
+    var errorBox = document.getElementById('errorBox');
 
     function showLoading() {
         outputSection.style.display = 'block';
@@ -170,25 +154,17 @@
     async function runCommand(args) {
         showLoading();
         try {
-            const response = await fetch('/api/run', {
+            var response = await fetch('/api/run', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ args: args, timeout: 120 }),
             });
-            
-            if (!response.ok) {
-                throw new Error('HTTP ' + response.status);
-            }
-
-            const result = await response.json();
-            
+            if (!response.ok) { throw new Error('HTTP ' + response.status); }
+            var result = await response.json();
             if (!result.success) {
                 showError('Error (codigo ' + result.returncode + '):\n' + (result.stderr || result.stdout || 'Sin output'));
                 return;
             }
-
             showOutput(result.stdout || result.stderr || '(sin output)');
             AdminReports.handleCommandResult(result, outputSection);
         } catch (error) {
@@ -196,35 +172,115 @@
         }
     }
 
-    // Collector buttons
-    document.querySelectorAll('[data-collector]').forEach(function(button) {
-        button.addEventListener('click', function() {
-            const collector = this.getAttribute('data-collector');
-            const args = ['python3', '-m', 'ops.cli.ia_ops', 'collect-' + collector + '-health'];
-            runCommand(args);
-        });
-    });
-
-    // Nightly form
     document.getElementById('nightlyForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        const args = ['python3', '-m', 'ops.cli.ia_ops', 'run-nightly-auditor'];
-        runCommand(args);
+        runCommand(['python3', '-m', 'ops.cli.ia_ops', 'run-nightly-auditor']);
     });
 
-    // Sentry form
     document.getElementById('sentryForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        const service = this.querySelector('[name="service"]').value;
-        
-        if (!service) {
-            showError('Debe seleccionar un servicio');
+        var service = this.querySelector('[name="service"]').value;
+        if (!service) { showError('Debe seleccionar un servicio'); return; }
+        runCommand(['python3', '-m', 'ops.cli.ia_ops', 'run-sentry-agent', '--service', service]);
+    });
+
+    /* --- Collector tabs (lazy-loaded rich templates) --- */
+    var COLLECTORS = ['host', 'runtime', 'mysql', 'elastic', 'app'];
+    var tabCache = {};
+    var tabContent = document.getElementById('tab-content');
+    var tabItems = document.querySelectorAll('#collectorTabs li[data-tab]');
+
+    function setActiveTab(name) {
+        tabItems.forEach(function(li) {
+            if (li.getAttribute('data-tab') === name) {
+                li.classList.add('is-active');
+            } else {
+                li.classList.remove('is-active');
+            }
+        });
+    }
+
+    function showTabLoading() {
+        tabContent.innerHTML =
+            '<div class="has-text-centered py-5">' +
+            '<span class="icon is-large"><i class="fas fa-spinner fa-pulse fa-2x"></i></span>' +
+            '<p class="mt-2">Cargando...</p></div>';
+    }
+
+    function showTabError(tabName) {
+        tabContent.innerHTML =
+            '<div class="notification is-danger">' +
+            '<span class="icon"><i class="fas fa-exclamation-triangle"></i></span> ' +
+            'Error al cargar.' +
+            ' <button class="button is-small is-danger is-outlined ml-3" id="retryBtn">' +
+            '<span class="icon"><i class="fas fa-redo"></i></span><span>Reintentar</span></button></div>';
+        document.getElementById('retryBtn').addEventListener('click', function() {
+            loadTab(tabName);
+        });
+    }
+
+    function renderCachedContent(html, tabName) {
+        tabContent.innerHTML =
+            '<div style="position:relative">' +
+            '<button class="button is-small is-light" ' +
+            'style="position:absolute;top:0;right:0;z-index:1" id="refreshBtn" title="Refrescar">' +
+            '<span class="icon"><i class="fas fa-sync-alt"></i></span></button>' +
+            '<div>' + html + '</div></div>';
+        document.getElementById('refreshBtn').addEventListener('click', function() {
+            delete tabCache[tabName];
+            loadTab(tabName);
+        });
+    }
+
+    async function fetchCollector(name) {
+        var response = await fetch('/diagnostics/' + name);
+        if (!response.ok) { throw new Error('HTTP ' + response.status); }
+        return response.text();
+    }
+
+    async function loadTab(tabName) {
+        setActiveTab(tabName);
+
+        if (tabName !== 'all' && tabCache[tabName]) {
+            renderCachedContent(tabCache[tabName], tabName);
+            return;
+        }
+        if (tabName === 'all' && tabCache['_all']) {
+            renderCachedContent(tabCache['_all'], 'all');
             return;
         }
 
-        const args = ['python3', '-m', 'ops.cli.ia_ops', 'run-sentry-agent', '--service', service];
-        runCommand(args);
+        showTabLoading();
+
+        try {
+            if (tabName === 'all') {
+                var results = await Promise.all(COLLECTORS.map(function(c) {
+                    return fetchCollector(c).catch(function() {
+                        return '<div class="notification is-warning">Error al cargar ' + c + '</div>';
+                    });
+                }));
+                var combined = results.join('<hr>');
+                tabCache['_all'] = combined;
+                renderCachedContent(combined, 'all');
+            } else {
+                var html = await fetchCollector(tabName);
+                tabCache[tabName] = html;
+                renderCachedContent(html, tabName);
+            }
+        } catch (err) {
+            showTabError(tabName);
+        }
+    }
+
+    /* Tab click handlers */
+    tabItems.forEach(function(li) {
+        li.addEventListener('click', function() {
+            loadTab(li.getAttribute('data-tab'));
+        });
     });
+
+    /* Auto-load first tab */
+    loadTab('host');
 })();
 </script>
 {% endblock %}
