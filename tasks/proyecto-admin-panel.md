@@ -42,6 +42,8 @@ Panel de administracion web para la plataforma nuevecuatrouno. Permite operar, d
 
 ### Fase 4: UX y arquitectura
 - Sincronizacion unificada: 3 secciones en layout horizontal (Editorial, Platform, Drift)
+- Sync page: layout horizontal en 3 columnas (Editorial | Platform | Drift) con outputs independientes
+- Fix de botones de sincronizacion que no funcionaban (modal de confirmacion faltante)
 - Crontab rediseñado: deteccion de estado instalado/no, toggle install/uninstall, dos secciones (host + contenedor)
 - Descripciones humanas para cada cron job
 - Monitorizacion de crons del contenedor (cron-master) en solo lectura
@@ -56,6 +58,15 @@ Panel de administracion web para la plataforma nuevecuatrouno. Permite operar, d
 - Import circular eliminado
 - Codigo duplicado eliminado (parsing crontab, timestamps, settings)
 - Documentacion sincronizada: docs/README.md, docs/poc-local-runbook.md, AGENTS.md
+- Fix de bug post-refactor: collect_non_ok_checks() sin return statement
+
+### Fase 6: Pulido final
+- Reportes: cards colapsados por defecto con contador de ficheros
+- Reportes: organizacion por sub-tipo dentro de cada categoria (editorial report-only, drift, platform dry-run, etc.)
+- Reportes: retencion automatica de 30 dias con limpieza al arrancar + boton manual + configurable via REPORT_RETENTION_DAYS
+- Navbar: reordenado a Diagnosticos | Contenedores | Crontab | Sincronizacion | Rollover | Reportes | Historial
+- Crontab: descripcion "Tarea de WordPress" para crons del contenedor
+- UI: idioma unificado a español en toda la interfaz
 
 ## Arquitectura final
 
@@ -76,6 +87,7 @@ Panel de administracion web para la plataforma nuevecuatrouno. Permite operar, d
 | history_bp.py | Blueprint /history/ |
 | static/js/admin.js | JS compartido: auto-display reportes |
 | templates/ | Jinja2: base, index, 7 paginas + 8 partials de collectors |
+| retention | Limpieza automatica de reportes >30 dias (configurable) |
 
 ### Decisiones tecnicas
 - Flask sin build tooling (Bulma CDN + vanilla JS)
@@ -96,6 +108,7 @@ Panel de administracion web para la plataforma nuevecuatrouno. Permite operar, d
 - Sin HTTPS: para produccion necesita Cloudflare o cert local
 - Sin rate limiting en /api/run: un usuario podria saturar con ejecuciones concurrentes
 - Bulma via CDN: en produccion servir local para no depender de terceros
+- Retencion de reportes solo por mtime del fichero; si el reloj del sistema cambia, podria borrar reportes recientes
 
 ## Siguiente paso recomendado
 - Configuracion de produccion: systemd unit + Gunicorn + Cloudflare Zone Lockdown
