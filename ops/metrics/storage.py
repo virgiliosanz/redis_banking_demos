@@ -64,8 +64,8 @@ class MetricsStore:
         cutoff = time.time() - range_minutes * 60
         cur = self._conn.execute(
             "SELECT ts, metric_name, value FROM samples "
-            "WHERE group_name = ? AND ts >= ? ORDER BY ts",
-            (group, cutoff),
+            "WHERE (group_name = ? OR group_name LIKE ?) AND ts >= ? ORDER BY ts",
+            (group, group + ".%", cutoff),
         )
         return cur.fetchall()
 

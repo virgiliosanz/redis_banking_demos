@@ -76,9 +76,9 @@ def _collect_containers(store: MetricsStore) -> None:
         cpu_val = _parse_pct(cpu_raw)
         mem_val = _parse_pct(mem_raw)
         if cpu_val is not None:
-            store.write_sample("container", f"{name}.cpu_pct", cpu_val)
+            store.write_sample("containers", f"{name}.cpu_pct", cpu_val)
         if mem_val is not None:
-            store.write_sample("container", f"{name}.mem_pct", mem_val)
+            store.write_sample("containers", f"{name}.mem_pct", mem_val)
 
 
 # ------------------------------------------------------------------
@@ -195,7 +195,7 @@ def _collect_nginx(settings: Settings, store: MetricsStore) -> None:
     try:
         result = compose_exec(
             nginx_service,
-            ["sh", "-lc", "curl -fsS http://127.0.0.1:8081/stub_status"],
+            ["sh", "-lc", "curl -fsS http://127.0.0.1:80/nginx_status"],
             cwd=cwd, check=False,
         )
     except Exception:

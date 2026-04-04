@@ -88,6 +88,29 @@ class MetricsStoreTests(unittest.TestCase):
         rows = self.store.query("nonexistent", range_minutes=60)
         self.assertEqual(rows, [])
 
+    def test_query_prefix_matching(self) -> None:
+        """Querying 'mysql' returns rows from 'mysql' and 'mysql.db-live'."""
+        now = time.time()
+        self.store.write_sample("mysql", "global_metric", 1.0, ts=now - 10)
+        self.store.write_sample("mysql.db-live", "threads_connected", 5.0, ts=now - 10)
+        self.store.write_sample("mysql.db-archive", "threads_connected", 3.0, ts=now - 10)
+        self.store.write_sample("phpfpm", "unrelated", 99.0, ts=now - 10)
+
+        rows = self.store.query("mysql", range_minutes=1)
+        metrics = {name: val for _, name, val in rows}
+        self.assertEqual(len(rows), 3)
+        self.assertAlmostEqual(metrics["global_metric"], 1.0)
+        self.assertIn("threads_connected", metrics)
+
+    def test_query_prefix_no_false_positives(self) -> None:
+        """Querying 'mysql' must not return 'mysqld' or 'mysql_extra'."""
+        now = time.time()
+        self.store.write_sample("mysql", "m1", 1.0, ts=now - 10)
+        self.store.write_sample("mysqld", "m2", 2.0, ts=now - 10)
+
+        rows = self.store.query("mysql", range_minutes=1)
+        self.assertEqual(len(rows), 1)
+
     # ------------------------------------------------------------------
     # purge
     # ------------------------------------------------------------------

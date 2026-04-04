@@ -94,7 +94,7 @@ class TestCollectContainers(unittest.TestCase):
             stderr="",
         )
         _collect_containers(self.store)
-        rows = self.store.query("container", 60)
+        rows = self.store.query("containers", 60)
         metrics = {name: val for _, name, val in rows}
         self.assertAlmostEqual(metrics["n9-fe-live.cpu_pct"], 12.5)
         self.assertAlmostEqual(metrics["n9-db-live.mem_pct"], 25.1)
@@ -103,7 +103,7 @@ class TestCollectContainers(unittest.TestCase):
     def test_handles_docker_failure(self, mock_run: MagicMock) -> None:
         mock_run.return_value = CommandResult(args=[], returncode=1, stdout="", stderr="error")
         _collect_containers(self.store)
-        self.assertEqual(self.store.query("container", 60), [])
+        self.assertEqual(self.store.query("containers", 60), [])
 
 
 class TestCollectElastic(unittest.TestCase):
@@ -253,7 +253,7 @@ class TestCollectAndStore(unittest.TestCase):
             store.write_sample("host", "cpu", 10.0)
 
         def write_containers(store):
-            store.write_sample("container", "c1.cpu_pct", 5.0)
+            store.write_sample("containers", "c1.cpu_pct", 5.0)
 
         mock_host.side_effect = write_host
         mock_containers.side_effect = write_containers
@@ -261,7 +261,7 @@ class TestCollectAndStore(unittest.TestCase):
         result = collect_and_store(_settings(), self.store)
         self.assertEqual(result["samples_written"], 2)
         self.assertEqual(result["groups"]["host"], 1)
-        self.assertEqual(result["groups"]["container"], 1)
+        self.assertEqual(result["groups"]["containers"], 1)
         self.assertIn("purged", result)
         self.assertEqual(result["retention_hours"], 24)
 
