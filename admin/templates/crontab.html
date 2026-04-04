@@ -70,6 +70,32 @@
     </p>
 </div>
 
+<!-- Crons del contenedor -->
+<div class="box" id="section-container-crons">
+    <div class="is-flex is-align-items-center mb-3">
+        <h3 class="title is-5 mb-0 mr-3">
+            <span class="icon-text">
+                <span class="icon"><i class="fas fa-box"></i></span>
+                <span>Crons del contenedor (cron-master)</span>
+            </span>
+        </h3>
+        <button class="button is-small is-light ml-3" id="refreshContainerCrons" title="Actualizar">
+            <span class="icon"><i class="fas fa-sync-alt"></i></span>
+            <span>Actualizar</span>
+        </button>
+    </div>
+    <p class="help mb-3">
+        <span class="icon is-small"><i class="fas fa-circle-info"></i></span>
+        Estos crons se ejecutan dentro del contenedor cron-master y gestionan tareas WordPress internas.
+    </p>
+    <div id="container-crons-loading" class="has-text-centered py-4">
+        <span class="icon is-large"><i class="fas fa-spinner fa-pulse fa-2x"></i></span>
+        <p class="mt-2">Cargando crons del contenedor...</p>
+    </div>
+    <div id="container-crons-error" class="notification is-warning" style="display: none;"></div>
+    <div id="container-crons-table" style="display: none;"></div>
+</div>
+
 <div class="box" id="outputContainer" style="display: none;">
     <h3 class="title is-5">
         <span class="icon-text">
@@ -294,5 +320,58 @@
     }
 
     fetchStatus();
+
+    /* --- Container crons (cron-master) --- */
+    var containerLoading = document.getElementById('container-crons-loading');
+    var containerError = document.getElementById('container-crons-error');
+    var containerTable = document.getElementById('container-crons-table');
+
+    function renderContainerCrons(entries) {
+        if (!entries || entries.length === 0) {
+            containerTable.innerHTML = '<p class="has-text-grey">No se encontraron entradas de crontab en el contenedor.</p>';
+            containerTable.style.display = 'block';
+            return;
+        }
+        var html = '<table class="table is-fullwidth is-striped is-hoverable">';
+        html += '<thead><tr><th>Horario</th><th>Comando</th><th>Estado</th></tr></thead><tbody>';
+        for (var i = 0; i < entries.length; i++) {
+            var e = entries[i];
+            var statusTag = e.status === 'activo'
+                ? '<span class="tag is-success">Activo</span>'
+                : '<span class="tag is-info">Variable</span>';
+            html += '<tr><td><code>' + escapeHtml(e.schedule) + '</code></td>' +
+                '<td style="max-width:500px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(e.command) + '"><code>' + escapeHtml(e.command) + '</code></td>' +
+                '<td>' + statusTag + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        containerTable.innerHTML = html;
+        containerTable.style.display = 'block';
+    }
+
+    function fetchContainerCrons() {
+        containerLoading.style.display = 'block';
+        containerError.style.display = 'none';
+        containerTable.style.display = 'none';
+
+        fetch('/crontab/api/container-crons')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                containerLoading.style.display = 'none';
+                if (data.error) {
+                    containerError.innerHTML = '<span class="icon"><i class="fas fa-exclamation-triangle"></i></span> ' + escapeHtml(data.error);
+                    containerError.style.display = 'block';
+                } else {
+                    renderContainerCrons(data.entries || []);
+                }
+            })
+            .catch(function(err) {
+                containerLoading.style.display = 'none';
+                containerError.innerHTML = '<span class="icon"><i class="fas fa-exclamation-triangle"></i></span> Error de red: ' + escapeHtml(err.message);
+                containerError.style.display = 'block';
+            });
+    }
+
+    document.getElementById('refreshContainerCrons').addEventListener('click', fetchContainerCrons);
+    fetchContainerCrons();
 </script>
 {% endblock %}

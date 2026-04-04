@@ -17,6 +17,7 @@ from flask import Blueprint, render_template, jsonify, request
 from ops.config import load_settings
 from ops.collectors import elastic as elastic_collector
 from ops.collectors import app as app_collector
+from ops.collectors import cron as cron_collector
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +102,76 @@ def app_health():
     if _wants_json():
         return jsonify(data)
     return _render("partials/app_health.html", data)
+
+
+@bp.route("/cron")
+def cron_health():
+    """Cron heartbeat health and container crontab entries."""
+    try:
+        settings = _get_settings()
+        data = cron_collector.collect(settings)
+    except Exception as exc:
+        logger.exception("cron collector failed")
+        if _wants_json():
+            return jsonify({"error": str(exc)}), 500
+        data = {"error": str(exc)}
+
+    # Fetch container crontab from cron-master
+    container_crons: list[dict[str, str]] = []
+    container_error = ""
+    try:
+        from .runner import run_cli
+        from .containers import get_compose_root
+        result = run_cli(
+            ["docker", "compose", "exec", "-T", "cron-master", "crontab", "-l"],
+            timeout=15,
+            cwd=str(get_compose_root()),
+        )
+        if result.success:
+            container_crons = _parse_crontab_lines(result.stdout)
+        else:
+            stderr_lower = (result.stderr or "").lower()
+            if "no crontab" in stderr_lower:
+                container_crons = []
+            else:
+                container_error = result.stderr or result.stdout or "Error al leer crontab del contenedor"
+    except Exception as exc:
+        logger.exception("container crontab fetch failed")
+        container_error = str(exc)
+
+    if _wants_json():
+        return jsonify({"collector": data, "container_crons": container_crons, "container_error": container_error})
+    return render_template(
+        "partials/cron_health.html",
+        data=data,
+        container_crons=container_crons,
+        container_error=container_error,
+        timestamp=_now_stamp(),
+    )
+
+
+def _parse_crontab_lines(raw: str) -> list[dict[str, str]]:
+    """Parse crontab -l output into structured entries."""
+    entries: list[dict[str, str]] = []
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        parts = stripped.split(None, 5)
+        if len(parts) >= 6:
+            entries.append({
+                "schedule": " ".join(parts[:5]),
+                "command": parts[5],
+                "status": "activo",
+            })
+        elif len(parts) >= 1:
+            # Non-standard line (env var, etc.)
+            entries.append({
+                "schedule": "-",
+                "command": stripped,
+                "status": "variable",
+            })
+    return entries
 
 
 @bp.route("/nightly")

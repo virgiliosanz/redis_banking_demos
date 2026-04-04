@@ -599,6 +599,51 @@ def create_crontab_blueprint() -> Blueprint:
 
         return jsonify(status)
 
+    @bp.route("/api/container-crons")
+    def crontab_api_container_crons():
+        """Fetch crontab entries from the cron-master container.
+
+        Runs ``docker compose exec -T cron-master crontab -l`` and parses
+        the output into a list of schedule/command/status dicts.
+        """
+        from .containers import get_compose_root
+        compose_root = get_compose_root()
+        result = run_cli(
+            ["docker", "compose", "exec", "-T", "cron-master", "crontab", "-l"],
+            timeout=15,
+            cwd=str(compose_root),
+        )
+
+        if not result.success:
+            stderr_lower = (result.stderr or "").lower()
+            if "no crontab" in stderr_lower:
+                return jsonify({"entries": [], "error": ""})
+            return jsonify({
+                "entries": [],
+                "error": result.stderr or result.stdout or "Error al leer crontab del contenedor",
+            })
+
+        entries: list[dict[str, str]] = []
+        for line in (result.stdout or "").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            parts = stripped.split(None, 5)
+            if len(parts) >= 6:
+                entries.append({
+                    "schedule": " ".join(parts[:5]),
+                    "command": parts[5],
+                    "status": "activo",
+                })
+            elif len(parts) >= 1:
+                entries.append({
+                    "schedule": "-",
+                    "command": stripped,
+                    "status": "variable",
+                })
+
+        return jsonify({"entries": entries, "error": ""})
+
     return bp
 
 

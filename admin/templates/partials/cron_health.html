@@ -1,0 +1,173 @@
+{% macro status_tag(status) %}
+{%- if status == 'ok' -%}
+<span class="tag is-success">OK</span>
+{%- elif status == 'warning' -%}
+<span class="tag is-warning">Warning</span>
+{%- elif status == 'critical' -%}
+<span class="tag is-danger">Critico</span>
+{%- elif status == 'info' -%}
+<span class="tag is-info">Info</span>
+{%- else -%}
+<span class="tag is-light">{{ status }}</span>
+{%- endif -%}
+{% endmacro %}
+
+<div class="level mb-2">
+    <div class="level-left">
+        <div class="level-item">
+            <h2 class="title is-4 mb-0">
+                <span class="icon-text">
+                    <span class="icon"><i class="fas fa-clock"></i></span>
+                    <span>Salud de Cron</span>
+                </span>
+            </h2>
+        </div>
+    </div>
+    <div class="level-right">
+        <div class="level-item">
+            <span class="has-text-grey-light is-size-7">
+                <span class="icon is-small"><i class="fas fa-clock"></i></span>
+                Actualizado: {{ timestamp }}
+            </span>
+        </div>
+    </div>
+</div>
+
+{% if data.error is defined %}
+<div class="notification is-danger">
+    <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+    <span>Error al recopilar salud de Cron: {{ data.error }}</span>
+</div>
+{% else %}
+
+{# -- Heartbeat Jobs -- #}
+<div class="box">
+    <h3 class="title is-5">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-heartbeat"></i></span>
+            <span>Heartbeat de Jobs</span>
+        </span>
+    </h3>
+    {% if data.jobs %}
+    <table class="table is-fullwidth is-striped is-hoverable">
+        <thead>
+            <tr>
+                <th>Job</th>
+                <th>Estado</th>
+                <th>Fuente</th>
+                <th>Ultimo exito</th>
+                <th>Retraso (min)</th>
+                <th>Umbral warning</th>
+                <th>Umbral critico</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for job in data.jobs %}
+            <tr>
+                <td><code style="background-color: rgba(255,255,255,0.1); color: #b5b5b5; padding: 2px 4px; border-radius: 3px;">{{ job.job_name }}</code></td>
+                <td>{{ status_tag(job.status) }}</td>
+                <td>{{ job.source }}</td>
+                <td>
+                    {% if job.last_success_epoch %}
+                    {{ job.last_success_epoch }}
+                    {% else %}
+                    <span class="has-text-grey">--</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if job.delay_minutes is not none %}
+                    {{ job.delay_minutes }}
+                    {% else %}
+                    <span class="has-text-grey">--</span>
+                    {% endif %}
+                </td>
+                <td>{{ job.warning_minutes }}</td>
+                <td>{{ job.critical_minutes }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="has-text-grey">No hay jobs configurados.</p>
+    {% endif %}
+</div>
+
+{# -- Log errors -- #}
+{% if data.recent_log_errors %}
+<div class="box">
+    <h3 class="title is-5">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-exclamation-circle"></i></span>
+            <span>Errores recientes en logs</span>
+        </span>
+    </h3>
+    <div class="level">
+        <div class="level-left">
+            <div class="level-item">
+                {{ status_tag(data.recent_log_errors.status) }}
+            </div>
+            <div class="level-item">
+                <span>{{ data.recent_log_errors.count }} errores encontrados (patron: <code style="background-color: rgba(255,255,255,0.1); color: #b5b5b5; padding: 2px 4px; border-radius: 3px;">{{ data.recent_log_errors.pattern }}</code>)</span>
+            </div>
+        </div>
+    </div>
+    <p class="help has-text-grey">
+        <span class="icon is-small"><i class="fas fa-info-circle"></i></span>
+        Servicio: {{ data.recent_log_errors.source }} | Ultimas {{ data.recent_log_errors.tail_lines }} lineas | Umbral warning: {{ data.recent_log_errors.warning_threshold }} | Umbral critico: {{ data.recent_log_errors.critical_threshold }}
+    </p>
+</div>
+{% endif %}
+
+{# -- Container crontab -- #}
+<div class="box">
+    <h3 class="title is-5">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-docker fa-lg"></i></span>
+            <span>Crontab del contenedor (cron-master)</span>
+        </span>
+    </h3>
+    {% if container_error %}
+    <div class="notification is-warning">
+        <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+        <span>{{ container_error }}</span>
+    </div>
+    {% elif container_crons %}
+    <table class="table is-fullwidth is-striped is-hoverable">
+        <thead>
+            <tr>
+                <th>Horario</th>
+                <th>Comando</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for entry in container_crons %}
+            <tr>
+                <td><code style="background-color: rgba(255,255,255,0.1); color: #b5b5b5; padding: 2px 4px; border-radius: 3px;">{{ entry.schedule }}</code></td>
+                <td style="max-width: 500px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ entry.command }}"><code style="background-color: rgba(255,255,255,0.1); color: #b5b5b5; padding: 2px 4px; border-radius: 3px;">{{ entry.command }}</code></td>
+                <td>
+                    {% if entry.status == 'activo' %}
+                    <span class="tag is-success">Activo</span>
+                    {% elif entry.status == 'variable' %}
+                    <span class="tag is-info">Variable</span>
+                    {% else %}
+                    <span class="tag is-warning">{{ entry.status }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="has-text-grey">No se encontraron entradas de crontab en el contenedor.</p>
+    {% endif %}
+</div>
+
+{% if data.generated_at %}
+<p class="help has-text-grey">
+    <span class="icon is-small"><i class="fas fa-clock"></i></span>
+    Generado: {{ data.generated_at }}
+</p>
+{% endif %}
+
+{% endif %}
