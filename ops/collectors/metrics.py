@@ -425,6 +425,58 @@ def _collect_phpfpm(settings: Settings, store: MetricsStore) -> None:
 
 
 # ------------------------------------------------------------------
+# WordPress metrics
+# ------------------------------------------------------------------
+
+_WP_METRICS_SCRIPT = "/opt/project/scripts/internal/wp-metrics.php"
+_WP_PATH = "/srv/wp/site"
+
+
+def _collect_wordpress(settings: Settings, store: MetricsStore) -> None:
+    """Collect WordPress metrics via wp-metrics.php on cron-master."""
+    cwd = settings.project_root.resolve()
+    cron_service = compose_service_name("cron-master")
+
+    contexts = [
+        ("live", "wordpress.fe-live"),
+        ("archive", "wordpress.fe-archive"),
+    ]
+
+    for context, group in contexts:
+        try:
+            result = compose_exec(
+                cron_service,
+                ["env", f"N9_SITE_CONTEXT={context}",
+                 "wp", "--allow-root", "eval-file", _WP_METRICS_SCRIPT,
+                 f"--path={_WP_PATH}"],
+                cwd=cwd,
+                check=False,
+                exec_args=["--user", "root"],
+            )
+        except Exception:
+            logger.warning("wordpress %s metrics unavailable", context, exc_info=True)
+            continue
+
+        if result.returncode != 0:
+            logger.warning("wordpress %s metrics failed (rc=%d)", context, result.returncode)
+            continue
+
+        body = result.stdout.strip()
+        if not body:
+            continue
+
+        try:
+            data = json.loads(body)
+        except (json.JSONDecodeError, TypeError):
+            logger.warning("wordpress %s metrics parse error", context)
+            continue
+
+        metrics = data.get("metrics", {})
+        for metric_name, value in metrics.items():
+            _safe_write(store, group, metric_name, value)
+
+
+# ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
 
@@ -476,6 +528,7 @@ def collect_and_store(settings: Settings, store: MetricsStore) -> dict[str, Any]
     _collect_mysql(settings, proxy)  # type: ignore[arg-type]
     _collect_nginx(settings, proxy)  # type: ignore[arg-type]
     _collect_phpfpm(settings, proxy)  # type: ignore[arg-type]
+    _collect_wordpress(settings, proxy)  # type: ignore[arg-type]
 
     purged = store.purge(max_age_hours=retention_hours)
 

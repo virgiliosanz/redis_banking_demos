@@ -16,6 +16,7 @@ from ops.collectors.metrics import (
     _collect_mysql,
     _collect_nginx,
     _collect_phpfpm,
+    _collect_wordpress,
     _parse_docker_size,
     _parse_net_io,
     _parse_pct,
@@ -339,6 +340,7 @@ class TestCollectAndStore(unittest.TestCase):
         self.store.close()
         self._tmpdir.cleanup()
 
+    @patch("ops.collectors.metrics._collect_wordpress")
     @patch("ops.collectors.metrics._collect_phpfpm")
     @patch("ops.collectors.metrics._collect_nginx")
     @patch("ops.collectors.metrics._collect_mysql")
@@ -351,6 +353,7 @@ class TestCollectAndStore(unittest.TestCase):
         mock_containers: MagicMock,
         mock_elastic: MagicMock, mock_mysql: MagicMock,
         mock_nginx: MagicMock, mock_phpfpm: MagicMock,
+        mock_wordpress: MagicMock,
     ) -> None:
         def write_host(settings, store):
             store.write_sample("host", "cpu", 10.0)
@@ -368,6 +371,7 @@ class TestCollectAndStore(unittest.TestCase):
         self.assertIn("purged", result)
         self.assertEqual(result["retention_hours"], 24)
 
+    @patch("ops.collectors.metrics._collect_wordpress")
     @patch("ops.collectors.metrics._collect_phpfpm")
     @patch("ops.collectors.metrics._collect_nginx")
     @patch("ops.collectors.metrics._collect_mysql")
@@ -380,12 +384,129 @@ class TestCollectAndStore(unittest.TestCase):
         mock_containers: MagicMock,
         mock_elastic: MagicMock, mock_mysql: MagicMock,
         mock_nginx: MagicMock, mock_phpfpm: MagicMock,
+        mock_wordpress: MagicMock,
     ) -> None:
         import time
         # Insert an old sample directly
         self.store.write_sample("old", "m", 1.0, ts=time.time() - 100000)
         result = collect_and_store(_settings(), self.store)
         self.assertEqual(result["purged"], 1)
+
+
+class TestCollectWordPress(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.store = _make_store(self._tmpdir.name)
+
+    def tearDown(self) -> None:
+        self.store.close()
+        self._tmpdir.cleanup()
+
+    @patch("ops.collectors.metrics.compose_exec")
+    def test_live_context_all_metrics(self, mock_exec: MagicMock) -> None:
+        """Live context returns all metrics including cron/content/updates."""
+        live_data = {
+            "metrics": {
+                "cron_events_total": 42,
+                "cron_events_overdue": 3,
+                "cron_events_overdue_max_age": 120,
+                "db_size_mb": 85.5,
+                "autoload_size_kb": 512.3,
+                "autoload_count": 200,
+                "transients_count": 50,
+                "posts_published": 1500,
+                "posts_draft": 10,
+                "pages_published": 25,
+                "plugins_update_available": 2,
+                "themes_update_available": 1,
+                "php_error_count": 5,
+            }
+        }
+        archive_data = {
+            "metrics": {
+                "db_size_mb": 120.0,
+                "autoload_size_kb": 256.0,
+                "autoload_count": 100,
+                "transients_count": 20,
+                "php_error_count": 0,
+            }
+        }
+
+        def side_effect(service, cmd, cwd=None, check=True, exec_args=None):
+            cmd_str = " ".join(cmd)
+            if "N9_SITE_CONTEXT=live" in cmd_str:
+                return CommandResult(args=[], returncode=0, stdout=json.dumps(live_data), stderr="")
+            return CommandResult(args=[], returncode=0, stdout=json.dumps(archive_data), stderr="")
+
+        mock_exec.side_effect = side_effect
+        _collect_wordpress(_settings(), self.store)
+
+        live_rows = self.store.query("wordpress.fe-live", 60)
+        live_metrics = {name: val for _, name, val in live_rows}
+        self.assertAlmostEqual(live_metrics["cron_events_total"], 42)
+        self.assertAlmostEqual(live_metrics["db_size_mb"], 85.5)
+        self.assertAlmostEqual(live_metrics["posts_published"], 1500)
+        self.assertAlmostEqual(live_metrics["plugins_update_available"], 2)
+        self.assertAlmostEqual(live_metrics["php_error_count"], 5)
+        self.assertEqual(len(live_metrics), 13)
+
+        archive_rows = self.store.query("wordpress.fe-archive", 60)
+        archive_metrics = {name: val for _, name, val in archive_rows}
+        self.assertAlmostEqual(archive_metrics["db_size_mb"], 120.0)
+        self.assertAlmostEqual(archive_metrics["php_error_count"], 0)
+        self.assertEqual(len(archive_metrics), 5)
+
+    @patch("ops.collectors.metrics.compose_exec")
+    def test_archive_skips_live_only_metrics(self, mock_exec: MagicMock) -> None:
+        """Archive context only has db and error metrics (no cron/content/updates)."""
+        archive_data = {
+            "metrics": {
+                "db_size_mb": 120.0,
+                "autoload_size_kb": 256.0,
+                "autoload_count": 100,
+                "transients_count": 20,
+                "php_error_count": 0,
+            }
+        }
+
+        def side_effect(service, cmd, cwd=None, check=True, exec_args=None):
+            cmd_str = " ".join(cmd)
+            if "N9_SITE_CONTEXT=live" in cmd_str:
+                return CommandResult(args=[], returncode=1, stdout="", stderr="error")
+            return CommandResult(args=[], returncode=0, stdout=json.dumps(archive_data), stderr="")
+
+        mock_exec.side_effect = side_effect
+        _collect_wordpress(_settings(), self.store)
+
+        live_rows = self.store.query("wordpress.fe-live", 60)
+        self.assertEqual(len(live_rows), 0)
+
+        archive_rows = self.store.query("wordpress.fe-archive", 60)
+        archive_metrics = {name: val for _, name, val in archive_rows}
+        self.assertNotIn("cron_events_total", archive_metrics)
+        self.assertNotIn("posts_published", archive_metrics)
+        self.assertNotIn("plugins_update_available", archive_metrics)
+        self.assertAlmostEqual(archive_metrics["db_size_mb"], 120.0)
+
+    @patch("ops.collectors.metrics.compose_exec")
+    def test_handles_exec_failure(self, mock_exec: MagicMock) -> None:
+        """Gracefully handles compose_exec exceptions."""
+        mock_exec.side_effect = Exception("container not running")
+        _collect_wordpress(_settings(), self.store)
+        live_rows = self.store.query("wordpress.fe-live", 60)
+        archive_rows = self.store.query("wordpress.fe-archive", 60)
+        self.assertEqual(len(live_rows), 0)
+        self.assertEqual(len(archive_rows), 0)
+
+    @patch("ops.collectors.metrics.compose_exec")
+    def test_handles_invalid_json(self, mock_exec: MagicMock) -> None:
+        """Gracefully handles invalid JSON output."""
+        mock_exec.return_value = CommandResult(args=[], returncode=0, stdout="not json", stderr="")
+        _collect_wordpress(_settings(), self.store)
+        live_rows = self.store.query("wordpress.fe-live", 60)
+        archive_rows = self.store.query("wordpress.fe-archive", 60)
+        self.assertEqual(len(live_rows), 0)
+        self.assertEqual(len(archive_rows), 0)
 
 
 if __name__ == "__main__":

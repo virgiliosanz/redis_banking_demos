@@ -64,6 +64,8 @@ Estos ficheros existen para ser llamados desde Python o mediante `wp-cli eval-fi
   - `internal/sync/editorial/snapshot.php`
   - `internal/sync/editorial/plan.php`
   - `internal/sync/editorial/apply.php`
+- metricas:
+  - `internal/wp-metrics.php`
 - sync de plataforma:
   - `internal/sync/platform/source-snapshot.php`
   - `internal/sync/platform/snapshot.php`

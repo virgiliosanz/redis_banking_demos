@@ -31,7 +31,7 @@ _RANGE_MAP = {
 # Ranges that require the extended (raw + hourly) query path.
 _EXTENDED_RANGES = {"3d", "7d"}
 
-VALID_GROUPS = {"host", "nginx", "mysql", "elastic", "phpfpm", "containers"}
+VALID_GROUPS = {"host", "nginx", "mysql", "elastic", "phpfpm", "containers", "wordpress"}
 
 
 def _get_store() -> MetricsStore:
