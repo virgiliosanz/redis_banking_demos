@@ -145,22 +145,10 @@ function setUnavailable(el) {
 function truncateText(t, n) { return t.length <= n ? t : t.substring(0, n) + '...'; }
 
 function formatAge(minutes) {
-    if (minutes == null) return '—';
-    if (minutes < 60) return Math.round(minutes) + ' min';
-    if (minutes < 1440) return Math.round(minutes / 60) + ' h';
-    return Math.round(minutes / 1440) + ' d';
+    return TimeAgo.formatAge(minutes);
 }
 
-function timeAgo(isoStr) {
-    if (!isoStr) return '';
-    try {
-        var then = new Date(isoStr).getTime();
-        if (isNaN(then)) return isoStr;
-        var diffMin = Math.round((Date.now() - then) / 60000);
-        if (diffMin < 0) diffMin = 0;
-        return 'hace ' + formatAge(diffMin);
-    } catch(e) { return isoStr; }
-}
+var timeAgo = TimeAgo.timeAgoISO;
 
 /* ── Row 1: Service semaphores ─────────────────────── */
 function renderServices(services) {

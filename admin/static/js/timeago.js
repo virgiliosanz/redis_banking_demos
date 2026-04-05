@@ -81,9 +81,37 @@ var TimeAgo = (function() {
         humanizeEpochs(document);
     }
 
+    /**
+     * Format a duration in minutes to a short human-readable string.
+     * Examples: "5 min", "2 h", "3 d"
+     */
+    function formatAge(minutes) {
+        if (minutes == null) return '\u2014';
+        if (minutes < 60) return Math.round(minutes) + ' min';
+        if (minutes < 1440) return Math.round(minutes / 60) + ' h';
+        return Math.round(minutes / 1440) + ' d';
+    }
+
+    /**
+     * Like timeAgo() but accepts an ISO-8601 string instead of epoch seconds.
+     * Returns "hace 5 min", "hace 2 h", etc.
+     */
+    function timeAgoISO(isoStr) {
+        if (!isoStr) return '';
+        try {
+            var then = new Date(isoStr).getTime();
+            if (isNaN(then)) return isoStr;
+            var diffMin = Math.round((Date.now() - then) / 60000);
+            if (diffMin < 0) diffMin = 0;
+            return 'hace ' + formatAge(diffMin);
+        } catch(e) { return isoStr; }
+    }
+
     return {
         timeAgo: timeAgo,
+        timeAgoISO: timeAgoISO,
         formatAbsolute: formatAbsolute,
+        formatAge: formatAge,
         humanizeDuration: humanizeDuration,
         humanizeEpochs: humanizeEpochs,
         isoToEpoch: isoToEpoch

@@ -53,11 +53,7 @@
     var empty = document.getElementById('reports-empty');
     var errorBox = document.getElementById('reports-error');
 
-    function formatBytes(b) {
-        if (b < 1024) return b + ' B';
-        if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
-        return (b / 1048576).toFixed(1) + ' MB';
-    }
+    var formatBytes = AdminUtils.formatBytes;
 
     function formatDate(iso) {
         var d = new Date(iso);
