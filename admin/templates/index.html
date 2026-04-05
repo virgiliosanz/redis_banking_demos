@@ -85,7 +85,15 @@
     </div>
 </div>
 
-<!-- Row 3: Recent incidents (hidden when empty) -->
+<!-- Row 3: WordPress health indicators -->
+<div class="health-section">
+    <p class="title is-5"><span class="icon"><i class="fab fa-wordpress"></i></span> WordPress</p>
+    <div id="wp-indicators" class="loading-placeholder">
+        <span class="icon"><i class="fas fa-spinner fa-pulse"></i></span> Cargando...
+    </div>
+</div>
+
+<!-- Row 4: Recent incidents (hidden when empty) -->
 <div class="health-section" id="incidents-section">
     <p class="title is-5"><span class="icon"><i class="fas fa-exclamation-triangle"></i></span> Incidentes recientes</p>
     <div id="incidents-list" class="loading-placeholder">
@@ -218,7 +226,36 @@ function loadSparklines() {
         });
 }
 
-/* ── Row 3: Incidents ──────────────────────────────── */
+/* ── Row 3: WordPress indicators ───────────────────── */
+function wpStatusClass(status) {
+    if (status === 'ok') return 'is-success';
+    if (status === 'warning') return 'is-warning';
+    if (status === 'critical') return 'is-danger';
+    return 'is-light';
+}
+function renderWordpress(wp) {
+    var el = document.getElementById('wp-indicators');
+    if (!wp) {
+        el.innerHTML = '<span class="tag is-light">WordPress: No disponible</span>';
+        return;
+    }
+    var items = [
+        {label: 'WP-Cron', value: wp.cron_overdue, suffix: ' retrasados'},
+        {label: 'Updates', value: wp.updates_pending, suffix: ' pendientes'},
+        {label: 'Errores PHP', value: wp.php_errors, suffix: ''},
+        {label: 'Autoload', value: wp.db_autoload, suffix: ' opciones'}
+    ];
+    el.innerHTML = items.map(function(item) {
+        var v = item.value || {};
+        var cls = wpStatusClass(v.status);
+        return '<span class="tag ' + cls + ' is-medium mr-2 mb-2">' +
+            '<span class="svc-dot ' + (v.status || 'unknown') + '" style="margin-right:0.4rem;"></span>' +
+            item.label + ': ' + (v.value != null ? v.value : '?') + item.suffix +
+            '</span>';
+    }).join('');
+}
+
+/* ── Row 4: Incidents ──────────────────────────────── */
 function renderIncidents(incidents) {
     var section = document.getElementById('incidents-section');
     var el = document.getElementById('incidents-list');
@@ -302,11 +339,13 @@ function loadHealthSummary() {
         .then(function(r) { return r.json(); })
         .then(function(data) {
             renderServices(data.services);
+            renderWordpress(data.wordpress);
             renderIncidents(data.incidents);
             renderCronJobs(data.cron_jobs);
         })
         .catch(function() {
             setUnavailable(document.getElementById('svc-semaphores'));
+            document.getElementById('wp-indicators').innerHTML = '<span class="tag is-light">WordPress: No disponible</span>';
             setUnavailable(document.getElementById('incidents-list'));
             setUnavailable(document.getElementById('cron-status'));
         });

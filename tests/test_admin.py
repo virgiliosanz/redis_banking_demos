@@ -590,6 +590,100 @@ class TestHealthSummaryEndpoint(unittest.TestCase):
             nightly_job = next(j for j in data["cron_jobs"] if j["label"] == "nightly")
             self.assertEqual(nightly_job["status"], "warning")
 
+    def test_response_has_wordpress_key(self) -> None:
+        """Health summary response includes the wordpress key."""
+        resp = self.client.get("/api/health-summary")
+        data = resp.get_json()
+        self.assertIn("wordpress", data)
+
+    @mock.patch("admin.health_bp._collect_wordpress_health")
+    def test_wordpress_indicators_ok(self, mock_wp) -> None:
+        """WordPress indicators with all-ok values."""
+        mock_wp.return_value = {
+            "cron_overdue": {"value": 0, "status": "ok"},
+            "updates_pending": {"value": 0, "status": "ok"},
+            "php_errors": {"value": 0, "status": "ok"},
+            "db_autoload": {"value": 300, "status": "ok"},
+        }
+        resp = self.client.get("/api/health-summary")
+        data = resp.get_json()
+        wp = data["wordpress"]
+        self.assertIsNotNone(wp)
+        self.assertEqual(wp["cron_overdue"]["status"], "ok")
+        self.assertEqual(wp["updates_pending"]["status"], "ok")
+        self.assertEqual(wp["php_errors"]["status"], "ok")
+        self.assertEqual(wp["db_autoload"]["status"], "ok")
+        self.assertEqual(wp["db_autoload"]["value"], 300)
+
+    @mock.patch("admin.health_bp._collect_wordpress_health")
+    def test_wordpress_indicators_warning(self, mock_wp) -> None:
+        """WordPress indicators with warning values."""
+        mock_wp.return_value = {
+            "cron_overdue": {"value": 3, "status": "warning"},
+            "updates_pending": {"value": 2, "status": "warning"},
+            "php_errors": {"value": 5, "status": "warning"},
+            "db_autoload": {"value": 700, "status": "warning"},
+        }
+        resp = self.client.get("/api/health-summary")
+        data = resp.get_json()
+        wp = data["wordpress"]
+        for key in ("cron_overdue", "updates_pending", "php_errors", "db_autoload"):
+            self.assertEqual(wp[key]["status"], "warning")
+
+    @mock.patch("admin.health_bp._collect_wordpress_health")
+    def test_wordpress_indicators_critical(self, mock_wp) -> None:
+        """WordPress indicators with critical values."""
+        mock_wp.return_value = {
+            "cron_overdue": {"value": 10, "status": "critical"},
+            "updates_pending": {"value": 5, "status": "critical"},
+            "php_errors": {"value": 20, "status": "critical"},
+            "db_autoload": {"value": 1500, "status": "critical"},
+        }
+        resp = self.client.get("/api/health-summary")
+        data = resp.get_json()
+        wp = data["wordpress"]
+        for key in ("cron_overdue", "updates_pending", "php_errors", "db_autoload"):
+            self.assertEqual(wp[key]["status"], "critical")
+
+    @mock.patch("admin.health_bp._collect_wordpress_health")
+    def test_wordpress_none_when_unavailable(self, mock_wp) -> None:
+        """WordPress section is null when collector is unavailable."""
+        mock_wp.return_value = None
+        resp = self.client.get("/api/health-summary")
+        data = resp.get_json()
+        self.assertIsNone(data["wordpress"])
+
+    @mock.patch("admin.health_bp._collect_wordpress_health")
+    def test_wordpress_none_on_exception(self, mock_wp) -> None:
+        """WordPress section is null when collector raises."""
+        mock_wp.side_effect = Exception("collector down")
+        resp = self.client.get("/api/health-summary")
+        data = resp.get_json()
+        self.assertIsNone(data["wordpress"])
+
+
+class TestWordPressIndicatorLogic(unittest.TestCase):
+    """Test the _wp_indicator threshold logic directly."""
+
+    def test_ok_below_warning(self) -> None:
+        from admin.health_bp import _wp_indicator
+        self.assertEqual(_wp_indicator(0, (1, 5)), "ok")
+        self.assertEqual(_wp_indicator(0, (500, 1000)), "ok")
+        self.assertEqual(_wp_indicator(499, (500, 1000)), "ok")
+
+    def test_warning_at_boundary(self) -> None:
+        from admin.health_bp import _wp_indicator
+        self.assertEqual(_wp_indicator(1, (1, 5)), "warning")
+        self.assertEqual(_wp_indicator(5, (1, 5)), "warning")
+        self.assertEqual(_wp_indicator(500, (500, 1000)), "warning")
+        self.assertEqual(_wp_indicator(1000, (500, 1000)), "warning")
+
+    def test_critical_above_threshold(self) -> None:
+        from admin.health_bp import _wp_indicator
+        self.assertEqual(_wp_indicator(6, (1, 5)), "critical")
+        self.assertEqual(_wp_indicator(1001, (500, 1000)), "critical")
+        self.assertEqual(_wp_indicator(11, (1, 10)), "critical")
+
 
 # ---------------------------------------------------------------------------
 # capacity_bp.py tests
