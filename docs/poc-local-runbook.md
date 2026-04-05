@@ -39,8 +39,8 @@ Que hace el bootstrap:
 
 ### Verificacion IA-Ops minima
 ```sh
-./scripts/collect-nightly-context.sh --write-report
-./scripts/collect-mysql-health.sh
+python3 -m ops.cli.ia_ops collect-nightly-context --write-report
+python3 -m ops.cli.ia_ops collect-mysql-health
 ./scripts/run-nightly-auditor.sh
 ./scripts/run-sentry-agent.sh --service lb-nginx
 ./scripts/run-sentry-agent.sh --service elastic
@@ -62,7 +62,7 @@ TELEGRAM_MESSAGE_THREAD_ID=
 Vista previa sin enviar nada:
 
 ```sh
-./scripts/send-telegram-test.sh --preview --message "IA-Ops Telegram test"
+python3 -m ops.cli.ia_ops send-telegram-test --preview --message "IA-Ops Telegram test"
 ./scripts/run-nightly-auditor.sh --telegram-preview --no-write-report
 ./scripts/run-sentry-agent.sh --service lb-nginx --telegram-preview --no-write-report
 ```
@@ -75,7 +75,7 @@ Notas de semantica:
 Envio real:
 
 ```sh
-./scripts/send-telegram-test.sh --message "IA-Ops Telegram test"
+python3 -m ops.cli.ia_ops send-telegram-test --message "IA-Ops Telegram test"
 ./scripts/run-nightly-auditor.sh --notify-telegram
 ./scripts/run-sentry-agent.sh --service elastic --notify-telegram
 ./scripts/run-nightly-auditor.sh --no-notify-telegram

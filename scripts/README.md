@@ -27,12 +27,10 @@ Estos son los scripts pensados para operacion manual o validacion local:
   - `smoke-rollover-year.sh`
   - `smoke-functional.sh`
 - IA-Ops y scheduling:
-  - `collect-*.sh`
+  - `collect-cron-health.sh`
   - `run-nightly-auditor.sh`
   - `run-sentry-agent.sh`
   - `run-reactive-watch.sh`
-  - `report-live-archive-sync-drift.sh`
-  - `send-telegram-test.sh`
   - `install-nightly-auditor-cron.sh`
   - `install-reactive-watch-cron.sh`
   - `install-sync-jobs-cron.sh`
@@ -74,7 +72,9 @@ Estos ficheros existen para ser llamados desde Python o mediante `wp-cli eval-fi
 
 ## 3. Wrappers de compatibilidad
 
-Buena parte de los `collect-*`, `run-*`, `install-*`, `sync-*.sh` y `rollover-content-year.sh` son wrappers finos sobre `ops.cli.ia_ops`. Se mantienen porque reducen friccion en runbooks y porque la interfaz shell actual sigue siendo util para la operacion diaria.
+Los `run-*`, `install-*`, `sync-*.sh`, `collect-cron-health.sh` y `rollover-content-year.sh` son wrappers finos sobre `ops.cli.ia_ops`. Se mantienen porque reducen friccion en runbooks y porque la interfaz shell actual sigue siendo util para la operacion diaria.
+
+Los antiguos wrappers de collectors (`collect-app-health.sh`, `collect-host-health.sh`, etc.), `report-live-archive-sync-drift.sh` y `send-telegram-test.sh` fueron eliminados por ser redundantes con el panel de administracion y la CLI directa `python3 -m ops.cli.ia_ops`.
 
 La raiz de `scripts/` debe reservarse preferentemente para entrypoints de operador. Los helpers PHP internos viven bajo `scripts/internal/` para dejar mas clara esa frontera.
 
