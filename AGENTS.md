@@ -115,9 +115,11 @@ Si algo no se ha podido validar, se debe decir de forma explicita.
 | `ops/sync/` | Sincronizacion editorial y de plataforma entre live y archive |
 | `ops/rollover/` | Rollover anual de contenido live a archive |
 | `ops/util/` | Helpers base: docker, process, http, json, thresholds, time |
-| `admin/` | Panel de administracion Flask: blueprints, templates Jinja2, runners, historial |
-| `tests/` | Tests unitarios del paquete `ops/` (173 tests, sin dependencia de Docker) |
-| `scripts/` | Bootstrap, smoke tests, checks de calidad, wrappers shell para `ops/` |
+| `admin/` | Panel de administracion Flask: dashboard de salud, metricas operativas, diagnosticos (Host, Runtime, App, MySQL, Elastic, Cron, WordPress), capacity planning, reportes, crontab, sync, rollover. Dark mode. Dependencias locales (Chart.js, Bulma) |
+| `admin/static/` | Vendor JS/CSS (Chart.js, Bulma, Font Awesome), JS compartido (timeago, admin-utils, chart-helpers), CSS compartido (admin.css) |
+| `ops/metrics/` | Almacenamiento SQLite de metricas operativas, agregacion horaria, cleanup automatico |
+| `tests/` | Tests unitarios del paquete `ops/` (302 tests, sin dependencia de Docker) |
+| `scripts/` | Bootstrap, smoke tests, checks de calidad, cron wrappers, scripts PHP internos |
 | `scripts/internal/` | Scripts PHP internos ejecutados via `wp eval-file` desde `cron-master` |
 | `config/` | Configuracion no sensible: env de IA-Ops, routing cutover |
 | `nginx/` | Configuracion de LB-Nginx: routing por ano, FastCGI, debug headers |

@@ -196,9 +196,30 @@ python3 -m admin
 ```
 
 - Accesible en `http://localhost:9941`
-- Funcionalidades: dashboard con estado real, diagnosticos por collector, gestion de contenedores, sincronizacion, rollover, crontabs, reportes, historial
+- Funcionalidades: dashboard de salud, metricas operativas, diagnosticos por servicio, capacity planning, crontabs, sync, rollover, reportes
 - No requiere autenticacion (acceso restringido por firewall/red local)
 - Endpoint de salud: `GET /health`
+- Dark mode con persistencia en localStorage
+- Dependencias frontend locales (zero CDN)
+
+### Metricas operativas
+
+El sistema recoge 104 metricas por minuto desde 12 fuentes, almacenadas en SQLite con agregacion horaria y cleanup automatico.
+
+Recogida manual:
+```sh
+python3 -m ops.cli.ia_ops collect-metrics
+```
+
+Dashboard de metricas: `http://localhost:9941/metrics` — tabs Sistema/Servicios, filtros por instancia, rangos 5m-7d, bandas de umbrales, comparativa temporal y marcadores de incidentes.
+
+### Capacity planning
+
+Tendencias de disco, memoria, Elastic y MySQL con proyecciones lineales. Accesible en `http://localhost:9941/capacity`.
+
+### Diagnostico WordPress
+
+Semaforos para cron events, BD bloat, actualizaciones pendientes y errores PHP. Accesible desde la tab WordPress en diagnosticos.
 
 ## 6. Resultado esperado
 - Todos los contenedores en estado `healthy`

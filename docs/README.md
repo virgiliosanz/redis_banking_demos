@@ -17,10 +17,16 @@ El historico de trabajo y los planes de proyecto viven en `tasks/`.
 - checks MySQL en solo lectura con `ping` y processlist largo para `db-live` y `db-archive`
 - drift `live/archive` con resumen accionable para editorial y plataforma
 - baseline reproducible de calidad para Python, shell, PHP y `docker compose`
-- 173 tests unitarios cubriendo 24 de 28 modulos Python
+- 302 tests unitarios cubriendo 28 de 28 modulos Python
 - panel de administracion web (Flask) para operacion, diagnostico y monitorizacion
 - collectors con templates ricos (Host, Runtime, MySQL, Elastic, App, Cron)
 - explorador de reportes y historial de ejecuciones
+- metricas operativas con almacenamiento SQLite (104 metricas/minuto, 12 fuentes)
+- dashboard de salud unificado con semaforos, sparklines e indicadores
+- capacity planning con tendencias y proyecciones lineales
+- diagnostico de WordPress con semaforos (cron, BD, updates, errores)
+- dark mode en el panel de administracion
+- dependencias frontend locales (zero CDN)
 - dispatch table en `sentry.py` para extender diagnosticos sin tocar el core
 - heartbeat writing consolidado entre sync y rollover
 - build_reactive_incidents refactorizado en sub-funciones por dominio para mantenibilidad
@@ -39,7 +45,7 @@ El historico de trabajo y los planes de proyecto viven en `tasks/`.
 | `DB-Archive` | MySQL de contenido historico |
 | `Elastic` | busqueda comun con indices separados |
 | `Cron-Master` | `wp-cli`, syncs, rollover y jobs programados |
-| `Admin Panel` | panel web Flask para operacion y diagnostico |
+| `Admin Panel` | panel web Flask: dashboard de salud, metricas operativas, diagnosticos, capacity planning |
 
 ## Routing vigente
 - `nuevecuatrouno.test` sirve el frontend publico y el admin de `live`
@@ -58,7 +64,7 @@ La frontera anual real del balanceador ya no esta hardcodeada: sale de `config/r
 - sync editorial y de plataforma con drift report accionable
 - auditoria nocturna programable con `cron`
 - agente reactivo programable con `cron`, deduplicacion y salida a Telegram
-- baseline reproducible de calidad: `./scripts/check-quality.sh` (173 tests, shellcheck, php -l, py_compile, compose config)
+- baseline reproducible de calidad: `./scripts/check-quality.sh` (302 tests, shellcheck, php -l, py_compile, compose config)
 - gestion de crontabs refactorizada con helpers genericos reutilizables
 - compose_exec con soporte stdin para operaciones Docker que requieren piping de ficheros
 - panel de administracion web en http://localhost:9941 con dashboard de estado en tiempo real
@@ -68,12 +74,18 @@ La frontera anual real del balanceador ya no esta hardcodeada: sale de `config/r
 - gestion de crontabs (host e inspeccion de contenedor) desde la UI
 - sincronizacion editorial, plataforma y drift desde interfaz unificada
 - endpoint /health para monitorizacion del panel
+- metricas operativas: 104 metricas/minuto recogidas via cron, almacenadas en SQLite con agregacion horaria y cleanup automatico
+- dashboard de salud: semaforos de servicio, sparklines, indicadores WordPress, resumen de cron jobs
+- metricas con graficas interactivas: tabs Sistema/Servicios, filtros por instancia, rangos 5m-7d, bandas de umbrales, comparativa temporal, marcadores de incidentes
+- capacity planning: tendencias de disco, memoria, Elastic y MySQL con proyecciones lineales
+- diagnostico WordPress: cron events, BD bloat, actualizaciones pendientes, errores PHP
+- dark mode con persistencia en localStorage
 
 ## Limites actuales
 - laboratorio local, no produccion
 - sin alta disponibilidad
 - sin backups verificados
-- sin observabilidad pesada
+- observabilidad ligera implementada (metricas SQLite, no Prometheus/Grafana)
 - sin `cloudflared` en la POC
 - sin remediacion automatica destructiva
 

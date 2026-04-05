@@ -35,9 +35,22 @@ IA-Ops para diagnóstico reactivo y auditoría programada.
 | `php/` | Dockerfiles para PHP-FPM y PHP-CLI |
 | `wordpress/` | Templates wp-config, mu-plugins y contextos |
 | `ops/` | Paquete Python: IA-Ops, collectors, sync, rollover |
+| `admin/` | Panel de administracion web con dashboard, metricas y diagnosticos |
 | `scripts/` | Bootstrap, smoke tests, checks de calidad |
 | `tasks/` | Ficheros de proyecto activos y archivo |
-| `tests/` | Tests unitarios del paquete `ops/` |
+| `tests/` | Tests unitarios del paquete `ops/` (302 tests) |
+
+## Panel de Administración
+
+```sh
+# Iniciar el panel (por defecto puerto 9941)
+python3 -m admin
+```
+
+Dashboard de salud, métricas operativas (104 métricas/min), diagnósticos
+por servicio, capacity planning y gestión de cron.
+
+Accesible en `http://localhost:9941`
 
 ## Documentación
 
@@ -48,7 +61,7 @@ IA-Ops para diagnóstico reactivo y auditoría programada.
 ## Checks de calidad
 
 ```sh
-./scripts/check-quality.sh   # sintaxis shell, PHP, Python, compose + tests unitarios
+./scripts/check-quality.sh   # sintaxis shell, PHP, Python, compose + 302 tests unitarios
 ```
 
 ## Estado
