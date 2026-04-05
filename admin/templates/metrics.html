@@ -2,12 +2,9 @@
 {% block title %}Metricas{% endblock %}
 
 {% block extra_head %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
-<style>
-    .chart-container { position: relative; height: 280px; width: 100%; }
-    .metric-card { margin-bottom: 1.5rem; }
-</style>
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/chartjs-plugin-annotation.min.js') }}"></script>
+
 {% endblock %}
 
 {% block content %}
@@ -68,9 +65,14 @@
             <div class="select is-small">
                 <select id="serviciosFilter">
                     <option value="nginx" selected>Nginx</option>
-                    <option value="mysql">MySQL</option>
+                    <option value="phpfpm.fe-live">PHP-FPM: fe-live</option>
+                    <option value="phpfpm.fe-archive">PHP-FPM: fe-archive</option>
+                    <option value="phpfpm.be-admin">PHP-FPM: be-admin</option>
+                    <option value="mysql.db-live">MySQL: db-live</option>
+                    <option value="mysql.db-archive">MySQL: db-archive</option>
                     <option value="elastic">Elastic</option>
-                    <option value="phpfpm">PHP-FPM</option>
+                    <option value="wordpress.fe-live">WordPress: fe-live</option>
+                    <option value="wordpress.fe-archive">WordPress: fe-archive</option>
                 </select>
             </div>
         </div>
@@ -91,7 +93,7 @@
             <label class="label">Umbrales</label>
             <button class="button is-small is-warning" id="toggleThresholds">
                 <span class="icon"><i class="fas fa-layer-group"></i></span>
-                <span>Mostrar umbrales</span>
+                <span>Ocultar umbrales</span>
             </button>
         </div>
         <div class="column is-narrow">
@@ -133,61 +135,8 @@
     let compareYesterday = false;
     const COMPARABLE_RANGES = ['5m','15m','30m','1h','6h','24h'];
 
-    // Threshold definitions: { metricSuffix: { warning, critical } }
-    // Uses suffix matching so container metrics (e.g. n9-lb-nginx.cpu_pct) match *.cpu_pct
-    const THRESHOLDS = {
-        'cpu_user_pct':       { warning: 70,  critical: 90  },
-        'memory_used_pct':    { warning: 80,  critical: 95  },
-        'disk_used_pct':      { warning: 80,  critical: 95  },
-        'load_1':             { warning: 2.0, critical: 4.0 },
-        'cpu_pct':            { warning: 80,  critical: 95  },
-        'mem_pct':            { warning: 80,  critical: 95  },
-        'heap_used_pct':      { warning: 75,  critical: 90  },
-        'threads_connected':  { warning: 50,  critical: 100 }
-    };
-
-    function getThreshold(metricName) {
-        var parts = metricName.split('.');
-        var suffix = parts[parts.length - 1];
-        return THRESHOLDS[suffix] || null;
-    }
-
     function buildAnnotations(metricName, yMax) {
-        var th = getThreshold(metricName);
-        if (!th || !showThresholds) return {};
-        var upperBound = Math.max(yMax * 1.1, th.critical * 1.5);
-        return {
-            warningBand: {
-                type: 'box',
-                yMin: th.warning,
-                yMax: th.critical,
-                backgroundColor: 'rgba(255, 193, 7, 0.15)',
-                borderColor: 'rgba(255, 193, 7, 0.4)',
-                borderWidth: 1,
-                label: {
-                    display: true,
-                    content: 'Warning',
-                    position: 'start',
-                    color: '#b58900',
-                    font: { size: 10 }
-                }
-            },
-            criticalBand: {
-                type: 'box',
-                yMin: th.critical,
-                yMax: upperBound,
-                backgroundColor: 'rgba(220, 53, 69, 0.13)',
-                borderColor: 'rgba(220, 53, 69, 0.4)',
-                borderWidth: 1,
-                label: {
-                    display: true,
-                    content: 'Critical',
-                    position: 'start',
-                    color: '#c0392b',
-                    font: { size: 10 }
-                }
-            }
-        };
+        return ChartHelpers.addThresholdAnnotations(metricName, yMax, showThresholds);
     }
 
     /** Build vertical line annotations for incidents matching the active group. */
@@ -246,36 +195,28 @@
     // Mapping: tab -> groups to fetch
     const TAB_GROUPS = {
         sistema: ['host', 'containers'],
-        servicios: ['nginx', 'mysql', 'elastic', 'phpfpm']
+        servicios: ['nginx', 'phpfpm.fe-live', 'phpfpm.fe-archive', 'phpfpm.be-admin', 'mysql.db-live', 'mysql.db-archive', 'elastic', 'wordpress.fe-live', 'wordpress.fe-archive']
     };
     const SERVICE_LABELS = {
-        nginx: 'Nginx', mysql: 'MySQL', elastic: 'Elastic', phpfpm: 'PHP-FPM'
+        'nginx': 'Nginx',
+        'phpfpm.fe-live': 'PHP-FPM: fe-live',
+        'phpfpm.fe-archive': 'PHP-FPM: fe-archive',
+        'phpfpm.be-admin': 'PHP-FPM: be-admin',
+        'mysql.db-live': 'MySQL: db-live',
+        'mysql.db-archive': 'MySQL: db-archive',
+        'elastic': 'Elastic',
+        'wordpress.fe-live': 'WordPress: fe-live',
+        'wordpress.fe-archive': 'WordPress: fe-archive'
     };
 
     function getColor(i) { return COLORS[i % COLORS.length]; }
 
-    function isDarkMode() {
-        return document.documentElement.getAttribute('data-theme') === 'dark';
-    }
-
     function getChartThemeColors() {
-        if (isDarkMode()) {
-            return {
-                gridColor: 'rgba(255,255,255,0.15)',
-                tickColor: '#ccc',
-                titleColor: '#fff'
-            };
-        }
-        return {
-            gridColor: 'rgba(0,0,0,0.1)',
-            tickColor: '#666',
-            titleColor: '#333'
-        };
+        return AdminUtils.getThemeColors();
     }
 
     function destroyCharts() {
-        Object.values(charts).forEach(c => c.destroy());
-        charts = {};
+        ChartHelpers.destroyAllCharts(charts);
     }
 
     function isCounterMetric(name) {
@@ -326,8 +267,7 @@
             }
         } else {
             var svcFilter = document.getElementById('serviciosFilter').value;
-            var labels = {nginx:'Nginx', mysql:'MySQL', elastic:'Elastic', phpfpm:'PHP-FPM'};
-            el.textContent = labels[svcFilter] || svcFilter;
+            el.textContent = SERVICE_LABELS[svcFilter] || svcFilter;
         }
     }
 
@@ -369,7 +309,7 @@
             if (labels.length === 0) return;
 
             const card = document.createElement('div');
-            card.className = 'box metric-card';
+            card.className = 'box metric-card mb-5';
             card.innerHTML = '<h3 class="title is-5">' + chartLabel + '</h3>' +
                 '<div class="chart-container"><canvas id="chart-' + idx + '"></canvas></div>';
             area.appendChild(card);
@@ -487,11 +427,20 @@
             groups = [svcFilter];
         }
 
+        // Determine active group for incident filtering
+        var activeGroup = groups[0] || 'host';
+
         // Fetch all relevant groups in parallel
         var promises = groups.map(function(g) {
             return fetch('/metrics/api/data?range=' + currentRange + '&group=' + g)
                 .then(function(r) { return r.json(); });
         });
+
+        // Fetch incidents for this range
+        var incidentPromise = fetch('/metrics/api/incidents?range=' + currentRange)
+            .then(function(r) { return r.json(); })
+            .then(function(d) { return d.incidents || []; })
+            .catch(function() { return []; });
 
         // Optionally fetch yesterday's data for comparison
         var shouldCompare = compareYesterday && COMPARABLE_RANGES.indexOf(currentRange) !== -1;
@@ -503,10 +452,11 @@
             });
         }
 
-        Promise.all([Promise.all(promises), Promise.all(yesterdayPromises)])
-            .then(function(pair) {
-                var results = pair[0];
-                var yesterdayResults = pair[1];
+        Promise.all([Promise.all(promises), Promise.all(yesterdayPromises), incidentPromise])
+            .then(function(triple) {
+                var results = triple[0];
+                var yesterdayResults = triple[1];
+                var incidents = triple[2];
 
                 // Merge all metrics into one object
                 var allMetrics = {};
@@ -539,7 +489,7 @@
                     }
                 }
 
-                renderCharts(allMetrics, allYesterday);
+                renderCharts(allMetrics, allYesterday, incidents, activeGroup);
             })
             .catch(function(err) {
                 loading.style.display = 'none';
@@ -593,10 +543,10 @@
         var btn = this;
         if (showThresholds) {
             btn.classList.remove('is-outlined');
-            btn.querySelector('span:last-child').textContent = 'Mostrar umbrales';
+            btn.querySelector('span:last-child').textContent = 'Ocultar umbrales';
         } else {
             btn.classList.add('is-outlined');
-            btn.querySelector('span:last-child').textContent = 'Ocultar umbrales';
+            btn.querySelector('span:last-child').textContent = 'Mostrar umbrales';
         }
         fetchMetrics();
     });
@@ -607,11 +557,9 @@
         var btn = this;
         if (compareYesterday) {
             btn.classList.remove('is-outlined');
-            btn.classList.add('is-link');
             btn.querySelector('span:last-child').textContent = 'Comparando con ayer';
         } else {
             btn.classList.add('is-outlined');
-            btn.classList.remove('is-link');
             btn.querySelector('span:last-child').textContent = 'Comparar con ayer';
         }
         fetchMetrics();
@@ -629,7 +577,6 @@
                 compareYesterday = false;
                 var btn = document.getElementById('toggleCompare');
                 btn.classList.add('is-outlined');
-                btn.classList.remove('is-link');
                 btn.querySelector('span:last-child').textContent = 'Comparar con ayer';
             }
         }
