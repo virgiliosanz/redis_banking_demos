@@ -340,9 +340,13 @@
         }, 1000);
     }
 
-    function runWithArgs(command, args) {
+    function setAllButtonsDisabled(disabled) {
         var buttons = document.querySelectorAll('button:not(#cancelExecBtn)');
-        buttons.forEach(function(btn) { btn.disabled = true; });
+        buttons.forEach(function(btn) { btn.disabled = disabled; });
+    }
+
+    function runWithArgs(command, args) {
+        setAllButtonsDisabled(true);
 
         outputContainer.style.display = 'block';
         outputBox.textContent = 'Ejecutando ' + command + '...\n';
@@ -389,7 +393,7 @@
             clearTimeout(timeoutId);
             stopCountdown();
             currentAbortController = null;
-            buttons.forEach(function(btn) { btn.disabled = false; });
+            setAllButtonsDisabled(false);
         });
     }
 
