@@ -432,8 +432,26 @@ _WP_METRICS_SCRIPT = "/opt/project/scripts/internal/wp-metrics.php"
 _WP_PATH = "/srv/wp/site"
 
 
+# Metrics that are point-in-time status indicators (not temporal).
+# These belong in diagnostics only, not in the metrics SQLite store.
+_WP_METRICS_EXCLUDE = frozenset({
+    "plugins_update_available",
+    "themes_update_available",
+    "cron_events_total",
+    "cron_events_overdue",
+    "cron_events_overdue_max_age",
+    "language_updates_available",
+    "core_update_available",
+})
+
+
 def _collect_wordpress(settings: Settings, store: MetricsStore) -> None:
-    """Collect WordPress metrics via wp-metrics.php on cron-master."""
+    """Collect WordPress metrics via wp-metrics.php on cron-master.
+
+    Only temporal metrics (db size, autoload, content counts, errors) are
+    stored.  Point-in-time status indicators (updates, cron) are excluded
+    because they belong in the diagnostics system.
+    """
     cwd = settings.project_root.resolve()
     cron_service = compose_service_name("cron-master")
 
@@ -473,7 +491,8 @@ def _collect_wordpress(settings: Settings, store: MetricsStore) -> None:
 
         metrics = data.get("metrics", {})
         for metric_name, value in metrics.items():
-            _safe_write(store, group, metric_name, value)
+            if metric_name not in _WP_METRICS_EXCLUDE:
+                _safe_write(store, group, metric_name, value)
 
 
 # ------------------------------------------------------------------

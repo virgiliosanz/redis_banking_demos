@@ -403,8 +403,8 @@ class TestCollectWordPress(unittest.TestCase):
         self._tmpdir.cleanup()
 
     @patch("ops.collectors.metrics.compose_exec")
-    def test_live_context_all_metrics(self, mock_exec: MagicMock) -> None:
-        """Live context returns all metrics including cron/content/updates."""
+    def test_live_context_temporal_metrics_only(self, mock_exec: MagicMock) -> None:
+        """Live context stores only temporal metrics; cron/updates are excluded."""
         live_data = {
             "metrics": {
                 "cron_events_total": 42,
@@ -419,6 +419,8 @@ class TestCollectWordPress(unittest.TestCase):
                 "pages_published": 25,
                 "plugins_update_available": 2,
                 "themes_update_available": 1,
+                "language_updates_available": 3,
+                "core_update_available": 1,
                 "php_error_count": 5,
             }
         }
@@ -443,12 +445,21 @@ class TestCollectWordPress(unittest.TestCase):
 
         live_rows = self.store.query("wordpress.fe-live", 60)
         live_metrics = {name: val for _, name, val in live_rows}
-        self.assertAlmostEqual(live_metrics["cron_events_total"], 42)
+        # Temporal metrics are stored
         self.assertAlmostEqual(live_metrics["db_size_mb"], 85.5)
         self.assertAlmostEqual(live_metrics["posts_published"], 1500)
-        self.assertAlmostEqual(live_metrics["plugins_update_available"], 2)
         self.assertAlmostEqual(live_metrics["php_error_count"], 5)
-        self.assertEqual(len(live_metrics), 13)
+        # Point-in-time status indicators are excluded
+        self.assertNotIn("cron_events_total", live_metrics)
+        self.assertNotIn("cron_events_overdue", live_metrics)
+        self.assertNotIn("cron_events_overdue_max_age", live_metrics)
+        self.assertNotIn("plugins_update_available", live_metrics)
+        self.assertNotIn("themes_update_available", live_metrics)
+        self.assertNotIn("language_updates_available", live_metrics)
+        self.assertNotIn("core_update_available", live_metrics)
+        # 8 temporal metrics: db_size_mb, autoload_size_kb, autoload_count,
+        # transients_count, posts_published, posts_draft, pages_published, php_error_count
+        self.assertEqual(len(live_metrics), 8)
 
         archive_rows = self.store.query("wordpress.fe-archive", 60)
         archive_metrics = {name: val for _, name, val in archive_rows}

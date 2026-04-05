@@ -49,6 +49,8 @@ def _transform_metrics(raw: dict[str, object]) -> dict[str, object]:
         result["updates"] = {
             "plugins": metrics.get("plugins_update_available", 0),
             "themes": metrics.get("themes_update_available", 0),
+            "languages": metrics.get("language_updates_available", 0),
+            "core_update_available": bool(metrics.get("core_update_available", 0)),
         }
 
     # Errors section

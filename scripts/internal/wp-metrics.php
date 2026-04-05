@@ -98,6 +98,23 @@ if ($is_live) {
     wp_update_themes();
     $theme_updates = get_theme_updates();
     $metrics['themes_update_available'] = is_array($theme_updates) ? count($theme_updates) : 0;
+
+    // Language (translation) updates
+    $translation_updates = wp_get_translation_updates();
+    $metrics['language_updates_available'] = is_array($translation_updates) ? count($translation_updates) : 0;
+
+    // Core WP version check
+    $core_updates = get_core_updates();
+    $core_update_available = false;
+    if (is_array($core_updates)) {
+        foreach ($core_updates as $update) {
+            if (isset($update->response) && $update->response === 'upgrade') {
+                $core_update_available = true;
+                break;
+            }
+        }
+    }
+    $metrics['core_update_available'] = $core_update_available ? 1 : 0;
 }
 
 // --- PHP errors (both) ---

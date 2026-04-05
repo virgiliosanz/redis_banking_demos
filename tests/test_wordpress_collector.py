@@ -46,6 +46,7 @@ class WordPressCollectorTests(unittest.TestCase):
             "cron_events_total": 10, "cron_events_overdue": 0, "cron_events_overdue_max_age": 0,
             "db_size_mb": 100, "autoload_count": 300, "autoload_size_kb": 500, "transients_count": 50,
             "plugins_update_available": 0, "themes_update_available": 0,
+            "language_updates_available": 2, "core_update_available": 1,
             "php_error_count": 0,
             "posts_published": 500, "posts_draft": 3, "pages_published": 10,
         }}
@@ -62,6 +63,9 @@ class WordPressCollectorTests(unittest.TestCase):
         self.assertIn("archive", result)
         self.assertEqual(result["live"]["cron"]["total"], 10)
         self.assertEqual(result["archive"]["database"]["size_mb"], 200)
+        # New fields
+        self.assertEqual(result["live"]["updates"]["languages"], 2)
+        self.assertTrue(result["live"]["updates"]["core_update_available"])
 
     @mock.patch("ops.collectors.wordpress.compose_exec")
     def test_collect_graceful_fallback_on_failure(self, mock_exec):
@@ -133,7 +137,7 @@ class WordPressDiagnosticsEndpointTests(unittest.TestCase):
             "live": {
                 "cron": {"total": 5, "overdue": 0, "max_overdue_seconds": 0},
                 "database": {"size_mb": 100, "autoload_count": 300, "autoload_size_kb": 500, "transients_count": 50},
-                "updates": {"plugins": 0, "themes": 0},
+                "updates": {"plugins": 0, "themes": 0, "languages": 0, "core_update_available": False},
                 "errors": {"php_error_count": 0},
                 "content": {"posts_published": 100, "posts_draft": 2, "pages_published": 5},
             },

@@ -99,15 +99,19 @@
         {% if ctx_name == 'live' and ctx.get('updates') %}
         {% set upd = ctx.updates %}
         {% set pending = upd.get('plugins', 0) + upd.get('themes', 0) %}
-        {% set upd_status = 'ok' if pending == 0 else ('critical' if pending > 3 else 'warning') %}
+        {% set upd_status = 'ok' if pending == 0 and not upd.get('core_update_available', false) else ('critical' if pending > 3 or upd.get('core_update_available', false) else 'warning') %}
         <div class="column is-half-tablet is-one-third-desktop">
             <div class="box">
                 <div class="level mb-2">
                     <div class="level-left"><strong>Actualizaciones</strong></div>
                     <div class="level-right">{{ semaphore(upd_status) }}</div>
                 </div>
+                {% if upd.get('core_update_available', false) %}
+                <p class="is-size-7 has-text-danger"><span class="icon is-small"><i class="fas fa-arrow-circle-up"></i></span> <strong>Nueva version de WordPress disponible</strong></p>
+                {% endif %}
                 <p class="is-size-7">Plugins pendientes: <strong>{{ upd.get('plugins', 0) }}</strong></p>
                 <p class="is-size-7">Temas pendientes: <strong>{{ upd.get('themes', 0) }}</strong></p>
+                <p class="is-size-7">Traducciones pendientes: <strong>{{ upd.get('languages', 0) }}</strong></p>
             </div>
         </div>
         {% endif %}
