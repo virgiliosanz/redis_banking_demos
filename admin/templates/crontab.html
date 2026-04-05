@@ -70,12 +70,22 @@
 
 <!-- Salida compartida -->
 <div class="box" id="outputContainer" style="display: none;">
-    <h3 class="title is-5">
-        <span class="icon-text">
-            <span class="icon"><i class="fas fa-terminal"></i></span>
-            <span>Salida</span>
-        </span>
-    </h3>
+    <div class="is-flex is-align-items-center is-justify-content-space-between mb-3">
+        <h3 class="title is-5 mb-0">
+            <span class="icon-text">
+                <span class="icon"><i class="fas fa-terminal"></i></span>
+                <span>Salida</span>
+            </span>
+        </h3>
+        <div id="execStatusBar" style="display: none;" class="is-flex is-align-items-center">
+            <span class="icon has-text-warning mr-2"><i class="fas fa-spinner fa-spin"></i></span>
+            <span id="execCountdown" class="has-text-grey mr-3">Ejecutando... (90s)</span>
+            <button class="button is-small is-danger is-outlined" id="cancelExecBtn">
+                <span class="icon"><i class="fas fa-times"></i></span>
+                <span>Cancelar</span>
+            </button>
+        </div>
+    </div>
     <pre class="output-box" id="output"></pre>
 </div>
 
@@ -291,17 +301,65 @@
         runWithArgs(command, args);
     }
 
+    var currentAbortController = null;
+    var countdownInterval = null;
+    var FETCH_TIMEOUT_SECONDS = 90;
+
+    var execStatusBar = document.getElementById('execStatusBar');
+    var execCountdown = document.getElementById('execCountdown');
+    var cancelExecBtn = document.getElementById('cancelExecBtn');
+
+    cancelExecBtn.addEventListener('click', function() {
+        if (currentAbortController) {
+            currentAbortController.abort();
+            currentAbortController = null;
+        }
+    });
+
+    function stopCountdown() {
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+        }
+        execStatusBar.style.display = 'none';
+    }
+
+    function startCountdown(seconds) {
+        var remaining = seconds;
+        execStatusBar.style.display = 'flex';
+        execCountdown.textContent = 'Ejecutando... (' + remaining + 's)';
+        countdownInterval = setInterval(function() {
+            remaining--;
+            if (remaining <= 0) {
+                execCountdown.textContent = 'Esperando respuesta...';
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            } else {
+                execCountdown.textContent = 'Ejecutando... (' + remaining + 's)';
+            }
+        }, 1000);
+    }
+
     function runWithArgs(command, args) {
-        var buttons = document.querySelectorAll('button');
+        var buttons = document.querySelectorAll('button:not(#cancelExecBtn)');
         buttons.forEach(function(btn) { btn.disabled = true; });
 
         outputContainer.style.display = 'block';
         outputBox.textContent = 'Ejecutando ' + command + '...\n';
 
+        currentAbortController = new AbortController();
+        var signal = currentAbortController.signal;
+        var timeoutId = setTimeout(function() {
+            if (currentAbortController) currentAbortController.abort();
+        }, FETCH_TIMEOUT_SECONDS * 1000);
+
+        startCountdown(FETCH_TIMEOUT_SECONDS);
+
         fetch('/api/run', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ args: args, timeout: 60 })
+            body: JSON.stringify({ args: args, timeout: 60 }),
+            signal: signal
         })
         .then(function(response) { return response.json(); })
         .then(function(data) {
@@ -317,9 +375,20 @@
             fetchStatus();
         })
         .catch(function(err) {
-            outputBox.textContent = 'Error de red: ' + err.message;
+            if (err.name === 'AbortError') {
+                var prev = outputBox.textContent;
+                outputBox.textContent = prev +
+                    '\n\n--- TIMEOUT ---\n' +
+                    'Timeout alcanzado (' + FETCH_TIMEOUT_SECONDS + 's): la ejecucion continua en segundo plano.\n' +
+                    'Puedes verificar el resultado en los logs del sistema.';
+            } else {
+                outputBox.textContent = 'Error de red: ' + err.message;
+            }
         })
         .finally(function() {
+            clearTimeout(timeoutId);
+            stopCountdown();
+            currentAbortController = null;
             buttons.forEach(function(btn) { btn.disabled = false; });
         });
     }
