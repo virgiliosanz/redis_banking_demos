@@ -41,17 +41,18 @@ class WordPressCollectorTests(unittest.TestCase):
 
     @mock.patch("ops.collectors.wordpress.compose_exec")
     def test_collect_returns_live_and_archive(self, mock_exec):
-        live = {
-            "cron": {"total": 10, "overdue": 0, "max_overdue_seconds": 0},
-            "database": {"size_mb": 100, "autoload_count": 300, "autoload_size_kb": 500, "transients_count": 50},
-            "updates": {"plugins": 0, "themes": 0},
-            "errors": {"php_error_count": 0},
-            "content": {"posts_published": 500, "posts_draft": 3, "pages_published": 10},
-        }
-        archive = {
-            "database": {"size_mb": 200, "autoload_count": 200, "autoload_size_kb": 400, "transients_count": 30},
-            "errors": {"php_error_count": 0},
-        }
+        # Use the flat format that wp-metrics.php actually outputs
+        live = {"metrics": {
+            "cron_events_total": 10, "cron_events_overdue": 0, "cron_events_overdue_max_age": 0,
+            "db_size_mb": 100, "autoload_count": 300, "autoload_size_kb": 500, "transients_count": 50,
+            "plugins_update_available": 0, "themes_update_available": 0,
+            "php_error_count": 0,
+            "posts_published": 500, "posts_draft": 3, "pages_published": 10,
+        }}
+        archive = {"metrics": {
+            "db_size_mb": 200, "autoload_count": 200, "autoload_size_kb": 400, "transients_count": 30,
+            "php_error_count": 0,
+        }}
         mock_exec.side_effect = self._mock_compose_exec(live, archive)
 
         result = wordpress_collector.collect(_settings())

@@ -221,6 +221,11 @@
     /* Tab click handlers */
     tabItems.forEach(function(li) {
         li.addEventListener('click', function() {
+            /* Hide command output panel when switching tabs */
+            outputSection.style.display = 'none';
+            outputBox.textContent = '';
+            errorBox.style.display = 'none';
+            loadingIndicator.style.display = 'none';
             loadTab(li.getAttribute('data-tab'));
         });
     });

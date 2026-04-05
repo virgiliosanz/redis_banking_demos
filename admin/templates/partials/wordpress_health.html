@@ -145,6 +145,16 @@
         {% endif %}
 
     </div>
+
+    {# Fallback when no section cards rendered (all healthy / no data) #}
+    {% set has_cards = ctx.get('cron') or ctx.get('database') or ctx.get('updates') or ctx.get('errors') or ctx.get('content') %}
+    {% if not has_cards %}
+    <div class="notification is-success is-light">
+        <span class="icon"><i class="fas fa-check-circle"></i></span>
+        <span>Sin datos disponibles para este contexto.</span>
+    </div>
+    {% endif %}
+
     {% endif %}
 </div>
 {% endfor %}
