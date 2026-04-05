@@ -136,7 +136,6 @@ def collect(settings: Settings) -> dict[str, object]:
         "host": {
             "os": host_os,
             "logical_cpus": logical_cpus,
-            "project_path": str(project_path),
         },
         "checks": {
             "docker_daemon": {
