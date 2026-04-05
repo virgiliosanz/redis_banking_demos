@@ -134,7 +134,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
 <script>
 'use strict';
 
@@ -274,17 +274,33 @@ function renderIncidents(incidents) {
     }).join('');
 }
 
-/* ── Row 4: Cron status ────────────────────────────── */
-function renderCronJobs(jobs) {
+/* ── Row 4: Cron status (summary) ─────────────────── */
+function renderCronJobs(jobs, overallStatus) {
     var el = document.getElementById('cron-status');
-    if (!jobs || jobs.length === 0) { setUnavailable(el); return; }
-    el.innerHTML = jobs.map(function(j) {
+    if (!jobs || jobs.length === 0) {
+        el.innerHTML = '<span class="tag is-light is-medium">Sin datos de cron</span>';
+        return;
+    }
+    if (overallStatus === 'ok') {
+        el.innerHTML = '<span class="tag is-success is-medium">\u2713 Todos los cron jobs OK</span>';
+        return;
+    }
+    var problematic = jobs.filter(function(j) { return j.status === 'warning' || j.status === 'critical'; });
+    var hasCritical = problematic.some(function(j) { return j.status === 'critical'; });
+    var tagClass = hasCritical ? 'is-danger' : 'is-warning';
+    var icon = hasCritical ? '\u2717' : '\u26a0';
+    var label = hasCritical
+        ? icon + ' ' + problematic.length + ' cron jobs cr\u00edticos'
+        : icon + ' ' + problematic.length + ' cron jobs con retraso';
+    var html = '<p><span class="tag ' + tagClass + ' is-medium">' + label + '</span></p>';
+    html += problematic.map(function(j) {
         return '<div class="cron-row">' +
             '<span class="svc-dot ' + j.status + '"></span>' +
             '<strong>' + j.label + '</strong>' +
             '<span class="cron-age">(' + formatAge(j.age_minutes) + ')</span>' +
             '</div>';
     }).join('');
+    el.innerHTML = html;
 }
 
 /* ── Secondary cards ──────────────────────────────── */
@@ -341,7 +357,7 @@ function loadHealthSummary() {
             renderServices(data.services);
             renderWordpress(data.wordpress);
             renderIncidents(data.incidents);
-            renderCronJobs(data.cron_jobs);
+            renderCronJobs(data.cron_jobs, data.cron_overall_status);
         })
         .catch(function() {
             setUnavailable(document.getElementById('svc-semaphores'));

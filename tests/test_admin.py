@@ -334,7 +334,7 @@ class TestMetricsPage(unittest.TestCase):
 
     def test_metrics_page_includes_chart_js(self) -> None:
         resp = self.client.get("/metrics/")
-        self.assertIn(b"chart.js", resp.data)
+        self.assertIn(b"chart.umd.min.js", resp.data)
 
     def test_metrics_page_includes_range_selector(self) -> None:
         resp = self.client.get("/metrics/")
@@ -473,6 +473,7 @@ class TestHealthSummaryEndpoint(unittest.TestCase):
         self.assertIn("services", data)
         self.assertIn("incidents", data)
         self.assertIn("cron_jobs", data)
+        self.assertIn("cron_overall_status", data)
 
     def test_services_list_has_expected_entries(self) -> None:
         self.mock_run.return_value = subprocess.CompletedProcess(
@@ -589,6 +590,34 @@ class TestHealthSummaryEndpoint(unittest.TestCase):
             self.assertEqual(metrics_job["status"], "ok")
             nightly_job = next(j for j in data["cron_jobs"] if j["label"] == "nightly")
             self.assertEqual(nightly_job["status"], "warning")
+            self.assertEqual(data["cron_overall_status"], "warning")
+
+    def test_cron_overall_status_ok_when_all_ok(self) -> None:
+        """Overall cron status is ok when all jobs are ok."""
+        with mock.patch("admin.health_bp._collect_cron_health") as mock_fn:
+            mock_fn.return_value = [
+                {"label": "metrics", "job_name": "collect-metrics",
+                 "age_minutes": 2.0, "warning_minutes": 5,
+                 "critical_minutes": 15, "status": "ok"},
+            ]
+            resp = self.client.get("/api/health-summary")
+            data = resp.get_json()
+            self.assertEqual(data["cron_overall_status"], "ok")
+
+    def test_cron_overall_status_critical_when_any_critical(self) -> None:
+        """Overall cron status is critical when any job is critical."""
+        with mock.patch("admin.health_bp._collect_cron_health") as mock_fn:
+            mock_fn.return_value = [
+                {"label": "metrics", "job_name": "collect-metrics",
+                 "age_minutes": 2.0, "warning_minutes": 5,
+                 "critical_minutes": 15, "status": "ok"},
+                {"label": "nightly", "job_name": "nightly-auditor",
+                 "age_minutes": 5000.0, "warning_minutes": 1440,
+                 "critical_minutes": 2880, "status": "critical"},
+            ]
+            resp = self.client.get("/api/health-summary")
+            data = resp.get_json()
+            self.assertEqual(data["cron_overall_status"], "critical")
 
     def test_response_has_wordpress_key(self) -> None:
         """Health summary response includes the wordpress key."""
@@ -808,7 +837,7 @@ class TestCapacityPage(unittest.TestCase):
 
     def test_capacity_page_includes_chart_js(self) -> None:
         resp = self.client.get("/capacity/")
-        self.assertIn(b"chart.js", resp.data)
+        self.assertIn(b"chart.umd.min.js", resp.data)
 
     def test_capacity_navbar_link(self) -> None:
         resp = self.client.get("/capacity/")

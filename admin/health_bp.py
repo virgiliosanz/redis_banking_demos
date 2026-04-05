@@ -227,10 +227,18 @@ def api_health_summary():
     except Exception:
         wordpress = None
 
+    # Compute overall cron status (worst of all jobs)
+    cron_overall = "ok"
+    if cron_jobs:
+        _severity = {"ok": 0, "unknown": 0, "warning": 1, "critical": 2}
+        worst = max(_severity.get(j["status"], 0) for j in cron_jobs)
+        cron_overall = {0: "ok", 1: "warning", 2: "critical"}[worst]
+
     return jsonify({
         "timestamp": timestamp,
         "services": services,
         "incidents": incidents,
         "cron_jobs": cron_jobs,
+        "cron_overall_status": cron_overall,
         "wordpress": wordpress,
     })
