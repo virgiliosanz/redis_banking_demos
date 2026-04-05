@@ -1,32 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Reportes{% endblock %}
 
-{% block extra_head %}
-<style>
-    .report-viewer {
-        background: #1a2e1a;
-        color: #0f0;
-        font-family: 'Courier New', monospace;
-        font-size: 0.85rem;
-        padding: 1rem;
-        border-radius: 6px;
-        max-height: 500px;
-        overflow-y: auto;
-        white-space: pre-wrap;
-        word-break: break-all;
-        margin-top: 0.75rem;
-    }
-    .file-row { cursor: pointer; }
-    .file-row:hover { background: #f5f5f5; }
-    .card { margin-bottom: 1rem; }
-    .card-header { cursor: pointer; }
-    .subtype-section { margin-left: 1.5rem; margin-bottom: 0.5rem; }
-    .subtype-header { cursor: pointer; padding: 0.4rem 0; font-weight: 600; color: #363636; }
-    .subtype-header:hover { color: #3273dc; }
-    .toggle-icon { margin-right: 0.4rem; transition: transform 0.15s; }
-</style>
-{% endblock %}
-
 {% block content %}
 <h1 class="title">
     <span class="icon"><i class="fas fa-folder-open"></i></span>
@@ -88,7 +62,7 @@
             '<thead><tr><th>Archivo</th><th>Fecha</th><th>Tamano</th></tr></thead><tbody>';
         files.forEach(function(f, fi) {
             var vid = idPrefix + '-' + fi;
-            table += '<tr class="file-row" onclick="window.__loadReport(\'' +
+            table += '<tr class="is-clickable" onclick="window.__loadReport(\'' +
                 f.path.replace(/'/g, "\\'") + "','" + vid + "')\">" +
                 '<td><span class="icon"><i class="fas fa-file-alt"></i></span> ' +
                 f.name + '</td><td>' + formatDate(f.modified_timestamp) +
@@ -103,10 +77,10 @@
         container.innerHTML = '';
         categories.forEach(function(cat, ci) {
             var card = document.createElement('div');
-            card.className = 'card';
+            card.className = 'card mb-4';
 
             var header = document.createElement('header');
-            header.className = 'card-header';
+            header.className = 'card-header is-clickable';
             header.innerHTML = '<p class="card-header-title">' +
                 '<span class="icon toggle-icon"><i class="fas fa-chevron-right"></i></span>' +
                 '<span class="icon"><i class="fas fa-folder"></i></span>' +
@@ -120,7 +94,7 @@
 
             cat.subtypes.forEach(function(st, si) {
                 var section = document.createElement('div');
-                section.className = 'subtype-section';
+                section.className = 'subtype-section ml-5 mb-2';
                 var stHeader = document.createElement('div');
                 stHeader.className = 'subtype-header';
                 stHeader.innerHTML = '<span class="icon toggle-icon"><i class="fas fa-chevron-right"></i></span>' +

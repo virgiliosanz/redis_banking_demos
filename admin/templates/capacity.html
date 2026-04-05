@@ -3,11 +3,7 @@
 
 {% block extra_head %}
 <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
-<style>
-    .chart-container { position: relative; height: 280px; width: 100%; }
-    .capacity-card { margin-bottom: 1.5rem; }
-    .projection-tag { font-size: 0.9rem; }
-</style>
+
 {% endblock %}
 
 {% block content %}
@@ -57,7 +53,7 @@
         }
         const current = m.current_value !== null ? m.current_value + ' ' + m.unit : 'N/A';
         col.innerHTML =
-            '<div class="box capacity-card">' +
+            '<div class="box capacity-card mb-5">' +
             '<p class="heading">' + m.label + '</p>' +
             '<p class="title is-4">' + current + '</p>' +
             projection +
@@ -67,7 +63,7 @@
 
     function createChart(m) {
         const section = document.createElement('div');
-        section.className = 'box capacity-card';
+        section.className = 'box capacity-card mb-5';
         section.innerHTML =
             '<p class="subtitle is-5">' + m.label + ' — tendencia 7d</p>' +
             '<div class="chart-container"><canvas id="chart-' + m.key + '"></canvas></div>';
