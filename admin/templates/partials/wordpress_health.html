@@ -31,9 +31,11 @@
 </div>
 
 {% if data.error is defined and data.error %}
-<div class="notification is-danger">
-    <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
-    <span>{{ data.error }}</span>
+<div class="notification is-info is-light">
+    <span class="icon"><i class="fas fa-info-circle"></i></span>
+    <span>WordPress no instalado o no accesible</span>
+    <p class="is-size-7 mt-1">Ejecute el bootstrap para instalar WordPress.</p>
+    <p class="is-size-7 has-text-grey mt-1">{{ data.error }}</p>
 </div>
 {% else %}
 

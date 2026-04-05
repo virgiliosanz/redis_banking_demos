@@ -39,9 +39,10 @@
 </div>
 
 {% if data.error is defined %}
-<div class="notification is-danger">
+<div class="notification is-warning">
     <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
-    <span>Error al recopilar salud de Elasticsearch: {{ data.error }}</span>
+    <span>Elasticsearch no accesible</span>
+    <p class="is-size-7 mt-1 has-text-grey">{{ data.error }}</p>
 </div>
 {% else %}
 
@@ -183,9 +184,10 @@
         </tbody>
     </table>
     {% else %}
-    <div class="notification is-danger is-light">
-        <span class="icon"><i class="fas fa-times-circle"></i></span>
+    <div class="notification is-warning is-light">
+        <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
         <span>Alias <strong>{{ alias.alias_name }}</strong> no encontrado.</span>
+        <p class="is-size-7 mt-1">El alias se crea automaticamente al indexar contenido en Elasticsearch.</p>
     </div>
     {% endif %}
 </div>

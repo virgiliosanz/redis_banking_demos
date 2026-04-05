@@ -127,7 +127,7 @@ class SentryRuntimeTests(unittest.TestCase):
 
     def test_diagnose_sentry_elastic_alias_missing(self) -> None:
         context = _base_context()
-        context["elastic"]["alias"]["status"] = "critical"
+        context["elastic"]["alias"]["status"] = "warning"
         diagnosis = diagnose_sentry_service("elastic", context, container_health="healthy")
         self.assertEqual(diagnosis.severity, "critical")
 

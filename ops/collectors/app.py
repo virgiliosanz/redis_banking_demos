@@ -14,8 +14,11 @@ def _http_check(url: str, *, expected_http_code: int = 200) -> dict[str, object]
         status = "ok"
         reason = ""
     elif http_code == 0:
-        status = "unreachable"
-        reason = "No se pudo conectar al servicio (timeout o conexion rechazada)"
+        status = "warning"
+        reason = "Servicio no accesible"
+    elif http_code == 404:
+        status = "warning"
+        reason = "Endpoint no configurado (HTTP 404)"
     else:
         status = "critical"
         reason = f"Esperado HTTP {expected_http_code}, recibido {http_code}"

@@ -77,7 +77,18 @@
 
     function showError(message) {
         loadingIndicator.style.display = 'none';
-        errorBox.textContent = message;
+        /* Detect WordPress not installed errors and show a friendlier message */
+        var wpPatterns = ['wp-metrics', 'WordPress', 'wp eval-file', 'wp-cli', 'wp --allow-root', 'No WordPress', 'wp: not found'];
+        var isWpError = wpPatterns.some(function(p) { return message.indexOf(p) !== -1; });
+        if (isWpError) {
+            errorBox.className = 'notification is-info is-light';
+            errorBox.innerHTML = '<span class="icon"><i class="fas fa-info-circle"></i></span> ' +
+                '<strong>Requiere WordPress instalado</strong>' +
+                '<p class="is-size-7 mt-1">Ejecute el bootstrap para instalar WordPress antes de ejecutar este comando.</p>';
+        } else {
+            errorBox.className = 'notification is-danger';
+            errorBox.textContent = message;
+        }
         errorBox.style.display = 'block';
     }
 

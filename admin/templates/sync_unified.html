@@ -250,6 +250,23 @@ function executeSection(form) {
         outputPre.textContent = prefix + output + suffix;
         outputPre.scrollTop = outputPre.scrollHeight;
 
+        /* Detect WordPress not installed and show friendly message */
+        if (!data.success) {
+            var wpPatterns = ['wp-metrics', 'WordPress', 'wp eval-file', 'wp-cli', 'wp --allow-root', 'No WordPress', 'wp: not found'];
+            var fullOutput = (data.stdout || '') + (data.stderr || '');
+            var isWpError = wpPatterns.some(function(p) { return fullOutput.indexOf(p) !== -1; });
+            if (isWpError) {
+                var existingNotice = box.querySelector('.wp-notice');
+                if (existingNotice) existingNotice.remove();
+                var notice = document.createElement('div');
+                notice.className = 'notification is-info is-light mt-3 wp-notice';
+                notice.innerHTML = '<span class="icon"><i class="fas fa-info-circle"></i></span> ' +
+                    '<strong>WordPress no instalado</strong> — la sincronización requiere ambas instancias activas.' +
+                    '<p class="is-size-7 mt-1">Ejecute el bootstrap para instalar WordPress.</p>';
+                outputContainer.appendChild(notice);
+            }
+        }
+
         /* Report auto-display per section */
         if (data.success) {
             var reportPath = AdminReports.detectReportPath(data.stdout);

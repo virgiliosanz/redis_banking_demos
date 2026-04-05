@@ -1,7 +1,7 @@
 {% macro check_icon(status) %}
 {%- if status == 'ok' -%}
 <span class="icon has-text-success"><i class="fas fa-check-circle"></i></span>
-{%- elif status == 'unreachable' -%}
+{%- elif status == 'warning' or status == 'unreachable' -%}
 <span class="icon has-text-warning"><i class="fas fa-exclamation-triangle"></i></span>
 {%- else -%}
 <span class="icon has-text-danger"><i class="fas fa-times-circle"></i></span>
@@ -11,8 +11,8 @@
 {% macro http_tag(status) %}
 {%- if status == 'ok' -%}
 <span class="tag is-success">OK</span>
-{%- elif status == 'unreachable' -%}
-<span class="tag is-warning">No responde</span>
+{%- elif status == 'warning' or status == 'unreachable' -%}
+<span class="tag is-warning">Aviso</span>
 {%- else -%}
 <span class="tag is-danger">Critico</span>
 {%- endif -%}
@@ -66,8 +66,8 @@
                         <a href="{{ chk.url | default('#') }}" target="_blank" class="has-text-link-light is-size-7">{{ chk.url | default('') }}</a>
                     </p>
                     <div class="mt-2">
-                        {% if chk.status == 'unreachable' %}
-                        <span class="tag is-warning">No responde</span>
+                        {% if chk.status == 'warning' or chk.status == 'unreachable' %}
+                        <span class="tag is-warning">{{ chk.reason }}</span>
                         {% elif chk.http_code == chk.expected_http_code %}
                         <span class="tag is-success">HTTP {{ chk.http_code }}</span>
                         {% else %}
@@ -77,14 +77,10 @@
                         </span>
                         {% endif %}
                     </div>
-                    {% if chk.reason %}
-                    <p class="help {% if chk.status == 'unreachable' %}has-text-warning{% else %}has-text-danger{% endif %} mt-1">
+                    {% if chk.reason and chk.status not in ('warning', 'unreachable') %}
+                    <p class="help has-text-danger mt-1">
                         <span class="icon is-small">
-                            {% if chk.status == 'unreachable' %}
-                            <i class="fas fa-exclamation-triangle"></i>
-                            {% else %}
                             <i class="fas fa-times-circle"></i>
-                            {% endif %}
                         </span>
                         {{ chk.reason }}
                     </p>

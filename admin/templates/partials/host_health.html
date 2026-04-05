@@ -42,7 +42,11 @@
         <div class="level-item has-text-centered">
             <div>
                 <p class="heading">Proyecto</p>
+                {% if data.host.project_path %}
                 <p class="title is-6" style="font-size:0.75rem;">{{ data.host.project_path }}</p>
+                {% else %}
+                <p class="title is-6 has-text-grey" style="font-size:0.75rem;">No configurado</p>
+                {% endif %}
             </div>
         </div>
         <div class="level-item has-text-centered">

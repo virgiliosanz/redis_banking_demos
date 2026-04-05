@@ -26,7 +26,7 @@ class AppCollectorTests(unittest.TestCase):
         self.assertEqual(payload["checks"]["smoke_scripts"][0]["script"], "./scripts/smoke-routing.sh")
         self.assertNotIn("error_detail", payload["checks"]["smoke_scripts"][0])
 
-    def test_http_check_unreachable_returns_unreachable_status(self) -> None:
+    def test_http_check_unreachable_returns_warning_status(self) -> None:
         with mock.patch("ops.collectors.app.get_status_code", side_effect=[0, 0, 0]), mock.patch(
             "ops.collectors.app.run_command"
         ) as run_command:
@@ -34,11 +34,11 @@ class AppCollectorTests(unittest.TestCase):
             payload = app_collector.collect(self._settings())
 
         chk = payload["checks"]["live_login"]
-        self.assertEqual(chk["status"], "unreachable")
+        self.assertEqual(chk["status"], "warning")
         self.assertEqual(chk["http_code"], 0)
-        self.assertIn("conectar", chk["reason"])
+        self.assertIn("no accesible", chk["reason"].lower())
 
-    def test_http_check_wrong_code_returns_critical(self) -> None:
+    def test_http_check_404_returns_warning(self) -> None:
         with mock.patch("ops.collectors.app.get_status_code", side_effect=[404, 200, 200]), mock.patch(
             "ops.collectors.app.run_command"
         ) as run_command:
@@ -46,8 +46,19 @@ class AppCollectorTests(unittest.TestCase):
             payload = app_collector.collect(self._settings())
 
         chk = payload["checks"]["live_login"]
+        self.assertEqual(chk["status"], "warning")
+        self.assertIn("no configurado", chk["reason"].lower())
+
+    def test_http_check_wrong_code_returns_critical(self) -> None:
+        with mock.patch("ops.collectors.app.get_status_code", side_effect=[500, 200, 200]), mock.patch(
+            "ops.collectors.app.run_command"
+        ) as run_command:
+            run_command.return_value.returncode = 0
+            payload = app_collector.collect(self._settings())
+
+        chk = payload["checks"]["live_login"]
         self.assertEqual(chk["status"], "critical")
-        self.assertIn("404", chk["reason"])
+        self.assertIn("500", chk["reason"])
 
     def test_smoke_failure_includes_error_detail(self) -> None:
         with mock.patch("ops.collectors.app.get_status_code", side_effect=[200, 200, 200]), mock.patch(

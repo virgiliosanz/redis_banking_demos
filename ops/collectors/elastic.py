@@ -52,6 +52,6 @@ def collect(settings: Settings) -> dict[str, object]:
             "present": alias_present,
             "rows": alias_rows,
             "source": f"/_cat/aliases/{alias_name}?format=json",
-            "status": "ok" if alias_present else "critical",
+            "status": "ok" if alias_present else "warning",
         },
     }
