@@ -1,0 +1,150 @@
+{# Semaphore macro: ok/warning/critical #}
+{% macro semaphore(status) %}
+{%- if status == 'ok' -%}
+<span class="tag is-success"><span class="icon is-small"><i class="fas fa-check-circle"></i></span>&nbsp;OK</span>
+{%- elif status == 'warning' -%}
+<span class="tag is-warning"><span class="icon is-small"><i class="fas fa-exclamation-triangle"></i></span>&nbsp;Aviso</span>
+{%- else -%}
+<span class="tag is-danger"><span class="icon is-small"><i class="fas fa-times-circle"></i></span>&nbsp;Critico</span>
+{%- endif -%}
+{% endmacro %}
+
+<div class="level mb-2">
+    <div class="level-left">
+        <div class="level-item">
+            <h2 class="title is-4 mb-0">
+                <span class="icon-text">
+                    <span class="icon"><i class="fab fa-wordpress"></i></span>
+                    <span>Salud de WordPress</span>
+                </span>
+            </h2>
+        </div>
+    </div>
+    <div class="level-right">
+        <div class="level-item">
+            <span class="has-text-grey-light is-size-7">
+                <span class="icon is-small"><i class="fas fa-clock"></i></span>
+                Actualizado: <span class="epoch-ago" data-epoch="{{ timestamp }}">{{ timestamp }}</span>
+            </span>
+        </div>
+    </div>
+</div>
+
+{% if data.error is defined and data.error %}
+<div class="notification is-danger">
+    <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+    <span>{{ data.error }}</span>
+</div>
+{% else %}
+
+{% for ctx_name, ctx_label in [('live', 'Live'), ('archive', 'Archive')] %}
+{% set ctx = data.get(ctx_name, {}) %}
+<div class="box mb-5">
+    <h3 class="title is-5 mb-3">
+        <span class="icon-text">
+            <span class="icon"><i class="fas fa-{% if ctx_name == 'live' %}broadcast-tower{% else %}archive{% endif %}"></i></span>
+            <span>{{ ctx_label }}</span>
+        </span>
+    </h3>
+
+    {% if ctx.get('error') %}
+    <div class="notification is-warning is-light">
+        <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+        <span>{{ ctx.error }}</span>
+    </div>
+    {% else %}
+
+    <div class="columns is-multiline">
+
+        {# --- WP-Cron (live only) --- #}
+        {% if ctx_name == 'live' and ctx.get('cron') %}
+        {% set cron = ctx.cron %}
+        {% set overdue = cron.get('overdue', 0) %}
+        {% set max_ov = cron.get('max_overdue_seconds', 0) %}
+        {% set cron_status = 'ok' if overdue == 0 else ('critical' if overdue > 5 or max_ov > 3600 else 'warning') %}
+        <div class="column is-half-tablet is-one-third-desktop">
+            <div class="box">
+                <div class="level mb-2">
+                    <div class="level-left"><strong>WP-Cron</strong></div>
+                    <div class="level-right">{{ semaphore(cron_status) }}</div>
+                </div>
+                <p class="is-size-7">Total eventos: <strong>{{ cron.get('total', '—') }}</strong></p>
+                <p class="is-size-7">Atrasados: <strong>{{ overdue }}</strong></p>
+                <p class="is-size-7">Mayor atraso: <strong><script>document.write(TimeAgo.humanizeDuration({{ max_ov }}))</script></strong></p>
+            </div>
+        </div>
+        {% endif %}
+
+        {# --- Base de datos (both) --- #}
+        {% if ctx.get('database') %}
+        {% set db = ctx.database %}
+        {% set ac = db.get('autoload_count', 0) %}
+        {% set db_status = 'ok' if ac < 500 else ('critical' if ac > 1000 else 'warning') %}
+        <div class="column is-half-tablet is-one-third-desktop">
+            <div class="box">
+                <div class="level mb-2">
+                    <div class="level-left"><strong>Base de datos</strong></div>
+                    <div class="level-right">{{ semaphore(db_status) }}</div>
+                </div>
+                <p class="is-size-7">Tamano: <strong>{{ db.get('size_mb', '—') }} MB</strong></p>
+                <p class="is-size-7">Autoload: <strong>{{ ac }}</strong> ({{ db.get('autoload_size_kb', '—') }} KB)</p>
+                <p class="is-size-7">Transients: <strong>{{ db.get('transients_count', '—') }}</strong></p>
+            </div>
+        </div>
+        {% endif %}
+
+        {# --- Actualizaciones (live only) --- #}
+        {% if ctx_name == 'live' and ctx.get('updates') %}
+        {% set upd = ctx.updates %}
+        {% set pending = upd.get('plugins', 0) + upd.get('themes', 0) %}
+        {% set upd_status = 'ok' if pending == 0 else ('critical' if pending > 3 else 'warning') %}
+        <div class="column is-half-tablet is-one-third-desktop">
+            <div class="box">
+                <div class="level mb-2">
+                    <div class="level-left"><strong>Actualizaciones</strong></div>
+                    <div class="level-right">{{ semaphore(upd_status) }}</div>
+                </div>
+                <p class="is-size-7">Plugins pendientes: <strong>{{ upd.get('plugins', 0) }}</strong></p>
+                <p class="is-size-7">Temas pendientes: <strong>{{ upd.get('themes', 0) }}</strong></p>
+            </div>
+        </div>
+        {% endif %}
+
+        {# --- Errores PHP (both) --- #}
+        {% if ctx.get('errors') %}
+        {% set errs = ctx.errors %}
+        {% set ec = errs.get('php_error_count', 0) %}
+        {% set err_status = 'ok' if ec == 0 else ('critical' if ec > 10 else 'warning') %}
+        <div class="column is-half-tablet is-one-third-desktop">
+            <div class="box">
+                <div class="level mb-2">
+                    <div class="level-left"><strong>Errores PHP</strong></div>
+                    <div class="level-right">{{ semaphore(err_status) }}</div>
+                </div>
+                <p class="is-size-7">Errores recientes: <strong>{{ ec }}</strong></p>
+            </div>
+        </div>
+        {% endif %}
+
+        {# --- Contenido (live only, informative) --- #}
+        {% if ctx_name == 'live' and ctx.get('content') %}
+        {% set cnt = ctx.content %}
+        <div class="column is-half-tablet is-one-third-desktop">
+            <div class="box">
+                <div class="level mb-2">
+                    <div class="level-left"><strong>Contenido</strong></div>
+                    <div class="level-right"><span class="tag is-info is-light">Info</span></div>
+                </div>
+                <p class="is-size-7">Posts publicados: <strong>{{ cnt.get('posts_published', '—') }}</strong></p>
+                <p class="is-size-7">Borradores: <strong>{{ cnt.get('posts_draft', '—') }}</strong></p>
+                <p class="is-size-7">Paginas: <strong>{{ cnt.get('pages_published', '—') }}</strong></p>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
+
+{% endif %}

@@ -21,6 +21,7 @@ from ops.collectors import cron as cron_collector
 from ops.collectors import host as host_collector
 from ops.collectors import mysql as mysql_collector
 from ops.collectors import runtime as runtime_collector
+from ops.collectors import wordpress as wordpress_collector
 
 from .report_parser import parse_nightly_findings, parse_crontab_lines
 
@@ -366,3 +367,21 @@ def runtime_health():
         error=None,
         timestamp=_now_stamp(),
     )
+
+
+
+@bp.route("/wordpress")
+def wordpress_health():
+    """WordPress internal health: WP-Cron, database, updates, errors, content."""
+    try:
+        settings = _get_settings()
+        data = wordpress_collector.collect(settings)
+    except Exception as exc:
+        logger.exception("wordpress collector failed")
+        if _wants_json():
+            return jsonify({"error": str(exc)}), 500
+        data = {"error": str(exc)}
+
+    if _wants_json():
+        return jsonify(data)
+    return _render("partials/wordpress_health.html", data)
