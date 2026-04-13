@@ -139,9 +139,9 @@ public class AssistantService {
         dropIndex(KB_INDEX);
 
         createVectorIndex(MEMORY_INDEX, MEMORY_PREFIX,
-                "summary TEXT tags TAG SEPARATOR \",\" date TEXT");
+                "summary TEXT tags TAG SEPARATOR , date TEXT");
         createVectorIndex(KB_INDEX, KB_PREFIX,
-                "title TEXT content TEXT tags TAG SEPARATOR \",\"");
+                "title TEXT content TEXT tags TAG SEPARATOR ,");
     }
 
     private void dropIndex(String indexName) {
