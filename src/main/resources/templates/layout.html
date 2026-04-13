@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      data-theme="light">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title layout:title-pattern="$CONTENT_TITLE — Redis Banking Workshop">Redis Banking Workshop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+    <link th:href="@{/css/redis-brand.css}" rel="stylesheet"/>
+    <link th:href="@{/vendor/prism/prism.css}" rel="stylesheet"/>
+</head>
+<body>
+    <nav class="top-nav">
+        <div class="nav-container">
+            <a th:href="@{/}" class="nav-brand">
+                <span class="nav-logo">⬡</span>
+                <span class="nav-title">Redis Banking Workshop</span>
+            </a>
+            <div class="nav-links">
+                <a th:href="@{/usecase/1}" class="nav-link" data-uc="1">UC1: Session</a>
+                <a th:href="@{/usecase/2}" class="nav-link" data-uc="2">UC2: Rate Limit</a>
+                <a th:href="@{/usecase/3}" class="nav-link" data-uc="3">UC3: Dedup</a>
+                <a th:href="@{/usecase/4}" class="nav-link" data-uc="4">UC4: Fraud</a>
+                <a th:href="@{/usecase/5}" class="nav-link" data-uc="5">UC5: Features</a>
+                <a th:href="@{/usecase/6}" class="nav-link" data-uc="6">UC6: Search</a>
+                <a th:href="@{/usecase/7}" class="nav-link" data-uc="7">UC7: AI</a>
+            </div>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
+                <span class="theme-icon-light">☀️</span>
+                <span class="theme-icon-dark">🌙</span>
+            </button>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div layout:fragment="content"></div>
+    </main>
+
+    <footer class="site-footer">
+        <div class="footer-container">
+            <p>Redis Banking Workshop Demo &mdash; Built with Spring Boot 3.x &amp; Redis Stack</p>
+        </div>
+    </footer>
+
+    <script th:src="@{/vendor/prism/prism.js}"></script>
+    <script th:src="@{/vendor/prism/prism-java.js}"></script>
+    <script th:src="@{/vendor/prism/prism-bash.js}"></script>
+    <script th:src="@{/vendor/prism/prism-json.js}"></script>
+    <script th:src="@{/js/main.js}"></script>
+    <div layout:fragment="scripts"></div>
+</body>
+</html>

@@ -9,3 +9,30 @@ __pycache__/
 .secrets/*
 !.secrets/README.md
 !.secrets/*.example
+
+
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# IDE (Java)
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# Maven wrapper JAR (downloaded at build time)
+.mvn/wrapper/maven-wrapper.jar
+
+# Spring Boot
+hs_err_pid*
+
+# Redis data
+dump.rdb
+appendonly.aof

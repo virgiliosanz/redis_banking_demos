@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Home</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <section class="hero">
+            <h1>Redis Banking Workshop</h1>
+            <p class="hero-subtitle">7 real-world Redis use cases for modern banking applications</p>
+        </section>
+
+        <section class="use-case-grid">
+            <a th:each="uc : ${useCases}"
+               th:href="@{'/usecase/' + ${uc.id}}"
+               class="use-case-card">
+                <div class="card-header">
+                    <span class="card-icon" th:text="${uc.icon}"></span>
+                    <span class="card-number" th:text="'UC' + ${uc.id}"></span>
+                </div>
+                <h2 class="card-title" th:text="${uc.title}"></h2>
+                <p class="card-description" th:text="${uc.description}"></p>
+                <div class="card-features">
+                    <span class="card-feature-badge" th:text="${uc.features}"></span>
+                </div>
+            </a>
+        </section>
+
+        <section class="narrative-flow">
+            <h2>Workshop Narrative Flow</h2>
+            <div class="flow-steps">
+                <div class="flow-step"><span class="step-num">1</span> Authenticate <span class="flow-arrow">→</span></div>
+                <div class="flow-step"><span class="step-num">2</span> Rate Limit <span class="flow-arrow">→</span></div>
+                <div class="flow-step"><span class="step-num">3</span> Deduplicate <span class="flow-arrow">→</span></div>
+                <div class="flow-step"><span class="step-num">4</span> Detect Fraud <span class="flow-arrow">→</span></div>
+                <div class="flow-step"><span class="step-num">5</span> Score Risk <span class="flow-arrow">→</span></div>
+                <div class="flow-step"><span class="step-num">6</span> Search Docs <span class="flow-arrow">→</span></div>
+                <div class="flow-step"><span class="step-num">7</span> Ask AI</div>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

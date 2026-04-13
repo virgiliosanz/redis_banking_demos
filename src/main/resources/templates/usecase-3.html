@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${useCaseTitle}">Transaction Deduplication</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">UC3</span>
+            <h1 th:text="${useCaseTitle}">Transaction Deduplication</h1>
+        </div>
+
+        <div class="usecase-panels">
+            <section class="panel demo-panel">
+                <h2>Live Demo</h2>
+                <div id="demo-container" class="demo-container">
+                    <p class="placeholder-text">Demo coming soon — submit transactions and see deduplication in action.</p>
+                </div>
+            </section>
+
+            <section class="panel code-panel">
+                <h2>Code Showcase</h2>
+                <div class="code-container">
+                    <pre><code class="language-java">// Transaction Deduplication with Set/Bloom Filter + Hash + TTL
+// Code snippets will be added here</code></pre>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div layout:fragment="scripts">
+        <script th:src="@{/js/usecase-3.js}"></script>
+    </div>
+</body>
+</html>

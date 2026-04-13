@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${useCaseTitle}">Session Management</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">UC1</span>
+            <h1 th:text="${useCaseTitle}">Session Management + Auth Token</h1>
+        </div>
+
+        <div class="usecase-panels">
+            <section class="panel demo-panel">
+                <h2>Live Demo</h2>
+                <div id="demo-container" class="demo-container">
+                    <p class="placeholder-text">Demo coming soon — authenticate a user and manage their session with Redis.</p>
+                </div>
+            </section>
+
+            <section class="panel code-panel">
+                <h2>Code Showcase</h2>
+                <div class="code-container">
+                    <pre><code class="language-java">// Session Management with Redis Hash + TTL
+// Code snippets will be added here</code></pre>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div layout:fragment="scripts">
+        <script th:src="@{/js/usecase-1.js}"></script>
+    </div>
+</body>
+</html>
