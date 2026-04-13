@@ -88,7 +88,7 @@ Para Java/Spring Boot: seguir convenciones de Spring Boot 3.x y Spring Data Redi
 La salida minima esperada para cualquier cambio es:
 - `docker compose up -d` → Redis Stack healthy
 - `./mvnw compile` → sin errores de compilacion
-- `./mvnw spring-boot:run` → aplicacion arranca en puerto 8080
+- `./mvnw test` → tests pasando
 - Cada pagina de caso de uso carga con panel de demo y panel de code showcase
 - Cada endpoint REST responde correctamente
 - La UI sigue las guias de marca Redis (verificacion visual de colores, fuentes, espaciado)
