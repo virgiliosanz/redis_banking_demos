@@ -1,0 +1,19 @@
+services:
+  redis:
+    image: redis/redis-stack:7.4.2-v3
+    container_name: redis-workshop
+    ports:
+      - "6379:6379"
+      - "8001:8001"   # RedisInsight
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  redis-data:

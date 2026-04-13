@@ -14,126 +14,110 @@ Precedencia:
 - este fichero gobierna el modo normal de trabajo dentro del repositorio
 
 ## 2. Proposito del repositorio
-Este repositorio evoluciona una plataforma WordPress orientada a alto trafico, con especial foco en:
-- arquitectura reproducible
-- operacion y observabilidad
-- seguridad
-- rendimiento
-- capa IA-Ops operativa con diagnostico reactivo (Sentry Agent), auditoria programada (Nightly Auditor) y watch reactivo con cooldown por incidente
+Este repositorio contiene el **Redis Banking Workshop Demo**: una aplicacion Spring Boot 3.x + Vanilla JS que presenta 7 casos de uso interactivos de Redis para un workshop dirigido a clientes del sector bancario.
 
-## 3. Skill obligatorio
-Para cualquier tarea relacionada con infraestructura, Docker, Docker Compose, CI/CD, hardening, despliegue, observabilidad, operacion, runtime, redes, secretos, backups, cache, Nginx, PHP-FPM, MySQL, Elasticsearch, Cloudflare o automatizacion de plataforma, se debe usar siempre el skill `devops-engineer`.
+Cada caso de uso tiene:
+- un **panel de demo en vivo** donde el usuario interactua y ve resultados en tiempo real
+- un **panel de code showcase** con snippets curados de Redis (Java + Redis CLI) con syntax highlighting
+
+Foco principal:
+- claridad y impacto visual para audiencia tecnica (arquitectos, desarrolladores)
+- buenas practicas de Redis en cada caso de uso
+- experiencia de desarrollador fluida (arranque rapido, codigo legible)
+
+## 3. Skills obligatorios
+Para cualquier tarea relacionada con Redis (estructuras de datos, Redis Query Engine, busqueda vectorial, patrones de caching, modelado de datos), se debe usar siempre el skill `redis-development`.
+
+Para cualquier tarea relacionada con frontend o UI (colores, tipografia, componentes, dark mode, layout), se debe usar siempre el skill `redis-brand-ui`.
 
 Esto aplica tanto a:
 - implementacion
 - revisiones
-- propuestas de arquitectura
-- runbooks
-- validacion operativa
-- respuesta a incidencias
+- propuestas de diseno
+- validacion visual
 
-Si una tarea mezcla aplicacion e infraestructura, el skill `devops-engineer` sigue siendo obligatorio en la parte de plataforma.
+Si una tarea mezcla backend y frontend, ambos skills aplican en sus respectivas areas.
 
-## 4. Roles operativos previstos
-- **Sentry Agent (reactivo):** analiza anomalias disparadas por logs, checks o eventos operativos. Diagnostica por servicio con dispatch table extensible.
-- **Nightly Auditor (proactivo):** resume salud, capacidad, crecimiento y riesgos operativos en una ejecucion programada.
-- **Watch reactivo:** evaluador Python ejecutado por `cron` cada 5 minutos. Detecta incidentes, aplica cooldown y deduplicacion antes de lanzar el Sentry Agent. Estado persistido en JSON.
+Para Java/Spring Boot: seguir convenciones de Spring Boot 3.x y Spring Data Redis con Lettuce.
 
-Estos roles estan implementados en `ops/runtime/`. No autorizan por si mismos acciones destructivas.
+## 4. Principios de trabajo
+- **Demo-first:** priorizar claridad y impacto visual sobre patrones de produccion. Esto es un workshop, no un sistema productivo.
+- Cada caso de uso debe ser autocontenido y demostrable de forma independiente.
+- Los snippets del code showcase deben ser pedagogicos: claros, bien comentados, mostrando comandos Redis de forma explicita.
+- Favorecer simplicidad. Si hay dos formas de hacer algo, elegir la mas facil de entender en una presentacion en vivo.
+- Todas las interacciones con Redis deben seguir las buenas practicas del skill `redis-development` (naming de keys, TTL, connection pooling, etc.).
+- El frontend debe seguir estrictamente las guias del skill `redis-brand-ui` (colores, tipografia, espaciado, componentes).
 
-## 5. Principios de trabajo
-- Pensar como ingeniero DevOps senior: IaC, reproducibilidad, rollback y validacion antes de dar por bueno un cambio.
-- Priorizar seguridad y rendimiento aunque implique corregir al usuario si una decision tecnica es floja.
-- Favorecer soluciones idempotentes y traducibles a automatizacion real, idealmente Ansible, Compose, Terraform o equivalente.
-- No asumir que una arquitectura esta bien porque "funciona en local"; hay que dejar claros limites y huecos hacia produccion.
-- Toda recomendacion relevante debe incluir impacto operativo y via de rollback.
-
-## 6. Normas de seguridad
+## 5. Normas de seguridad
+- **Sin credenciales reales en el repo.** Usar datos mock/demo exclusivamente.
+- **Sin PII real en datos de ejemplo.** Todos los datos bancarios son ficticios.
+- **Docker Compose solo para desarrollo local.** No hay despliegue a produccion.
 - **Human-in-the-loop:** no ejecutar acciones destructivas o irreversibles sin confirmacion explicita del usuario.
-- **Por defecto, solo lectura:** en diagnostico e investigacion, empezar siempre por lectura, inspeccion y validacion.
-- **Secretos fuera del repo:** no versionar secretos reales ni copiarlos a codigo o CI/CD variables si existe una alternativa mejor.
-- **Privacidad:** antes de enviar contexto a APIs externas, filtrar emails e IPs publicas completas; las IPs privadas pueden mantenerse si son utiles para diagnostico.
-- **Origen y edge:** no asumir que Cloudflare sustituye el hardening del origen; documentar siempre los controles que viven en edge y los que deben quedar en origen.
 
-## 7. Reglas de rendimiento y coste
-- No enviar logs completos a modelos externos.
-- Limitar el contexto de logs con filtros y ventanas acotadas, por ejemplo `tail -n 500` y palabras clave como `CRITICAL`, `ERROR` o `FATAL`.
-- Priorizar el analisis de slow queries, I/O wait, cache miss, colas y cuellos de botella de red o disco.
-- Cuando haya varias alternativas tecnicas, preferir la mas simple que mantenga buen aislamiento operativo.
+## 6. Convenciones Java/Spring Boot
+- Paquete base: `com.redis.workshop`
+  - `controller/` — REST controllers, uno por caso de uso
+  - `service/` — Logica de negocio + operaciones Redis, uno por caso de uso
+  - `config/` — Configuracion de Redis, data loaders
+  - `model/` — DTOs y objetos de dominio
+- Naming: `{UseCase}Controller.java`, `{UseCase}Service.java`
+- Usar Spring Data Redis con Lettuce (no Jedis)
+- Usar `StringRedisTemplate` o `RedisTemplate<String, String>` para visibilidad explicita de comandos Redis
+- Preferir comandos Redis explicitos sobre abstracciones de Spring cuando haga la demo mas clara
+- Convencion de keys: `workshop:{usecase}:{entity}:{id}` (ejemplo: `workshop:session:user:1001`)
 
-## 8. Reglas DevOps obligatorias
-- Trabajar siempre como infraestructura declarativa o reproducible; evitar cambios manuales no documentados.
-- Implementar o mantener healthchecks y smoke tests cuando se toque runtime o routing.
-- Documentar rollback cuando se cambie arquitectura, mounts, networking, persistencia o componentes criticos.
-- No usar `latest` en imagenes o dependencias criticas de runtime.
-- No bajar el liston de seguridad por conveniencia local si existe una opcion razonable mejor.
-- No considerar cerrada una fase sin validacion tecnica real.
-- Ejecutar `./scripts/check-quality.sh` antes de cerrar cualquier cambio; el script cubre tests unitarios, sintaxis Python/shell/PHP y validacion de `compose.yaml`.
+## 7. Convenciones frontend
+- Templates Thymeleaf para server-side rendering con layout compartido
+- Todo el comportamiento dinamico en vanilla JS — sin jQuery, sin React, sin frameworks
+- Un fichero JS por caso de uso: `static/js/usecase-N.js`
+- Utilidades compartidas: `static/js/main.js`
+- CSS: `static/css/redis-brand.css` con todos los tokens de marca
+- Syntax highlighting: Prism.js (fichero vendor local, no CDN)
+- Dark mode toggle usando CSS custom properties y atributo `data-theme`
+- Todo el espaciado en multiplos de 8px, todo el border-radius en 5px
+- Nunca usar negro puro (`#000`) — usar `#091A23`
+- Nunca usar rojos genericos — siempre `#FF4438` (Redis Red)
 
-## 9. Marco de trabajo para cambios y proyectos
-- Los cambios se discuten primero con el usuario y se proponen opciones cuando haya decisiones de arquitectura.
-- Una vez acordada una linea de trabajo, se crea un fichero `tasks/proyecto-[titulo].md`.
-- Cada fase debe dejar:
-  - cambios implementados
-  - validacion ejecutada
-  - decisiones tomadas
-  - lecciones aprendidas
-- Al cierre de cada fase se hace un commit en el repositorio y se actualiza el fichero del proyecto.
-- Al cierre del proyecto se hace:
-  - commit final
-  - tag con `[titulo-proyecto]`
-  - actualizacion de la documentacion en `docs/` basandose en lo implementado y en las notas del proyecto
-- Cuando un proyecto quede cerrado, su fichero pasa a `tasks/archive/`.
+## 8. Datos de demo
+- Todos los datos de ejemplo son mock/ficticios con tematica bancaria.
+- Los datos se cargan al arrancar la aplicacion via `@PostConstruct` o `ApplicationRunner`.
+- Los vectores pre-computados se almacenan como arrays de floats en las clases data loader (no se necesita modelo de embeddings en vivo).
+- Documentos de regulacion: extractos ficticios de MiFID II, PSD2, GDPR (resumenes inventados).
 
-## 10. Criterio de validacion
-Cuando se toque infraestructura o runtime, la salida minima esperada es:
-- configuracion reproducible
-- validacion de sintaxis o equivalente
-- smoke tests post-cambio
-- tests unitarios pasando (`python3 -m unittest discover -s tests`)
-- `./scripts/check-quality.sh` sin errores
-- explicacion de riesgos residuales
-- siguiente paso recomendado
+## 9. Criterio de validacion
+La salida minima esperada para cualquier cambio es:
+- `docker compose up -d` → Redis Stack healthy
+- `./mvnw compile` → sin errores de compilacion
+- `./mvnw spring-boot:run` → aplicacion arranca en puerto 8080
+- Cada pagina de caso de uso carga con panel de demo y panel de code showcase
+- Cada endpoint REST responde correctamente
+- La UI sigue las guias de marca Redis (verificacion visual de colores, fuentes, espaciado)
 
 Si algo no se ha podido validar, se debe decir de forma explicita.
 
-## 11. Criterio de calidad de respuestas
+## 10. Criterio de calidad de respuestas
 - Ser directo y tecnico.
-- No dar la razon al usuario cuando la decision empeora seguridad, operacion o rendimiento.
+- No dar la razon al usuario cuando la decision empeora claridad, experiencia de demo o buenas practicas Redis.
 - Explicar tradeoffs de forma concreta.
 - Evitar ambiguedad sobre que esta implementado, que esta validado y que queda pendiente.
 
-
-## 12. Mapa del codebase
+## 11. Mapa del codebase
 
 | Directorio | Contenido |
 | :--- | :--- |
-| `ops/` | Paquete Python principal: config, collectors, runtime (sentry, nightly, drift, reactive), sync, rollover, scheduling, notificaciones |
-| `ops/cli/` | Entry point CLI (`ia_ops.py`) con argparse para todos los comandos operativos |
-| `ops/collectors/` | Collectors por dominio: host, runtime, app, mysql, elastic, cron, logs |
-| `ops/runtime/` | Logica de diagnostico: sentry (dispatch table), nightly (assessment), drift, heartbeats, reactive (cooldown+lock) |
-| `ops/sync/` | Sincronizacion editorial y de plataforma entre live y archive |
-| `ops/rollover/` | Rollover anual de contenido live a archive |
-| `ops/util/` | Helpers base: docker, process, http, json, thresholds, time |
-| `admin/` | Panel de administracion Flask: dashboard de salud, metricas operativas, diagnosticos (Host, Runtime, App, MySQL, Elastic, Cron, WordPress), capacity planning, reportes, crontab, sync, rollover. Dark mode. Dependencias locales (Chart.js, Bulma) |
-| `admin/static/` | Vendor JS/CSS (Chart.js, Bulma, Font Awesome), JS compartido (timeago, admin-utils, chart-helpers), CSS compartido (admin.css) |
-| `ops/metrics/` | Almacenamiento SQLite de metricas operativas, agregacion horaria, cleanup automatico |
-| `tests/` | Tests unitarios del paquete `ops/` (302 tests, sin dependencia de Docker) |
-| `scripts/` | Bootstrap, smoke tests, checks de calidad, cron wrappers, scripts PHP internos |
-| `scripts/internal/` | Scripts PHP internos ejecutados via `wp eval-file` desde `cron-master` |
-| `config/` | Configuracion no sensible: env de IA-Ops, routing cutover |
-| `nginx/` | Configuracion de LB-Nginx: routing por ano, FastCGI, debug headers |
-| `php/` | Dockerfiles para PHP-FPM y PHP-CLI |
-| `wordpress/` | Templates wp-config, mu-plugins, contextos por instancia |
-| `docs/` | Documentacion viva de arquitectura, runbooks y contratos operativos |
-| `tasks/` | Ficheros de proyecto activos; `tasks/archive/` para proyectos cerrados |
+| `src/main/java/com/redis/workshop/` | Aplicacion Spring Boot: controllers, services, config, models |
+| `src/main/java/.../controller/` | REST controllers — uno por caso de uso |
+| `src/main/java/.../service/` | Operaciones Redis + logica de negocio — uno por caso de uso |
+| `src/main/java/.../config/` | RedisConfig, DataLoader, WebConfig |
+| `src/main/java/.../model/` | DTOs, objetos de dominio |
+| `src/main/resources/templates/` | Templates Thymeleaf: layout, index, usecase-1..7 |
+| `src/main/resources/static/css/` | redis-brand.css, prism.css |
+| `src/main/resources/static/js/` | main.js, usecase-1.js..usecase-7.js, prism.js |
+| `src/main/resources/` | application.yml |
+| `docker-compose.yml` | Redis Stack para desarrollo |
+| `AGENTS.md` | Este fichero — guia operativa para agentes |
+| `README.md` | Instrucciones de setup, descripcion de casos de uso |
 
-## 13. Documentacion de referencia
-- `README.md` (raiz): vista rapida del proyecto, prerrequisitos, bootstrap y estructura
-- `docs/README.md`: estado actual de la arquitectura, topologia, capacidades y limites
-- `docs/poc-local-runbook.md`: bootstrap, verificacion, cron, Telegram y operacion local
-- `docs/ia-ops-bootstrap-contract.md`: checks, severidades, fuentes permitidas y formato de salida
-- `docs/content-lifecycle-live-archive.md`: rollover, sync editorial, sync de plataforma
-- `docs/search-architecture-live-archive.md`: indices separados, alias comun, degradacion
-- `docs/cache-policy-by-context.md`: politica de cache del origen
-- `docs/wordpress-persistence-layout.md`: persistencia compartida y aislamiento por contexto
+## 12. Documentacion de referencia
+- `README.md` (raiz): setup rapido, prerrequisitos, descripcion de los 7 casos de uso
+- `AGENTS.md` (este fichero): guia operativa para agentes que trabajen en el repo
