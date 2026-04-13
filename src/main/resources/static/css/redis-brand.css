@@ -127,6 +127,7 @@ a:hover {
     overflow-x: auto;
     flex: 1;
     scrollbar-width: none;
+}
 
 /* --- Main Content --- */
 .main-content {
