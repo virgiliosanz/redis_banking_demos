@@ -11,20 +11,146 @@
             <span class="usecase-badge">UC4</span>
             <h1 th:text="${useCaseTitle}">Real-time Fraud Detection</h1>
         </div>
+        <p class="usecase-subtitle">Transaction Risk Scoring &mdash; velocity checks with Sorted Sets, event logging with Streams, geographic anomaly detection.</p>
 
         <div class="usecase-panels">
+            <!-- LEFT: Live Demo Panel -->
             <section class="panel demo-panel">
                 <h2>Live Demo</h2>
                 <div id="demo-container" class="demo-container">
-                    <p class="placeholder-text">Demo coming soon — evaluate transactions for fraud in real time.</p>
+                    <!-- Transaction Form -->
+                    <form id="fraudForm" class="demo-form" autocomplete="off">
+                        <div class="form-group">
+                            <label for="cardNumber">Card Number</label>
+                            <select id="cardNumber" class="form-control">
+                                <option value="4000-1234-5678-9010">4000-1234-5678-9010 (Alice — ES)</option>
+                                <option value="4000-2345-6789-0123">4000-2345-6789-0123 (Bob — ES)</option>
+                                <option value="4000-3456-7890-1234">4000-3456-7890-1234 (Carlos — FR)</option>
+                                <option value="4000-4567-8901-2345">4000-4567-8901-2345 (Diana — DE)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="amount">Amount (&euro;)</label>
+                            <input type="number" id="amount" class="form-control" value="150.00" min="0.01" step="0.01" />
+                        </div>
+                        <div class="form-group">
+                            <label for="merchant">Merchant</label>
+                            <select id="merchant" class="form-control">
+                                <option value="Amazon ES">Amazon ES</option>
+                                <option value="El Corte Inglés">El Corte Inglés</option>
+                                <option value="Luxury Watches Ltd">Luxury Watches Ltd</option>
+                                <option value="ATM Withdrawal">ATM Withdrawal</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="country">Country</label>
+                            <select id="country" class="form-control">
+                                <option value="ES">🇪🇸 Spain (ES)</option>
+                                <option value="FR">🇫🇷 France (FR)</option>
+                                <option value="DE">🇩🇪 Germany (DE)</option>
+                                <option value="NG">🇳🇬 Nigeria (NG)</option>
+                                <option value="RU">🇷🇺 Russia (RU)</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="evaluateBtn">🔍 Evaluate Transaction</button>
+                            <button type="button" class="btn btn-secondary" id="burstBtn">⚡ Rapid-fire (5 txs)</button>
+                            <button type="button" class="btn btn-outline" id="resetBtn">🔄 Reset</button>
+                        </div>
+                    </form>
+
+                    <!-- Risk Score Display -->
+                    <div id="riskDisplay" class="fraud-risk-display" style="display:none;">
+                        <div class="fraud-risk-header">
+                            <span class="fraud-risk-label">Risk Score</span>
+                            <span id="riskScore" class="fraud-risk-score">0</span>
+                        </div>
+                        <div class="fraud-gauge-bar">
+                            <div id="riskGaugeFill" class="fraud-gauge-fill" style="width:0%"></div>
+                        </div>
+                        <div id="riskLevel" class="fraud-risk-level">LOW</div>
+                        <div id="riskFactors" class="fraud-risk-factors"></div>
+                    </div>
+
+                    <!-- Transaction Stream -->
+                    <h3 class="log-title">Transaction Stream</h3>
+                    <div id="txStream" class="tx-log">
+                        <p class="placeholder-text">No evaluations yet. Submit a transaction above.</p>
+                    </div>
                 </div>
             </section>
 
+            <!-- RIGHT: Code Showcase Panel -->
             <section class="panel code-panel">
                 <h2>Code Showcase</h2>
                 <div class="code-container">
-                    <pre><code class="language-java">// Fraud Detection with Sorted Set + Streams + RQE
-// Code snippets will be added here</code></pre>
+                    <h3 class="code-section-title">1. Velocity Tracking (Sorted Set)</h3>
+                    <pre><code class="language-java">// ZADD — record each transaction with timestamp as score
+String velocityKey = "workshop:fraud:velocity:" + cardNumber;
+long now = Instant.now().toEpochMilli();
+
+redis.opsForZSet().add(velocityKey, txId, now);
+
+// ZRANGEBYSCORE — count txs in last 5 minutes
+long windowStart = now - (300 * 1000); // 5 min ago
+Set&lt;String&gt; recentTxs = redis.opsForZSet()
+    .rangeByScore(velocityKey, windowStart, now);
+
+int velocityCount = recentTxs.size();
+// velocityCount &gt; 5 → HIGH RISK!
+
+// Clean expired entries
+redis.opsForZSet()
+    .removeRangeByScore(velocityKey, 0, windowStart - 1);</code></pre>
+
+                    <h3 class="code-section-title">2. Redis CLI — Velocity Check</h3>
+                    <pre><code class="language-bash"># Add transaction with timestamp as score
+ZADD workshop:fraud:velocity:4000-1234 1713045600000 "tx-abc123"
+# → (integer) 1
+
+# Count transactions in last 5 minutes
+ZRANGEBYSCORE workshop:fraud:velocity:4000-1234 1713045300000 1713045600000
+# → 1) "tx-prev001"
+# → 2) "tx-prev002"
+# → 3) "tx-abc123"
+# 3 transactions → elevated velocity
+
+# Clean old entries
+ZREMRANGEBYSCORE workshop:fraud:velocity:4000-1234 0 1713045299999</code></pre>
+
+                    <h3 class="code-section-title">3. Event Stream (Redis Streams)</h3>
+                    <pre><code class="language-java">// XADD — log every fraud evaluation to a stream
+Map&lt;String, String&gt; entry = Map.of(
+    "txId", txId,
+    "card", cardNumber,
+    "amount", String.valueOf(amount),
+    "riskScore", String.valueOf(riskScore),
+    "riskLevel", riskLevel
+);
+
+redis.opsForStream().add(
+    StreamRecords.string(entry)
+        .withStreamKey("workshop:fraud:stream"));
+
+// XREVRANGE — read most recent evaluations
+redis.opsForStream().reverseRange(
+    "workshop:fraud:stream",
+    Range.unbounded(),
+    Limit.limit().count(20));</code></pre>
+
+                    <h3 class="code-section-title">4. Redis CLI — Stream Commands</h3>
+                    <pre><code class="language-bash"># Log a fraud evaluation event
+XADD workshop:fraud:stream * txId "tx-abc123" card "4000-1234" amount "15000.00" riskScore "75" riskLevel "CRITICAL"
+# → "1713045600000-0"
+
+# Read last 5 evaluations
+XREVRANGE workshop:fraud:stream + - COUNT 5
+
+# Stream length
+XLEN workshop:fraud:stream
+
+# Trim to last 50 entries
+XTRIM workshop:fraud:stream MAXLEN ~ 50</code></pre>
                 </div>
             </section>
         </div>

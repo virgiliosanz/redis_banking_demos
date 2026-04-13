@@ -1010,3 +1010,92 @@ a:hover {
 .demo-form {
     margin-bottom: calc(var(--spacing-unit) * 2);
 }
+
+/* --- UC4: Fraud Detection --- */
+.fraud-risk-display {
+    margin-top: calc(var(--spacing-unit) * 3);
+    padding: calc(var(--spacing-unit) * 2);
+    border-radius: var(--border-radius);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+}
+
+.fraud-risk-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: calc(var(--spacing-unit) * 1);
+}
+
+.fraud-risk-label {
+    font-family: var(--font-code);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.fraud-risk-score {
+    font-family: var(--font-code);
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.fraud-gauge-bar {
+    height: 12px;
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    margin-bottom: calc(var(--spacing-unit) * 1.5);
+}
+
+.fraud-gauge-fill {
+    height: 100%;
+    border-radius: var(--border-radius);
+    transition: width 0.5s ease, background 0.3s ease;
+}
+
+.fraud-risk-level {
+    font-family: var(--font-code);
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: center;
+    padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 1);
+    border-radius: var(--border-radius);
+    margin-bottom: calc(var(--spacing-unit) * 1);
+}
+
+.fraud-level-low { color: #0a7e3e; background: rgba(10, 126, 62, 0.1); }
+.fraud-level-medium { color: #d4a017; background: rgba(212, 160, 23, 0.1); }
+.fraud-level-high { color: #e67e22; background: rgba(230, 126, 34, 0.1); }
+.fraud-level-critical { color: #FF4438; background: rgba(255, 68, 56, 0.1); }
+
+[data-theme="dark"] .fraud-level-low { color: #4ade80; background: rgba(74, 222, 128, 0.15); }
+[data-theme="dark"] .fraud-level-medium { color: #fbbf24; background: rgba(251, 191, 36, 0.15); }
+[data-theme="dark"] .fraud-level-high { color: #fb923c; background: rgba(251, 146, 60, 0.15); }
+[data-theme="dark"] .fraud-level-critical { color: #FF4438; background: rgba(255, 68, 56, 0.15); }
+
+.fraud-risk-factors {
+    margin-top: calc(var(--spacing-unit) * 1);
+}
+
+.fraud-factor {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    padding: calc(var(--spacing-unit) * 0.5) 0;
+    border-bottom: 1px solid var(--border-color);
+    font-family: var(--font-code);
+}
+
+.fraud-factor:last-child { border-bottom: none; }
+
+.fraud-badge-low { color: #0a7e3e; background: rgba(10, 126, 62, 0.1); }
+.fraud-badge-medium { color: #d4a017; background: rgba(212, 160, 23, 0.1); }
+.fraud-badge-high { color: #e67e22; background: rgba(230, 126, 34, 0.1); }
+.fraud-badge-critical { color: #FF4438; background: rgba(255, 68, 56, 0.1); }
+
+[data-theme="dark"] .fraud-badge-low { color: #4ade80; background: rgba(74, 222, 128, 0.15); }
+[data-theme="dark"] .fraud-badge-medium { color: #fbbf24; background: rgba(251, 191, 36, 0.15); }
+[data-theme="dark"] .fraud-badge-high { color: #fb923c; background: rgba(251, 146, 60, 0.15); }
+[data-theme="dark"] .fraud-badge-critical { color: #FF4438; background: rgba(255, 68, 56, 0.15); }
