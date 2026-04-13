@@ -13,18 +13,162 @@
         </div>
 
         <div class="usecase-panels">
+            <!-- LEFT: Live Demo Panel -->
             <section class="panel demo-panel">
                 <h2>Live Demo</h2>
                 <div id="demo-container" class="demo-container">
-                    <p class="placeholder-text">Demo coming soon — store and retrieve real-time risk features.</p>
+
+                    <!-- Client Selector -->
+                    <div class="form-group">
+                        <label for="clientSelect">Select Client</label>
+                        <select id="clientSelect" class="form-control"></select>
+                    </div>
+
+                    <!-- Risk Score Badge -->
+                    <div id="risk-badge-container" style="text-align:center; margin-bottom:16px; display:none;">
+                        <div id="risk-badge" style="display:inline-block; padding:8px 24px; border-radius:5px; font-weight:700; font-size:1.1rem;"></div>
+                    </div>
+
+                    <!-- Feature Dashboard Table -->
+                    <div class="data-card" id="feature-card" style="display:none;">
+                        <h3>Feature Vector (Redis Hash)</h3>
+                        <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;" id="redis-key-display"></div>
+                        <div id="feature-table"></div>
+                    </div>
+
+                    <!-- Transaction Simulator -->
+                    <div class="data-card" style="margin-top:16px;">
+                        <h3>Simulate Transaction</h3>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label for="txAmount">Amount (€)</label>
+                            <input type="number" id="txAmount" class="form-input" placeholder="500.00" step="0.01" min="1"/>
+                        </div>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label for="txCountry">Country</label>
+                            <select id="txCountry" class="form-control">
+                                <option value="ES">🇪🇸 Spain</option>
+                                <option value="UK">🇬🇧 United Kingdom</option>
+                                <option value="DE">🇩🇪 Germany</option>
+                                <option value="US">🇺🇸 United States</option>
+                                <option value="RU">🇷🇺 Russia</option>
+                                <option value="CN">🇨🇳 China</option>
+                                <option value="NG">🇳🇬 Nigeria</option>
+                            </select>
+                        </div>
+                        <button id="simulateBtn" class="btn btn-primary" style="width:100%;">
+                            ⚡ Simulate Transaction
+                        </button>
+                    </div>
+
+                    <!-- Redis Commands Executed -->
+                    <div id="commands-card" class="data-card" style="margin-top:16px; display:none;">
+                        <h3>Redis Commands Executed</h3>
+                        <pre id="commands-output" style="font-size:0.75rem; margin:0; white-space:pre-wrap; color:var(--text-secondary);"></pre>
+                    </div>
                 </div>
             </section>
 
+            <!-- RIGHT: Code Showcase Panel -->
             <section class="panel code-panel">
                 <h2>Code Showcase</h2>
                 <div class="code-container">
-                    <pre><code class="language-java">// Feature Store with Hash + TTL + RQE
-// Code snippets will be added here</code></pre>
+                    <div class="code-tabs">
+                        <button class="code-tab active" data-tab="java">Java</button>
+                        <button class="code-tab" data-tab="cli">Redis CLI</button>
+                    </div>
+
+                    <div class="code-block active" id="tab-java">
+                        <pre><code class="language-java">// 1. Store client features — HSET (bulk)
+String key = "workshop:features:client:C1001";
+
+Map&lt;String, String&gt; features = Map.of(
+    "tx_count_1h",         "2",
+    "tx_count_24h",        "5",
+    "tx_amount_avg_24h",   "120.50",
+    "tx_amount_max_24h",   "250.00",
+    "distinct_countries_7d","1",
+    "distinct_devices_30d", "2",
+    "risk_score",           "12"
+);
+
+// HSET — write all features atomically
+redis.opsForHash().putAll(key, features);
+
+// 2. Read full feature vector — HGETALL
+Map&lt;Object, Object&gt; allFeatures =
+    redis.opsForHash().entries(key);
+// Returns ALL fields in ~0.1ms (vs 50-200ms
+// from a data warehouse query)
+
+// 3. Atomic counter update — HINCRBY
+// New transaction arrives → increment counters
+redis.opsForHash().increment(key,
+    "tx_count_1h", 1);
+redis.opsForHash().increment(key,
+    "tx_count_24h", 1);
+
+// 4. Update computed features — HSET
+redis.opsForHash().put(key,
+    "tx_amount_avg_24h", "135.25");
+redis.opsForHash().put(key,
+    "risk_score", "15");
+
+// 5. Pipeline for bulk updates
+// (multiple HSET in one round-trip)
+redis.executePipelined((RedisCallback&lt;Object&gt;) conn -&gt; {
+    byte[] k = key.getBytes();
+    conn.hashCommands().hSet(k,
+        "tx_count_1h".getBytes(), "3".getBytes());
+    conn.hashCommands().hSet(k,
+        "last_tx_timestamp".getBytes(),
+        String.valueOf(now).getBytes());
+    conn.hashCommands().hSet(k,
+        "risk_score".getBytes(), "18".getBytes());
+    return null;
+});
+
+// 6. Read single feature — HGET
+String riskScore = (String) redis.opsForHash()
+    .get(key, "risk_score");</code></pre>
+                    </div>
+
+                    <div class="code-block" id="tab-cli">
+                        <pre><code class="language-bash"># 1. Store feature vector (bulk HSET)
+HSET workshop:features:client:C1001 \
+  tx_count_1h 2 \
+  tx_count_24h 5 \
+  tx_amount_avg_24h "120.50" \
+  tx_amount_max_24h "250.00" \
+  distinct_countries_7d 1 \
+  distinct_devices_30d 2 \
+  risk_score 12
+
+# 2. Read full feature vector (~0.1ms)
+HGETALL workshop:features:client:C1001
+
+# 3. Atomic counter increment
+HINCRBY workshop:features:client:C1001 \
+  tx_count_1h 1
+HINCRBY workshop:features:client:C1001 \
+  tx_count_24h 1
+
+# 4. Update computed features
+HSET workshop:features:client:C1001 \
+  tx_amount_avg_24h "135.25" \
+  risk_score 15
+
+# 5. Read single feature
+HGET workshop:features:client:C1001 risk_score
+
+# 6. Feature store vs data warehouse
+# Redis Hash: HGETALL → ~0.1ms latency
+# SQL query:  SELECT * FROM features
+#             WHERE client_id = 'C1001'
+#             → 50-200ms latency
+#
+# For real-time ML scoring, sub-ms
+# feature retrieval is critical.</code></pre>
+                    </div>
                 </div>
             </section>
         </div>
