@@ -1099,3 +1099,22 @@ a:hover {
 [data-theme="dark"] .fraud-badge-medium { color: #fbbf24; background: rgba(251, 191, 36, 0.15); }
 [data-theme="dark"] .fraud-badge-high { color: #fb923c; background: rgba(251, 146, 60, 0.15); }
 [data-theme="dark"] .fraud-badge-critical { color: #FF4438; background: rgba(255, 68, 56, 0.15); }
+
+/* --- UC6: Document Search --- */
+.doc-mode-btn {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.doc-mode-btn.active {
+    background: var(--redis-primary);
+    color: #fff;
+    border-color: var(--redis-primary);
+}
+
+.doc-mode-btn:hover:not(.active):not(:disabled) {
+    background: var(--border-color);
+}
