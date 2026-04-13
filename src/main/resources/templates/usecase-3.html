@@ -11,20 +11,133 @@
             <span class="usecase-badge">UC3</span>
             <h1 th:text="${useCaseTitle}">Transaction Deduplication</h1>
         </div>
+        <p class="usecase-subtitle">Duplicate Payment Prevention &mdash; avoid double-charging on bank transfers using Redis SET with NX + EX flags.</p>
 
         <div class="usecase-panels">
+            <!-- LEFT: Live Demo Panel -->
             <section class="panel demo-panel">
                 <h2>Live Demo</h2>
                 <div id="demo-container" class="demo-container">
-                    <p class="placeholder-text">Demo coming soon — submit transactions and see deduplication in action.</p>
+                    <!-- Payment Form -->
+                    <form id="paymentForm" class="demo-form" autocomplete="off">
+                        <div class="form-group">
+                            <label for="sender">Sender Account</label>
+                            <select id="sender" class="form-control">
+                                <option value="ES12-0001-ALICE">ES12-0001-ALICE (Alice)</option>
+                                <option value="ES34-0002-BOB">ES34-0002-BOB (Bob)</option>
+                                <option value="ES56-0003-CARLOS">ES56-0003-CARLOS (Carlos)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="receiver">Receiver Account</label>
+                            <select id="receiver" class="form-control">
+                                <option value="ES78-0004-DIANA">ES78-0004-DIANA (Diana)</option>
+                                <option value="ES90-0005-EVA" selected>ES90-0005-EVA (Eva)</option>
+                                <option value="ES11-0006-FRANK">ES11-0006-FRANK (Frank)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="amount">Amount (&euro;)</label>
+                            <input type="number" id="amount" class="form-control" value="250.00" min="0.01" step="0.01" />
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="payBtn">💳 Pay Now</button>
+                            <button type="button" class="btn btn-secondary" id="doubleClickBtn">⚡ Double-Click Simulation</button>
+                            <button type="button" class="btn btn-outline" id="resetBtn">🔄 Reset Log</button>
+                        </div>
+                    </form>
+
+                    <!-- Result Display -->
+                    <div id="resultBox" class="result-box" style="display:none;">
+                        <div id="resultIcon" class="result-icon"></div>
+                        <div id="resultStatus" class="result-status"></div>
+                        <div id="resultDetails" class="result-details"></div>
+                    </div>
+
+                    <!-- Transaction Log -->
+                    <h3 class="log-title">Transaction Log</h3>
+                    <div id="txLog" class="tx-log">
+                        <p class="placeholder-text">No transactions yet. Submit a payment above.</p>
+                    </div>
                 </div>
             </section>
 
+            <!-- RIGHT: Code Showcase Panel -->
             <section class="panel code-panel">
                 <h2>Code Showcase</h2>
                 <div class="code-container">
-                    <pre><code class="language-java">// Transaction Deduplication with Set/Bloom Filter + Hash + TTL
-// Code snippets will be added here</code></pre>
+                    <h3 class="code-section-title">1. SETNX Pattern (SET NX EX)</h3>
+                    <pre><code class="language-java">// Atomic check-and-set: only succeeds if key doesn't exist
+// SET workshop:dedup:{txHash} "1" NX EX 300
+
+String txHash = sha256(sender + receiver + amount + timeWindow);
+String key = "workshop:dedup:" + txHash;
+
+// SET with NX (Not eXists) + EX (Expire) — atomic dedup!
+Boolean wasSet = redis.opsForValue()
+    .setIfAbsent(key, "1", Duration.ofSeconds(300));
+
+if (Boolean.TRUE.equals(wasSet)) {
+    // First time — process the payment
+    return "ACCEPTED";
+} else {
+    // Key already exists — duplicate detected!
+    return "DUPLICATE";
+}</code></pre>
+
+                    <h3 class="code-section-title">2. Redis CLI Equivalent</h3>
+                    <pre><code class="language-bash"># First attempt — key created, payment processed
+SET workshop:dedup:a1b2c3d4 "1" NX EX 300
+# → OK
+
+# Second attempt (within 5 min) — blocked!
+SET workshop:dedup:a1b2c3d4 "1" NX EX 300
+# → (nil)   ← duplicate detected
+
+# Check remaining TTL
+TTL workshop:dedup:a1b2c3d4
+# → (integer) 287
+
+# After TTL expires, same tx is accepted again
+SET workshop:dedup:a1b2c3d4 "1" NX EX 300
+# → OK</code></pre>
+
+                    <h3 class="code-section-title">3. Bloom Filter Alternative (High Volume)</h3>
+                    <pre><code class="language-bash"># For millions of tx/day, use a Bloom filter
+# Probabilistic — tiny false-positive rate, zero false-negatives
+# Much less memory than storing every key
+
+# Create filter (1M capacity, 0.01% error rate)
+BF.RESERVE workshop:dedup:bloom 0.0001 1000000
+
+# Check + add in one step
+BF.ADD workshop:dedup:bloom "a1b2c3d4e5f6"
+# → (integer) 1  ← new item, not seen before
+
+BF.ADD workshop:dedup:bloom "a1b2c3d4e5f6"
+# → (integer) 0  ← already exists = DUPLICATE
+
+# Check without adding
+BF.EXISTS workshop:dedup:bloom "a1b2c3d4e5f6"
+# → (integer) 1  ← exists</code></pre>
+
+                    <pre><code class="language-java">// Java equivalent with Lettuce + RedisBloom
+// Note: Bloom filters don't support per-item TTL
+// Combine with time-bucketed filter names:
+//   "workshop:dedup:bloom:2024-01-15-14"  (hourly bucket)
+
+// BF.ADD via Lettuce custom command
+Long added = redis.execute((RedisCallback&lt;Long&gt;) conn ->
+    conn.commands().execute("BF.ADD",
+        "workshop:dedup:bloom".getBytes(),
+        txHash.getBytes())
+);
+
+if (added == 1L) {
+    return "ACCEPTED";   // new transaction
+} else {
+    return "DUPLICATE";  // already seen
+}</code></pre>
                 </div>
             </section>
         </div>
