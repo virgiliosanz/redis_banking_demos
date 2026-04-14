@@ -4,12 +4,14 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.StreamRecords;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.*;
 
 @Service
+@DependsOn("startupCleanup")
 public class FraudService {
 
     private static final String VELOCITY_KEY_PREFIX = "workshop:fraud:velocity:";

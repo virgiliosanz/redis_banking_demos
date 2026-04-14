@@ -9,6 +9,7 @@ import org.springframework.data.geo.*;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.domain.geo.GeoReference;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 
 import com.redis.workshop.config.RedisSearchHelper;
@@ -17,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 @Service
+@DependsOn("startupCleanup")
 public class GeoFinderService {
 
     private static final Logger log = LoggerFactory.getLogger(GeoFinderService.class);

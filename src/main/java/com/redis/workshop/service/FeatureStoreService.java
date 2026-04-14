@@ -2,12 +2,14 @@ package com.redis.workshop.service;
 
 import jakarta.annotation.PostConstruct;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.*;
 
 @Service
+@DependsOn("startupCleanup")
 public class FeatureStoreService {
 
     private static final String FEATURE_PREFIX = "workshop:features:client:";

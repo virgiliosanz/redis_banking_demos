@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.connection.ReturnType;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
@@ -17,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 @Component
+@DependsOn("startupCleanup")
 public class DocumentDataLoader {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentDataLoader.class);

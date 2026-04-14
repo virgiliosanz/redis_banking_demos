@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.redis.workshop.config.RedisSearchHelper;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -18,6 +19,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Service
+@DependsOn("startupCleanup")
 public class AssistantService {
 
     private static final Logger log = LoggerFactory.getLogger(AssistantService.class);
