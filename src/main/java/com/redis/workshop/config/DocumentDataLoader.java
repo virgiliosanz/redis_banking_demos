@@ -1,5 +1,7 @@
 package com.redis.workshop.config;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.redis.workshop.service.OpenAiService;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
@@ -8,6 +10,7 @@ import org.springframework.data.redis.connection.ReturnType;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +34,17 @@ public class DocumentDataLoader {
 
     @PostConstruct
     public void loadDocuments() {
-        List<Map<String, Object>> docs = buildMockDocuments();
+        List<Map<String, Object>> docs;
+
+        // Try loading pre-computed embeddings from classpath first
+        List<Map<String, Object>> precomputed = loadPrecomputedEmbeddings();
+        if (precomputed != null && !precomputed.isEmpty()) {
+            docs = precomputed;
+            log.info("UC6: Using {} pre-computed document chunks from kb-embeddings.json", docs.size());
+        } else {
+            log.info("UC6: No pre-computed embeddings found, using built-in mock documents");
+            docs = buildMockDocuments();
+        }
 
         // Store each document as JSON
         for (Map<String, Object> doc : docs) {
@@ -49,6 +62,58 @@ public class DocumentDataLoader {
         // Create RediSearch index
         createIndex();
         log.info("UC6: Loaded {} regulation documents with vector embeddings", docs.size());
+    }
+
+    /**
+     * Load pre-computed embeddings from /data/kb-embeddings.json on the classpath.
+     * Returns null if the file is not found or cannot be parsed.
+     */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> loadPrecomputedEmbeddings() {
+        try {
+            InputStream is = getClass().getResourceAsStream("/data/kb-embeddings.json");
+            if (is == null) {
+                return null;
+            }
+
+            ObjectMapper mapper = new ObjectMapper();
+            List<Map<String, Object>> chunks = mapper.readValue(is, new TypeReference<>() {});
+
+            // Convert each chunk into the format expected by the rest of the loader
+            List<Map<String, Object>> docs = new ArrayList<>();
+            for (Map<String, Object> chunk : chunks) {
+                Map<String, Object> doc = new LinkedHashMap<>();
+                doc.put("id", chunk.get("id"));
+                doc.put("title", chunk.get("title"));
+                // Derive category from source
+                String source = chunk.getOrDefault("source", "").toString().toUpperCase();
+                doc.put("category", source);
+                doc.put("tags", source.toLowerCase());
+                // Use content as both summary and content for chunks
+                String content = chunk.getOrDefault("content", "").toString();
+                doc.put("summary", content.length() > 200 ? content.substring(0, 200) + "..." : content);
+                doc.put("content", content);
+
+                // Parse vector from the JSON
+                Object vectorObj = chunk.get("vector");
+                if (vectorObj instanceof List<?> vectorList) {
+                    float[] vector = new float[vectorList.size()];
+                    for (int i = 0; i < vectorList.size(); i++) {
+                        vector[i] = ((Number) vectorList.get(i)).floatValue();
+                    }
+                    doc.put("vector", vector);
+                } else {
+                    // Generate mock vector as fallback
+                    doc.put("vector", generateVector(content));
+                }
+
+                docs.add(doc);
+            }
+            return docs;
+        } catch (Exception e) {
+            log.warn("Failed to load pre-computed embeddings: {}", e.getMessage());
+            return null;
+        }
     }
 
     private void createIndex() {
