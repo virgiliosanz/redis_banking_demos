@@ -50,4 +50,61 @@ public class DocumentSearchController {
     public ResponseEntity<List<Map<String, Object>>> listDocuments() {
         return ResponseEntity.ok(documentSearchService.listDocuments());
     }
+
+    /**
+     * Query documents by field value.
+     * GET /api/docs/query?field=category&value=PSD2
+     */
+    @GetMapping("/query")
+    public ResponseEntity<Map<String, Object>> queryByField(
+            @RequestParam String field,
+            @RequestParam String value) {
+
+        if (field == null || field.isBlank() || value == null || value.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "ERROR",
+                    "message", "Both 'field' and 'value' parameters are required"
+            ));
+        }
+
+        return ResponseEntity.ok(documentSearchService.queryByField(field, value));
+    }
+
+    /**
+     * Read a single document by ID.
+     * GET /api/docs/{id}
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> getById(@PathVariable String id) {
+        Map<String, Object> result = documentSearchService.getById(id);
+        if ("NOT_FOUND".equals(result.get("status"))) {
+            return ResponseEntity.status(404).body(result);
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Read a specific field from a document.
+     * GET /api/docs/{id}/{path}
+     */
+    @GetMapping("/{id}/{path}")
+    public ResponseEntity<Map<String, Object>> getField(
+            @PathVariable String id,
+            @PathVariable String path) {
+        Map<String, Object> result = documentSearchService.getField(id, path);
+        if ("NOT_FOUND".equals(result.get("status"))) {
+            return ResponseEntity.status(404).body(result);
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Create a new custom document.
+     * POST /api/docs
+     */
+    @PostMapping
+    public ResponseEntity<Map<String, Object>> createDocument(@RequestBody Map<String, Object> doc) {
+        Map<String, Object> result = documentSearchService.createDocument(doc);
+        return ResponseEntity.status(201).body(result);
+    }
 }

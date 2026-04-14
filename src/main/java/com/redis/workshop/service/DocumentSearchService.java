@@ -113,6 +113,139 @@ public class DocumentSearchService {
         return docs;
     }
 
+    // --- CRUD operations ---
+
+    /**
+     * Read a single document by ID using JSON.GET.
+     */
+    public Map<String, Object> getById(String id) {
+        String key = DOC_PREFIX + id;
+        String redisCmd = "JSON.GET " + key + " $";
+
+        Object result = redis.execute(connection -> {
+            return connection.execute("JSON.GET",
+                    key.getBytes(StandardCharsets.UTF_8),
+                    "$".getBytes(StandardCharsets.UTF_8));
+        }, true);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("redisCommand", redisCmd);
+
+        if (result == null) {
+            response.put("status", "NOT_FOUND");
+            response.put("message", "No document found with id: " + id);
+            return response;
+        }
+
+        String json = decodeObject(result);
+        response.put("status", "OK");
+        response.put("id", id);
+        response.put("key", key);
+        response.put("document", json);
+        return response;
+    }
+
+    /**
+     * Read a specific field from a document using JSON.GET with JSONPath.
+     */
+    public Map<String, Object> getField(String id, String path) {
+        String key = DOC_PREFIX + id;
+        String jsonPath = path.startsWith("$") ? path : "$." + path;
+        String redisCmd = "JSON.GET " + key + " " + jsonPath;
+
+        Object result = redis.execute(connection -> {
+            return connection.execute("JSON.GET",
+                    key.getBytes(StandardCharsets.UTF_8),
+                    jsonPath.getBytes(StandardCharsets.UTF_8));
+        }, true);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("redisCommand", redisCmd);
+
+        if (result == null) {
+            response.put("status", "NOT_FOUND");
+            response.put("message", "No document or field found for key: " + key + " path: " + jsonPath);
+            return response;
+        }
+
+        String json = decodeObject(result);
+        response.put("status", "OK");
+        response.put("id", id);
+        response.put("key", key);
+        response.put("path", jsonPath);
+        response.put("value", json);
+        return response;
+    }
+
+    /**
+     * Create a new document using JSON.SET.
+     */
+    public Map<String, Object> createDocument(Map<String, Object> doc) {
+        String docId = "custom:" + System.currentTimeMillis();
+        String key = DOC_PREFIX + docId;
+
+        // Build the JSON document
+        Map<String, Object> fullDoc = new LinkedHashMap<>();
+        fullDoc.put("id", docId);
+        fullDoc.put("title", doc.getOrDefault("title", "Untitled"));
+        fullDoc.put("category", doc.getOrDefault("category", "Custom"));
+        fullDoc.put("summary", doc.getOrDefault("summary", ""));
+        fullDoc.put("content", doc.getOrDefault("content", ""));
+        fullDoc.put("tags", doc.getOrDefault("tags", "custom"));
+        // Add a mock vector so it's indexed for search
+        fullDoc.put("vector", generateMockVector(fullDoc.get("title") + " " + fullDoc.get("summary")));
+
+        String json = toSimpleJson(fullDoc);
+        String redisCmd = "JSON.SET " + key + " $ '" + json.replace("'", "\\'") + "'";
+
+        redis.execute(connection -> {
+            connection.execute("JSON.SET",
+                    key.getBytes(StandardCharsets.UTF_8),
+                    "$".getBytes(StandardCharsets.UTF_8),
+                    json.getBytes(StandardCharsets.UTF_8));
+            return null;
+        }, true);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("status", "CREATED");
+        response.put("id", docId);
+        response.put("key", key);
+        response.put("document", fullDoc);
+        response.put("redisCommand", redisCmd);
+        return response;
+    }
+
+    /**
+     * Query documents by field value using FT.SEARCH.
+     */
+    public Map<String, Object> queryByField(String field, String value) {
+        String ftQuery;
+        if ("category".equals(field)) {
+            // TAG field — use @category:{value}
+            ftQuery = "@" + field + ":{" + escapeQuery(value) + "}";
+        } else {
+            // TEXT field — use @field:value
+            ftQuery = "@" + field + ":" + escapeQuery(value);
+        }
+
+        String redisCmd = "FT.SEARCH " + INDEX_NAME + " \"" + ftQuery + "\" RETURN 5 title category summary content tags LIMIT 0 20";
+
+        List<Object> rawResults = redisSearchHelper.ftSearchRaw(INDEX_NAME, ftQuery,
+                "RETURN", "5", "title", "category", "summary", "content", "tags",
+                "LIMIT", "0", "20");
+
+        List<Map<String, Object>> results = parseSearchResults(rawResults, false, false);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("field", field);
+        response.put("value", value);
+        response.put("query", ftQuery);
+        response.put("resultCount", results.size());
+        response.put("results", results);
+        response.put("redisCommand", redisCmd);
+        return response;
+    }
+
     // --- Private helpers ---
 
     /**
@@ -312,5 +445,44 @@ public class DocumentSearchService {
     private static String escapeQuery(String query) {
         // Escape RediSearch special characters but keep spaces for multi-word search
         return query.replaceAll("([{}\\[\\]()\\\\@!\"~*<>:;./^$|&#+=-])", "\\\\$1");
+    }
+
+    private float[] generateMockVector(String text) {
+        return DocumentDataLoader.generateVector(text);
+    }
+
+    private String toSimpleJson(Map<String, Object> map) {
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (Map.Entry<String, Object> e : map.entrySet()) {
+            if ("vector".equals(e.getKey())) {
+                // Serialize vector as JSON array
+                if (!first) sb.append(",");
+                first = false;
+                sb.append("\"vector\":[");
+                float[] vec = (float[]) e.getValue();
+                for (int i = 0; i < vec.length; i++) {
+                    if (i > 0) sb.append(",");
+                    sb.append(vec[i]);
+                }
+                sb.append("]");
+                continue;
+            }
+            if (!first) sb.append(",");
+            first = false;
+            sb.append("\"").append(escapeJsonStr(e.getKey())).append("\":");
+            Object val = e.getValue();
+            if (val instanceof String s) {
+                sb.append("\"").append(escapeJsonStr(s)).append("\"");
+            } else {
+                sb.append(val);
+            }
+        }
+        sb.append("}");
+        return sb.toString();
+    }
+
+    private static String escapeJsonStr(String s) {
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
     }
 }

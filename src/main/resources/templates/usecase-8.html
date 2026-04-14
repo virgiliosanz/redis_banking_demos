@@ -16,8 +16,9 @@
             <h2>How it works</h2>
             <div class="how-it-works-steps">
                 <ol>
-                    <li>When a client sends a request to the app, a response within 100 milliseconds is guaranteed.</li>
-                    <li>The app requests data from Redis as the document database. Its built-in Redis Query Engine retrieves it in under 10 milliseconds.</li>
+                    <li><strong>Create &amp; Store</strong> — Documents are stored as native JSON in Redis using JSON.SET, with full JSONPath support for partial reads and updates.</li>
+                    <li><strong>Query &amp; Filter</strong> — The Redis Query Engine indexes JSON fields (TEXT, TAG, VECTOR) for instant queries using FT.SEARCH with field filters.</li>
+                    <li><strong>Search</strong> — Full-text, vector similarity (KNN), and hybrid search all run in under 10ms on the same indexed data.</li>
                 </ol>
             </div>
             <div class="how-it-works-diagram">
@@ -61,7 +62,134 @@
             <!-- LEFT: Live Demo Panel -->
             <section class="panel demo-panel">
                 <h2>Live Demo</h2>
-                <div id="demo-container" class="demo-container">
+
+                <!-- Main Tab Toggle -->
+                <div style="display:flex; gap:8px; margin-bottom:16px;">
+                    <button class="btn btn-sm doc-mode-btn active" id="tab-crud-btn" data-main-tab="crud">📝 CRUD Operations</button>
+                    <button class="btn btn-sm doc-mode-btn" id="tab-search-btn" data-main-tab="search">🔍 Search</button>
+                </div>
+
+                <!-- ====== CRUD TAB ====== -->
+                <div id="crud-tab" class="demo-container">
+
+                    <!-- Section 1: Read Document by ID -->
+                    <div class="data-card" style="margin-bottom:16px;">
+                        <h3>📖 Read Document by ID</h3>
+                        <div class="form-group">
+                            <label for="readDocId">Document ID</label>
+                            <div style="display:flex; gap:8px;">
+                                <select id="readDocId" class="form-input" style="flex:1;">
+                                    <option value="REG001">REG001 — PSD2 Strong Customer Auth</option>
+                                    <option value="REG002">REG002 — GDPR Data Protection</option>
+                                    <option value="REG003">REG003 — MiFID II Transaction Reporting</option>
+                                    <option value="REG004">REG004 — Basel III Capital Requirements</option>
+                                    <option value="REG005">REG005 — PSD2 Open Banking APIs</option>
+                                    <option value="REG006">REG006 — GDPR Cross-border Transfers</option>
+                                </select>
+                                <button id="readDocBtn" class="btn btn-primary">Read</button>
+                            </div>
+                        </div>
+                        <div id="read-cmd" class="data-card" style="display:none; background:var(--bg-tertiary);">
+                            <h3>Redis Command</h3>
+                            <pre id="read-cmd-output" style="font-size:0.72rem; margin:0; white-space:pre-wrap; color:var(--text-secondary); font-family:var(--font-code);"></pre>
+                        </div>
+                        <div id="read-result" style="margin-top:8px;"></div>
+                    </div>
+
+                    <!-- Section 2: Read Specific Field -->
+                    <div class="data-card" style="margin-bottom:16px;">
+                        <h3>🔎 Read Specific Field</h3>
+                        <div class="form-group">
+                            <label>Document ID + JSONPath</label>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                <select id="fieldDocId" class="form-input" style="flex:1; min-width:150px;">
+                                    <option value="REG001">REG001</option>
+                                    <option value="REG002">REG002</option>
+                                    <option value="REG003">REG003</option>
+                                    <option value="REG004">REG004</option>
+                                    <option value="REG005">REG005</option>
+                                </select>
+                                <select id="fieldPath" class="form-input" style="flex:1; min-width:120px;">
+                                    <option value="title">$.title</option>
+                                    <option value="summary">$.summary</option>
+                                    <option value="category">$.category</option>
+                                    <option value="tags">$.tags</option>
+                                    <option value="content">$.content</option>
+                                </select>
+                                <button id="readFieldBtn" class="btn btn-primary">Read Field</button>
+                            </div>
+                        </div>
+                        <div id="field-cmd" class="data-card" style="display:none; background:var(--bg-tertiary);">
+                            <h3>Redis Command</h3>
+                            <pre id="field-cmd-output" style="font-size:0.72rem; margin:0; white-space:pre-wrap; color:var(--text-secondary); font-family:var(--font-code);"></pre>
+                        </div>
+                        <div id="field-result" style="margin-top:8px;"></div>
+                    </div>
+
+                    <!-- Section 3: Create Document -->
+                    <div class="data-card" style="margin-bottom:16px;">
+                        <h3>➕ Create Document</h3>
+                        <div class="form-group">
+                            <label for="createTitle">Title</label>
+                            <input type="text" id="createTitle" class="form-input" placeholder="e.g. AML Transaction Monitoring"/>
+                        </div>
+                        <div class="form-group">
+                            <label for="createCategory">Category</label>
+                            <select id="createCategory" class="form-input">
+                                <option value="PSD2">PSD2</option>
+                                <option value="GDPR">GDPR</option>
+                                <option value="DORA">DORA</option>
+                                <option value="MiFID_II">MiFID II</option>
+                                <option value="Basel_III">Basel III</option>
+                                <option value="Custom" selected>Custom</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="createSummary">Summary</label>
+                            <textarea id="createSummary" class="form-input" rows="2" placeholder="Brief summary of the regulation..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="createTags">Tags (comma-separated)</label>
+                            <input type="text" id="createTags" class="form-input" placeholder="e.g. aml,monitoring,transactions"/>
+                        </div>
+                        <button id="createDocBtn" class="btn btn-primary" style="width:100%;">➕ Create Document</button>
+                        <div id="create-cmd" class="data-card" style="display:none; background:var(--bg-tertiary); margin-top:8px;">
+                            <h3>Redis Command</h3>
+                            <pre id="create-cmd-output" style="font-size:0.72rem; margin:0; white-space:pre-wrap; color:var(--text-secondary); font-family:var(--font-code);"></pre>
+                        </div>
+                        <div id="create-result" style="margin-top:8px;"></div>
+                    </div>
+
+                    <!-- Section 4: Query by Field -->
+                    <div class="data-card" style="margin-bottom:16px;">
+                        <h3>🔍 Query by Field</h3>
+                        <div class="form-group">
+                            <label>Field + Value</label>
+                            <div style="display:flex; gap:8px;">
+                                <select id="queryField" class="form-input" style="width:140px;">
+                                    <option value="category">category (TAG)</option>
+                                    <option value="title">title (TEXT)</option>
+                                </select>
+                                <input type="text" id="queryValue" class="form-input" placeholder="e.g. PSD2" style="flex:1;"/>
+                                <button id="queryBtn" class="btn btn-primary">Query</button>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                            <button class="btn btn-sm btn-secondary query-preset" data-field="category" data-value="PSD2">@category:{PSD2}</button>
+                            <button class="btn btn-sm btn-secondary query-preset" data-field="category" data-value="GDPR">@category:{GDPR}</button>
+                            <button class="btn btn-sm btn-secondary query-preset" data-field="category" data-value="DORA">@category:{DORA}</button>
+                            <button class="btn btn-sm btn-secondary query-preset" data-field="title" data-value="payment">@title:payment</button>
+                        </div>
+                        <div id="query-cmd" class="data-card" style="display:none; background:var(--bg-tertiary);">
+                            <h3>Redis Command</h3>
+                            <pre id="query-cmd-output" style="font-size:0.72rem; margin:0; white-space:pre-wrap; color:var(--text-secondary); font-family:var(--font-code);"></pre>
+                        </div>
+                        <div id="query-result" style="margin-top:8px;"></div>
+                    </div>
+                </div>
+
+                <!-- ====== SEARCH TAB ====== -->
+                <div id="search-tab" class="demo-container" style="display:none;">
 
                     <!-- Search Mode Toggle -->
                     <div class="form-group">
@@ -120,7 +248,9 @@
                     </div>
 
                     <div class="code-block" id="tab-java">
-                        <pre><code class="language-java">// 1. Store regulation doc — JSON.SET
+                        <pre><code class="language-java">// === CRUD Operations ===
+
+// 1. CREATE — JSON.SET (store document)
 String key = "workshop:docs:regulation:REG001";
 String json = """
   { "id": "REG001",
@@ -130,31 +260,32 @@ String json = """
     "content": "Full text...",
     "vector": [0.023, -0.118, ...] }
   """;
-
-// JSON.SET — store as RedisJSON document
 redis.execute(conn -&gt; conn.execute(
     "JSON.SET", key, "$", json));
 
-// 2. Create search index — FT.CREATE
-// TEXT fields for full-text, TAG for filters,
-// VECTOR HNSW for semantic similarity
+// 2. READ full doc — JSON.GET
 redis.execute(conn -&gt; conn.execute(
-  "FT.CREATE", "idx:regulations",
-  "ON", "JSON",
-  "PREFIX", "1", "workshop:docs:regulation:",
-  "SCHEMA",
-    "$.title", "AS", "title", "TEXT",
-      "WEIGHT", "2.0",
-    "$.category", "AS", "category", "TAG",
-    "$.summary", "AS", "summary", "TEXT",
-    "$.content", "AS", "content", "TEXT",
-    "$.vector", "AS", "vector", "VECTOR",
-      "HNSW", "6",
-      "TYPE", "FLOAT32",
-      "DIM", "768",
-      "DISTANCE_METRIC", "COSINE"));
+    "JSON.GET", key, "$"));
 
-// 3. Full-text search — FT.SEARCH
+// 3. READ specific field — JSON.GET + path
+redis.execute(conn -&gt; conn.execute(
+    "JSON.GET", key, "$.title"));
+
+// 4. READ multiple docs — JSON.MGET
+redis.execute(conn -&gt; conn.execute(
+    "JSON.MGET", key1, key2, key3, "$"));
+
+// 5. QUERY by field — FT.SEARCH + filter
+redis.execute(conn -&gt; conn.execute(
+  "FT.SEARCH", "idx:regulations",
+  "@category:{PSD2}",
+  "RETURN", "4",
+    "title", "category", "summary", "tags",
+  "LIMIT", "0", "10"));
+
+// === Search Operations ===
+
+// 6. Full-text search — FT.SEARCH
 redis.execute(conn -&gt; conn.execute(
   "FT.SEARCH", "idx:regulations",
   "payment services",
@@ -162,7 +293,7 @@ redis.execute(conn -&gt; conn.execute(
     "title", "category", "summary", "tags",
   "LIMIT", "0", "10"));
 
-// 4. Vector similarity (KNN) — FT.SEARCH
+// 7. Vector similarity (KNN)
 byte[] queryVec = embedQuery("data protection");
 redis.execute(conn -&gt; conn.execute(
   "FT.SEARCH", "idx:regulations",
@@ -173,7 +304,7 @@ redis.execute(conn -&gt; conn.execute(
   "PARAMS", "2", "BLOB", queryVec,
   "DIALECT", "2"));
 
-// 5. Hybrid: text filter + KNN
+// 8. Hybrid: text filter + KNN
 redis.execute(conn -&gt; conn.execute(
   "FT.SEARCH", "idx:regulations",
   "(payment)=&gt;[KNN 5 @vector $BLOB AS score]",
@@ -185,35 +316,41 @@ redis.execute(conn -&gt; conn.execute(
                     </div>
 
                     <div class="code-block active" id="tab-cli">
-                        <pre><code class="language-bash"># 1. Store document as JSON
+                        <pre><code class="language-bash"># === CRUD Operations ===
+
+# 1. CREATE — store document as JSON
 JSON.SET workshop:docs:regulation:REG001 $ '{
   "id": "REG001",
   "title": "PSD2 Strong Customer Auth",
   "category": "PSD2",
-  "summary": "SCA requirements for payments",
-  "content": "Full regulation text...",
-  "vector": [0.023, -0.118, ...]
+  "summary": "SCA requirements...",
+  "content": "Full regulation text..."
 }'
 
-# 2. Create index: TEXT + TAG + VECTOR on JSON
-FT.CREATE idx:regulations ON JSON \
-  PREFIX 1 workshop:docs:regulation: \
-  SCHEMA \
-    $.title AS title TEXT WEIGHT 2.0 \
-    $.category AS category TAG \
-    $.summary AS summary TEXT \
-    $.content AS content TEXT \
-    $.vector AS vector VECTOR HNSW 6 \
-      TYPE FLOAT32 DIM 768 \
-      DISTANCE_METRIC COSINE
+# 2. READ full document
+JSON.GET workshop:docs:regulation:REG001 $
 
-# 3. Full-text search
+# 3. READ specific field (JSONPath)
+JSON.GET workshop:docs:regulation:REG001 $.title
+JSON.GET workshop:docs:regulation:REG001 $.summary
+
+# 4. READ multiple documents at once
+JSON.MGET workshop:docs:regulation:REG001 \
+  workshop:docs:regulation:REG002 $
+
+# 5. QUERY by field — TAG filter
+FT.SEARCH idx:regulations "@category:{PSD2}" \
+  RETURN 4 title category summary tags \
+  LIMIT 0 10
+
+# === Search Operations ===
+
+# 6. Full-text search
 FT.SEARCH idx:regulations "payment services" \
   RETURN 4 title category summary tags \
   LIMIT 0 10
 
-# 4. Vector similarity (KNN)
-# $BLOB = binary float32 query vector
+# 7. Vector similarity (KNN)
 FT.SEARCH idx:regulations \
   "*=>[KNN 10 @vector $BLOB AS score]" \
   RETURN 5 title category summary tags score \
@@ -221,19 +358,13 @@ FT.SEARCH idx:regulations \
   PARAMS 2 BLOB $query_vector \
   DIALECT 2
 
-# 5. Hybrid: text pre-filter + KNN
+# 8. Hybrid: text pre-filter + KNN
 FT.SEARCH idx:regulations \
   "(payment)=>[KNN 5 @vector $BLOB AS score]" \
   RETURN 5 title category summary tags score \
   SORTBY score \
   PARAMS 2 BLOB $query_vector \
-  DIALECT 2
-
-# 6. Filter by category TAG
-FT.SEARCH idx:regulations \
-  "@category:{PSD2}" \
-  RETURN 3 title summary tags \
-  LIMIT 0 10</code></pre>
+  DIALECT 2</code></pre>
                     </div>
                 </div>
             </section>
