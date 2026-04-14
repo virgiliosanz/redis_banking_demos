@@ -11,6 +11,12 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.domain.geo.GeoReference;
 import org.springframework.stereotype.Service;
 
+import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.codec.ByteArrayCodec;
+import io.lettuce.core.output.NestedMultiOutput;
+import io.lettuce.core.protocol.CommandArgs;
+import io.lettuce.core.protocol.ProtocolKeyword;
+
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -193,14 +199,7 @@ public class GeoFinderService {
 
         String ftQuery = query.toString();
 
-        Object rawResults = redis.execute(connection -> {
-            return connection.execute("FT.SEARCH",
-                    INDEX_NAME.getBytes(StandardCharsets.UTF_8),
-                    ftQuery.getBytes(StandardCharsets.UTF_8),
-                    "LIMIT".getBytes(StandardCharsets.UTF_8),
-                    "0".getBytes(StandardCharsets.UTF_8),
-                    "20".getBytes(StandardCharsets.UTF_8));
-        }, true);
+        List<Object> rawResults = executeFtSearch(INDEX_NAME, ftQuery, "LIMIT", "0", "20");
 
         List<Map<String, Object>> results = parseRqeResults(rawResults);
 
@@ -244,6 +243,37 @@ public class GeoFinderService {
     }
 
     // --- Helpers ---
+
+    private static final ProtocolKeyword FT_SEARCH = new ProtocolKeyword() {
+        @Override public byte[] getBytes() { return "FT.SEARCH".getBytes(StandardCharsets.UTF_8); }
+        @Override public String name() { return "FT.SEARCH"; }
+    };
+
+    /**
+     * Execute FT.SEARCH using Lettuce's native dispatch with NestedMultiOutput.
+     * Spring Data Redis's connection.execute() uses ByteArrayOutput which cannot
+     * handle the integer count that FT.SEARCH returns as its first element.
+     */
+    @SuppressWarnings("unchecked")
+    private List<Object> executeFtSearch(String indexName, String query, String... extraArgs) {
+        return redis.execute((org.springframework.data.redis.core.RedisCallback<List<Object>>) connection -> {
+            Object nativeConn = connection.getNativeConnection();
+            if (nativeConn instanceof StatefulRedisConnection<?, ?> stateful) {
+                var codec = ByteArrayCodec.INSTANCE;
+                var output = new NestedMultiOutput<>(codec);
+                var args = new CommandArgs<>(codec);
+                args.add(indexName.getBytes(StandardCharsets.UTF_8));
+                args.add(query.getBytes(StandardCharsets.UTF_8));
+                for (String extra : extraArgs) {
+                    args.add(extra.getBytes(StandardCharsets.UTF_8));
+                }
+
+                var typedConn = (StatefulRedisConnection<byte[], byte[]>) stateful;
+                return typedConn.sync().dispatch(FT_SEARCH, output, args);
+            }
+            return List.<Object>of();
+        });
+    }
 
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> parseRqeResults(Object rawResults) {
