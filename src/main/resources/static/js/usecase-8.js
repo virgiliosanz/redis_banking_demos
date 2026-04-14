@@ -85,6 +85,17 @@
         resultMode.textContent = getModeLabel(data.mode);
         resultCount.textContent = data.resultCount || 0;
 
+        // Mock vectors warning
+        var existingWarning = document.getElementById('mock-vectors-warning');
+        if (existingWarning) existingWarning.remove();
+        if (data.mockVectors) {
+            var warning = document.createElement('div');
+            warning.id = 'mock-vectors-warning';
+            warning.style.cssText = 'background:var(--bg-tertiary); border-left:3px solid var(--redis-primary); padding:8px 12px; margin-bottom:12px; font-size:0.8rem; color:var(--text-muted); border-radius:0 5px 5px 0;';
+            warning.innerHTML = '⚠️ Using mock vectors (no OpenAI API key). Similarity scores are not meaningful — configure <code>OPENAI_API_KEY</code> for real embeddings.';
+            resultsContainer.parentNode.insertBefore(warning, resultsContainer);
+        }
+
         // Render result cards
         var results = data.results || [];
         if (results.length === 0) {

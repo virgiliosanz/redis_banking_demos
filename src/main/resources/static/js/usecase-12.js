@@ -54,6 +54,36 @@
         });
     });
 
+    // --- Quick scenario buttons ---
+    document.querySelectorAll('.geo-scenario').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            currentLat = parseFloat(btn.getAttribute('data-lat'));
+            currentLng = parseFloat(btn.getAttribute('data-lng'));
+            radiusSlider.value = btn.getAttribute('data-radius') || '2';
+            radiusValue.textContent = radiusSlider.value;
+
+            // Switch approach tab if specified
+            var approach = btn.getAttribute('data-approach');
+            if (approach) {
+                document.querySelectorAll('.geo-tab').forEach(function (t) { t.classList.remove('active'); });
+                var targetTab = document.querySelector('.geo-tab[data-approach="' + approach + '"]');
+                if (targetTab) targetTab.classList.add('active');
+                currentApproach = approach;
+                rqeFilters.style.display = approach === 'rqe' ? 'flex' : 'none';
+            }
+
+            // Set RQE filters if specified
+            var type = btn.getAttribute('data-type');
+            if (type && filterType) filterType.value = type;
+
+            // Clear active preset
+            document.querySelectorAll('.geo-preset').forEach(function (b) { b.classList.remove('active'); });
+
+            setUserLocation(currentLat, currentLng);
+            doSearch();
+        });
+    });
+
     // --- Radius slider ---
     radiusSlider.addEventListener('input', function () {
         radiusValue.textContent = radiusSlider.value;

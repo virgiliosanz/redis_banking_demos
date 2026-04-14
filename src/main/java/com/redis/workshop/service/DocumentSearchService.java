@@ -45,7 +45,7 @@ public class DocumentSearchService {
         response.put("query", query);
         response.put("resultCount", results.size());
         response.put("results", results);
-        response.put("redisCommand", "FT.SEARCH " + INDEX_NAME + " \"" + ftQuery + "\" RETURN 6 title category summary content tags LIMIT 0 10");
+        response.put("redisCommand", "FT.SEARCH " + INDEX_NAME + " \"" + ftQuery + "\" WITHSCORES RETURN 6 title category summary content tags LIMIT 0 10");
         return response;
     }
 
@@ -59,9 +59,11 @@ public class DocumentSearchService {
 
         List<Map<String, Object>> results = executeVectorSearch(vectorBytes, "*", 10);
 
+        boolean mockVectors = !openAiService.isConfigured();
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("mode", "vector");
         response.put("query", query);
+        response.put("mockVectors", mockVectors);
         response.put("resultCount", results.size());
         response.put("results", results);
         response.put("redisCommand", "FT.SEARCH " + INDEX_NAME + " \"*=>[KNN 10 @vector $BLOB AS score]\" RETURN 7 title category summary content tags score SORTBY score PARAMS 2 BLOB <vector_bytes> DIALECT 2");
@@ -86,9 +88,11 @@ public class DocumentSearchService {
             results = executeVectorSearch(vectorBytes, "*", 10);
         }
 
+        boolean mockVectors = !openAiService.isConfigured();
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("mode", "hybrid");
         response.put("query", query);
+        response.put("mockVectors", mockVectors);
         response.put("resultCount", results.size());
         response.put("results", results);
         response.put("redisCommand", "FT.SEARCH " + INDEX_NAME + " \"" + preFilter + "=>[KNN 10 @vector $BLOB AS score]\" RETURN 7 title category summary content tags score SORTBY score PARAMS 2 BLOB <vector_bytes> DIALECT 2");
@@ -127,10 +131,11 @@ public class DocumentSearchService {
 
     private List<Map<String, Object>> executeFtSearch(String query, byte[] vectorBytes) {
         List<Object> rawResults = redisSearchHelper.ftSearchRaw(INDEX_NAME, query,
+                "WITHSCORES",
                 "RETURN", "6", "title", "category", "summary", "content", "tags", "$.id",
                 "LIMIT", "0", "10");
 
-        return parseSearchResults(rawResults, false);
+        return parseSearchResults(rawResults, false, true);
     }
 
     private List<Map<String, Object>> executeVectorSearch(byte[] vectorBytes, String preFilter, int k) {
@@ -159,16 +164,18 @@ public class DocumentSearchService {
 
         List<Object> rawResults = redisSearchHelper.ftSearchWithBinaryArgs(INDEX_NAME, binaryArgs);
 
-        return parseSearchResults(rawResults, true);
+        return parseSearchResults(rawResults, true, false);
     }
 
     // Continued in next section...
     @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> parseSearchResults(Object rawResults, boolean hasScore) {
+    private List<Map<String, Object>> parseSearchResults(Object rawResults, boolean hasScore, boolean withScores) {
         List<Map<String, Object>> results = new ArrayList<>();
         if (rawResults == null) return results;
 
-        // FT.SEARCH returns: [total, key1, [field, val, ...], key2, [field, val, ...], ...]
+        // FT.SEARCH returns:
+        //   Without WITHSCORES: [total, key1, [fields...], key2, [fields...], ...]
+        //   With WITHSCORES:    [total, key1, score1, [fields...], key2, score2, [fields...], ...]
         List<Object> list;
         if (rawResults instanceof List<?> l) {
             list = (List<Object>) l;
@@ -178,12 +185,27 @@ public class DocumentSearchService {
 
         if (list.size() < 2) return results;
 
+        int step = withScores ? 3 : 2;
         // First element is the total count
-        for (int i = 1; i < list.size(); i += 2) {
-            if (i + 1 >= list.size()) break;
-
+        for (int i = 1; i < list.size(); i += step) {
             String docKey = decodeObject(list.get(i));
-            Object fieldsObj = list.get(i + 1);
+
+            double ftScore = 0.0;
+            Object fieldsObj;
+            if (withScores) {
+                if (i + 2 >= list.size()) break;
+                // Parse the relevance score returned by RediSearch
+                try {
+                    ftScore = Double.parseDouble(decodeObject(list.get(i + 1)));
+                } catch (NumberFormatException e) {
+                    ftScore = 0.0;
+                }
+                fieldsObj = list.get(i + 2);
+            } else {
+                if (i + 1 >= list.size()) break;
+                fieldsObj = list.get(i + 1);
+            }
+
             if (!(fieldsObj instanceof List<?> fields)) continue;
 
             Map<String, Object> doc = new LinkedHashMap<>();
@@ -211,11 +233,29 @@ public class DocumentSearchService {
                 }
             }
 
-            if (!hasScore && !doc.containsKey("score")) {
-                doc.put("score", 1.0); // Full-text match = full relevance
+            // For WITHSCORES (full-text), store the raw score for later normalization
+            if (withScores && !doc.containsKey("score")) {
+                doc.put("score", ftScore);
+            }
+
+            if (!hasScore && !withScores && !doc.containsKey("score")) {
+                doc.put("score", 1.0);
             }
 
             results.add(doc);
+        }
+
+        // Normalize full-text scores to 0-1 range using max score
+        if (withScores && !results.isEmpty()) {
+            double maxScore = results.stream()
+                    .mapToDouble(d -> ((Number) d.getOrDefault("score", 0.0)).doubleValue())
+                    .max().orElse(1.0);
+            if (maxScore > 0) {
+                for (Map<String, Object> doc : results) {
+                    double raw = ((Number) doc.getOrDefault("score", 0.0)).doubleValue();
+                    doc.put("score", Math.round((raw / maxScore) * 1000.0) / 1000.0);
+                }
+            }
         }
 
         return results;

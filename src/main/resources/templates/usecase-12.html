@@ -100,6 +100,17 @@
                         <input type="range" id="radiusSlider" min="0.5" max="5" step="0.5" value="2"/>
                     </div>
 
+                    <!-- Quick scenarios -->
+                    <div style="margin-bottom:12px;">
+                        <label style="font-size:0.8rem; color:var(--text-muted);">Quick scenarios:</label>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
+                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4168" data-lng="-3.7038" data-radius="2" data-approach="native">📍 Sol — 2km</button>
+                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4530" data-lng="-3.6883" data-radius="3" data-approach="native">🏢 Chamartín — 3km</button>
+                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4065" data-lng="-3.6895" data-radius="1" data-approach="rqe" data-type="atm">🏧 ATMs near Atocha</button>
+                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4372" data-lng="-3.6920" data-radius="2" data-approach="rqe" data-type="branch">🏦 Branches Castellana</button>
+                        </div>
+                    </div>
+
                     <!-- Search button -->
                     <button id="btnSearch" class="rl-btn rl-btn-primary" style="width:100%;margin-bottom:16px;">🔍 Search</button>
 
