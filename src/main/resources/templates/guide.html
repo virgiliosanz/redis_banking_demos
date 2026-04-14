@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Presenter Guide</title>
+    <style>
+        .guide-container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+        .guide-container h1 { font-size: 1.75rem; margin-bottom: 8px; }
+        .guide-container h2 { font-size: 1.35rem; margin-top: 40px; border-bottom: 2px solid var(--color-border, #E5E7EB); padding-bottom: 8px; }
+        .guide-container h3 { font-size: 1.1rem; margin-top: 24px; color: var(--color-text-secondary, #6B7280); }
+        .guide-container p, .guide-container li { line-height: 1.6; }
+        .guide-container ol, .guide-container ul { padding-left: 24px; }
+        .guide-container code { background: var(--color-code-bg, #F3F4F6); padding: 2px 6px; border-radius: 5px; font-family: 'Space Mono', monospace; font-size: 0.9em; }
+        .guide-container pre { background: var(--color-code-bg, #F3F4F6); padding: 16px; border-radius: 5px; overflow-x: auto; }
+        .guide-container pre code { background: none; padding: 0; }
+        .guide-meta { color: var(--color-text-secondary, #6B7280); margin-bottom: 24px; }
+        .guide-quote { background: var(--color-code-bg, #F3F4F6); border-left: 4px solid #FF4438; padding: 16px; margin: 16px 0; border-radius: 0 5px 5px 0; font-style: italic; }
+        .guide-hr { border: none; border-top: 1px solid var(--color-border, #E5E7EB); margin: 40px 0; }
+    </style>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="guide-container">
+
+            <h1>📋 Redis Banking Workshop — Presenter Guide</h1>
+            <div class="guide-meta">
+                <p>Duration: ~2 hours · Audience: Technical architects and developers · Format: Live demo</p>
+            </div>
+
+            <h2>Setup</h2>
+            <pre><code>docker compose --profile workshop up -d --build
+# Open http://localhost:8080</code></pre>
+
+            <hr class="guide-hr"/>
+
+            <!-- UC1 -->
+            <h2>UC1: Authentication Token Store</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"When a user authenticates, we need to store their token somewhere fast and reliable. Redis is perfect for this — we store the token as a Hash with a TTL, so it auto-expires when the session ends. Any microservice in your architecture can validate the user by checking Redis."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Click "Login" with the demo credentials</li>
+                <li>Show the generated token and its TTL countdown</li>
+                <li>Click "Validate Token" — show it returns valid</li>
+                <li>Wait or click "Logout" — show the token is gone</li>
+                <li>Try to validate again — show it fails</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>HSET workshop:auth:token:{id} ...</code> — store token</li>
+                <li><code>EXPIRE</code> — auto-cleanup</li>
+                <li><code>HGET</code> / <code>EXISTS</code> — validate token</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>Sub-millisecond token validation vs database lookup</li>
+                <li>Distributed: any service can check the token</li>
+                <li>TTL = automatic session expiry, no cleanup jobs needed</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
+            <!-- UC2 -->
+            <h2>UC2: Session Storage</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"Once authenticated, we need to store session state — form data, user preferences, recent actions. Instead of keeping this in the app server (which doesn't scale) or hitting the database on every request, we use Redis as a distributed session store."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Create a new session — show data loaded from "RDBMS"</li>
+                <li>Modify session data (update a field)</li>
+                <li>Show the session in Redis with all fields</li>
+                <li>End the session — data "written back" to DB</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>HSET</code> / <code>HGETALL</code> — session CRUD</li>
+                <li><code>EXPIRE</code> — auto-cleanup on inactivity</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>Stateless app servers: any instance can serve any user</li>
+                <li>Redis vs sticky sessions: horizontal scaling</li>
+                <li>TTL handles abandoned sessions automatically</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
+            <!-- UC3 -->
+            <h2>UC3: User Profile Storage</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"In banking, a user profile is scattered across multiple systems — accounts, activity logs, preferences. Redis aggregates all of this into a single fast-access profile. When the user logs in, one call to Redis gives you everything."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Select a user (e.g., "María García")</li>
+                <li>Click "Load Profile" — show data aggregated from Accounts DB, Activity DB, Preferences DB</li>
+                <li>Modify a field (e.g., notification preference)</li>
+                <li>Click "Sync Back" — changes written to source databases</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>HSET</code> with multiple fields — aggregated profile</li>
+                <li><code>HGETALL</code> — single read for complete profile</li>
+                <li>Pipeline for multi-DB aggregation</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>Single source of truth during the session</li>
+                <li>60x faster than querying 3 different databases</li>
+                <li>Write-back pattern for data consistency</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
+            <!-- UC4 -->
+            <h2>UC4: Rate Limiting</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"With PSD2 and Open Banking, your APIs are exposed to third parties. You need to protect them. Redis makes rate limiting trivial — INCR a counter, check the limit, set a TTL. It's atomic and fast."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Click "Send Request" a few times — see counter increment</li>
+                <li>Hit the limit — see the request denied in red</li>
+                <li>Wait for the window to reset — see it allow again</li>
+                <li>Show the sliding window vs fixed window difference</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>INCR</code> — atomic counter</li>
+                <li><code>EXPIRE</code> — window reset</li>
+                <li><code>ZADD</code> + <code>ZRANGEBYSCORE</code> — sliding window</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>Atomic operations = no race conditions under load</li>
+                <li>Multiple strategies: fixed window, sliding window, token bucket</li>
+                <li>Per-user, per-API-key, per-IP — flexible key design</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
+            <!-- UC5 -->
+            <h2>UC5: Transaction Deduplication</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"Duplicate payments are a real problem in banking — network retries, user double-clicks, system failures. Redis gives you instant dedup with SET NX (set if not exists) and Bloom filters for memory-efficient duplicate checking."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Submit a transaction — see it accepted</li>
+                <li>Submit the same transaction again — see it rejected as duplicate</li>
+                <li>Submit a different transaction — accepted</li>
+                <li>Show the Bloom filter approach for high-volume scenarios</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>SET key value NX EX ttl</code> — atomic check-and-set</li>
+                <li><code>BF.ADD</code> / <code>BF.EXISTS</code> — probabilistic dedup</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>SETNX is atomic — impossible to have two transactions slip through</li>
+                <li>Bloom filter: 99.97% accurate with fraction of the memory</li>
+                <li>TTL controls the dedup window (e.g., 24 hours)</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
+            <!-- UC6 -->
+            <h2>UC6: Fraud Detection (Transaction Risk Scoring)</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"This is where Redis really shines in banking. Redis serves as the online feature store for real-time fraud scoring. Account features, customer features, transaction features — all stored in Redis Hashes for sub-millisecond access. A scoring microservice queries Redis and gets a risk score in under 10ms."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Submit a normal transaction — see LOW risk score (green)</li>
+                <li>Submit a high-amount transaction — see MEDIUM risk</li>
+                <li>Submit rapid-fire transactions (burst) — velocity check triggers HIGH risk</li>
+                <li>Submit from unusual location — see CRITICAL risk</li>
+                <li>Show the transaction stream log</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>ZADD</code> + <code>ZRANGEBYSCORE</code> — velocity tracking</li>
+                <li><code>XADD</code> / <code>XRANGE</code> — transaction stream</li>
+                <li><code>HGETALL</code> — feature retrieval</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>60x faster than traditional database for feature serving</li>
+                <li>Active-Active for multi-geo with 99.999% SLA</li>
+                <li>Sorted Sets for time-windowed velocity checks</li>
+                <li>Streams for audit trail and model retraining</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
+            <!-- UC7 -->
+            <h2>UC7: Feature Store</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"Redis isn't just a cache — it's a real-time data platform. Here we use it as a feature store, ingesting time series data from multiple sources and serving it via the Redis Query Engine. Sub-millisecond response times, no matter where your users are."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Show pre-loaded client features (3 different risk profiles)</li>
+                <li>Select a client — view their feature vector</li>
+                <li>Update a feature in real-time (e.g., increment transaction count)</li>
+                <li>Recalculate risk score — see it change based on updated features</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>HSET</code> / <code>HGETALL</code> — feature storage</li>
+                <li><code>HINCRBY</code> — real-time feature updates</li>
+                <li><code>FT.SEARCH</code> — query features via RQE</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>Online feature store for ML model serving</li>
+                <li>Real-time feature updates (not batch)</li>
+                <li>Redis Query Engine for complex queries on features</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
+            <!-- UC8 -->
+            <h2>UC8: Document Database</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"Redis 8 includes a full document database with JSON support and a powerful query engine. You can store regulation documents, search them with full-text queries, and even do vector similarity search — all from Redis, with sub-10ms response times."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Type a full-text search query (e.g., "customer authentication")</li>
+                <li>Show results with relevance scores</li>
+                <li>Switch to vector search mode — find semantically similar documents</li>
+                <li>Try hybrid search — combine text filter + vector similarity</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>JSON.SET</code> — store documents</li>
+                <li><code>FT.CREATE</code> — index with TEXT + VECTOR fields</li>
+                <li><code>FT.SEARCH</code> — full-text query</li>
+                <li><code>FT.SEARCH ... KNN</code> — vector similarity</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>No need for Elasticsearch + separate vector DB</li>
+                <li>One database for text search + vector search + structured queries</li>
+                <li>Redis Query Engine supports full-text, numeric, tag, and vector fields</li>
+                <li>&lt;10ms for document retrieval</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
+            <!-- UC9 -->
+            <h2>UC9: AI Agent Memory + RAG</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"AI agents need memory — both short-term (current conversation) and long-term (past interactions). Redis provides both, plus RAG retrieval for knowledge base search. This is the architecture behind every serious AI banking assistant."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Start a conversation — ask about wire transfers</li>
+                <li>Show the Memory Inspection panel — see short-term memory (Hash with TTL)</li>
+                <li>Ask a follow-up — agent recalls context from short-term memory</li>
+                <li>Ask about a topic from past interactions — agent retrieves from long-term memory (vector search)</li>
+                <li>Ask a regulatory question — agent pulls from knowledge base (RAG)</li>
+                <li>Show which memories and KB docs were retrieved</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>HSET</code> + <code>EXPIRE</code> — short-term conversation memory</li>
+                <li><code>JSON.SET</code> + <code>FT.SEARCH KNN</code> — long-term memory retrieval</li>
+                <li><code>FT.SEARCH KNN</code> — RAG document retrieval</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>Short-term memory: Redis Hash with TTL = automatic cleanup</li>
+                <li>Long-term memory: vector search over past interactions</li>
+                <li>RAG: same Redis instance serves as vector store</li>
+                <li>No external vector database needed — Redis does it all</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
+            <!-- Closing -->
+            <h2>Closing</h2>
+            <h3>Key takeaways</h3>
+            <ol>
+                <li>Redis is not just a cache — it's a real-time data platform</li>
+                <li>One database for sessions, rate limiting, fraud detection, feature store, document search, AND AI memory</li>
+                <li>Sub-millisecond latency for all operations</li>
+                <li>Built-in search engine (full-text + vector) since Redis 8</li>
+                <li>Active-Active for multi-geo banking requirements</li>
+            </ol>
+            <h3>Questions?</h3>
+            <p>Open any demo and let the audience try it themselves.</p>
+
+        </div>
+    </div>
+</body>
+</html>
