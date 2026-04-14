@@ -1,4 +1,4 @@
-/** UC11: Real-time Transaction Monitoring — Redis Time Series */
+/** UC11: Real-time Transaction Monitoring — Redis Streams */
 (function () {
     'use strict';
 
@@ -36,7 +36,7 @@
         var ctx = canvas.getContext('2d');
         var dpr = window.devicePixelRatio || 1;
         var rect = canvas.parentElement.getBoundingClientRect();
-        var width = rect.width;
+        var width = Math.floor(rect.width); // floor to prevent sub-pixel growth
         var height = 200;
 
         canvas.width = width * dpr;

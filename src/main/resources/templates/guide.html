@@ -308,27 +308,28 @@
             <!-- UC11 -->
             <h2>UC11: Real-time Transaction Monitoring</h2>
             <h3>What to say</h3>
-            <div class="guide-quote">"Banks need to monitor transactions in real time — TPS, amounts, risk scores. Redis Time Series is purpose-built for this. TS.ADD ingests data points, TS.RANGE with AGGREGATION queries them in time buckets. You get a live dashboard with sub-millisecond queries, automatic retention, and built-in aggregation — no external time series DB needed."</div>
+            <div class="guide-quote">"Banks need to monitor transactions in real time — TPS, amounts, risk scores. Redis Streams are perfect for this. XADD ingests transaction events with auto-generated timestamp IDs, XRANGE queries them by time window, and the app aggregates into time buckets. You get a live dashboard with sub-millisecond writes and reads — using a core Redis data structure."</div>
             <h3>Demo steps</h3>
             <ol>
                 <li>Click "Start Simulation" — watch the chart build up (~2 TPS)</li>
                 <li>Point out the metrics cards: TPS, total count, average amount</li>
                 <li>Click "Inject Anomaly" — see the spike in the chart and the High Risk % jump</li>
                 <li>Click "Stop" to pause, then "Reset" to clear</li>
-                <li>Show the Redis CLI tab — explain TS.CREATE, TS.ADD, TS.RANGE</li>
+                <li>Show the Redis CLI tab — explain XADD, XRANGE, XLEN</li>
             </ol>
             <h3>Key Redis commands</h3>
             <ul>
-                <li><code>TS.CREATE</code> — create a time series with retention and duplicate policy</li>
-                <li><code>TS.ADD</code> — add a data point (key, timestamp, value)</li>
-                <li><code>TS.RANGE</code> + <code>AGGREGATION</code> — query with SUM/AVG/MAX in time buckets</li>
+                <li><code>XADD</code> — add a transaction event with amount and risk score fields</li>
+                <li><code>XRANGE</code> — query entries in a timestamp range</li>
+                <li><code>XLEN</code> — get total stream length</li>
+                <li><code>XTRIM</code> — bound the stream with MAXLEN</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
-                <li>Redis 8 includes Time Series natively — no separate module</li>
-                <li>Automatic retention: data older than 1 hour is pruned</li>
-                <li>DUPLICATE_POLICY SUM: multiple adds in the same millisecond are summed</li>
-                <li>AGGREGATION in TS.RANGE: server-side aggregation, not client-side</li>
+                <li>Redis Streams: append-only log with ms-precision timestamp IDs</li>
+                <li>XTRIM MAXLEN keeps the stream bounded (last 10,000 entries)</li>
+                <li>Aggregation done in Java: COUNT, AVG, SUM per 1-second bucket</li>
+                <li>Stream IDs are time-based — natural fit for time-range queries</li>
                 <li>Perfect for real-time dashboards, alerting, and anomaly detection</li>
             </ul>
 

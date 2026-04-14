@@ -1736,11 +1736,14 @@ a:hover {
     border-radius: var(--border-radius);
     padding: calc(var(--spacing-unit) * 1);
     overflow: hidden;
+    max-width: 100%;
+    position: relative;
 }
 
 .tm-chart-wrapper canvas {
     display: block;
     width: 100%;
+    max-width: 100%;
 }
 
 @media (max-width: 768px) {

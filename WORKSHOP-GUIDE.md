@@ -258,25 +258,26 @@ docker compose --profile workshop up -d --build
 ## UC11: Real-time Transaction Monitoring
 
 ### What to say
-"Banks need to monitor transactions in real time — TPS, amounts, risk scores. Redis Time Series is purpose-built for this. TS.ADD ingests data points, TS.RANGE with AGGREGATION queries them in time buckets. You get a live dashboard with sub-millisecond queries, automatic retention, and built-in aggregation — no external time series DB needed."
+"Banks need to monitor transactions in real time — TPS, amounts, risk scores. Redis Streams are perfect for this. XADD ingests transaction events with auto-generated timestamp IDs, XRANGE queries them by time window, and the app aggregates into time buckets. You get a live dashboard with sub-millisecond writes and reads — using a core Redis data structure."
 
 ### Demo steps
 1. Click "Start Simulation" — watch the chart build up (~2 TPS)
 2. Point out the metrics cards: TPS, total count, average amount
 3. Click "Inject Anomaly" — see the spike in the chart and the High Risk % jump
 4. Click "Stop" to pause, then "Reset" to clear
-5. Show the Redis CLI tab — explain TS.CREATE, TS.ADD, TS.RANGE
+5. Show the Redis CLI tab — explain XADD, XRANGE, XLEN
 
 ### Key Redis commands
-- `TS.CREATE` — create a time series with retention and duplicate policy
-- `TS.ADD` — add a data point (key, timestamp, value)
-- `TS.RANGE` + `AGGREGATION` — query with SUM/AVG/MAX in time buckets
+- `XADD` — add a transaction event with amount and risk score fields
+- `XRANGE` — query entries in a timestamp range
+- `XLEN` — get total stream length
+- `XTRIM` — bound the stream with MAXLEN
 
 ### Talking points
-- Redis 8 includes Time Series natively — no separate module
-- Automatic retention: data older than 1 hour is pruned
-- DUPLICATE_POLICY SUM: multiple adds in the same millisecond are summed
-- AGGREGATION in TS.RANGE: server-side aggregation, not client-side
+- Redis Streams: append-only log with ms-precision timestamp IDs
+- XTRIM MAXLEN keeps the stream bounded (last 10,000 entries)
+- Aggregation done in Java: COUNT, AVG, SUM per 1-second bucket
+- Stream IDs are time-based — natural fit for time-range queries
 - Perfect for real-time dashboards, alerting, and anomaly detection
 
 ---

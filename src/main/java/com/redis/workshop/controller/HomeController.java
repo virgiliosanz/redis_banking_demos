@@ -42,8 +42,8 @@ public class HomeController {
                     "description", "Speed up data access with Redis cache — from 200ms to <1ms",
                     "icon", "⚡", "features", "String · GET · SET EX · DEL"),
             Map.of("id", "11", "title", "Transaction Monitoring",
-                    "description", "Live transaction metrics with Redis Time Series",
-                    "icon", "📈", "features", "Time Series · TS.ADD · TS.RANGE"),
+                    "description", "Live transaction metrics with Redis Streams",
+                    "icon", "📈", "features", "Streams · XADD · XRANGE · XLEN"),
             Map.of("id", "12", "title", "ATM & Branch Finder",
                     "description", "Find nearest ATMs and branches with Redis Geospatial",
                     "icon", "📍", "features", "Geo · JSON · RQE · GEOSEARCH")

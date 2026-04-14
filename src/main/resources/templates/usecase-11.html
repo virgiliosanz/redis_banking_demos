@@ -11,16 +11,16 @@
             <span class="usecase-badge">UC11</span>
             <h1 th:text="${useCaseTitle}">Real-time Transaction Monitoring</h1>
         </div>
-        <p class="usecase-subtitle">Live transaction metrics with Redis Time Series &mdash; TS.CREATE, TS.ADD, TS.RANGE with aggregation.</p>
+        <p class="usecase-subtitle">Live transaction metrics with Redis Streams &mdash; XADD, XRANGE, XLEN with manual aggregation.</p>
 
         <section class="how-it-works">
             <h2>How it works</h2>
             <div class="how-it-works-steps">
                 <ol>
-                    <li><strong>Ingest:</strong> Each transaction generates data points — count, amount, risk score — written to Redis Time Series with TS.ADD.</li>
-                    <li><strong>Store:</strong> Redis Time Series stores timestamped data with automatic retention (1 hour) and duplicate policies (SUM for counts, LAST for values).</li>
-                    <li><strong>Query:</strong> TS.RANGE with AGGREGATION retrieves data in time buckets (1-second windows) for real-time dashboards.</li>
-                    <li><strong>Detect:</strong> Anomaly bursts (spike in volume + high amounts) are instantly visible in the time series data.</li>
+                    <li><strong>Ingest:</strong> Each transaction is written to a Redis Stream with XADD — amount and risk score as fields.</li>
+                    <li><strong>Store:</strong> Redis Streams store timestamped entries with automatic IDs (ms-precision). XTRIM MAXLEN keeps the stream bounded.</li>
+                    <li><strong>Query:</strong> XRANGE reads entries in a time window. The app aggregates into 1-second buckets (COUNT, AVG, SUM) for the dashboard.</li>
+                    <li><strong>Detect:</strong> Anomaly bursts (spike in volume + high amounts) are instantly visible in the aggregated stream data.</li>
                 </ol>
             </div>
             <div class="how-it-works-diagram">
@@ -41,14 +41,14 @@
                     <line x1="125" y1="47" x2="215" y2="85" class="svg-arrow" stroke-width="2" marker-end="url(#uc11-arrow)"/>
                     <line x1="125" y1="97" x2="215" y2="95" class="svg-arrow" stroke-width="2" marker-end="url(#uc11-arrow)"/>
                     <line x1="125" y1="147" x2="215" y2="105" class="svg-arrow" stroke-width="2" marker-end="url(#uc11-arrow)"/>
-                    <text x="170" y="75" text-anchor="middle" font-size="10" class="svg-label">TS.ADD</text>
+                    <text x="170" y="75" text-anchor="middle" font-size="10" class="svg-label">XADD</text>
                     <!-- Redis -->
                     <circle cx="290" cy="95" r="60" class="svg-redis-circle"/>
                     <text x="290" y="85" text-anchor="middle" font-size="15" class="svg-redis-text">Redis</text>
-                    <text x="290" y="103" text-anchor="middle" font-size="11" class="svg-redis-text">Time Series</text>
+                    <text x="290" y="103" text-anchor="middle" font-size="11" class="svg-redis-text">Streams</text>
                     <!-- Arrow Redis → App -->
                     <line x1="350" y1="95" x2="430" y2="95" class="svg-arrow" stroke-width="2" marker-end="url(#uc11-arrow)"/>
-                    <text x="390" y="85" text-anchor="middle" font-size="10" class="svg-label">TS.RANGE</text>
+                    <text x="390" y="85" text-anchor="middle" font-size="10" class="svg-label">XRANGE</text>
                     <!-- Dashboard -->
                     <rect x="440" y="55" width="140" height="80" rx="5" ry="5" class="svg-box" stroke-width="1"/>
                     <text x="510" y="82" text-anchor="middle" font-size="13" font-weight="600">📊 Dashboard</text>
@@ -131,66 +131,63 @@
 
                 <!-- Redis CLI -->
                 <div class="code-container code-tab-content active" id="tab-cli">
-<pre><code class="language-bash"># ═══ Redis Time Series — Transaction Monitoring ═══
+<pre><code class="language-bash"># ═══ Redis Streams — Transaction Monitoring ═══
 
-# Create time series with 1-hour retention
-TS.CREATE workshop:txmonitor:ts:count \
-  RETENTION 3600000 DUPLICATE_POLICY SUM
+# Add transaction events (auto-generated timestamp ID)
+XADD workshop:txmonitor:stream * \
+  amount 250.00 riskScore 35.0
 
-TS.CREATE workshop:txmonitor:ts:amount \
-  RETENTION 3600000 DUPLICATE_POLICY LAST
+XADD workshop:txmonitor:stream * \
+  amount 15000.00 riskScore 82.5
 
-# Add data points (timestamp = * means auto)
-TS.ADD workshop:txmonitor:ts:count * 1
-TS.ADD workshop:txmonitor:ts:amount * 250.00
-TS.ADD workshop:txmonitor:ts:risk_score * 35.0
+# Query last 60 seconds (IDs are ms-based)
+# From = now - 60000, To = now
+XRANGE workshop:txmonitor:stream 1713045540000 1713045600000
 
-# Query last 60 seconds in 1-second buckets
-TS.RANGE workshop:txmonitor:ts:count \
-  - + AGGREGATION SUM 1000
+# Stream length (total entries)
+XLEN workshop:txmonitor:stream
 
-# Average amount per 5-second bucket
-TS.RANGE workshop:txmonitor:ts:amount \
-  - + AGGREGATION AVG 5000
+# Trim to keep last 10000 entries
+XTRIM workshop:txmonitor:stream MAXLEN ~ 10000
 
-# Max risk score per 10-second bucket
-TS.RANGE workshop:txmonitor:ts:risk_score \
-  - + AGGREGATION MAX 10000</code></pre>
+# Read most recent 5 entries
+XREVRANGE workshop:txmonitor:stream + - COUNT 5</code></pre>
                 </div>
 
                 <!-- Java -->
                 <div class="code-container code-tab-content" id="tab-java">
-<pre><code class="language-java">// ═══ Redis Time Series with RedisCallback ═══
-// Spring Data Redis doesn't have TS.* templates,
-// so we use execute() for raw commands
+<pre><code class="language-java">// ═══ Redis Streams with Spring Data Redis ═══
 
-// Create a time series
-redis.execute((RedisCallback&lt;Object&gt;) connection -&gt;
-    connection.execute("TS.CREATE",
-        "workshop:txmonitor:ts:count".getBytes(),
-        "RETENTION".getBytes(), "3600000".getBytes(),
-        "DUPLICATE_POLICY".getBytes(), "SUM".getBytes()));
+// Add a transaction event — XADD
+Map&lt;String, String&gt; fields = Map.of(
+    "amount", "250.00",
+    "riskScore", "35.0");
+MapRecord&lt;String, String, String&gt; record =
+    StreamRecords.string(fields)
+        .withStreamKey("workshop:txmonitor:stream");
+redis.opsForStream().add(record);
 
-// Add a data point
-long timestamp = System.currentTimeMillis();
-redis.execute((RedisCallback&lt;Object&gt;) connection -&gt;
-    connection.execute("TS.ADD",
-        "workshop:txmonitor:ts:count".getBytes(),
-        String.valueOf(timestamp).getBytes(),
-        "1".getBytes()));
+// Trim to bound stream size — XTRIM
+redis.opsForStream().trim(STREAM_KEY, 10000);
 
-// Query with aggregation (SUM per 1-second bucket)
-long now = System.currentTimeMillis();
-long from = now - 60000; // last 60 seconds
-List&lt;Object&gt; results = redis.execute(
-    (RedisCallback&lt;Object&gt;) connection -&gt;
-        connection.execute("TS.RANGE",
-            key.getBytes(),
-            String.valueOf(from).getBytes(),
-            String.valueOf(now).getBytes(),
-            "AGGREGATION".getBytes(),
-            "SUM".getBytes(),
-            "1000".getBytes())); // 1000ms = 1s bucket</code></pre>
+// Query a time range — XRANGE
+// Stream IDs are timestamp-based: "1713045600000-0"
+String fromId = (now - 60000) + "-0";
+String toId = now + "-99999";
+List&lt;MapRecord&gt; records = redis.opsForStream()
+    .range(STREAM_KEY,
+        Range.closed(fromId, toId),
+        Limit.limit().count(10000));
+
+// Manual aggregation into 1-second buckets
+Map&lt;Long, BucketData&gt; buckets = new TreeMap&lt;&gt;();
+for (var rec : records) {
+    long ts = parseTimestamp(rec.getId());
+    long bucket = (ts / 1000) * 1000;
+    double amount = parseDouble(
+        rec.getValue().get("amount"));
+    // ... accumulate count, sum, avg per bucket
+}</code></pre>
                 </div>
             </section>
         </div>
