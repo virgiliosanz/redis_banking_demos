@@ -130,6 +130,11 @@
                 <h2>Live Demo</h2>
                 <div id="demo-container" class="demo-container">
 
+                    <!-- API Status Indicator -->
+                    <div id="api-status" style="margin-bottom:8px; font-family:var(--font-code); font-size:0.75rem; padding:6px 12px; border-radius:var(--border-radius); display:inline-block;">
+                        <span id="api-status-text" style="color:var(--text-muted);">Checking API status...</span>
+                    </div>
+
                     <!-- Chat Interface -->
                     <div class="data-card" id="chat-card">
                         <h3>💬 Chat with AI Assistant</h3>
@@ -138,10 +143,14 @@
                                 Type a message below to start chatting. Try asking about transfers, accounts, or investments.
                             </div>
                         </div>
-                        <div style="display:flex; gap:8px;">
+                        <div style="display:flex; gap:8px; align-items:center;">
                             <input type="text" id="chatInput" class="form-input" placeholder="Ask about transfers, accounts, loans..."
                                    style="flex:1;"/>
                             <button id="sendBtn" class="btn btn-primary">Send</button>
+                            <span id="streaming-indicator" style="display:none; font-size:0.75rem; color:var(--redis-primary); font-family:var(--font-code); white-space:nowrap;">
+                                <span style="display:inline-block; width:8px; height:8px; background:var(--redis-primary); border-radius:50%; animation:uc9-pulse 1s infinite; vertical-align:middle; margin-right:4px;"></span>
+                                Streaming...
+                            </span>
                         </div>
                     </div>
 
@@ -177,6 +186,14 @@
                             <div id="rag-results" style="font-size:0.8rem; color:var(--text-muted);">
                                 No documents retrieved yet.
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Sources Panel (SSE mode only) -->
+                    <div id="sourcesPanel" class="data-card" style="margin-top:16px; display:none; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:var(--border-radius); padding:16px;">
+                        <h3 style="margin-bottom:12px;">🔍 Redis Context Sources</h3>
+                        <div id="sourcesContent">
+                            <!-- Populated by JS on SSE sources event -->
                         </div>
                     </div>
 
@@ -342,6 +359,42 @@ FT.SEARCH idx:assistant_kb \
     </div>
 
     <div layout:fragment="scripts">
+        <style>
+            @keyframes uc9-pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.3; }
+            }
+            .uc9-source-item {
+                display: flex; gap: 8px; align-items: baseline; padding: 6px 0;
+                border-bottom: 1px solid var(--border-color); flex-wrap: wrap;
+            }
+            .uc9-source-item:last-child { border-bottom: none; }
+            .uc9-source-key {
+                font-family: var(--font-code); font-size: 0.7rem; color: var(--text-muted);
+                word-break: break-all;
+            }
+            .uc9-source-title {
+                font-size: 0.8rem; font-weight: 600; color: var(--text-primary); flex: 1;
+            }
+            .uc9-source-score {
+                font-family: var(--font-code); font-size: 0.7rem; padding: 2px 8px;
+                border-radius: var(--border-radius); white-space: nowrap;
+            }
+            .uc9-score-high { background: rgba(5, 150, 105, 0.15); color: #059669; }
+            .uc9-score-med  { background: rgba(217, 119, 6, 0.15); color: #d97706; }
+            .uc9-score-low  { background: rgba(107, 114, 128, 0.15); color: var(--text-muted); }
+            .uc9-redis-cmd {
+                display: block; font-family: var(--font-code); font-size: 0.7rem;
+                background: var(--bg-tertiary); padding: 6px 10px; border-radius: var(--border-radius);
+                margin-top: 4px; word-break: break-all; color: var(--text-secondary);
+            }
+            .uc9-sources-section { margin-bottom: 12px; }
+            .uc9-sources-section:last-child { margin-bottom: 0; }
+            .uc9-sources-section h5 {
+                font-size: 0.75rem; font-family: var(--font-code); color: var(--redis-primary);
+                text-transform: uppercase; margin-bottom: 4px; font-weight: 600;
+            }
+        </style>
         <script th:src="@{/js/usecase-9.js}"></script>
     </div>
 </body>

@@ -1,6 +1,7 @@
 /**
  * UC9: AI Agent Memory + RAG
- * Chat interface with short-term, long-term memory and RAG inspection
+ * Chat interface with short-term, long-term memory and RAG inspection.
+ * Supports SSE streaming (when OpenAI is configured) and mock fallback.
  */
 (function () {
     'use strict';
@@ -8,6 +9,7 @@
     // --- State ---
     var sessionId = 'sess-' + Math.random().toString(36).substring(2, 10);
     var userName = 'Demo User';
+    var openaiConfigured = false; // set on load via /api/assistant/status
 
     // --- DOM refs ---
     var chatMessages = document.getElementById('chat-messages');
@@ -20,6 +22,10 @@
     var commandsOutput = document.getElementById('commands-output');
     var latencyDisplay = document.getElementById('latency-display');
     var resetBtn = document.getElementById('resetBtn');
+    var apiStatusText = document.getElementById('api-status-text');
+    var streamingIndicator = document.getElementById('streaming-indicator');
+    var sourcesPanel = document.getElementById('sourcesPanel');
+    var sourcesContent = document.getElementById('sourcesContent');
 
     // --- Code Tabs ---
     document.querySelectorAll('.code-tab').forEach(function (tab) {
@@ -130,17 +136,152 @@
         ragResults.innerHTML = html;
     }
 
-    // --- Send Message ---
-    function sendMessage() {
-        var message = chatInput.value.trim();
-        if (!message) return;
+    // --- Input control ---
+    function setInputEnabled(enabled) {
+        chatInput.disabled = !enabled;
+        sendBtn.disabled = !enabled;
+        sendBtn.textContent = enabled ? 'Send' : '...';
+        if (enabled) chatInput.focus();
+    }
 
-        chatInput.value = '';
-        sendBtn.disabled = true;
-        sendBtn.textContent = '...';
+    function showStreamingIndicator() {
+        if (streamingIndicator) streamingIndicator.style.display = '';
+    }
 
+    function hideStreamingIndicator() {
+        if (streamingIndicator) streamingIndicator.style.display = 'none';
+    }
+
+    // --- Sources panel ---
+    function scoreClass(score) {
+        if (score >= 0.8) return 'uc9-score-high';
+        if (score >= 0.5) return 'uc9-score-med';
+        return 'uc9-score-low';
+    }
+
+    function displaySources(sources) {
+        if (!sourcesPanel || !sourcesContent) return;
+        var html = '';
+
+        // Knowledge Base Documents
+        if (sources.kbDocs && sources.kbDocs.length > 0) {
+            html += '<div class="uc9-sources-section"><h5>📄 Knowledge Base Documents</h5>';
+            sources.kbDocs.forEach(function (doc) {
+                html += '<div class="uc9-source-item">';
+                html += '<span class="uc9-source-key">' + escapeHtml(doc.redisKey || '') + '</span>';
+                if (doc.title) html += '<span class="uc9-source-title">' + escapeHtml(doc.title) + '</span>';
+                html += '<span class="uc9-source-score ' + scoreClass(doc.score) + '">Score: ' + (doc.score != null ? doc.score.toFixed(2) : '—') + '</span>';
+                html += '</div>';
+            });
+            html += '</div>';
+        }
+
+        // Memories
+        if (sources.memories && sources.memories.length > 0) {
+            html += '<div class="uc9-sources-section"><h5>🧠 Relevant Memories</h5>';
+            sources.memories.forEach(function (mem) {
+                html += '<div class="uc9-source-item">';
+                html += '<span class="uc9-source-key">' + escapeHtml(mem.redisKey || '') + '</span>';
+                if (mem.summary) html += '<span class="uc9-source-title">' + escapeHtml(mem.summary) + '</span>';
+                html += '<span class="uc9-source-score ' + scoreClass(mem.score) + '">Score: ' + (mem.score != null ? mem.score.toFixed(2) : '—') + '</span>';
+                html += '</div>';
+            });
+            html += '</div>';
+        }
+
+        // Redis Commands
+        if (sources.redisCommands && sources.redisCommands.length > 0) {
+            html += '<div class="uc9-sources-section"><h5>⚡ Redis Commands Used</h5>';
+            sources.redisCommands.forEach(function (cmd) {
+                html += '<code class="uc9-redis-cmd">' + escapeHtml(cmd) + '</code>';
+            });
+            html += '</div>';
+        }
+
+        if (html) {
+            sourcesContent.innerHTML = html;
+            sourcesPanel.style.display = '';
+        }
+    }
+
+    // --- SSE Streaming send ---
+    function sendMessageStream(message) {
+        addMessage('user', message);
+
+        // Create empty assistant bubble for streaming
+        var welcome = chatMessages.querySelector('.chat-welcome');
+        if (welcome) welcome.remove();
+
+        var msgDiv = document.createElement('div');
+        msgDiv.style.cssText = 'margin-bottom:12px; padding:10px 14px; border-radius:var(--border-radius); max-width:90%; font-size:0.85rem; line-height:1.5; background:var(--bg-tertiary); color:var(--text-primary);';
+        chatMessages.appendChild(msgDiv);
+
+        setInputEnabled(false);
+        showStreamingIndicator();
+        addTypingIndicator();
+
+        var url = '/api/assistant/chat/stream?sessionId=' + encodeURIComponent(sessionId)
+            + '&userName=' + encodeURIComponent(userName)
+            + '&message=' + encodeURIComponent(message);
+
+        var eventSource = new EventSource(url);
+        var fullResponse = '';
+
+        eventSource.addEventListener('sources', function (e) {
+            removeTypingIndicator();
+            try {
+                var sources = JSON.parse(e.data);
+                displaySources(sources);
+
+                // Also update the memory inspection panels with source data
+                if (sources.memories) updateMemoryResults(sources.memories);
+                if (sources.kbDocs) updateRagResults(sources.kbDocs);
+                if (sources.redisCommands) {
+                    commandsCard.style.display = '';
+                    commandsOutput.textContent = sources.redisCommands.join('\n');
+                }
+            } catch (err) { /* ignore parse errors */ }
+        });
+
+        eventSource.addEventListener('token', function (e) {
+            removeTypingIndicator();
+            try {
+                var data = JSON.parse(e.data);
+                fullResponse += data.content;
+                msgDiv.innerHTML = formatMarkdown(fullResponse);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            } catch (err) { /* ignore parse errors */ }
+        });
+
+        eventSource.addEventListener('done', function (e) {
+            eventSource.close();
+            hideStreamingIndicator();
+            setInputEnabled(true);
+            updateShortTermMemory();
+            try {
+                var meta = JSON.parse(e.data);
+                if (meta.latencyMs) {
+                    latencyDisplay.textContent = '⏱ Total latency: ' + meta.latencyMs + 'ms';
+                }
+            } catch (err) { /* ignore */ }
+        });
+
+        eventSource.onerror = function () {
+            eventSource.close();
+            removeTypingIndicator();
+            hideStreamingIndicator();
+            if (!fullResponse) {
+                msgDiv.innerHTML = '<span style="color:var(--redis-primary);">Error connecting to AI service. Retrying may help.</span>';
+            }
+            setInputEnabled(true);
+        };
+    }
+
+    // --- Mock send (existing behavior) ---
+    function sendMessageMock(message) {
         addMessage('user', message);
         addTypingIndicator();
+        setInputEnabled(false);
 
         window.workshopFetch('/api/assistant/chat', {
             sessionId: sessionId,
@@ -148,8 +289,7 @@
             message: message
         }).then(function (data) {
             removeTypingIndicator();
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Send';
+            setInputEnabled(true);
 
             if (data.error) {
                 addMessage('assistant', 'Sorry, something went wrong: ' + data.error);
@@ -157,13 +297,10 @@
             }
 
             addMessage('assistant', data.response);
-
-            // Update inspection panels
             updateShortTermMemory();
             updateMemoryResults(data.memoriesRetrieved);
             updateRagResults(data.kbDocsRetrieved);
 
-            // Show Redis commands
             if (data.redisCommands) {
                 commandsCard.style.display = '';
                 commandsOutput.textContent = data.redisCommands.join('\n');
@@ -173,10 +310,22 @@
             }
         }).catch(function () {
             removeTypingIndicator();
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Send';
+            setInputEnabled(true);
             addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
         });
+    }
+
+    // --- Send Message (router) ---
+    function sendMessage() {
+        var message = chatInput.value.trim();
+        if (!message) return;
+        chatInput.value = '';
+
+        if (openaiConfigured) {
+            sendMessageStream(message);
+        } else {
+            sendMessageMock(message);
+        }
     }
 
     // --- Event Listeners ---
@@ -195,9 +344,27 @@
             memoryResults.innerHTML = '<span style="color:var(--text-muted);">No memories retrieved yet.</span>';
             ragResults.innerHTML = '<span style="color:var(--text-muted);">No documents retrieved yet.</span>';
             commandsCard.style.display = 'none';
+            if (sourcesPanel) sourcesPanel.style.display = 'none';
+            latencyDisplay.textContent = '';
             resetBtn.disabled = false;
             resetBtn.textContent = '🔄 Reset Demo';
         });
+    });
+
+    // --- Check API status on load ---
+    window.workshopGet('/api/assistant/status').then(function (data) {
+        openaiConfigured = !!(data && data.openaiConfigured);
+        if (openaiConfigured) {
+            apiStatusText.innerHTML = '✅ OpenAI Connected';
+            apiStatusText.style.color = '#059669';
+        } else {
+            apiStatusText.innerHTML = '⚠️ Mock Mode <span style="font-weight:400;">(set OPENAI_API_KEY for real AI)</span>';
+            apiStatusText.style.color = '#d97706';
+        }
+    }).catch(function () {
+        openaiConfigured = false;
+        apiStatusText.innerHTML = '⚠️ Mock Mode';
+        apiStatusText.style.color = '#d97706';
     });
 
     // Focus input on load
