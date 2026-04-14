@@ -1,29 +1,29 @@
 /**
- * UC1: Session Management + Auth Token
- * Interactive demo: login, session display, TTL countdown, logout
+ * UC1: Authentication Token Store
+ * Interactive demo: login → generate token → validate → logout (destroy)
  */
 (function () {
     'use strict';
 
     var MAX_TTL = 300;
     var ttlInterval = null;
-    var currentUser = null;
     var currentToken = null;
 
     // --- DOM refs ---
     var loginSection   = document.getElementById('login-section');
-    var sessionSection = document.getElementById('session-section');
+    var tokenSection   = document.getElementById('token-section');
     var loginBtn       = document.getElementById('loginBtn');
     var logoutBtn      = document.getElementById('logoutBtn');
+    var validateBtn    = document.getElementById('validateBtn');
     var usernameInput  = document.getElementById('username');
     var passwordInput  = document.getElementById('password');
     var loginError     = document.getElementById('login-error');
-    var sessionData    = document.getElementById('session-data');
     var tokenData      = document.getElementById('token-data');
+    var validateResult = document.getElementById('validate-result');
     var ttlValue       = document.getElementById('ttl-value');
     var ttlFill        = document.getElementById('ttl-fill');
-    var sessionStatus  = document.getElementById('session-status');
-    var sessionExpired = document.getElementById('session-expired');
+    var tokenStatus    = document.getElementById('token-status');
+    var tokenExpired   = document.getElementById('token-expired');
 
     // --- Code Tabs ---
     document.querySelectorAll('.code-tab').forEach(function (tab) {
@@ -42,37 +42,33 @@
 
     function showLogin() {
         loginSection.style.display = '';
-        sessionSection.style.display = 'none';
+        tokenSection.style.display = 'none';
         loginError.style.display = 'none';
-        sessionExpired.style.display = 'none';
+        tokenExpired.style.display = 'none';
+        validateResult.style.display = 'none';
         usernameInput.value = '';
         passwordInput.value = '';
     }
 
-    function showSession(data) {
+    function showToken(data) {
         loginSection.style.display = 'none';
-        sessionSection.style.display = '';
-        sessionExpired.style.display = 'none';
-        sessionStatus.textContent = '● ACTIVE';
-        sessionStatus.className = 'status-badge active';
+        tokenSection.style.display = '';
+        tokenExpired.style.display = 'none';
+        validateResult.style.display = 'none';
+        tokenStatus.textContent = '● VALID';
+        tokenStatus.className = 'status-badge active';
 
         var rows = '';
-        rows += buildRow('Key', data.sessionKey);
+        rows += buildRow('Redis Key', data.redisKey);
+        rows += buildRow('Token ID', data.tokenId);
         rows += buildRow('Username', data.username);
         rows += buildRow('Full Name', data.fullName);
         rows += buildRow('Email', data.email);
         rows += buildRow('Role', data.role);
-        rows += buildRow('Account', data.accountId);
         rows += buildRow('IP Address', data.ipAddress);
-        sessionData.innerHTML = rows;
+        tokenData.innerHTML = rows;
 
-        var tokenRows = '';
-        tokenRows += buildRow('Key', data.tokenKey);
-        tokenRows += buildRow('Token', data.token);
-        tokenData.innerHTML = tokenRows;
-
-        currentUser = data.username;
-        currentToken = data.token;
+        currentToken = data.tokenId;
         startTtlCountdown(data.ttl);
     }
 
@@ -84,16 +80,16 @@
             if (ttl <= 0) {
                 ttlValue.textContent = '0s';
                 ttlFill.style.width = '0%';
-                sessionStatus.textContent = '● EXPIRED';
-                sessionStatus.className = 'status-badge expired';
-                sessionExpired.style.display = '';
+                tokenStatus.textContent = '● EXPIRED';
+                tokenStatus.className = 'status-badge expired';
+                tokenExpired.style.display = '';
                 logoutBtn.style.display = 'none';
+                validateBtn.disabled = true;
                 stopTtlCountdown();
-                // Auto-return to login after 3s
                 setTimeout(function () {
-                    currentUser = null;
                     currentToken = null;
                     logoutBtn.style.display = '';
+                    validateBtn.disabled = false;
                     showLogin();
                 }, 3000);
                 return;
@@ -108,10 +104,7 @@
     }
 
     function stopTtlCountdown() {
-        if (ttlInterval) {
-            clearInterval(ttlInterval);
-            ttlInterval = null;
-        }
+        if (ttlInterval) { clearInterval(ttlInterval); ttlInterval = null; }
     }
 
     // --- Login ---
@@ -123,48 +116,48 @@
             loginError.style.display = '';
             return;
         }
-
         loginBtn.disabled = true;
         loginBtn.textContent = 'Authenticating...';
         loginError.style.display = 'none';
 
-        window.workshopFetch('/api/session/login', { username: username, password: password })
+        window.workshopFetch('/api/auth/login', { username: username, password: password })
             .then(function (data) {
                 loginBtn.disabled = false;
-                loginBtn.textContent = '🔐 Login';
-                if (data.error) {
-                    loginError.textContent = data.error;
-                    loginError.style.display = '';
-                } else {
-                    showSession(data);
-                }
+                loginBtn.textContent = '🔑 Login & Generate Token';
+                if (data.error) { loginError.textContent = data.error; loginError.style.display = ''; }
+                else { showToken(data); }
             })
             .catch(function () {
                 loginBtn.disabled = false;
-                loginBtn.textContent = '🔐 Login';
+                loginBtn.textContent = '🔑 Login & Generate Token';
                 loginError.textContent = 'Network error — is the server running?';
                 loginError.style.display = '';
             });
     });
 
-    // Enter key to login
-    passwordInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') loginBtn.click();
-    });
-    usernameInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') passwordInput.focus();
-    });
+    passwordInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') loginBtn.click(); });
+    usernameInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') passwordInput.focus(); });
 
-    // --- Logout ---
-    logoutBtn.addEventListener('click', function () {
-        if (!currentUser) return;
-
-        window.workshopFetch('/api/session/logout', { username: currentUser })
-            .then(function () {
-                stopTtlCountdown();
-                currentUser = null;
-                currentToken = null;
-                showLogin();
+    // --- Validate ---
+    validateBtn.addEventListener('click', function () {
+        if (!currentToken) return;
+        window.workshopFetch('/api/auth/validate', { token: currentToken })
+            .then(function (data) {
+                validateResult.style.display = '';
+                if (data.valid) {
+                    validateResult.className = 'alert alert-success';
+                    validateResult.innerHTML = '✅ Token is <strong>valid</strong>. TTL: ' + data.ttl + 's remaining.';
+                } else {
+                    validateResult.className = 'alert alert-error';
+                    validateResult.innerHTML = '❌ Token is <strong>invalid</strong> or expired.';
+                }
             });
+    });
+
+    // --- Logout (Destroy Token) ---
+    logoutBtn.addEventListener('click', function () {
+        if (!currentToken) return;
+        window.workshopFetch('/api/auth/logout', { token: currentToken })
+            .then(function () { stopTtlCountdown(); currentToken = null; showLogin(); });
     });
 })();

@@ -3,62 +3,75 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <head>
-    <title th:text="${useCaseTitle}">Transaction Deduplication</title>
+    <title th:text="${useCaseTitle}">User Profile Storage</title>
 </head>
 <body>
     <div layout:fragment="content">
         <div class="usecase-header">
             <span class="usecase-badge">UC3</span>
-            <h1 th:text="${useCaseTitle}">Transaction Deduplication</h1>
+            <h1 th:text="${useCaseTitle}">User Profile Storage</h1>
         </div>
-        <p class="usecase-subtitle">Duplicate Payment Prevention &mdash; avoid double-charging on bank transfers using Redis SET with NX + EX flags.</p>
 
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->
             <section class="panel demo-panel">
                 <h2>Live Demo</h2>
                 <div id="demo-container" class="demo-container">
-                    <!-- Payment Form -->
-                    <form id="paymentForm" class="demo-form" autocomplete="off">
-                        <div class="form-group">
-                            <label for="sender">Sender Account</label>
-                            <select id="sender" class="form-control">
-                                <option value="ES12-0001-ALICE">ES12-0001-ALICE (Alice)</option>
-                                <option value="ES34-0002-BOB">ES34-0002-BOB (Bob)</option>
-                                <option value="ES56-0003-CARLOS">ES56-0003-CARLOS (Carlos)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="receiver">Receiver Account</label>
-                            <select id="receiver" class="form-control">
-                                <option value="ES78-0004-DIANA">ES78-0004-DIANA (Diana)</option>
-                                <option value="ES90-0005-EVA" selected>ES90-0005-EVA (Eva)</option>
-                                <option value="ES11-0006-FRANK">ES11-0006-FRANK (Frank)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="amount">Amount (&euro;)</label>
-                            <input type="number" id="amount" class="form-control" value="250.00" min="0.01" step="0.01" />
-                        </div>
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" id="payBtn">💳 Pay Now</button>
-                            <button type="button" class="btn btn-secondary" id="doubleClickBtn">⚡ Double-Click Simulation</button>
-                            <button type="button" class="btn btn-outline" id="resetBtn">🔄 Reset Log</button>
-                        </div>
-                    </form>
+                    <p class="demo-scenario">
+                        <strong>Scenario:</strong> Aggregate a user profile from 3 separate databases
+                        (Accounts, Activity, Preferences) into a single Redis Hash for fast access.
+                    </p>
 
-                    <!-- Result Display -->
-                    <div id="resultBox" class="result-box" style="display:none;">
-                        <div id="resultIcon" class="result-icon"></div>
-                        <div id="resultStatus" class="result-status"></div>
-                        <div id="resultDetails" class="result-details"></div>
+                    <!-- User Selector -->
+                    <div class="form-group">
+                        <label for="userSelect">Select User</label>
+                        <select id="userSelect" class="form-control"></select>
                     </div>
 
-                    <!-- Transaction Log -->
-                    <h3 class="log-title">Transaction Log</h3>
-                    <div id="txLog" class="tx-log">
-                        <p class="placeholder-text">No transactions yet. Submit a payment above.</p>
+                    <div class="form-actions" style="margin-bottom:16px;">
+                        <button id="loadBtn" class="btn btn-primary">📥 Load Profile from DBs</button>
+                        <button id="syncBtn" class="btn btn-secondary" disabled>📤 Sync Back to DBs</button>
                     </div>
+
+                    <!-- Profile Display -->
+                    <div id="profile-card" class="data-card" style="display:none;">
+                        <h3>Aggregated Profile (Redis Hash)</h3>
+                        <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;" id="redis-key-display"></div>
+                        <div id="profile-data"></div>
+                    </div>
+
+                    <!-- Inline Edit -->
+                    <div id="edit-card" class="data-card" style="display:none; margin-top:16px;">
+                        <h3>Update Profile Field</h3>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label for="editField">Field</label>
+                            <select id="editField" class="form-control">
+                                <option value="pref_language">Language</option>
+                                <option value="pref_notifications">Notifications</option>
+                                <option value="pref_theme">Theme</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label for="editValue">New Value</label>
+                            <input type="text" id="editValue" class="form-input" placeholder="Enter new value"/>
+                        </div>
+                        <button id="updateBtn" class="btn btn-secondary" style="width:100%;">✏️ Update Field</button>
+                    </div>
+
+                    <!-- TTL bar -->
+                    <div id="ttl-container" style="display:none; margin-top:16px;">
+                        <div class="ttl-bar-container">
+                            <div class="ttl-bar-label">
+                                <span>TTL</span>
+                                <span id="ttl-value">600s</span>
+                            </div>
+                            <div class="ttl-bar">
+                                <div class="ttl-bar-fill" id="ttl-fill" style="width:100%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="sync-result" style="display:none; margin-top:12px;"></div>
                 </div>
             </section>
 
@@ -66,78 +79,79 @@
             <section class="panel code-panel">
                 <h2>Code Showcase</h2>
                 <div class="code-container">
-                    <h3 class="code-section-title">1. SETNX Pattern (SET NX EX)</h3>
-                    <pre><code class="language-java">// Atomic check-and-set: only succeeds if key doesn't exist
-// SET workshop:dedup:{txHash} "1" NX EX 300
+                    <div class="code-tabs">
+                        <button class="code-tab active" data-tab="java">Java</button>
+                        <button class="code-tab" data-tab="cli">Redis CLI</button>
+                    </div>
 
-String txHash = sha256(sender + receiver + amount + timeWindow);
-String key = "workshop:dedup:" + txHash;
+                    <div class="code-block active" id="tab-java">
+                        <pre><code class="language-java">// 1. Aggregate from multiple DBs — HSET
+String key = "workshop:profile:user:" + userId;
 
-// SET with NX (Not eXists) + EX (Expire) — atomic dedup!
-Boolean wasSet = redis.opsForValue()
-    .setIfAbsent(key, "1", Duration.ofSeconds(300));
+Map&lt;String, String&gt; profile = new HashMap&lt;&gt;();
 
-if (Boolean.TRUE.equals(wasSet)) {
-    // First time — process the payment
-    return "ACCEPTED";
-} else {
-    // Key already exists — duplicate detected!
-    return "DUPLICATE";
-}</code></pre>
+// From Accounts DB
+profile.put("account_number", "ES76-0128...");
+profile.put("account_balance", "12450.75");
+profile.put("account_type", "Premium Savings");
 
-                    <h3 class="code-section-title">2. Redis CLI Equivalent</h3>
-                    <pre><code class="language-bash"># First attempt — key created, payment processed
-SET workshop:dedup:a1b2c3d4 "1" NX EX 300
-# → OK
+// From Activity DB
+profile.put("activity_lastLogin", "2024-04-12");
+profile.put("activity_recentTxCount", "14");
 
-# Second attempt (within 5 min) — blocked!
-SET workshop:dedup:a1b2c3d4 "1" NX EX 300
-# → (nil)   ← duplicate detected
+// From Preferences DB
+profile.put("pref_language", "es");
+profile.put("pref_notifications", "email");
 
-# Check remaining TTL
-TTL workshop:dedup:a1b2c3d4
-# → (integer) 287
+// HSET — store all fields in one call
+redis.opsForHash().putAll(key, profile);
 
-# After TTL expires, same tx is accepted again
-SET workshop:dedup:a1b2c3d4 "1" NX EX 300
-# → OK</code></pre>
+// EXPIRE — auto-cleanup
+redis.expire(key, 600, TimeUnit.SECONDS);
 
-                    <h3 class="code-section-title">3. Bloom Filter Alternative (High Volume)</h3>
-                    <pre><code class="language-bash"># For millions of tx/day, use a Bloom filter
-# Probabilistic — tiny false-positive rate, zero false-negatives
-# Much less memory than storing every key
+// 2. Read full profile — HGETALL
+Map&lt;Object, Object&gt; data =
+    redis.opsForHash().entries(key);
 
-# Create filter (1M capacity, 0.01% error rate)
-BF.RESERVE workshop:dedup:bloom 0.0001 1000000
+// 3. Update single field — HSET
+redis.opsForHash()
+    .put(key, "pref_language", "en");
 
-# Check + add in one step
-BF.ADD workshop:dedup:bloom "a1b2c3d4e5f6"
-# → (integer) 1  ← new item, not seen before
+// 4. Atomic counter — HINCRBY
+redis.opsForHash()
+    .increment(key, "activity_loginCount", 1);</code></pre>
+                    </div>
 
-BF.ADD workshop:dedup:bloom "a1b2c3d4e5f6"
-# → (integer) 0  ← already exists = DUPLICATE
+                    <div class="code-block" id="tab-cli">
+                        <pre><code class="language-bash"># 1. Store aggregated profile
+HSET workshop:profile:user:U1001 \
+  account_number "ES76-0128-0001..." \
+  account_balance "12450.75" \
+  account_type "Premium Savings" \
+  activity_lastLogin "2024-04-12" \
+  activity_recentTxCount "14" \
+  pref_language "es" \
+  pref_notifications "email" \
+  pref_theme "light"
 
-# Check without adding
-BF.EXISTS workshop:dedup:bloom "a1b2c3d4e5f6"
-# → (integer) 1  ← exists</code></pre>
+# 2. Set TTL
+EXPIRE workshop:profile:user:U1001 600
 
-                    <pre><code class="language-java">// Java equivalent with Lettuce + RedisBloom
-// Note: Bloom filters don't support per-item TTL
-// Combine with time-bucketed filter names:
-//   "workshop:dedup:bloom:2024-01-15-14"  (hourly bucket)
+# 3. Read full profile
+HGETALL workshop:profile:user:U1001
 
-// BF.ADD via Lettuce custom command
-Long added = redis.execute((RedisCallback&lt;Long&gt;) conn ->
-    conn.commands().execute("BF.ADD",
-        "workshop:dedup:bloom".getBytes(),
-        txHash.getBytes())
-);
+# 4. Update single field
+HSET workshop:profile:user:U1001 \
+  pref_language "en"
 
-if (added == 1L) {
-    return "ACCEPTED";   // new transaction
-} else {
-    return "DUPLICATE";  // already seen
-}</code></pre>
+# 5. Atomic increment
+HINCRBY workshop:profile:user:U1001 \
+  activity_loginCount 1
+
+# 6. Read single field
+HGET workshop:profile:user:U1001 \
+  account_balance</code></pre>
+                    </div>
                 </div>
             </section>
         </div>

@@ -1,120 +1,142 @@
-/** UC3: Transaction Deduplication */
+/**
+ * UC3: User Profile Storage
+ * Interactive demo: select user → load from DBs → view profile → edit → sync back
+ */
 (function () {
     'use strict';
 
-    document.addEventListener('DOMContentLoaded', function () {
-        var form = document.getElementById('paymentForm');
-        var payBtn = document.getElementById('payBtn');
-        var doubleClickBtn = document.getElementById('doubleClickBtn');
-        var resetBtn = document.getElementById('resetBtn');
-        var resultBox = document.getElementById('resultBox');
-        var resultIcon = document.getElementById('resultIcon');
-        var resultStatus = document.getElementById('resultStatus');
-        var resultDetails = document.getElementById('resultDetails');
-        var txLog = document.getElementById('txLog');
+    var MAX_TTL = 600;
+    var ttlInterval = null;
 
-        function getFormData() {
-            return {
-                sender: document.getElementById('sender').value,
-                receiver: document.getElementById('receiver').value,
-                amount: document.getElementById('amount').value
-            };
-        }
+    // --- DOM refs ---
+    var userSelect     = document.getElementById('userSelect');
+    var loadBtn        = document.getElementById('loadBtn');
+    var syncBtn        = document.getElementById('syncBtn');
+    var profileCard    = document.getElementById('profile-card');
+    var profileData    = document.getElementById('profile-data');
+    var redisKeyDisplay = document.getElementById('redis-key-display');
+    var editCard       = document.getElementById('edit-card');
+    var editField      = document.getElementById('editField');
+    var editValue      = document.getElementById('editValue');
+    var updateBtn      = document.getElementById('updateBtn');
+    var ttlContainer   = document.getElementById('ttl-container');
+    var ttlValue       = document.getElementById('ttl-value');
+    var ttlFill        = document.getElementById('ttl-fill');
+    var syncResult     = document.getElementById('sync-result');
 
-        function showResult(data) {
-            var accepted = data.status === 'ACCEPTED';
-            resultBox.style.display = 'block';
-            resultBox.className = 'result-box ' + (accepted ? 'result-accepted' : 'result-duplicate');
-            resultIcon.textContent = accepted ? '✅' : '🚫';
-            resultStatus.textContent = accepted ? 'Payment Accepted' : 'Duplicate Detected!';
-            resultDetails.innerHTML =
-                '<span class="detail-label">Hash:</span> <code>' + data.txHash + '</code><br>' +
-                '<span class="detail-label">Key:</span> <code>' + data.redisKey + '</code><br>' +
-                '<span class="detail-label">TTL:</span> ' + data.ttlSeconds + 's';
-
-            // Animate
-            resultBox.classList.remove('result-animate');
-            void resultBox.offsetWidth; // force reflow
-            resultBox.classList.add('result-animate');
-        }
-
-        function renderLog(entries) {
-            if (!entries || entries.length === 0) {
-                txLog.innerHTML = '<p class="placeholder-text">No transactions yet. Submit a payment above.</p>';
-                return;
-            }
-            var html = '<table class="log-table"><thead><tr>' +
-                '<th>Status</th><th>Sender</th><th>Receiver</th><th>Amount</th><th>Hash</th><th>Time</th>' +
-                '</tr></thead><tbody>';
-            entries.forEach(function (e) {
-                var accepted = e.status === 'ACCEPTED';
-                var ts = e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : '';
-                html += '<tr class="' + (accepted ? 'log-accepted' : 'log-duplicate') + '">' +
-                    '<td><span class="status-badge ' + (accepted ? 'badge-accepted' : 'badge-duplicate') + '">' +
-                    e.status + '</span></td>' +
-                    '<td>' + e.sender + '</td>' +
-                    '<td>' + e.receiver + '</td>' +
-                    '<td>&euro;' + e.amount + '</td>' +
-                    '<td><code>' + e.txHash.substring(0, 10) + '…</code></td>' +
-                    '<td>' + ts + '</td></tr>';
-            });
-            html += '</tbody></table>';
-            txLog.innerHTML = html;
-        }
-
-        function submitPayment(data) {
-            payBtn.disabled = true;
-            return workshopFetch('/api/dedup/submit', data)
-                .then(function (result) {
-                    showResult(result);
-                    return refreshLog();
-                })
-                .catch(function (err) {
-                    resultBox.style.display = 'block';
-                    resultBox.className = 'result-box result-duplicate';
-                    resultIcon.textContent = '❌';
-                    resultStatus.textContent = 'Error';
-                    resultDetails.textContent = err.message;
-                })
-                .finally(function () {
-                    payBtn.disabled = false;
-                });
-        }
-
-        function refreshLog() {
-            return workshopGet('/api/dedup/log').then(renderLog);
-        }
-
-        // Pay button
-        form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            submitPayment(getFormData());
+    // --- Code Tabs ---
+    document.querySelectorAll('.code-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            document.querySelectorAll('.code-tab').forEach(function (t) { t.classList.remove('active'); });
+            document.querySelectorAll('.code-block').forEach(function (b) { b.classList.remove('active'); });
+            tab.classList.add('active');
+            document.getElementById('tab-' + tab.getAttribute('data-tab')).classList.add('active');
         });
-
-        // Double-click simulation — sends same tx twice with 100ms gap
-        doubleClickBtn.addEventListener('click', function () {
-            var data = getFormData();
-            doubleClickBtn.disabled = true;
-            doubleClickBtn.textContent = '⚡ Sending...';
-            submitPayment(data).then(function () {
-                return new Promise(function (resolve) { setTimeout(resolve, 100); });
-            }).then(function () {
-                return submitPayment(data);
-            }).finally(function () {
-                doubleClickBtn.disabled = false;
-                doubleClickBtn.textContent = '⚡ Double-Click Simulation';
-            });
-        });
-
-        // Reset
-        resetBtn.addEventListener('click', function () {
-            workshopFetch('/api/dedup/reset', {}).then(function () {
-                resultBox.style.display = 'none';
-                refreshLog();
-            });
-        });
-
-        // Load initial log
-        refreshLog();
     });
+
+    // --- Helpers ---
+    function buildRow(label, value, highlight) {
+        var cls = highlight ? ' style="font-weight:700; color:var(--redis-primary);"' : '';
+        return '<div class="data-row"><span class="data-label">' + label +
+               '</span><span class="data-value"' + cls + '>' + value + '</span></div>';
+    }
+
+    // --- Load users into selector ---
+    function loadUsers() {
+        window.workshopGet('/api/profile/users').then(function (users) {
+            userSelect.innerHTML = '';
+            users.forEach(function (u) {
+                var opt = document.createElement('option');
+                opt.value = u.userId;
+                opt.textContent = u.userId + ' — ' + u.name + ' (' + u.segment + ')';
+                userSelect.appendChild(opt);
+            });
+        });
+    }
+
+    // --- Display profile ---
+    function displayProfile(data) {
+        profileCard.style.display = '';
+        editCard.style.display = '';
+        ttlContainer.style.display = '';
+        syncBtn.disabled = false;
+        redisKeyDisplay.textContent = '📦 ' + data.redisKey;
+
+        var rows = '';
+        var keys = Object.keys(data).sort();
+        keys.forEach(function (key) {
+            if (key === 'redisKey' || key === 'ttl' || key === 'fieldCount' || key === 'sources') return;
+            var label = key.replace(/^(account_|activity_|pref_)/, function (m) {
+                return m === 'account_' ? '🏦 ' : m === 'activity_' ? '📊 ' : '⚙️ ';
+            });
+            rows += buildRow(label, data[key], key.startsWith('account_balance'));
+        });
+        profileData.innerHTML = rows;
+
+        startTtlCountdown(data.ttl || MAX_TTL);
+    }
+
+    function startTtlCountdown(initialTtl) {
+        if (ttlInterval) clearInterval(ttlInterval);
+        var ttl = initialTtl;
+        function tick() {
+            if (ttl <= 0) { ttlValue.textContent = '0s'; ttlFill.style.width = '0%'; clearInterval(ttlInterval); return; }
+            ttlValue.textContent = ttl + 's';
+            ttlFill.style.width = ((ttl / MAX_TTL) * 100) + '%';
+            ttl--;
+        }
+        tick();
+        ttlInterval = setInterval(tick, 1000);
+    }
+
+    // --- Load profile ---
+    loadBtn.addEventListener('click', function () {
+        var userId = userSelect.value;
+        loadBtn.disabled = true;
+        loadBtn.textContent = 'Loading from DBs...';
+        syncResult.style.display = 'none';
+
+        window.workshopFetch('/api/profile/load/' + userId, {})
+            .then(function (data) {
+                loadBtn.disabled = false;
+                loadBtn.textContent = '📥 Load Profile from DBs';
+                if (data.error) return;
+                displayProfile(data);
+            })
+            .catch(function () {
+                loadBtn.disabled = false;
+                loadBtn.textContent = '📥 Load Profile from DBs';
+            });
+    });
+
+    // --- Update field ---
+    updateBtn.addEventListener('click', function () {
+        var userId = userSelect.value;
+        var field = editField.value;
+        var value = editValue.value.trim();
+        if (!value) { editValue.style.borderColor = 'var(--redis-primary)'; return; }
+        editValue.style.borderColor = '';
+
+        var body = {};
+        body[field] = value;
+        window.workshopFetch('/api/profile/update/' + userId, body)
+            .then(function (data) {
+                if (data && !data.error) displayProfile(data);
+                editValue.value = '';
+            });
+    });
+
+    // --- Sync back ---
+    syncBtn.addEventListener('click', function () {
+        var userId = userSelect.value;
+        window.workshopFetch('/api/profile/sync/' + userId, {})
+            .then(function (data) {
+                syncResult.style.display = '';
+                syncResult.className = 'alert alert-success';
+                syncResult.innerHTML = '✅ ' + data.message;
+            });
+    });
+
+    // --- Init ---
+    loadUsers();
 })();

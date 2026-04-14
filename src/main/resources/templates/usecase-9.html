@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${useCaseTitle}">AI Banking Assistant</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">UC9</span>
+            <h1 th:text="${useCaseTitle}">AI Banking Assistant (Memory + RAG)</h1>
+        </div>
+
+        <div class="usecase-panels">
+            <!-- LEFT: Live Demo Panel -->
+            <section class="panel demo-panel">
+                <h2>Live Demo</h2>
+                <div id="demo-container" class="demo-container">
+
+                    <!-- Chat Interface -->
+                    <div class="data-card" id="chat-card">
+                        <h3>💬 Chat with AI Assistant</h3>
+                        <div id="chat-messages" style="max-height:320px; overflow-y:auto; margin-bottom:8px; padding:8px; background:var(--bg-secondary); border-radius:var(--border-radius); min-height:120px;">
+                            <div class="chat-welcome" style="color:var(--text-muted); font-style:italic; padding:16px 0; text-align:center;">
+                                Type a message below to start chatting. Try asking about transfers, accounts, or investments.
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="chatInput" class="form-input" placeholder="Ask about transfers, accounts, loans..."
+                                   style="flex:1;"/>
+                            <button id="sendBtn" class="btn btn-primary">Send</button>
+                        </div>
+                    </div>
+
+                    <!-- Memory Inspection Panel -->
+                    <div class="data-card" style="margin-top:16px;">
+                        <h3>🔍 Memory Inspection</h3>
+
+                        <!-- Short-term Memory -->
+                        <div style="margin-bottom:12px;">
+                            <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--redis-primary); font-weight:600; margin-bottom:4px;">
+                                SHORT-TERM MEMORY (Redis Hash + TTL)
+                            </div>
+                            <div id="short-term-info" style="font-size:0.8rem; color:var(--text-muted);">
+                                No active conversation yet.
+                            </div>
+                        </div>
+
+                        <!-- Retrieved Long-term Memories -->
+                        <div style="margin-bottom:12px;">
+                            <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--redis-primary); font-weight:600; margin-bottom:4px;">
+                                LONG-TERM MEMORY RETRIEVED (Vector Search)
+                            </div>
+                            <div id="memory-results" style="font-size:0.8rem; color:var(--text-muted);">
+                                No memories retrieved yet.
+                            </div>
+                        </div>
+
+                        <!-- Retrieved RAG Documents -->
+                        <div>
+                            <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--redis-primary); font-weight:600; margin-bottom:4px;">
+                                RAG DOCUMENTS RETRIEVED (Vector Search)
+                            </div>
+                            <div id="rag-results" style="font-size:0.8rem; color:var(--text-muted);">
+                                No documents retrieved yet.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Redis Commands Executed -->
+                    <div id="commands-card" class="data-card" style="margin-top:16px; display:none;">
+                        <h3>⚡ Redis Commands Executed</h3>
+                        <pre id="commands-output" style="font-size:0.75rem; margin:0; white-space:pre-wrap; color:var(--text-secondary);"></pre>
+                        <div id="latency-display" style="font-family:var(--font-code); font-size:0.75rem; color:var(--redis-primary); margin-top:8px;"></div>
+                    </div>
+
+                    <!-- Reset button -->
+                    <div style="margin-top:16px; text-align:right;">
+                        <button id="resetBtn" class="btn btn-outline btn-sm">🔄 Reset Demo</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT: Code Showcase Panel -->
+            <section class="panel code-panel">
+                <h2>Code Showcase</h2>
+                <div class="code-container">
+                    <div class="code-tabs">
+                        <button class="code-tab active" data-tab="java">Java</button>
+                        <button class="code-tab" data-tab="cli">Redis CLI</button>
+                    </div>
+
+                    <div class="code-block active" id="tab-java">
+                        <pre><code class="language-java">// 1. Short-term Memory — HSET + EXPIRE
+// Store conversation context as a Hash
+String convKey = "workshop:assistant:conversation:"
+    + sessionId;
+
+Map&lt;String, String&gt; convData = Map.of(
+    "messages", objectMapper.writeValueAsString(
+        messageHistory),
+    "created_at", Instant.now().toString(),
+    "last_active", Instant.now().toString(),
+    "user_name", userName
+);
+redis.opsForHash().putAll(convKey, convData);
+// TTL: auto-expire after 10 min of inactivity
+redis.expire(convKey, 600, TimeUnit.SECONDS);
+
+// 2. Long-term Memory — Hash + Vector
+// Store past interaction with embedding vector
+String memKey = "workshop:assistant:memory:mem-001";
+redis.opsForHash().putAll(memKey, Map.of(
+    "summary", "Asked about wire transfer fees",
+    "detail", "Customer inquired about SWIFT...",
+    "date", "2024-03-15",
+    "tags", "transfer,international,fees"
+));
+// Store vector as raw FLOAT32 bytes
+conn.hashCommands().hSet(
+    memKey.getBytes(),
+    "vector".getBytes(),
+    vectorToBytes(embedding)  // 768-dim float[]
+);
+
+// 3. FT.CREATE — Vector index for memories
+// FT.CREATE idx:assistant_memory
+//   ON HASH PREFIX 1 workshop:assistant:memory:
+//   SCHEMA
+//     summary TEXT
+//     tags TAG SEPARATOR ","
+//     vector VECTOR HNSW 6
+//       TYPE FLOAT32 DIM 768
+//       DISTANCE_METRIC COSINE
+
+// 4. FT.SEARCH KNN — Retrieve memories
+// FT.SEARCH idx:assistant_memory
+//   "*=&gt;[KNN 3 @vector $BLOB]"
+//   PARAMS 2 BLOB &lt;query_vector_bytes&gt;
+//   RETURN 3 summary detail date
+//   DIALECT 2
+
+// 5. RAG — Same pattern for knowledge base
+// FT.SEARCH idx:assistant_kb
+//   "*=&gt;[KNN 3 @vector $BLOB]"
+//   PARAMS 2 BLOB &lt;query_vector_bytes&gt;
+//   RETURN 3 title content tags
+//   DIALECT 2
+
+// 6. Complete flow
+// a) HGETALL conversation (short-term)
+// b) FT.SEARCH memories (long-term)
+// c) FT.SEARCH knowledge base (RAG)
+// d) Generate response (mock LLM)
+// e) HSET conversation with new messages
+// f) EXPIRE to refresh TTL</code></pre>
+                    </div>
+
+                    <div class="code-block" id="tab-cli">
+                        <pre><code class="language-bash"># 1. Short-term Memory — conversation context
+HSET workshop:assistant:conversation:sess-001 \
+  messages '[{"role":"user","content":"..."}]' \
+  created_at "2024-03-15T10:00:00Z" \
+  last_active "2024-03-15T10:05:00Z" \
+  user_name "Demo User"
+
+# Auto-expire after 10 minutes
+EXPIRE workshop:assistant:conversation:sess-001 600
+
+# Read conversation
+HGETALL workshop:assistant:conversation:sess-001
+
+# Check remaining TTL
+TTL workshop:assistant:conversation:sess-001
+
+# 2. Long-term Memory — store with vector
+HSET workshop:assistant:memory:mem-001 \
+  summary "Asked about wire transfer fees" \
+  detail "Customer inquired about SWIFT..." \
+  date "2024-03-15" \
+  tags "transfer,international,fees" \
+  vector "&lt;768-dim FLOAT32 binary blob&gt;"
+
+# 3. Create vector index for memories
+FT.CREATE idx:assistant_memory \
+  ON HASH PREFIX 1 workshop:assistant:memory: \
+  SCHEMA \
+    summary TEXT \
+    tags TAG SEPARATOR "," \
+    date TEXT \
+    vector VECTOR HNSW 6 \
+      TYPE FLOAT32 DIM 768 \
+      DISTANCE_METRIC COSINE
+
+# 4. KNN search — find similar memories
+FT.SEARCH idx:assistant_memory \
+  "*=&gt;[KNN 3 @vector $BLOB]" \
+  PARAMS 2 BLOB "&lt;query_vector&gt;" \
+  RETURN 3 summary detail date \
+  DIALECT 2
+
+# 5. RAG knowledge base index
+FT.CREATE idx:assistant_kb \
+  ON HASH PREFIX 1 workshop:assistant:kb: \
+  SCHEMA \
+    title TEXT \
+    content TEXT \
+    tags TAG SEPARATOR "," \
+    vector VECTOR HNSW 6 \
+      TYPE FLOAT32 DIM 768 \
+      DISTANCE_METRIC COSINE
+
+# 6. KNN search — retrieve KB articles
+FT.SEARCH idx:assistant_kb \
+  "*=&gt;[KNN 3 @vector $BLOB]" \
+  PARAMS 2 BLOB "&lt;query_vector&gt;" \
+  RETURN 3 title content tags \
+  DIALECT 2
+
+# Memory patterns summary:
+# SHORT-TERM: Hash + TTL (10 min window)
+# LONG-TERM:  Hash + Vector (KNN search)
+# RAG:        Hash + Vector (KNN search)
+# All served from Redis in &lt; 5ms total</code></pre>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div layout:fragment="scripts">
+        <script th:src="@{/js/usecase-9.js}"></script>
+    </div>
+</body>
+</html>

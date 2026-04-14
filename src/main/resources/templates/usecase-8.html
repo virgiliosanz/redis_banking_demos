@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${useCaseTitle}">Document Search</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">UC8</span>
+            <h1 th:text="${useCaseTitle}">Document Search (Full-text + Vector)</h1>
+        </div>
+
+        <div class="usecase-panels">
+            <!-- LEFT: Live Demo Panel -->
+            <section class="panel demo-panel">
+                <h2>Live Demo</h2>
+                <div id="demo-container" class="demo-container">
+
+                    <!-- Search Mode Toggle -->
+                    <div class="form-group">
+                        <label>Search Mode</label>
+                        <div id="mode-toggle" style="display:flex; gap:8px;">
+                            <button class="btn btn-sm doc-mode-btn active" data-mode="full-text">📝 Full-Text</button>
+                            <button class="btn btn-sm doc-mode-btn" data-mode="vector">🧠 Vector</button>
+                            <button class="btn btn-sm doc-mode-btn" data-mode="hybrid">⚡ Hybrid</button>
+                        </div>
+                    </div>
+
+                    <!-- Search Bar -->
+                    <div class="form-group">
+                        <label for="searchInput">Search Regulation Documents</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="searchInput" class="form-input" placeholder="e.g. payment services, data protection, capital requirements..." style="flex:1;"/>
+                            <button id="searchBtn" class="btn btn-primary">🔍 Search</button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Searches -->
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+                        <button class="btn btn-sm btn-secondary doc-quick" data-q="payment services">payment services</button>
+                        <button class="btn btn-sm btn-secondary doc-quick" data-q="customer data protection">customer data protection</button>
+                        <button class="btn btn-sm btn-secondary doc-quick" data-q="capital requirements">capital requirements</button>
+                        <button class="btn btn-sm btn-secondary doc-quick" data-q="transaction reporting">transaction reporting</button>
+                    </div>
+
+                    <!-- Redis Command Executed -->
+                    <div id="command-card" class="data-card" style="display:none;">
+                        <h3>Redis Command</h3>
+                        <pre id="command-output" style="font-size:0.72rem; margin:0; white-space:pre-wrap; color:var(--text-secondary); font-family:var(--font-code);"></pre>
+                    </div>
+
+                    <!-- Results Summary -->
+                    <div id="results-summary" style="display:none; margin-bottom:16px;">
+                        <span style="font-family:var(--font-code); font-size:0.85rem; color:var(--text-muted);">
+                            Mode: <strong id="result-mode"></strong> · Found: <strong id="result-count"></strong> documents
+                        </span>
+                    </div>
+
+                    <!-- Search Results -->
+                    <div id="results-container"></div>
+                </div>
+            </section>
+
+            <!-- RIGHT: Code Showcase Panel -->
+            <section class="panel code-panel">
+                <h2>Code Showcase</h2>
+                <div class="code-container">
+                    <div class="code-tabs">
+                        <button class="code-tab active" data-tab="java">Java</button>
+                        <button class="code-tab" data-tab="cli">Redis CLI</button>
+                    </div>
+
+                    <div class="code-block active" id="tab-java">
+                        <pre><code class="language-java">// 1. Store regulation doc — JSON.SET
+String key = "workshop:docs:regulation:REG001";
+String json = """
+  { "id": "REG001",
+    "title": "PSD2 Strong Customer Auth",
+    "category": "PSD2",
+    "summary": "SCA requirements...",
+    "content": "Full text...",
+    "vector": [0.023, -0.118, ...] }
+  """;
+
+// JSON.SET — store as RedisJSON document
+redis.execute(conn -&gt; conn.execute(
+    "JSON.SET", key, "$", json));
+
+// 2. Create search index — FT.CREATE
+// TEXT fields for full-text, TAG for filters,
+// VECTOR HNSW for semantic similarity
+redis.execute(conn -&gt; conn.execute(
+  "FT.CREATE", "idx:regulations",
+  "ON", "JSON",
+  "PREFIX", "1", "workshop:docs:regulation:",
+  "SCHEMA",
+    "$.title", "AS", "title", "TEXT",
+      "WEIGHT", "2.0",
+    "$.category", "AS", "category", "TAG",
+    "$.summary", "AS", "summary", "TEXT",
+    "$.content", "AS", "content", "TEXT",
+    "$.vector", "AS", "vector", "VECTOR",
+      "HNSW", "6",
+      "TYPE", "FLOAT32",
+      "DIM", "768",
+      "DISTANCE_METRIC", "COSINE"));
+
+// 3. Full-text search — FT.SEARCH
+redis.execute(conn -&gt; conn.execute(
+  "FT.SEARCH", "idx:regulations",
+  "payment services",
+  "RETURN", "4",
+    "title", "category", "summary", "tags",
+  "LIMIT", "0", "10"));
+
+// 4. Vector similarity (KNN) — FT.SEARCH
+byte[] queryVec = embedQuery("data protection");
+redis.execute(conn -&gt; conn.execute(
+  "FT.SEARCH", "idx:regulations",
+  "*=&gt;[KNN 10 @vector $BLOB AS score]",
+  "RETURN", "5",
+    "title", "category", "summary", "score",
+  "SORTBY", "score",
+  "PARAMS", "2", "BLOB", queryVec,
+  "DIALECT", "2"));
+
+// 5. Hybrid: text filter + KNN
+redis.execute(conn -&gt; conn.execute(
+  "FT.SEARCH", "idx:regulations",
+  "(payment)=&gt;[KNN 5 @vector $BLOB AS score]",
+  "RETURN", "5",
+    "title", "category", "summary", "score",
+  "SORTBY", "score",
+  "PARAMS", "2", "BLOB", queryVec,
+  "DIALECT", "2"));</code></pre>
+                    </div>
+
+                    <div class="code-block" id="tab-cli">
+                        <pre><code class="language-bash"># 1. Store document as JSON
+JSON.SET workshop:docs:regulation:REG001 $ '{
+  "id": "REG001",
+  "title": "PSD2 Strong Customer Auth",
+  "category": "PSD2",
+  "summary": "SCA requirements for payments",
+  "content": "Full regulation text...",
+  "vector": [0.023, -0.118, ...]
+}'
+
+# 2. Create index: TEXT + TAG + VECTOR on JSON
+FT.CREATE idx:regulations ON JSON \
+  PREFIX 1 workshop:docs:regulation: \
+  SCHEMA \
+    $.title AS title TEXT WEIGHT 2.0 \
+    $.category AS category TAG \
+    $.summary AS summary TEXT \
+    $.content AS content TEXT \
+    $.vector AS vector VECTOR HNSW 6 \
+      TYPE FLOAT32 DIM 768 \
+      DISTANCE_METRIC COSINE
+
+# 3. Full-text search
+FT.SEARCH idx:regulations "payment services" \
+  RETURN 4 title category summary tags \
+  LIMIT 0 10
+
+# 4. Vector similarity (KNN)
+# $BLOB = binary float32 query vector
+FT.SEARCH idx:regulations \
+  "*=>[KNN 10 @vector $BLOB AS score]" \
+  RETURN 5 title category summary tags score \
+  SORTBY score \
+  PARAMS 2 BLOB $query_vector \
+  DIALECT 2
+
+# 5. Hybrid: text pre-filter + KNN
+FT.SEARCH idx:regulations \
+  "(payment)=>[KNN 5 @vector $BLOB AS score]" \
+  RETURN 5 title category summary tags score \
+  SORTBY score \
+  PARAMS 2 BLOB $query_vector \
+  DIALECT 2
+
+# 6. Filter by category TAG
+FT.SEARCH idx:regulations \
+  "@category:{PSD2}" \
+  RETURN 3 title summary tags \
+  LIMIT 0 10</code></pre>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div layout:fragment="scripts">
+        <script th:src="@{/js/usecase-8.js}"></script>
+    </div>
+</body>
+</html>

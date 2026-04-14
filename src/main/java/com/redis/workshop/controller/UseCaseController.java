@@ -13,18 +13,20 @@ import java.util.Map;
 public class UseCaseController {
 
     private static final Map<Integer, String> TITLES = Map.of(
-            1, "Session Management + Auth Token",
-            2, "Rate Limiting (Open Banking / PSD2)",
-            3, "Transaction Deduplication",
-            4, "Real-time Fraud Detection",
-            5, "Feature Store (Risk Scoring)",
-            6, "Document Search (Full-text + Vector)",
-            7, "AI Banking Assistant (Memory + RAG)"
+            1, "Authentication Token Store",
+            2, "Session Storage",
+            3, "User Profile Storage",
+            4, "Rate Limiting (Open Banking / PSD2)",
+            5, "Transaction Deduplication",
+            6, "Real-time Fraud Detection",
+            7, "Feature Store (Risk Scoring)",
+            8, "Document Database (Full-text + Vector)",
+            9, "AI Agent Memory + RAG"
     );
 
     @GetMapping("/{id}")
     public String useCase(@PathVariable int id, Model model) {
-        if (id < 1 || id > 7) {
+        if (id < 1 || id > 9) {
             return "redirect:/";
         }
         model.addAttribute("useCaseId", id);

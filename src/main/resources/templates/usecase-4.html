@@ -3,154 +3,168 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <head>
-    <title th:text="${useCaseTitle}">Real-time Fraud Detection</title>
+    <title th:text="${useCaseTitle}">Rate Limiting</title>
 </head>
 <body>
     <div layout:fragment="content">
         <div class="usecase-header">
             <span class="usecase-badge">UC4</span>
-            <h1 th:text="${useCaseTitle}">Real-time Fraud Detection</h1>
+            <h1 th:text="${useCaseTitle}">Rate Limiting (Open Banking / PSD2)</h1>
         </div>
-        <p class="usecase-subtitle">Transaction Risk Scoring &mdash; velocity checks with Sorted Sets, event logging with Streams, geographic anomaly detection.</p>
 
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->
             <section class="panel demo-panel">
                 <h2>Live Demo</h2>
                 <div id="demo-container" class="demo-container">
-                    <!-- Transaction Form -->
-                    <form id="fraudForm" class="demo-form" autocomplete="off">
-                        <div class="form-group">
-                            <label for="cardNumber">Card Number</label>
-                            <select id="cardNumber" class="form-control">
-                                <option value="4000-1234-5678-9010">4000-1234-5678-9010 (Alice — ES)</option>
-                                <option value="4000-2345-6789-0123">4000-2345-6789-0123 (Bob — ES)</option>
-                                <option value="4000-3456-7890-1234">4000-3456-7890-1234 (Carlos — FR)</option>
-                                <option value="4000-4567-8901-2345">4000-4567-8901-2345 (Diana — DE)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="amount">Amount (&euro;)</label>
-                            <input type="number" id="amount" class="form-control" value="150.00" min="0.01" step="0.01" />
-                        </div>
-                        <div class="form-group">
-                            <label for="merchant">Merchant</label>
-                            <select id="merchant" class="form-control">
-                                <option value="Amazon ES">Amazon ES</option>
-                                <option value="El Corte Inglés">El Corte Inglés</option>
-                                <option value="Luxury Watches Ltd">Luxury Watches Ltd</option>
-                                <option value="ATM Withdrawal">ATM Withdrawal</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="country">Country</label>
-                            <select id="country" class="form-control">
-                                <option value="ES">🇪🇸 Spain (ES)</option>
-                                <option value="FR">🇫🇷 France (FR)</option>
-                                <option value="DE">🇩🇪 Germany (DE)</option>
-                                <option value="NG">🇳🇬 Nigeria (NG)</option>
-                                <option value="RU">🇷🇺 Russia (RU)</option>
-                            </select>
-                        </div>
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary" id="evaluateBtn">🔍 Evaluate Transaction</button>
-                            <button type="button" class="btn btn-secondary" id="burstBtn">⚡ Rapid-fire (5 txs)</button>
-                            <button type="button" class="btn btn-outline" id="resetBtn">🔄 Reset</button>
-                        </div>
-                    </form>
+                    <p class="demo-scenario">
+                        <strong>Scenario:</strong> A fintech app (<code>fintech-app-001</code>) calls your
+                        Open Banking API. PSD2 requires rate limiting to protect against abuse.
+                        <br/>Limit: <strong>10 requests / 60 seconds</strong> (fixed window).
+                    </p>
 
-                    <!-- Risk Score Display -->
-                    <div id="riskDisplay" class="fraud-risk-display" style="display:none;">
-                        <div class="fraud-risk-header">
-                            <span class="fraud-risk-label">Risk Score</span>
-                            <span id="riskScore" class="fraud-risk-score">0</span>
+                    <!-- Rate limit gauge -->
+                    <div class="rl-gauge">
+                        <div class="rl-gauge-label">Remaining Requests</div>
+                        <div class="rl-gauge-bar">
+                            <div class="rl-gauge-fill" id="gaugeFill"></div>
                         </div>
-                        <div class="fraud-gauge-bar">
-                            <div id="riskGaugeFill" class="fraud-gauge-fill" style="width:0%"></div>
+                        <div class="rl-gauge-count">
+                            <span id="remainingCount">10</span> / <span id="limitCount">10</span>
                         </div>
-                        <div id="riskLevel" class="fraud-risk-level">LOW</div>
-                        <div id="riskFactors" class="fraud-risk-factors"></div>
                     </div>
 
-                    <!-- Transaction Stream -->
-                    <h3 class="log-title">Transaction Stream</h3>
-                    <div id="txStream" class="tx-log">
-                        <p class="placeholder-text">No evaluations yet. Submit a transaction above.</p>
+                    <!-- Action buttons -->
+                    <div class="rl-actions">
+                        <button id="btnCallApi" class="rl-btn rl-btn-primary">
+                            ⚡ Call API
+                        </button>
+                        <button id="btnBurst" class="rl-btn rl-btn-secondary">
+                            🔥 Burst (5 calls)
+                        </button>
+                        <button id="btnReset" class="rl-btn rl-btn-outline">
+                            ↺ Reset
+                        </button>
                     </div>
+
+                    <!-- Status / 429 display -->
+                    <div id="statusBox" class="rl-status rl-status-ok">
+                        <span id="statusIcon">✅</span>
+                        <span id="statusText">Ready — click "Call API" to simulate a request</span>
+                    </div>
+
+                    <!-- TTL countdown -->
+                    <div class="rl-ttl" id="ttlBox" style="display:none;">
+                        Window resets in <strong id="ttlValue">0</strong>s
+                    </div>
+
+                    <!-- Request log -->
+                    <div class="rl-log-header">Request Log</div>
+                    <div class="rl-log" id="requestLog"></div>
                 </div>
             </section>
 
             <!-- RIGHT: Code Showcase Panel -->
             <section class="panel code-panel">
                 <h2>Code Showcase</h2>
-                <div class="code-container">
-                    <h3 class="code-section-title">1. Velocity Tracking (Sorted Set)</h3>
-                    <pre><code class="language-java">// ZADD — record each transaction with timestamp as score
-String velocityKey = "workshop:fraud:velocity:" + cardNumber;
-long now = Instant.now().toEpochMilli();
 
-redis.opsForZSet().add(velocityKey, txId, now);
+                <div class="code-tabs">
+                    <button class="code-tab active" data-tab="fixed">Fixed Window</button>
+                    <button class="code-tab" data-tab="sliding">Sliding Window</button>
+                    <button class="code-tab" data-tab="cli">Redis CLI</button>
+                </div>
 
-// ZRANGEBYSCORE — count txs in last 5 minutes
-long windowStart = now - (300 * 1000); // 5 min ago
-Set&lt;String&gt; recentTxs = redis.opsForZSet()
-    .rangeByScore(velocityKey, windowStart, now);
+                <!-- Fixed Window -->
+                <div class="code-container code-tab-content active" id="tab-fixed">
+<pre><code class="language-java">// ═══ Fixed-Window Rate Limiting ═══
+// Pattern: INCR + EXPIRE
+// Simple, efficient, atomic counter per time window
 
-int velocityCount = recentTxs.size();
-// velocityCount &gt; 5 → HIGH RISK!
+String key = "workshop:ratelimit:" + clientId;
 
-// Clean expired entries
-redis.opsForZSet()
-    .removeRangeByScore(velocityKey, 0, windowStart - 1);</code></pre>
+// INCR atomically increments (creates key=1 if absent)
+Long count = redis.opsForValue().increment(key);
 
-                    <h3 class="code-section-title">2. Redis CLI — Velocity Check</h3>
-                    <pre><code class="language-bash"># Add transaction with timestamp as score
-ZADD workshop:fraud:velocity:4000-1234 1713045600000 "tx-abc123"
+// Set TTL only on the FIRST request of a new window
+if (count == 1) {
+    redis.expire(key, 60, TimeUnit.SECONDS);
+}
+
+// Check if client exceeded the limit
+boolean allowed = count &lt;= MAX_REQUESTS;  // e.g. 10
+long remaining = Math.max(0, MAX_REQUESTS - count);
+
+if (!allowed) {
+    // Return 429 Too Many Requests
+    // Include Retry-After header (TTL of the key)
+    Long ttl = redis.getExpire(key, TimeUnit.SECONDS);
+    response.setHeader("Retry-After", ttl.toString());
+}</code></pre>
+                </div>
+
+                <!-- Sliding Window -->
+                <div class="code-container code-tab-content" id="tab-sliding">
+<pre><code class="language-java">// ═══ Sliding-Window Rate Limiting ═══
+// Pattern: Sorted Set (ZADD + ZRANGEBYSCORE + ZCARD)
+// More precise than fixed-window, no boundary burst
+
+String key = "workshop:ratelimit:sliding:" + clientId;
+long now = System.currentTimeMillis();
+long windowStart = now - (WINDOW_SECONDS * 1000);
+
+// 1. Remove expired entries outside the window
+redis.opsForZSet().removeRangeByScore(key, 0, windowStart);
+
+// 2. Count current requests in the window
+Long count = redis.opsForZSet().zCard(key);
+
+if (count != null &amp;&amp; count &lt; MAX_REQUESTS) {
+    // 3. Add current request (score = timestamp)
+    redis.opsForZSet().add(key, UUID.randomUUID().toString(), now);
+
+    // 4. Set TTL as safety net for cleanup
+    redis.expire(key, WINDOW_SECONDS + 1, TimeUnit.SECONDS);
+
+    return true;  // Allowed
+} else {
+    return false; // Rate limit exceeded — 429
+}
+
+// Advantage: no "boundary burst" problem
+// A client can't get 2x the limit at window boundaries</code></pre>
+                </div>
+
+                <!-- Redis CLI -->
+                <div class="code-container code-tab-content" id="tab-cli">
+<pre><code class="language-bash"># ═══ Fixed-Window with Redis CLI ═══
+
+# Increment counter (creates if not exists)
+INCR workshop:ratelimit:fintech-app-001
 # → (integer) 1
 
-# Count transactions in last 5 minutes
-ZRANGEBYSCORE workshop:fraud:velocity:4000-1234 1713045300000 1713045600000
-# → 1) "tx-prev001"
-# → 2) "tx-prev002"
-# → 3) "tx-abc123"
-# 3 transactions → elevated velocity
+# Set expiry on first request
+EXPIRE workshop:ratelimit:fintech-app-001 60
+# → (integer) 1
 
-# Clean old entries
-ZREMRANGEBYSCORE workshop:fraud:velocity:4000-1234 0 1713045299999</code></pre>
+# Check current count
+GET workshop:ratelimit:fintech-app-001
+# → "5"
 
-                    <h3 class="code-section-title">3. Event Stream (Redis Streams)</h3>
-                    <pre><code class="language-java">// XADD — log every fraud evaluation to a stream
-Map&lt;String, String&gt; entry = Map.of(
-    "txId", txId,
-    "card", cardNumber,
-    "amount", String.valueOf(amount),
-    "riskScore", String.valueOf(riskScore),
-    "riskLevel", riskLevel
-);
+# Check TTL (time until window resets)
+TTL workshop:ratelimit:fintech-app-001
+# → (integer) 42
 
-redis.opsForStream().add(
-    StreamRecords.string(entry)
-        .withStreamKey("workshop:fraud:stream"));
+# ═══ Sliding-Window with Redis CLI ═══
 
-// XREVRANGE — read most recent evaluations
-redis.opsForStream().reverseRange(
-    "workshop:fraud:stream",
-    Range.unbounded(),
-    Limit.limit().count(20));</code></pre>
+# Add request with timestamp as score
+ZADD workshop:ratelimit:sliding:fintech-app-001 1713045600000 "req-uuid-1"
 
-                    <h3 class="code-section-title">4. Redis CLI — Stream Commands</h3>
-                    <pre><code class="language-bash"># Log a fraud evaluation event
-XADD workshop:fraud:stream * txId "tx-abc123" card "4000-1234" amount "15000.00" riskScore "75" riskLevel "CRITICAL"
-# → "1713045600000-0"
+# Remove expired entries
+ZREMRANGEBYSCORE workshop:ratelimit:sliding:fintech-app-001 0 1713045540000
 
-# Read last 5 evaluations
-XREVRANGE workshop:fraud:stream + - COUNT 5
-
-# Stream length
-XLEN workshop:fraud:stream
-
-# Trim to last 50 entries
-XTRIM workshop:fraud:stream MAXLEN ~ 50</code></pre>
+# Count requests in current window
+ZCARD workshop:ratelimit:sliding:fintech-app-001
+# → (integer) 3</code></pre>
                 </div>
             </section>
         </div>

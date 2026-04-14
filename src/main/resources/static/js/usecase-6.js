@@ -1,149 +1,151 @@
-/**
- * UC6: Document Search — Full-text + Vector + Hybrid
- * Interactive demo: search bar, mode toggle, results rendering
- */
+/** UC6: Real-time Fraud Detection */
 (function () {
     'use strict';
 
-    // --- DOM refs ---
-    var searchInput = document.getElementById('searchInput');
-    var searchBtn = document.getElementById('searchBtn');
-    var commandCard = document.getElementById('command-card');
-    var commandOutput = document.getElementById('command-output');
-    var resultsSummary = document.getElementById('results-summary');
-    var resultMode = document.getElementById('result-mode');
-    var resultCount = document.getElementById('result-count');
-    var resultsContainer = document.getElementById('results-container');
+    var RISK_COLORS = {
+        LOW: '#0a7e3e',
+        MEDIUM: '#d4a017',
+        HIGH: '#e67e22',
+        CRITICAL: '#FF4438'
+    };
 
-    var currentMode = 'full-text';
+    document.addEventListener('DOMContentLoaded', function () {
+        var form = document.getElementById('fraudForm');
+        var evaluateBtn = document.getElementById('evaluateBtn');
+        var burstBtn = document.getElementById('burstBtn');
+        var resetBtn = document.getElementById('resetBtn');
+        var riskDisplay = document.getElementById('riskDisplay');
+        var riskScoreEl = document.getElementById('riskScore');
+        var riskGaugeFill = document.getElementById('riskGaugeFill');
+        var riskLevelEl = document.getElementById('riskLevel');
+        var riskFactorsEl = document.getElementById('riskFactors');
+        var txStream = document.getElementById('txStream');
 
-    // --- Code Tabs ---
-    document.querySelectorAll('.code-tab').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            document.querySelectorAll('.code-tab').forEach(function (t) { t.classList.remove('active'); });
-            document.querySelectorAll('.code-block').forEach(function (b) { b.classList.remove('active'); });
-            tab.classList.add('active');
-            document.getElementById('tab-' + tab.getAttribute('data-tab')).classList.add('active');
-        });
-    });
-
-    // --- Mode Toggle ---
-    document.querySelectorAll('.doc-mode-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            document.querySelectorAll('.doc-mode-btn').forEach(function (b) { b.classList.remove('active'); });
-            btn.classList.add('active');
-            currentMode = btn.getAttribute('data-mode');
-        });
-    });
-
-    // --- Quick Search Buttons ---
-    document.querySelectorAll('.doc-quick').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            searchInput.value = btn.getAttribute('data-q');
-            doSearch();
-        });
-    });
-
-    // --- Search ---
-    searchBtn.addEventListener('click', doSearch);
-    searchInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') doSearch();
-    });
-
-    function doSearch() {
-        var query = searchInput.value.trim();
-        if (!query) {
-            searchInput.style.borderColor = 'var(--redis-primary)';
-            return;
-        }
-        searchInput.style.borderColor = '';
-        searchBtn.disabled = true;
-        searchBtn.textContent = 'Searching...';
-
-        var url = '/api/docs/search?q=' + encodeURIComponent(query) + '&mode=' + encodeURIComponent(currentMode);
-
-        window.workshopGet(url).then(function (data) {
-            searchBtn.disabled = false;
-            searchBtn.textContent = '🔍 Search';
-            renderResults(data);
-        }).catch(function () {
-            searchBtn.disabled = false;
-            searchBtn.textContent = '🔍 Search';
-            resultsContainer.innerHTML = '<p style="color:var(--redis-primary);">Search failed. Is Redis running?</p>';
-        });
-    }
-
-    function renderResults(data) {
-        // Show Redis command
-        if (data.redisCommand) {
-            commandCard.style.display = '';
-            commandOutput.textContent = data.redisCommand;
+        function getFormData() {
+            return {
+                cardNumber: document.getElementById('cardNumber').value,
+                amount: document.getElementById('amount').value,
+                merchant: document.getElementById('merchant').value,
+                country: document.getElementById('country').value
+            };
         }
 
-        // Show summary
-        resultsSummary.style.display = '';
-        resultMode.textContent = getModeLabel(data.mode);
-        resultCount.textContent = data.resultCount || 0;
+        function showRisk(data) {
+            riskDisplay.style.display = 'block';
+            var score = data.riskScore || 0;
+            var level = data.riskLevel || 'LOW';
+            var color = RISK_COLORS[level] || RISK_COLORS.LOW;
 
-        // Render result cards
-        var results = data.results || [];
-        if (results.length === 0) {
-            resultsContainer.innerHTML = '<div class="data-card" style="text-align:center; padding:32px;"><p style="color:var(--text-muted);">No documents found. Try a different query or search mode.</p></div>';
-            return;
-        }
+            riskScoreEl.textContent = score;
+            riskScoreEl.style.color = color;
+            riskGaugeFill.style.width = score + '%';
+            riskGaugeFill.style.background = color;
+            riskLevelEl.textContent = level;
+            riskLevelEl.className = 'fraud-risk-level fraud-level-' + level.toLowerCase();
 
-        var html = '';
-        results.forEach(function (doc, idx) {
-            var scoreDisplay = formatScore(doc.score, data.mode);
-            var categoryClass = getCategoryClass(doc.category);
-
-            html += '<div class="data-card" style="margin-bottom:12px; animation: resultPop 0.3s ease ' + (idx * 0.05) + 's both;">';
-            html += '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">';
-            html += '<div style="flex:1;">';
-            html += '<div style="font-weight:700; font-size:0.95rem; color:var(--text-primary); margin-bottom:4px;">' + escapeHtml(doc.title || '') + '</div>';
-            html += '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">';
-            html += '<span class="status-badge ' + categoryClass + '" style="font-size:0.7rem;">' + escapeHtml(doc.category || '') + '</span>';
-            if (doc.tags) {
-                var tags = (doc.tags || '').split(',');
-                tags.slice(0, 3).forEach(function (tag) {
-                    html += '<span style="font-family:var(--font-code); font-size:0.65rem; color:var(--text-muted); background:var(--bg-tertiary); padding:2px 6px; border-radius:3px;">' + escapeHtml(tag.trim()) + '</span>';
+            var factorsHtml = '';
+            if (data.factors && data.factors.length) {
+                data.factors.forEach(function (f) {
+                    factorsHtml += '<div class="fraud-factor">' + escapeHtml(f) + '</div>';
                 });
             }
-            html += '</div></div>';
-            html += '<div style="text-align:right; min-width:80px;">' + scoreDisplay + '</div>';
-            html += '</div>';
-            html += '<div style="font-size:0.82rem; color:var(--text-secondary); line-height:1.5;">' + escapeHtml(doc.summary || '') + '</div>';
-            html += '</div>';
+            riskFactorsEl.innerHTML = factorsHtml;
+
+            // Animate
+            riskDisplay.classList.remove('result-animate');
+            void riskDisplay.offsetWidth;
+            riskDisplay.classList.add('result-animate');
+        }
+
+        function escapeHtml(str) {
+            var div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function renderStream(entries) {
+            if (!entries || entries.length === 0) {
+                txStream.innerHTML = '<p class="placeholder-text">No evaluations yet. Submit a transaction above.</p>';
+                return;
+            }
+            var html = '<table class="log-table"><thead><tr>' +
+                '<th>Risk</th><th>Score</th><th>Card</th><th>Amount</th><th>Country</th><th>Velocity</th><th>Time</th>' +
+                '</tr></thead><tbody>';
+            entries.forEach(function (e) {
+                var level = (e.riskLevel || 'LOW').toLowerCase();
+                var color = RISK_COLORS[e.riskLevel] || RISK_COLORS.LOW;
+                var ts = e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : '';
+                var cardShort = (e.card || '').substring((e.card || '').length - 4);
+                var geo = e.geoAnomaly === 'true' ? ' ⚠️' : '';
+                html += '<tr>' +
+                    '<td><span class="status-badge fraud-badge-' + level + '">' + (e.riskLevel || '') + '</span></td>' +
+                    '<td style="font-weight:700;color:' + color + '">' + (e.riskScore || 0) + '</td>' +
+                    '<td><code>***' + cardShort + '</code></td>' +
+                    '<td>&euro;' + (e.amount || '0') + '</td>' +
+                    '<td>' + (e.country || '') + geo + '</td>' +
+                    '<td>' + (e.velocityCount || 0) + ' txs</td>' +
+                    '<td>' + ts + '</td></tr>';
+            });
+            html += '</tbody></table>';
+            txStream.innerHTML = html;
+        }
+
+        function submitEvaluation(data) {
+            evaluateBtn.disabled = true;
+            return workshopFetch('/api/fraud/evaluate', data)
+                .then(function (result) {
+                    showRisk(result);
+                    return refreshStream();
+                })
+                .catch(function (err) {
+                    riskDisplay.style.display = 'block';
+                    riskScoreEl.textContent = '?';
+                    riskLevelEl.textContent = 'ERROR';
+                    riskFactorsEl.textContent = err.message;
+                })
+                .finally(function () {
+                    evaluateBtn.disabled = false;
+                });
+        }
+
+        function refreshStream() {
+            return workshopGet('/api/fraud/stream?count=20').then(renderStream);
+        }
+
+        // Evaluate button
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            submitEvaluation(getFormData());
         });
 
-        resultsContainer.innerHTML = html;
-    }
+        // Rapid-fire: send 5 transactions quickly to trigger velocity alert
+        burstBtn.addEventListener('click', function () {
+            var data = getFormData();
+            burstBtn.disabled = true;
+            burstBtn.textContent = '⚡ Sending...';
+            var chain = Promise.resolve();
+            for (var i = 0; i < 5; i++) {
+                chain = chain.then(function () {
+                    return submitEvaluation(data);
+                }).then(function () {
+                    return new Promise(function (r) { setTimeout(r, 200); });
+                });
+            }
+            chain.finally(function () {
+                burstBtn.disabled = false;
+                burstBtn.textContent = '⚡ Rapid-fire (5 txs)';
+            });
+        });
 
-    function getModeLabel(mode) {
-        if (mode === 'vector') return '🧠 Vector (KNN)';
-        if (mode === 'hybrid') return '⚡ Hybrid (Text + KNN)';
-        return '📝 Full-Text (RQE)';
-    }
+        // Reset
+        resetBtn.addEventListener('click', function () {
+            workshopFetch('/api/fraud/reset', {}).then(function () {
+                riskDisplay.style.display = 'none';
+                refreshStream();
+            });
+        });
 
-    function formatScore(score, mode) {
-        if (score === undefined || score === null) return '';
-        var s = parseFloat(score);
-        var pct = Math.round(s * 100);
-        var color = pct >= 80 ? '#0a7e3e' : (pct >= 50 ? '#cc8800' : 'var(--text-muted)');
-        var label = mode === 'full-text' ? 'Match' : 'Similarity';
-        return '<div style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted);">' + label + '</div>' +
-               '<div style="font-family:var(--font-code); font-size:1.1rem; font-weight:700; color:' + color + ';">' + pct + '%</div>';
-    }
-
-    function getCategoryClass(category) {
-        if (category === 'PSD2') return 'active';
-        if (category === 'GDPR') return 'expired';
-        return '';
-    }
-
-    function escapeHtml(str) {
-        var div = document.createElement('div');
-        div.appendChild(document.createTextNode(str));
-        return div.innerHTML;
-    }
+        // Load initial stream
+        refreshStream();
+    });
 })();

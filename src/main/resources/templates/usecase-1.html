@@ -3,13 +3,13 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <head>
-    <title th:text="${useCaseTitle}">Session Management</title>
+    <title th:text="${useCaseTitle}">Authentication Token Store</title>
 </head>
 <body>
     <div layout:fragment="content">
         <div class="usecase-header">
             <span class="usecase-badge">UC1</span>
-            <h1 th:text="${useCaseTitle}">Session Management + Auth Token</h1>
+            <h1 th:text="${useCaseTitle}">Authentication Token Store</h1>
         </div>
 
         <div class="usecase-panels">
@@ -20,6 +20,10 @@
 
                     <!-- Login Form -->
                     <div id="login-section">
+                        <p class="demo-scenario">
+                            <strong>Scenario:</strong> Generate an auth token on login, store it in a Redis Hash with TTL,
+                            validate it, and destroy it on logout.
+                        </p>
                         <div class="form-group">
                             <label for="username">Username</label>
                             <input type="text" id="username" class="form-input"
@@ -31,27 +35,27 @@
                                    placeholder="password1 or password2"/>
                         </div>
                         <button id="loginBtn" class="btn btn-primary" style="width:100%">
-                            🔐 Login
+                            🔑 Login &amp; Generate Token
                         </button>
                         <div id="login-error" class="alert alert-error" style="display:none; margin-top:16px;"></div>
                     </div>
 
-                    <!-- Session Info (hidden until login) -->
-                    <div id="session-section" style="display:none">
+                    <!-- Token Info (hidden until login) -->
+                    <div id="token-section" style="display:none">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                            <span class="status-badge active" id="session-status">● ACTIVE</span>
-                            <button id="logoutBtn" class="btn btn-outline btn-sm">Logout</button>
+                            <span class="status-badge active" id="token-status">● VALID</span>
+                            <button id="logoutBtn" class="btn btn-outline btn-sm">🗑️ Destroy Token</button>
                         </div>
 
                         <div class="data-card">
-                            <h3>Session Data (Redis Hash)</h3>
-                            <div id="session-data"></div>
-                        </div>
-
-                        <div class="data-card">
-                            <h3>Auth Token (Redis String)</h3>
+                            <h3>Auth Token (Redis Hash)</h3>
                             <div id="token-data"></div>
                         </div>
+
+                        <div style="display:flex; gap:8px; margin-top:16px;">
+                            <button id="validateBtn" class="btn btn-secondary" style="flex:1;">✅ Validate Token</button>
+                        </div>
+                        <div id="validate-result" style="display:none; margin-top:12px;"></div>
 
                         <div class="ttl-bar-container">
                             <div class="ttl-bar-label">
@@ -63,8 +67,8 @@
                             </div>
                         </div>
 
-                        <div id="session-expired" class="alert alert-error" style="display:none; margin-top:16px;">
-                            ⏰ Session expired — TTL reached zero. Data removed from Redis.
+                        <div id="token-expired" class="alert alert-error" style="display:none; margin-top:16px;">
+                            ⏰ Token expired — TTL reached zero. Key removed from Redis.
                         </div>
                     </div>
                 </div>
@@ -80,78 +84,60 @@
                     </div>
 
                     <div class="code-block active" id="tab-java">
-                        <pre><code class="language-java">// 1. Create session — HSET + EXPIRE
-String sessionKey = "workshop:session:user:" + username;
+                        <pre><code class="language-java">// 1. Generate token &amp; store as Hash — HSET
+String tokenId = UUID.randomUUID().toString();
+String key = "workshop:auth:token:" + tokenId;
 
-// Store session data as a Redis Hash
-Map&lt;String, String&gt; session = Map.of(
-    "username",  username,
-    "fullName",  "Ana García López",
-    "role",      "Premium Client",
-    "accountId", "ES76-0128-0001-23-0100012345",
-    "token",     UUID.randomUUID().toString(),
-    "createdAt", String.valueOf(System.currentTimeMillis())
+Map&lt;String, String&gt; tokenData = Map.of(
+    "tokenId",  tokenId,
+    "username", "user1",
+    "fullName", "Ana García López",
+    "role",     "Premium Client",
+    "issuedAt", String.valueOf(System.currentTimeMillis())
 );
 
-// HSET — write all fields atomically
-redis.opsForHash().putAll(sessionKey, session);
+// HSET — store all token fields atomically
+redis.opsForHash().putAll(key, tokenData);
 
 // EXPIRE — auto-delete after 300 seconds
-redis.expire(sessionKey, 300, TimeUnit.SECONDS);
+redis.expire(key, 300, TimeUnit.SECONDS);
 
-// 2. Store auth token — SET with EX
-String tokenKey = "workshop:session:token:" + token;
-redis.opsForValue()
-     .set(tokenKey, username, 300, TimeUnit.SECONDS);
-
-// 3. Read session — HGETALL
+// 2. Validate token — HGETALL
 Map&lt;Object, Object&gt; data =
-    redis.opsForHash().entries(sessionKey);
+    redis.opsForHash().entries(key);
+// Empty map = token expired or invalid
 
-// 4. Check remaining TTL — TTL command
-Long ttl = redis.getExpire(sessionKey,
+// 3. Check remaining TTL — TTL command
+Long ttl = redis.getExpire(key,
                            TimeUnit.SECONDS);
 
-// 5. Validate token — GET
-String user = redis.opsForValue().get(tokenKey);
-
-// 6. Logout — DEL session + token
-redis.delete(sessionKey);
-redis.delete(tokenKey);</code></pre>
+// 4. Logout — DEL (destroy token)
+redis.delete(key);</code></pre>
                     </div>
 
                     <div class="code-block" id="tab-cli">
-                        <pre><code class="language-bash"># 1. Create session Hash
-HSET workshop:session:user:user1 \
+                        <pre><code class="language-bash"># 1. Store auth token as Hash
+HSET workshop:auth:token:a1b2c3d4-uuid \
+  tokenId "a1b2c3d4-uuid" \
   username "user1" \
   fullName "Ana García López" \
   role "Premium Client" \
-  accountId "ES76-0128-0001-23-0100012345" \
-  token "a1b2c3d4-e5f6-7890-abcd-ef1234567890" \
-  createdAt "1713045600000"
+  issuedAt "1713045600000"
 
 # 2. Set TTL (300 seconds = 5 min)
-EXPIRE workshop:session:user:user1 300
+EXPIRE workshop:auth:token:a1b2c3d4-uuid 300
 
-# 3. Store auth token → username mapping
-SET workshop:session:token:a1b2c3d4-... \
-  "user1" EX 300
+# 3. Validate — read all token fields
+HGETALL workshop:auth:token:a1b2c3d4-uuid
 
-# 4. Read full session
-HGETALL workshop:session:user:user1
+# 4. Read single field
+HGET workshop:auth:token:a1b2c3d4-uuid username
 
-# 5. Read single field
-HGET workshop:session:user:user1 role
+# 5. Check remaining TTL
+TTL workshop:auth:token:a1b2c3d4-uuid
 
-# 6. Check remaining TTL
-TTL workshop:session:user:user1
-
-# 7. Validate token
-GET workshop:session:token:a1b2c3d4-...
-
-# 8. Logout — delete both keys
-DEL workshop:session:user:user1
-DEL workshop:session:token:a1b2c3d4-...</code></pre>
+# 6. Logout — delete token
+DEL workshop:auth:token:a1b2c3d4-uuid</code></pre>
                     </div>
                 </div>
             </section>

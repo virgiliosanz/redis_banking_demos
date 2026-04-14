@@ -3,63 +3,80 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <head>
-    <title th:text="${useCaseTitle}">Document Search</title>
+    <title th:text="${useCaseTitle}">Real-time Fraud Detection</title>
 </head>
 <body>
     <div layout:fragment="content">
         <div class="usecase-header">
             <span class="usecase-badge">UC6</span>
-            <h1 th:text="${useCaseTitle}">Document Search (Full-text + Vector)</h1>
+            <h1 th:text="${useCaseTitle}">Real-time Fraud Detection</h1>
         </div>
+        <p class="usecase-subtitle">Transaction Risk Scoring &mdash; velocity checks with Sorted Sets, event logging with Streams, geographic anomaly detection.</p>
 
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->
             <section class="panel demo-panel">
                 <h2>Live Demo</h2>
                 <div id="demo-container" class="demo-container">
-
-                    <!-- Search Mode Toggle -->
-                    <div class="form-group">
-                        <label>Search Mode</label>
-                        <div id="mode-toggle" style="display:flex; gap:8px;">
-                            <button class="btn btn-sm doc-mode-btn active" data-mode="full-text">📝 Full-Text</button>
-                            <button class="btn btn-sm doc-mode-btn" data-mode="vector">🧠 Vector</button>
-                            <button class="btn btn-sm doc-mode-btn" data-mode="hybrid">⚡ Hybrid</button>
+                    <!-- Transaction Form -->
+                    <form id="fraudForm" class="demo-form" autocomplete="off">
+                        <div class="form-group">
+                            <label for="cardNumber">Card Number</label>
+                            <select id="cardNumber" class="form-control">
+                                <option value="4000-1234-5678-9010">4000-1234-5678-9010 (Alice — ES)</option>
+                                <option value="4000-2345-6789-0123">4000-2345-6789-0123 (Bob — ES)</option>
+                                <option value="4000-3456-7890-1234">4000-3456-7890-1234 (Carlos — FR)</option>
+                                <option value="4000-4567-8901-2345">4000-4567-8901-2345 (Diana — DE)</option>
+                            </select>
                         </div>
-                    </div>
-
-                    <!-- Search Bar -->
-                    <div class="form-group">
-                        <label for="searchInput">Search Regulation Documents</label>
-                        <div style="display:flex; gap:8px;">
-                            <input type="text" id="searchInput" class="form-input" placeholder="e.g. payment services, data protection, capital requirements..." style="flex:1;"/>
-                            <button id="searchBtn" class="btn btn-primary">🔍 Search</button>
+                        <div class="form-group">
+                            <label for="amount">Amount (&euro;)</label>
+                            <input type="number" id="amount" class="form-control" value="150.00" min="0.01" step="0.01" />
                         </div>
+                        <div class="form-group">
+                            <label for="merchant">Merchant</label>
+                            <select id="merchant" class="form-control">
+                                <option value="Amazon ES">Amazon ES</option>
+                                <option value="El Corte Inglés">El Corte Inglés</option>
+                                <option value="Luxury Watches Ltd">Luxury Watches Ltd</option>
+                                <option value="ATM Withdrawal">ATM Withdrawal</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="country">Country</label>
+                            <select id="country" class="form-control">
+                                <option value="ES">🇪🇸 Spain (ES)</option>
+                                <option value="FR">🇫🇷 France (FR)</option>
+                                <option value="DE">🇩🇪 Germany (DE)</option>
+                                <option value="NG">🇳🇬 Nigeria (NG)</option>
+                                <option value="RU">🇷🇺 Russia (RU)</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="evaluateBtn">🔍 Evaluate Transaction</button>
+                            <button type="button" class="btn btn-secondary" id="burstBtn">⚡ Rapid-fire (5 txs)</button>
+                            <button type="button" class="btn btn-outline" id="resetBtn">🔄 Reset</button>
+                        </div>
+                    </form>
+
+                    <!-- Risk Score Display -->
+                    <div id="riskDisplay" class="fraud-risk-display" style="display:none;">
+                        <div class="fraud-risk-header">
+                            <span class="fraud-risk-label">Risk Score</span>
+                            <span id="riskScore" class="fraud-risk-score">0</span>
+                        </div>
+                        <div class="fraud-gauge-bar">
+                            <div id="riskGaugeFill" class="fraud-gauge-fill" style="width:0%"></div>
+                        </div>
+                        <div id="riskLevel" class="fraud-risk-level">LOW</div>
+                        <div id="riskFactors" class="fraud-risk-factors"></div>
                     </div>
 
-                    <!-- Quick Searches -->
-                    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
-                        <button class="btn btn-sm btn-secondary doc-quick" data-q="payment services">payment services</button>
-                        <button class="btn btn-sm btn-secondary doc-quick" data-q="customer data protection">customer data protection</button>
-                        <button class="btn btn-sm btn-secondary doc-quick" data-q="capital requirements">capital requirements</button>
-                        <button class="btn btn-sm btn-secondary doc-quick" data-q="transaction reporting">transaction reporting</button>
+                    <!-- Transaction Stream -->
+                    <h3 class="log-title">Transaction Stream</h3>
+                    <div id="txStream" class="tx-log">
+                        <p class="placeholder-text">No evaluations yet. Submit a transaction above.</p>
                     </div>
-
-                    <!-- Redis Command Executed -->
-                    <div id="command-card" class="data-card" style="display:none;">
-                        <h3>Redis Command</h3>
-                        <pre id="command-output" style="font-size:0.72rem; margin:0; white-space:pre-wrap; color:var(--text-secondary); font-family:var(--font-code);"></pre>
-                    </div>
-
-                    <!-- Results Summary -->
-                    <div id="results-summary" style="display:none; margin-bottom:16px;">
-                        <span style="font-family:var(--font-code); font-size:0.85rem; color:var(--text-muted);">
-                            Mode: <strong id="result-mode"></strong> · Found: <strong id="result-count"></strong> documents
-                        </span>
-                    </div>
-
-                    <!-- Search Results -->
-                    <div id="results-container"></div>
                 </div>
             </section>
 
@@ -67,127 +84,73 @@
             <section class="panel code-panel">
                 <h2>Code Showcase</h2>
                 <div class="code-container">
-                    <div class="code-tabs">
-                        <button class="code-tab active" data-tab="java">Java</button>
-                        <button class="code-tab" data-tab="cli">Redis CLI</button>
-                    </div>
+                    <h3 class="code-section-title">1. Velocity Tracking (Sorted Set)</h3>
+                    <pre><code class="language-java">// ZADD — record each transaction with timestamp as score
+String velocityKey = "workshop:fraud:velocity:" + cardNumber;
+long now = Instant.now().toEpochMilli();
 
-                    <div class="code-block active" id="tab-java">
-                        <pre><code class="language-java">// 1. Store regulation doc — JSON.SET
-String key = "workshop:docs:regulation:REG001";
-String json = """
-  { "id": "REG001",
-    "title": "PSD2 Strong Customer Auth",
-    "category": "PSD2",
-    "summary": "SCA requirements...",
-    "content": "Full text...",
-    "vector": [0.023, -0.118, ...] }
-  """;
+redis.opsForZSet().add(velocityKey, txId, now);
 
-// JSON.SET — store as RedisJSON document
-redis.execute(conn -&gt; conn.execute(
-    "JSON.SET", key, "$", json));
+// ZRANGEBYSCORE — count txs in last 5 minutes
+long windowStart = now - (300 * 1000); // 5 min ago
+Set&lt;String&gt; recentTxs = redis.opsForZSet()
+    .rangeByScore(velocityKey, windowStart, now);
 
-// 2. Create search index — FT.CREATE
-// TEXT fields for full-text, TAG for filters,
-// VECTOR HNSW for semantic similarity
-redis.execute(conn -&gt; conn.execute(
-  "FT.CREATE", "idx:regulations",
-  "ON", "JSON",
-  "PREFIX", "1", "workshop:docs:regulation:",
-  "SCHEMA",
-    "$.title", "AS", "title", "TEXT",
-      "WEIGHT", "2.0",
-    "$.category", "AS", "category", "TAG",
-    "$.summary", "AS", "summary", "TEXT",
-    "$.content", "AS", "content", "TEXT",
-    "$.vector", "AS", "vector", "VECTOR",
-      "HNSW", "6",
-      "TYPE", "FLOAT32",
-      "DIM", "768",
-      "DISTANCE_METRIC", "COSINE"));
+int velocityCount = recentTxs.size();
+// velocityCount &gt; 5 → HIGH RISK!
 
-// 3. Full-text search — FT.SEARCH
-redis.execute(conn -&gt; conn.execute(
-  "FT.SEARCH", "idx:regulations",
-  "payment services",
-  "RETURN", "4",
-    "title", "category", "summary", "tags",
-  "LIMIT", "0", "10"));
+// Clean expired entries
+redis.opsForZSet()
+    .removeRangeByScore(velocityKey, 0, windowStart - 1);</code></pre>
 
-// 4. Vector similarity (KNN) — FT.SEARCH
-byte[] queryVec = embedQuery("data protection");
-redis.execute(conn -&gt; conn.execute(
-  "FT.SEARCH", "idx:regulations",
-  "*=&gt;[KNN 10 @vector $BLOB AS score]",
-  "RETURN", "5",
-    "title", "category", "summary", "score",
-  "SORTBY", "score",
-  "PARAMS", "2", "BLOB", queryVec,
-  "DIALECT", "2"));
+                    <h3 class="code-section-title">2. Redis CLI — Velocity Check</h3>
+                    <pre><code class="language-bash"># Add transaction with timestamp as score
+ZADD workshop:fraud:velocity:4000-1234 1713045600000 "tx-abc123"
+# → (integer) 1
 
-// 5. Hybrid: text filter + KNN
-redis.execute(conn -&gt; conn.execute(
-  "FT.SEARCH", "idx:regulations",
-  "(payment)=&gt;[KNN 5 @vector $BLOB AS score]",
-  "RETURN", "5",
-    "title", "category", "summary", "score",
-  "SORTBY", "score",
-  "PARAMS", "2", "BLOB", queryVec,
-  "DIALECT", "2"));</code></pre>
-                    </div>
+# Count transactions in last 5 minutes
+ZRANGEBYSCORE workshop:fraud:velocity:4000-1234 1713045300000 1713045600000
+# → 1) "tx-prev001"
+# → 2) "tx-prev002"
+# → 3) "tx-abc123"
+# 3 transactions → elevated velocity
 
-                    <div class="code-block" id="tab-cli">
-                        <pre><code class="language-bash"># 1. Store document as JSON
-JSON.SET workshop:docs:regulation:REG001 $ '{
-  "id": "REG001",
-  "title": "PSD2 Strong Customer Auth",
-  "category": "PSD2",
-  "summary": "SCA requirements for payments",
-  "content": "Full regulation text...",
-  "vector": [0.023, -0.118, ...]
-}'
+# Clean old entries
+ZREMRANGEBYSCORE workshop:fraud:velocity:4000-1234 0 1713045299999</code></pre>
 
-# 2. Create index: TEXT + TAG + VECTOR on JSON
-FT.CREATE idx:regulations ON JSON \
-  PREFIX 1 workshop:docs:regulation: \
-  SCHEMA \
-    $.title AS title TEXT WEIGHT 2.0 \
-    $.category AS category TAG \
-    $.summary AS summary TEXT \
-    $.content AS content TEXT \
-    $.vector AS vector VECTOR HNSW 6 \
-      TYPE FLOAT32 DIM 768 \
-      DISTANCE_METRIC COSINE
+                    <h3 class="code-section-title">3. Event Stream (Redis Streams)</h3>
+                    <pre><code class="language-java">// XADD — log every fraud evaluation to a stream
+Map&lt;String, String&gt; entry = Map.of(
+    "txId", txId,
+    "card", cardNumber,
+    "amount", String.valueOf(amount),
+    "riskScore", String.valueOf(riskScore),
+    "riskLevel", riskLevel
+);
 
-# 3. Full-text search
-FT.SEARCH idx:regulations "payment services" \
-  RETURN 4 title category summary tags \
-  LIMIT 0 10
+redis.opsForStream().add(
+    StreamRecords.string(entry)
+        .withStreamKey("workshop:fraud:stream"));
 
-# 4. Vector similarity (KNN)
-# $BLOB = binary float32 query vector
-FT.SEARCH idx:regulations \
-  "*=>[KNN 10 @vector $BLOB AS score]" \
-  RETURN 5 title category summary tags score \
-  SORTBY score \
-  PARAMS 2 BLOB $query_vector \
-  DIALECT 2
+// XREVRANGE — read most recent evaluations
+redis.opsForStream().reverseRange(
+    "workshop:fraud:stream",
+    Range.unbounded(),
+    Limit.limit().count(20));</code></pre>
 
-# 5. Hybrid: text pre-filter + KNN
-FT.SEARCH idx:regulations \
-  "(payment)=>[KNN 5 @vector $BLOB AS score]" \
-  RETURN 5 title category summary tags score \
-  SORTBY score \
-  PARAMS 2 BLOB $query_vector \
-  DIALECT 2
+                    <h3 class="code-section-title">4. Redis CLI — Stream Commands</h3>
+                    <pre><code class="language-bash"># Log a fraud evaluation event
+XADD workshop:fraud:stream * txId "tx-abc123" card "4000-1234" amount "15000.00" riskScore "75" riskLevel "CRITICAL"
+# → "1713045600000-0"
 
-# 6. Filter by category TAG
-FT.SEARCH idx:regulations \
-  "@category:{PSD2}" \
-  RETURN 3 title summary tags \
-  LIMIT 0 10</code></pre>
-                    </div>
+# Read last 5 evaluations
+XREVRANGE workshop:fraud:stream + - COUNT 5
+
+# Stream length
+XLEN workshop:fraud:stream
+
+# Trim to last 50 entries
+XTRIM workshop:fraud:stream MAXLEN ~ 50</code></pre>
                 </div>
             </section>
         </div>

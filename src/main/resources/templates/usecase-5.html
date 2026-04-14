@@ -3,67 +3,61 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <head>
-    <title th:text="${useCaseTitle}">Feature Store</title>
+    <title th:text="${useCaseTitle}">Transaction Deduplication</title>
 </head>
 <body>
     <div layout:fragment="content">
         <div class="usecase-header">
             <span class="usecase-badge">UC5</span>
-            <h1 th:text="${useCaseTitle}">Feature Store (Risk Scoring)</h1>
+            <h1 th:text="${useCaseTitle}">Transaction Deduplication</h1>
         </div>
+        <p class="usecase-subtitle">Duplicate Payment Prevention &mdash; avoid double-charging on bank transfers using Redis SET with NX + EX flags.</p>
 
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->
             <section class="panel demo-panel">
                 <h2>Live Demo</h2>
                 <div id="demo-container" class="demo-container">
-
-                    <!-- Client Selector -->
-                    <div class="form-group">
-                        <label for="clientSelect">Select Client</label>
-                        <select id="clientSelect" class="form-control"></select>
-                    </div>
-
-                    <!-- Risk Score Badge -->
-                    <div id="risk-badge-container" style="text-align:center; margin-bottom:16px; display:none;">
-                        <div id="risk-badge" style="display:inline-block; padding:8px 24px; border-radius:5px; font-weight:700; font-size:1.1rem;"></div>
-                    </div>
-
-                    <!-- Feature Dashboard Table -->
-                    <div class="data-card" id="feature-card" style="display:none;">
-                        <h3>Feature Vector (Redis Hash)</h3>
-                        <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;" id="redis-key-display"></div>
-                        <div id="feature-table"></div>
-                    </div>
-
-                    <!-- Transaction Simulator -->
-                    <div class="data-card" style="margin-top:16px;">
-                        <h3>Simulate Transaction</h3>
-                        <div class="form-group" style="margin-bottom:8px;">
-                            <label for="txAmount">Amount (€)</label>
-                            <input type="number" id="txAmount" class="form-input" placeholder="500.00" step="0.01" min="1"/>
-                        </div>
-                        <div class="form-group" style="margin-bottom:8px;">
-                            <label for="txCountry">Country</label>
-                            <select id="txCountry" class="form-control">
-                                <option value="ES">🇪🇸 Spain</option>
-                                <option value="UK">🇬🇧 United Kingdom</option>
-                                <option value="DE">🇩🇪 Germany</option>
-                                <option value="US">🇺🇸 United States</option>
-                                <option value="RU">🇷🇺 Russia</option>
-                                <option value="CN">🇨🇳 China</option>
-                                <option value="NG">🇳🇬 Nigeria</option>
+                    <!-- Payment Form -->
+                    <form id="paymentForm" class="demo-form" autocomplete="off">
+                        <div class="form-group">
+                            <label for="sender">Sender Account</label>
+                            <select id="sender" class="form-control">
+                                <option value="ES12-0001-ALICE">ES12-0001-ALICE (Alice)</option>
+                                <option value="ES34-0002-BOB">ES34-0002-BOB (Bob)</option>
+                                <option value="ES56-0003-CARLOS">ES56-0003-CARLOS (Carlos)</option>
                             </select>
                         </div>
-                        <button id="simulateBtn" class="btn btn-primary" style="width:100%;">
-                            ⚡ Simulate Transaction
-                        </button>
+                        <div class="form-group">
+                            <label for="receiver">Receiver Account</label>
+                            <select id="receiver" class="form-control">
+                                <option value="ES78-0004-DIANA">ES78-0004-DIANA (Diana)</option>
+                                <option value="ES90-0005-EVA" selected>ES90-0005-EVA (Eva)</option>
+                                <option value="ES11-0006-FRANK">ES11-0006-FRANK (Frank)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="amount">Amount (&euro;)</label>
+                            <input type="number" id="amount" class="form-control" value="250.00" min="0.01" step="0.01" />
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="payBtn">💳 Pay Now</button>
+                            <button type="button" class="btn btn-secondary" id="doubleClickBtn">⚡ Double-Click Simulation</button>
+                            <button type="button" class="btn btn-outline" id="resetBtn">🔄 Reset Log</button>
+                        </div>
+                    </form>
+
+                    <!-- Result Display -->
+                    <div id="resultBox" class="result-box" style="display:none;">
+                        <div id="resultIcon" class="result-icon"></div>
+                        <div id="resultStatus" class="result-status"></div>
+                        <div id="resultDetails" class="result-details"></div>
                     </div>
 
-                    <!-- Redis Commands Executed -->
-                    <div id="commands-card" class="data-card" style="margin-top:16px; display:none;">
-                        <h3>Redis Commands Executed</h3>
-                        <pre id="commands-output" style="font-size:0.75rem; margin:0; white-space:pre-wrap; color:var(--text-secondary);"></pre>
+                    <!-- Transaction Log -->
+                    <h3 class="log-title">Transaction Log</h3>
+                    <div id="txLog" class="tx-log">
+                        <p class="placeholder-text">No transactions yet. Submit a payment above.</p>
                     </div>
                 </div>
             </section>
@@ -72,103 +66,78 @@
             <section class="panel code-panel">
                 <h2>Code Showcase</h2>
                 <div class="code-container">
-                    <div class="code-tabs">
-                        <button class="code-tab active" data-tab="java">Java</button>
-                        <button class="code-tab" data-tab="cli">Redis CLI</button>
-                    </div>
+                    <h3 class="code-section-title">1. SETNX Pattern (SET NX EX)</h3>
+                    <pre><code class="language-java">// Atomic check-and-set: only succeeds if key doesn't exist
+// SET workshop:dedup:{txHash} "1" NX EX 300
 
-                    <div class="code-block active" id="tab-java">
-                        <pre><code class="language-java">// 1. Store client features — HSET (bulk)
-String key = "workshop:features:client:C1001";
+String txHash = sha256(sender + receiver + amount + timeWindow);
+String key = "workshop:dedup:" + txHash;
 
-Map&lt;String, String&gt; features = Map.of(
-    "tx_count_1h",         "2",
-    "tx_count_24h",        "5",
-    "tx_amount_avg_24h",   "120.50",
-    "tx_amount_max_24h",   "250.00",
-    "distinct_countries_7d","1",
-    "distinct_devices_30d", "2",
-    "risk_score",           "12"
+// SET with NX (Not eXists) + EX (Expire) — atomic dedup!
+Boolean wasSet = redis.opsForValue()
+    .setIfAbsent(key, "1", Duration.ofSeconds(300));
+
+if (Boolean.TRUE.equals(wasSet)) {
+    // First time — process the payment
+    return "ACCEPTED";
+} else {
+    // Key already exists — duplicate detected!
+    return "DUPLICATE";
+}</code></pre>
+
+                    <h3 class="code-section-title">2. Redis CLI Equivalent</h3>
+                    <pre><code class="language-bash"># First attempt — key created, payment processed
+SET workshop:dedup:a1b2c3d4 "1" NX EX 300
+# → OK
+
+# Second attempt (within 5 min) — blocked!
+SET workshop:dedup:a1b2c3d4 "1" NX EX 300
+# → (nil)   ← duplicate detected
+
+# Check remaining TTL
+TTL workshop:dedup:a1b2c3d4
+# → (integer) 287
+
+# After TTL expires, same tx is accepted again
+SET workshop:dedup:a1b2c3d4 "1" NX EX 300
+# → OK</code></pre>
+
+                    <h3 class="code-section-title">3. Bloom Filter Alternative (High Volume)</h3>
+                    <pre><code class="language-bash"># For millions of tx/day, use a Bloom filter
+# Probabilistic — tiny false-positive rate, zero false-negatives
+# Much less memory than storing every key
+
+# Create filter (1M capacity, 0.01% error rate)
+BF.RESERVE workshop:dedup:bloom 0.0001 1000000
+
+# Check + add in one step
+BF.ADD workshop:dedup:bloom "a1b2c3d4e5f6"
+# → (integer) 1  ← new item, not seen before
+
+BF.ADD workshop:dedup:bloom "a1b2c3d4e5f6"
+# → (integer) 0  ← already exists = DUPLICATE
+
+# Check without adding
+BF.EXISTS workshop:dedup:bloom "a1b2c3d4e5f6"
+# → (integer) 1  ← exists</code></pre>
+
+                    <pre><code class="language-java">// Java equivalent with Lettuce + RedisBloom
+// Note: Bloom filters don't support per-item TTL
+// Combine with time-bucketed filter names:
+//   "workshop:dedup:bloom:2024-01-15-14"  (hourly bucket)
+
+// BF.ADD via Lettuce custom command
+Long added = redis.execute((RedisCallback&lt;Long&gt;) conn ->
+    conn.commands().execute("BF.ADD",
+        "workshop:dedup:bloom".getBytes(),
+        txHash.getBytes())
 );
 
-// HSET — write all features atomically
-redis.opsForHash().putAll(key, features);
-
-// 2. Read full feature vector — HGETALL
-Map&lt;Object, Object&gt; allFeatures =
-    redis.opsForHash().entries(key);
-// Returns ALL fields in ~0.1ms (vs 50-200ms
-// from a data warehouse query)
-
-// 3. Atomic counter update — HINCRBY
-// New transaction arrives → increment counters
-redis.opsForHash().increment(key,
-    "tx_count_1h", 1);
-redis.opsForHash().increment(key,
-    "tx_count_24h", 1);
-
-// 4. Update computed features — HSET
-redis.opsForHash().put(key,
-    "tx_amount_avg_24h", "135.25");
-redis.opsForHash().put(key,
-    "risk_score", "15");
-
-// 5. Pipeline for bulk updates
-// (multiple HSET in one round-trip)
-redis.executePipelined((RedisCallback&lt;Object&gt;) conn -&gt; {
-    byte[] k = key.getBytes();
-    conn.hashCommands().hSet(k,
-        "tx_count_1h".getBytes(), "3".getBytes());
-    conn.hashCommands().hSet(k,
-        "last_tx_timestamp".getBytes(),
-        String.valueOf(now).getBytes());
-    conn.hashCommands().hSet(k,
-        "risk_score".getBytes(), "18".getBytes());
-    return null;
-});
-
-// 6. Read single feature — HGET
-String riskScore = (String) redis.opsForHash()
-    .get(key, "risk_score");</code></pre>
-                    </div>
-
-                    <div class="code-block" id="tab-cli">
-                        <pre><code class="language-bash"># 1. Store feature vector (bulk HSET)
-HSET workshop:features:client:C1001 \
-  tx_count_1h 2 \
-  tx_count_24h 5 \
-  tx_amount_avg_24h "120.50" \
-  tx_amount_max_24h "250.00" \
-  distinct_countries_7d 1 \
-  distinct_devices_30d 2 \
-  risk_score 12
-
-# 2. Read full feature vector (~0.1ms)
-HGETALL workshop:features:client:C1001
-
-# 3. Atomic counter increment
-HINCRBY workshop:features:client:C1001 \
-  tx_count_1h 1
-HINCRBY workshop:features:client:C1001 \
-  tx_count_24h 1
-
-# 4. Update computed features
-HSET workshop:features:client:C1001 \
-  tx_amount_avg_24h "135.25" \
-  risk_score 15
-
-# 5. Read single feature
-HGET workshop:features:client:C1001 risk_score
-
-# 6. Feature store vs data warehouse
-# Redis Hash: HGETALL → ~0.1ms latency
-# SQL query:  SELECT * FROM features
-#             WHERE client_id = 'C1001'
-#             → 50-200ms latency
-#
-# For real-time ML scoring, sub-ms
-# feature retrieval is critical.</code></pre>
-                    </div>
+if (added == 1L) {
+    return "ACCEPTED";   // new transaction
+} else {
+    return "DUPLICATE";  // already seen
+}</code></pre>
                 </div>
             </section>
         </div>

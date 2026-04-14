@@ -1,151 +1,180 @@
-/** UC4: Real-time Fraud Detection */
+/** UC4: Rate Limiting — Open Banking API Protection (PSD2) */
 (function () {
     'use strict';
 
-    var RISK_COLORS = {
-        LOW: '#0a7e3e',
-        MEDIUM: '#d4a017',
-        HIGH: '#e67e22',
-        CRITICAL: '#FF4438'
-    };
+    // --- DOM refs ---
+    var gaugeFill      = document.getElementById('gaugeFill');
+    var remainingCount = document.getElementById('remainingCount');
+    var limitCount     = document.getElementById('limitCount');
+    var statusBox      = document.getElementById('statusBox');
+    var statusIcon     = document.getElementById('statusIcon');
+    var statusText     = document.getElementById('statusText');
+    var ttlBox         = document.getElementById('ttlBox');
+    var ttlValue       = document.getElementById('ttlValue');
+    var requestLog     = document.getElementById('requestLog');
+    var btnCallApi     = document.getElementById('btnCallApi');
+    var btnBurst       = document.getElementById('btnBurst');
+    var btnReset       = document.getElementById('btnReset');
 
-    document.addEventListener('DOMContentLoaded', function () {
-        var form = document.getElementById('fraudForm');
-        var evaluateBtn = document.getElementById('evaluateBtn');
-        var burstBtn = document.getElementById('burstBtn');
-        var resetBtn = document.getElementById('resetBtn');
-        var riskDisplay = document.getElementById('riskDisplay');
-        var riskScoreEl = document.getElementById('riskScore');
-        var riskGaugeFill = document.getElementById('riskGaugeFill');
-        var riskLevelEl = document.getElementById('riskLevel');
-        var riskFactorsEl = document.getElementById('riskFactors');
-        var txStream = document.getElementById('txStream');
+    var limit = 10;
+    var ttlInterval = null;
 
-        function getFormData() {
-            return {
-                cardNumber: document.getElementById('cardNumber').value,
-                amount: document.getElementById('amount').value,
-                merchant: document.getElementById('merchant').value,
-                country: document.getElementById('country').value
-            };
-        }
-
-        function showRisk(data) {
-            riskDisplay.style.display = 'block';
-            var score = data.riskScore || 0;
-            var level = data.riskLevel || 'LOW';
-            var color = RISK_COLORS[level] || RISK_COLORS.LOW;
-
-            riskScoreEl.textContent = score;
-            riskScoreEl.style.color = color;
-            riskGaugeFill.style.width = score + '%';
-            riskGaugeFill.style.background = color;
-            riskLevelEl.textContent = level;
-            riskLevelEl.className = 'fraud-risk-level fraud-level-' + level.toLowerCase();
-
-            var factorsHtml = '';
-            if (data.factors && data.factors.length) {
-                data.factors.forEach(function (f) {
-                    factorsHtml += '<div class="fraud-factor">' + escapeHtml(f) + '</div>';
-                });
-            }
-            riskFactorsEl.innerHTML = factorsHtml;
-
-            // Animate
-            riskDisplay.classList.remove('result-animate');
-            void riskDisplay.offsetWidth;
-            riskDisplay.classList.add('result-animate');
-        }
-
-        function escapeHtml(str) {
-            var div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
-
-        function renderStream(entries) {
-            if (!entries || entries.length === 0) {
-                txStream.innerHTML = '<p class="placeholder-text">No evaluations yet. Submit a transaction above.</p>';
-                return;
-            }
-            var html = '<table class="log-table"><thead><tr>' +
-                '<th>Risk</th><th>Score</th><th>Card</th><th>Amount</th><th>Country</th><th>Velocity</th><th>Time</th>' +
-                '</tr></thead><tbody>';
-            entries.forEach(function (e) {
-                var level = (e.riskLevel || 'LOW').toLowerCase();
-                var color = RISK_COLORS[e.riskLevel] || RISK_COLORS.LOW;
-                var ts = e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : '';
-                var cardShort = (e.card || '').substring((e.card || '').length - 4);
-                var geo = e.geoAnomaly === 'true' ? ' ⚠️' : '';
-                html += '<tr>' +
-                    '<td><span class="status-badge fraud-badge-' + level + '">' + (e.riskLevel || '') + '</span></td>' +
-                    '<td style="font-weight:700;color:' + color + '">' + (e.riskScore || 0) + '</td>' +
-                    '<td><code>***' + cardShort + '</code></td>' +
-                    '<td>&euro;' + (e.amount || '0') + '</td>' +
-                    '<td>' + (e.country || '') + geo + '</td>' +
-                    '<td>' + (e.velocityCount || 0) + ' txs</td>' +
-                    '<td>' + ts + '</td></tr>';
-            });
-            html += '</tbody></table>';
-            txStream.innerHTML = html;
-        }
-
-        function submitEvaluation(data) {
-            evaluateBtn.disabled = true;
-            return workshopFetch('/api/fraud/evaluate', data)
-                .then(function (result) {
-                    showRisk(result);
-                    return refreshStream();
-                })
-                .catch(function (err) {
-                    riskDisplay.style.display = 'block';
-                    riskScoreEl.textContent = '?';
-                    riskLevelEl.textContent = 'ERROR';
-                    riskFactorsEl.textContent = err.message;
-                })
-                .finally(function () {
-                    evaluateBtn.disabled = false;
-                });
-        }
-
-        function refreshStream() {
-            return workshopGet('/api/fraud/stream?count=20').then(renderStream);
-        }
-
-        // Evaluate button
-        form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            submitEvaluation(getFormData());
+    // --- Code tabs ---
+    document.querySelectorAll('.code-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            document.querySelectorAll('.code-tab').forEach(function (t) { t.classList.remove('active'); });
+            document.querySelectorAll('.code-tab-content').forEach(function (c) { c.classList.remove('active'); });
+            tab.classList.add('active');
+            var target = document.getElementById('tab-' + tab.getAttribute('data-tab'));
+            if (target) target.classList.add('active');
         });
+    });
 
-        // Rapid-fire: send 5 transactions quickly to trigger velocity alert
-        burstBtn.addEventListener('click', function () {
-            var data = getFormData();
-            burstBtn.disabled = true;
-            burstBtn.textContent = '⚡ Sending...';
-            var chain = Promise.resolve();
-            for (var i = 0; i < 5; i++) {
-                chain = chain.then(function () {
-                    return submitEvaluation(data);
-                }).then(function () {
-                    return new Promise(function (r) { setTimeout(r, 200); });
-                });
+    // --- Gauge update ---
+    function updateGauge(remaining, max) {
+        var pct = (remaining / max) * 100;
+        gaugeFill.style.width = pct + '%';
+        remainingCount.textContent = remaining;
+        limitCount.textContent = max;
+
+        // Color transitions
+        if (pct > 50) {
+            gaugeFill.style.background = 'var(--redis-primary)';
+        } else if (pct > 20) {
+            gaugeFill.style.background = '#F59E0B';
+        } else {
+            gaugeFill.style.background = '#EF4444';
+        }
+    }
+
+    // --- Status display ---
+    function showStatus(allowed, data) {
+        if (allowed) {
+            statusBox.className = 'rl-status rl-status-ok';
+            statusIcon.textContent = '✅';
+            statusText.textContent = '200 OK — Request ' + data.currentCount + '/' + data.limit + ' allowed';
+        } else {
+            statusBox.className = 'rl-status rl-status-blocked';
+            statusIcon.textContent = '🚫';
+            statusText.textContent = '429 Too Many Requests — retry after ' + data.retryAfter + 's';
+        }
+    }
+
+    // --- TTL countdown ---
+    function startTtlCountdown(ttl) {
+        if (ttl <= 0) { ttlBox.style.display = 'none'; return; }
+        ttlBox.style.display = 'block';
+        ttlValue.textContent = ttl;
+
+        clearInterval(ttlInterval);
+        var remaining = ttl;
+        ttlInterval = setInterval(function () {
+            remaining--;
+            ttlValue.textContent = Math.max(0, remaining);
+            if (remaining <= 0) {
+                clearInterval(ttlInterval);
+                ttlBox.style.display = 'none';
+                refreshStatus();
             }
-            chain.finally(function () {
-                burstBtn.disabled = false;
-                burstBtn.textContent = '⚡ Rapid-fire (5 txs)';
-            });
-        });
+        }, 1000);
+    }
 
-        // Reset
-        resetBtn.addEventListener('click', function () {
-            workshopFetch('/api/fraud/reset', {}).then(function () {
-                riskDisplay.style.display = 'none';
-                refreshStream();
-            });
-        });
+    // --- Log entry ---
+    function addLogEntry(data) {
+        var entry = document.createElement('div');
+        entry.className = 'rl-log-entry ' + (data.allowed ? 'rl-log-ok' : 'rl-log-blocked');
+        var time = new Date().toLocaleTimeString();
+        var statusCode = data.allowed ? '200' : '429';
+        entry.innerHTML = '<span class="rl-log-time">' + time + '</span>' +
+            '<span class="rl-log-status">' + statusCode + '</span>' +
+            '<span class="rl-log-detail">Request #' + data.currentCount +
+            ' — ' + data.remaining + ' remaining</span>';
+        requestLog.insertBefore(entry, requestLog.firstChild);
 
-        // Load initial stream
-        refreshStream();
+        // Keep only last 15 entries
+        while (requestLog.children.length > 15) {
+            requestLog.removeChild(requestLog.lastChild);
+        }
+    }
+
+    // --- API call ---
+    function callApi() {
+        btnCallApi.disabled = true;
+        fetch('/api/ratelimit/check', { method: 'POST' })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                limit = data.limit;
+                updateGauge(data.remaining, data.limit);
+                showStatus(data.allowed, data);
+                addLogEntry(data);
+                if (data.ttl > 0) startTtlCountdown(data.ttl);
+            })
+            .catch(function (err) {
+                statusBox.className = 'rl-status rl-status-blocked';
+                statusIcon.textContent = '⚠️';
+                statusText.textContent = 'Error: ' + err.message;
+            })
+            .finally(function () { btnCallApi.disabled = false; });
+    }
+
+    // --- Burst ---
+    function burstCalls() {
+        btnBurst.disabled = true;
+        var calls = [];
+        for (var i = 0; i < 5; i++) {
+            calls.push(fetch('/api/ratelimit/check', { method: 'POST' }).then(function (r) { return r.json(); }));
+        }
+        Promise.all(calls).then(function (results) {
+            results.forEach(function (data) {
+                updateGauge(data.remaining, data.limit);
+                showStatus(data.allowed, data);
+                addLogEntry(data);
+                if (data.ttl > 0) startTtlCountdown(data.ttl);
+            });
+        }).finally(function () { btnBurst.disabled = false; });
+    }
+
+    // --- Reset ---
+    function resetLimit() {
+        fetch('/api/ratelimit/reset', { method: 'POST' })
+            .then(function () {
+                updateGauge(limit, limit);
+                statusBox.className = 'rl-status rl-status-ok';
+                statusIcon.textContent = '✅';
+                statusText.textContent = 'Rate limit reset — ready for new requests';
+                ttlBox.style.display = 'none';
+                clearInterval(ttlInterval);
+                requestLog.innerHTML = '';
+            });
+    }
+
+    // --- Refresh status (used after TTL expires) ---
+    function refreshStatus() {
+        fetch('/api/ratelimit/status')
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                limit = data.limit;
+                updateGauge(data.remaining, data.limit);
+                if (!data.active) {
+                    statusBox.className = 'rl-status rl-status-ok';
+                    statusIcon.textContent = '✅';
+                    statusText.textContent = 'Window expired — counter reset. Ready for new requests!';
+                }
+            });
+    }
+
+    // --- Init ---
+    btnCallApi.addEventListener('click', callApi);
+    btnBurst.addEventListener('click', burstCalls);
+    btnReset.addEventListener('click', resetLimit);
+
+    // Load initial status
+    refreshStatus();
+
+    // Re-highlight code after tab switch
+    document.querySelectorAll('.code-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            if (window.Prism) Prism.highlightAll();
+        });
     });
 })();
