@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.redis.workshop.config.RedisSearchHelper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -32,15 +33,17 @@ public class AssistantService {
 
     private final StringRedisTemplate redis;
     private final OpenAiService openAiService;
+    private final RedisSearchHelper redisSearchHelper;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // Pre-loaded data for keyword matching (fallback)
     private final List<Map<String, String>> memories = new ArrayList<>();
     private final List<Map<String, String>> kbArticles = new ArrayList<>();
 
-    public AssistantService(StringRedisTemplate redis, OpenAiService openAiService) {
+    public AssistantService(StringRedisTemplate redis, OpenAiService openAiService, RedisSearchHelper redisSearchHelper) {
         this.redis = redis;
         this.openAiService = openAiService;
+        this.redisSearchHelper = redisSearchHelper;
     }
 
     @PostConstruct
@@ -362,52 +365,36 @@ public class AssistantService {
     }
 
     // ── Vector Search (real KNN via FT.SEARCH) ────────────────────────
-    @SuppressWarnings("unchecked")
     private List<Map<String, Object>> vectorSearch(String indexName, String query, int k) {
         float[] queryVector = openAiService.getEmbedding(query);
         byte[] vectorBytes = vectorToBytes(queryVector);
 
         // FT.SEARCH <idx> "*=>[KNN <k> @vector $BLOB]" PARAMS 2 BLOB <bytes> DIALECT 2
-        List<byte[]> argList = new ArrayList<>();
-        argList.add(indexName.getBytes());
-        argList.add(("*=>[KNN " + k + " @vector $BLOB]").getBytes());
-        argList.add("PARAMS".getBytes());
-        argList.add("2".getBytes());
-        argList.add("BLOB".getBytes());
-        argList.add(vectorBytes);
-        argList.add("DIALECT".getBytes());
-        argList.add("2".getBytes());
-        byte[][] args = argList.toArray(new byte[0][]);
+        String knnQuery = "*=>[KNN " + k + " @vector $BLOB]";
+        byte[][] binaryArgs = new byte[][] {
+                knnQuery.getBytes(),
+                "PARAMS".getBytes(),
+                "2".getBytes(),
+                "BLOB".getBytes(),
+                vectorBytes,
+                "DIALECT".getBytes(),
+                "2".getBytes()
+        };
 
-        List<Object> rawResult = (List<Object>) redis.execute(
-                (org.springframework.data.redis.core.RedisCallback<Object>) conn ->
-                        conn.execute("FT.SEARCH", args));
+        List<Object> rawResult = redisSearchHelper.ftSearchWithBinaryArgs(indexName, binaryArgs);
+        List<Map<String, String>> parsed = redisSearchHelper.parseSearchResults(rawResult);
 
         List<Map<String, Object>> results = new ArrayList<>();
-        if (rawResult == null || rawResult.isEmpty()) return results;
-
-        // Parse FT.SEARCH response: [totalCount, key1, [field, value, ...], key2, [field, value, ...], ...]
-        for (int i = 1; i < rawResult.size(); i += 2) {
-            String redisKey = rawResult.get(i) instanceof byte[]
-                    ? new String((byte[]) rawResult.get(i)) : rawResult.get(i).toString();
-            if (i + 1 >= rawResult.size()) break;
-            List<Object> fields = (List<Object>) rawResult.get(i + 1);
-            Map<String, Object> doc = new LinkedHashMap<>();
-            doc.put("redisKey", redisKey);
-            for (int j = 0; j < fields.size() - 1; j += 2) {
-                String fieldName = fields.get(j) instanceof byte[]
-                        ? new String((byte[]) fields.get(j)) : fields.get(j).toString();
-                String fieldValue = fields.get(j + 1) instanceof byte[]
-                        ? new String((byte[]) fields.get(j + 1)) : fields.get(j + 1).toString();
-                if (!"vector".equals(fieldName)) {
-                    if ("__vector_score".equals(fieldName)) {
-                        doc.put("score", fieldValue);
-                    } else {
-                        doc.put(fieldName, fieldValue);
-                    }
+        for (var doc : parsed) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("redisKey", doc.get("_key"));
+            entry.put("score", doc.getOrDefault("__vector_score", "0"));
+            for (var e : doc.entrySet()) {
+                if (!e.getKey().equals("_key") && !e.getKey().equals("vector") && !e.getKey().equals("__vector_score")) {
+                    entry.put(e.getKey(), e.getValue());
                 }
             }
-            results.add(doc);
+            results.add(entry);
         }
         return results;
     }

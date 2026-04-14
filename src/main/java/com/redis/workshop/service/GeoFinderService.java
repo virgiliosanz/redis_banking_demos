@@ -11,11 +11,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.domain.geo.GeoReference;
 import org.springframework.stereotype.Service;
 
-import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.codec.ByteArrayCodec;
-import io.lettuce.core.output.NestedMultiOutput;
-import io.lettuce.core.protocol.CommandArgs;
-import io.lettuce.core.protocol.ProtocolKeyword;
+import com.redis.workshop.config.RedisSearchHelper;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -27,15 +23,17 @@ public class GeoFinderService {
 
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
+    private final RedisSearchHelper redisSearchHelper;
 
     private static final String GEO_KEY = "workshop:geo:atms";
     private static final String META_PREFIX = "workshop:geo:meta:";
     private static final String BRANCH_PREFIX = "workshop:geo:branch:";
     private static final String INDEX_NAME = "idx:branches";
 
-    public GeoFinderService(StringRedisTemplate redis, ObjectMapper objectMapper) {
+    public GeoFinderService(StringRedisTemplate redis, ObjectMapper objectMapper, RedisSearchHelper redisSearchHelper) {
         this.redis = redis;
         this.objectMapper = objectMapper;
+        this.redisSearchHelper = redisSearchHelper;
     }
 
     @PostConstruct
@@ -244,35 +242,8 @@ public class GeoFinderService {
 
     // --- Helpers ---
 
-    private static final ProtocolKeyword FT_SEARCH = new ProtocolKeyword() {
-        @Override public byte[] getBytes() { return "FT.SEARCH".getBytes(StandardCharsets.UTF_8); }
-        @Override public String name() { return "FT.SEARCH"; }
-    };
-
-    /**
-     * Execute FT.SEARCH using Lettuce's native dispatch with NestedMultiOutput.
-     * Spring Data Redis's connection.execute() uses ByteArrayOutput which cannot
-     * handle the integer count that FT.SEARCH returns as its first element.
-     */
-    @SuppressWarnings("unchecked")
     private List<Object> executeFtSearch(String indexName, String query, String... extraArgs) {
-        return redis.execute((org.springframework.data.redis.core.RedisCallback<List<Object>>) connection -> {
-            Object nativeConn = connection.getNativeConnection();
-            if (nativeConn instanceof StatefulRedisConnection<?, ?> stateful) {
-                var codec = ByteArrayCodec.INSTANCE;
-                var output = new NestedMultiOutput<>(codec);
-                var args = new CommandArgs<>(codec);
-                args.add(indexName.getBytes(StandardCharsets.UTF_8));
-                args.add(query.getBytes(StandardCharsets.UTF_8));
-                for (String extra : extraArgs) {
-                    args.add(extra.getBytes(StandardCharsets.UTF_8));
-                }
-
-                var typedConn = (StatefulRedisConnection<byte[], byte[]>) stateful;
-                return typedConn.sync().dispatch(FT_SEARCH, output, args);
-            }
-            return List.<Object>of();
-        });
+        return redisSearchHelper.ftSearchRaw(indexName, query, extraArgs);
     }
 
     @SuppressWarnings("unchecked")

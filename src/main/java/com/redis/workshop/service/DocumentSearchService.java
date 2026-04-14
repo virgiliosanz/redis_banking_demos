@@ -1,6 +1,7 @@
 package com.redis.workshop.service;
 
 import com.redis.workshop.config.DocumentDataLoader;
+import com.redis.workshop.config.RedisSearchHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -20,9 +21,11 @@ public class DocumentSearchService {
     private static final int VECTOR_DIM = 768;
 
     private final StringRedisTemplate redis;
+    private final RedisSearchHelper redisSearchHelper;
 
-    public DocumentSearchService(StringRedisTemplate redis) {
+    public DocumentSearchService(StringRedisTemplate redis, RedisSearchHelper redisSearchHelper) {
         this.redis = redis;
+        this.redisSearchHelper = redisSearchHelper;
     }
 
     /**
@@ -105,54 +108,39 @@ public class DocumentSearchService {
 
     // --- Private helpers ---
 
-    @SuppressWarnings("unchecked")
     private List<Map<String, Object>> executeFtSearch(String query, byte[] vectorBytes) {
-        Object rawResults = redis.execute(connection -> {
-            return connection.execute("FT.SEARCH",
-                    INDEX_NAME.getBytes(StandardCharsets.UTF_8),
-                    query.getBytes(StandardCharsets.UTF_8),
-                    "RETURN".getBytes(StandardCharsets.UTF_8),
-                    "6".getBytes(StandardCharsets.UTF_8),
-                    "title".getBytes(StandardCharsets.UTF_8),
-                    "category".getBytes(StandardCharsets.UTF_8),
-                    "summary".getBytes(StandardCharsets.UTF_8),
-                    "content".getBytes(StandardCharsets.UTF_8),
-                    "tags".getBytes(StandardCharsets.UTF_8),
-                    "$.id".getBytes(StandardCharsets.UTF_8),
-                    "LIMIT".getBytes(StandardCharsets.UTF_8),
-                    "0".getBytes(StandardCharsets.UTF_8),
-                    "10".getBytes(StandardCharsets.UTF_8));
-        }, true);
+        List<Object> rawResults = redisSearchHelper.ftSearchRaw(INDEX_NAME, query,
+                "RETURN", "6", "title", "category", "summary", "content", "tags", "$.id",
+                "LIMIT", "0", "10");
 
         return parseSearchResults(rawResults, false);
     }
 
-    @SuppressWarnings("unchecked")
     private List<Map<String, Object>> executeVectorSearch(byte[] vectorBytes, String preFilter, int k) {
         String knnQuery = preFilter + "=>[KNN " + k + " @vector $BLOB AS score]";
 
-        Object rawResults = redis.execute(connection -> {
-            return connection.execute("FT.SEARCH",
-                    INDEX_NAME.getBytes(StandardCharsets.UTF_8),
-                    knnQuery.getBytes(StandardCharsets.UTF_8),
-                    "RETURN".getBytes(StandardCharsets.UTF_8),
-                    "7".getBytes(StandardCharsets.UTF_8),
-                    "title".getBytes(StandardCharsets.UTF_8),
-                    "category".getBytes(StandardCharsets.UTF_8),
-                    "summary".getBytes(StandardCharsets.UTF_8),
-                    "content".getBytes(StandardCharsets.UTF_8),
-                    "tags".getBytes(StandardCharsets.UTF_8),
-                    "$.id".getBytes(StandardCharsets.UTF_8),
-                    "score".getBytes(StandardCharsets.UTF_8),
-                    "SORTBY".getBytes(StandardCharsets.UTF_8),
-                    "score".getBytes(StandardCharsets.UTF_8),
-                    "PARAMS".getBytes(StandardCharsets.UTF_8),
-                    "2".getBytes(StandardCharsets.UTF_8),
-                    "BLOB".getBytes(StandardCharsets.UTF_8),
-                    vectorBytes,
-                    "DIALECT".getBytes(StandardCharsets.UTF_8),
-                    "2".getBytes(StandardCharsets.UTF_8));
-        }, true);
+        byte[][] binaryArgs = new byte[][] {
+                knnQuery.getBytes(StandardCharsets.UTF_8),
+                "RETURN".getBytes(StandardCharsets.UTF_8),
+                "7".getBytes(StandardCharsets.UTF_8),
+                "title".getBytes(StandardCharsets.UTF_8),
+                "category".getBytes(StandardCharsets.UTF_8),
+                "summary".getBytes(StandardCharsets.UTF_8),
+                "content".getBytes(StandardCharsets.UTF_8),
+                "tags".getBytes(StandardCharsets.UTF_8),
+                "$.id".getBytes(StandardCharsets.UTF_8),
+                "score".getBytes(StandardCharsets.UTF_8),
+                "SORTBY".getBytes(StandardCharsets.UTF_8),
+                "score".getBytes(StandardCharsets.UTF_8),
+                "PARAMS".getBytes(StandardCharsets.UTF_8),
+                "2".getBytes(StandardCharsets.UTF_8),
+                "BLOB".getBytes(StandardCharsets.UTF_8),
+                vectorBytes,
+                "DIALECT".getBytes(StandardCharsets.UTF_8),
+                "2".getBytes(StandardCharsets.UTF_8)
+        };
+
+        List<Object> rawResults = redisSearchHelper.ftSearchWithBinaryArgs(INDEX_NAME, binaryArgs);
 
         return parseSearchResults(rawResults, true);
     }
