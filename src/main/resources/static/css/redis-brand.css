@@ -1118,3 +1118,131 @@ a:hover {
 .doc-mode-btn:hover:not(.active):not(:disabled) {
     background: var(--border-color);
 }
+
+/* ============================================
+   How It Works — Architecture Diagrams
+   ============================================ */
+.how-it-works {
+    background: #F5F7FA;
+    border-radius: var(--border-radius);
+    padding: 32px;
+    margin-bottom: 24px;
+    transition: background var(--transition);
+}
+
+[data-theme="dark"] .how-it-works {
+    background: #0D1117;
+}
+
+.how-it-works h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+}
+
+.how-it-works-steps {
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 16px 16px 16px 24px;
+    margin-bottom: 24px;
+    background: var(--bg-primary);
+}
+
+.how-it-works-steps ol {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.7;
+}
+
+.how-it-works-steps ol li {
+    margin-bottom: 4px;
+}
+
+.how-it-works-steps ol li:last-child {
+    margin-bottom: 0;
+}
+
+.how-it-works-diagram {
+    text-align: center;
+}
+
+.how-it-works-diagram svg {
+    max-width: 100%;
+    height: auto;
+}
+
+/* SVG text inherits theme colors */
+.how-it-works-diagram svg text {
+    fill: var(--text-primary);
+    font-family: var(--font-body);
+}
+
+.how-it-works-diagram svg .svg-box {
+    fill: var(--bg-primary);
+    stroke: var(--border-color);
+}
+
+.how-it-works-diagram svg .svg-arrow {
+    stroke: var(--text-primary);
+    fill: none;
+}
+
+.how-it-works-diagram svg .svg-arrow-head {
+    fill: var(--text-primary);
+}
+
+.how-it-works-diagram svg .svg-redis-circle {
+    fill: #FF4438;
+}
+
+.how-it-works-diagram svg .svg-step-circle {
+    fill: #FF4438;
+}
+
+.how-it-works-diagram svg .svg-step-text {
+    fill: #FFFFFF;
+    font-family: var(--font-body);
+    font-weight: 700;
+}
+
+.how-it-works-diagram svg .svg-redis-text {
+    fill: #FFFFFF;
+    font-family: var(--font-body);
+    font-weight: 700;
+}
+
+.how-it-works-diagram svg .svg-deny-box {
+    fill: #FF4438;
+    rx: 5;
+    ry: 5;
+}
+
+.how-it-works-diagram svg .svg-deny-text {
+    fill: #FFFFFF;
+    font-family: var(--font-body);
+    font-weight: 700;
+}
+
+.how-it-works-diagram svg .svg-label {
+    fill: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 12px;
+}
+
+/* Dual diagram layout for UC9 */
+.how-it-works-diagram-group {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+.how-it-works-diagram-group .diagram-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    text-align: center;
+}

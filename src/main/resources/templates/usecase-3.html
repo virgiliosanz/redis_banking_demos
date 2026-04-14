@@ -12,6 +12,61 @@
             <h1 th:text="${useCaseTitle}">User Profile Storage</h1>
         </div>
 
+        <section class="how-it-works">
+            <h2>How it works</h2>
+            <div class="how-it-works-steps">
+                <ol>
+                    <li>User profile data is aggregated from multiple databases into Redis for fast access.</li>
+                    <li>When a user logs in, the app fetches the complete profile from Redis. Updates are written to the profile.</li>
+                    <li>When the session ends, profile updates can be written back to the source databases.</li>
+                </ol>
+            </div>
+            <div class="how-it-works-diagram">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 220" width="700" height="220">
+                    <defs>
+                        <marker id="uc3-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                            <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                        </marker>
+                    </defs>
+                    <!-- User -->
+                    <rect x="20" y="60" width="100" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="70" y="85" text-anchor="middle" font-size="20">👤</text>
+                    <text x="70" y="105" text-anchor="middle" font-size="14" font-weight="600">User</text>
+                    <!-- Arrow User ↔ Web App -->
+                    <line x1="120" y1="90" x2="200" y2="90" class="svg-arrow" stroke-width="2" marker-end="url(#uc3-arrow)"/>
+                    <!-- Web App -->
+                    <rect x="210" y="60" width="130" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="275" y="95" text-anchor="middle" font-size="14" font-weight="600">Web App</text>
+                    <!-- Step 2 circle -->
+                    <circle cx="390" cy="78" r="12" class="svg-step-circle"/>
+                    <text x="390" y="83" text-anchor="middle" font-size="11" class="svg-step-text">2</text>
+                    <!-- Arrow Web App ↔ Redis -->
+                    <line x1="340" y1="90" x2="430" y2="90" class="svg-arrow" stroke-width="2" marker-end="url(#uc3-arrow)"/>
+                    <!-- Redis circle -->
+                    <circle cx="500" cy="90" r="55" class="svg-redis-circle"/>
+                    <text x="500" y="82" text-anchor="middle" font-size="16" class="svg-redis-text">Redis</text>
+                    <text x="500" y="100" text-anchor="middle" font-size="11" class="svg-redis-text">Profile Store</text>
+                    <!-- DB icons -->
+                    <rect x="580" y="30" width="100" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="630" y="50" text-anchor="middle" font-size="12">🗄️ Accounts</text>
+                    <rect x="580" y="75" width="100" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="630" y="95" text-anchor="middle" font-size="12">🗄️ Activity</text>
+                    <rect x="580" y="120" width="100" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="630" y="140" text-anchor="middle" font-size="12">🗄️ Prefs</text>
+                    <!-- Step 1 circle -->
+                    <circle cx="572" cy="45" r="12" class="svg-step-circle"/>
+                    <text x="572" y="50" text-anchor="middle" font-size="11" class="svg-step-text">1</text>
+                    <!-- Step 3 circle -->
+                    <circle cx="572" cy="135" r="12" class="svg-step-circle"/>
+                    <text x="572" y="140" text-anchor="middle" font-size="11" class="svg-step-text">3</text>
+                    <!-- Arrows Redis ↔ DBs -->
+                    <line x1="555" y1="75" x2="578" y2="48" class="svg-arrow" stroke-width="2" marker-end="url(#uc3-arrow)"/>
+                    <line x1="555" y1="90" x2="578" y2="90" class="svg-arrow" stroke-width="2" marker-end="url(#uc3-arrow)"/>
+                    <line x1="555" y1="105" x2="578" y2="132" class="svg-arrow" stroke-width="2" marker-end="url(#uc3-arrow)"/>
+                </svg>
+            </div>
+        </section>
+
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->
             <section class="panel demo-panel">

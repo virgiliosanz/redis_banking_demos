@@ -12,6 +12,57 @@
             <h1 th:text="${useCaseTitle}">Authentication Token Store</h1>
         </div>
 
+        <section class="how-it-works">
+            <h2>How it works</h2>
+            <div class="how-it-works-steps">
+                <ol>
+                    <li>A user enters their credentials.</li>
+                    <li>An identity provider validates the credentials and generates an authentication token.</li>
+                    <li>The token is stored in Redis for the duration of the session. Any component can validate the user by checking Redis.</li>
+                </ol>
+            </div>
+            <div class="how-it-works-diagram">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 200" width="700" height="200">
+                    <defs>
+                        <marker id="uc1-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                            <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                        </marker>
+                    </defs>
+                    <!-- Client -->
+                    <rect x="20" y="60" width="120" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="80" y="85" text-anchor="middle" font-size="20">📱</text>
+                    <text x="80" y="105" text-anchor="middle" font-size="14" font-weight="600">Client</text>
+                    <!-- Arrow Client → Gateway -->
+                    <line x1="140" y1="90" x2="220" y2="90" class="svg-arrow" stroke-width="2" marker-end="url(#uc1-arrow)"/>
+                    <!-- API Gateway -->
+                    <rect x="230" y="60" width="140" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="300" y="95" text-anchor="middle" font-size="14" font-weight="600">API Gateway</text>
+                    <!-- Arrow Gateway → Redis -->
+                    <line x1="370" y1="90" x2="480" y2="90" class="svg-arrow" stroke-width="2" marker-end="url(#uc1-arrow)"/>
+                    <!-- Step 3 circle -->
+                    <circle cx="425" cy="78" r="12" class="svg-step-circle"/>
+                    <text x="425" y="83" text-anchor="middle" font-size="11" class="svg-step-text">3</text>
+                    <!-- Redis circle -->
+                    <circle cx="540" cy="90" r="55" class="svg-redis-circle"/>
+                    <text x="540" y="82" text-anchor="middle" font-size="16" class="svg-redis-text">Redis</text>
+                    <text x="540" y="100" text-anchor="middle" font-size="11" class="svg-redis-text">Token Store</text>
+                    <!-- Identity Provider -->
+                    <rect x="230" y="150" width="140" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="300" y="175" text-anchor="middle" font-size="13" font-weight="600">Identity Provider</text>
+                    <!-- Step 1 circle -->
+                    <circle cx="258" cy="132" r="12" class="svg-step-circle"/>
+                    <text x="258" y="137" text-anchor="middle" font-size="11" class="svg-step-text">1</text>
+                    <!-- Arrow Gateway → IdP -->
+                    <line x1="270" y1="120" x2="270" y2="148" class="svg-arrow" stroke-width="2" marker-end="url(#uc1-arrow)"/>
+                    <!-- Step 2 circle -->
+                    <circle cx="340" cy="132" r="12" class="svg-step-circle"/>
+                    <text x="340" y="137" text-anchor="middle" font-size="11" class="svg-step-text">2</text>
+                    <!-- Arrow IdP → Gateway -->
+                    <line x1="330" y1="150" x2="330" y2="122" class="svg-arrow" stroke-width="2" marker-end="url(#uc1-arrow)"/>
+                </svg>
+            </div>
+        </section>
+
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->
             <section class="panel demo-panel">

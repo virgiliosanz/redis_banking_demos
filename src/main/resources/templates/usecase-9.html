@@ -12,6 +12,118 @@
             <h1 th:text="${useCaseTitle}">AI Banking Assistant (Memory + RAG)</h1>
         </div>
 
+        <section class="how-it-works">
+            <h2>How it works</h2>
+            <div class="how-it-works-diagram-group">
+                <!-- Diagram 1: Agent Memory -->
+                <div>
+                    <div class="diagram-label">Agent Memory</div>
+                    <div class="how-it-works-steps">
+                        <ol>
+                            <li>User makes a request to an agent.</li>
+                            <li>The agent generates a plan.</li>
+                            <li>The agent calls tools or an LLM for information.</li>
+                            <li>The agent stores information in short-term memory.</li>
+                            <li>Some information will be stored for long-term, while other info will only be saved temporarily.</li>
+                        </ol>
+                    </div>
+                    <div class="how-it-works-diagram">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 220" width="700" height="220">
+                            <defs>
+                                <marker id="uc9a-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                                    <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                                </marker>
+                            </defs>
+                            <!-- User -->
+                            <rect x="20" y="70" width="90" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="65" y="95" text-anchor="middle" font-size="20">👤</text>
+                            <text x="65" y="115" text-anchor="middle" font-size="13" font-weight="600">User</text>
+                            <!-- Arrow User ↔ Agent -->
+                            <line x1="110" y1="100" x2="170" y2="100" class="svg-arrow" stroke-width="2" marker-end="url(#uc9a-arrow)"/>
+                            <!-- AI Agent -->
+                            <rect x="180" y="70" width="110" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="235" y="95" text-anchor="middle" font-size="18">🤖</text>
+                            <text x="235" y="115" text-anchor="middle" font-size="13" font-weight="600">AI Agent</text>
+                            <!-- Tools above agent -->
+                            <rect x="140" y="10" width="55" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="167" y="30" text-anchor="middle" font-size="10">Tool 1</text>
+                            <rect x="205" y="10" width="55" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="232" y="30" text-anchor="middle" font-size="10">Tool 2</text>
+                            <rect x="270" y="10" width="55" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="297" y="30" text-anchor="middle" font-size="10">Tool 3</text>
+                            <line x1="210" y1="70" x2="180" y2="42" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9a-arrow)"/>
+                            <line x1="235" y1="70" x2="235" y2="42" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9a-arrow)"/>
+                            <line x1="260" y1="70" x2="290" y2="42" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9a-arrow)"/>
+                            <!-- LLM below agent -->
+                            <rect x="195" y="160" width="80" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="235" y="183" text-anchor="middle" font-size="12" font-weight="600">🧠 LLM</text>
+                            <line x1="235" y1="130" x2="235" y2="158" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9a-arrow)"/>
+                            <!-- Arrow Agent → Short-term memory -->
+                            <line x1="290" y1="100" x2="370" y2="100" class="svg-arrow" stroke-width="2" marker-end="url(#uc9a-arrow)"/>
+                            <!-- Short-term memory -->
+                            <rect x="380" y="70" width="120" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="440" y="95" text-anchor="middle" font-size="12" font-weight="600">Short-term</text>
+                            <text x="440" y="112" text-anchor="middle" font-size="12" font-weight="600">Memory</text>
+                            <!-- Arrow → Long-term memory -->
+                            <line x1="500" y1="100" x2="560" y2="100" class="svg-arrow" stroke-width="2" marker-end="url(#uc9a-arrow)"/>
+                            <!-- Long-term memory (Redis) -->
+                            <circle cx="625" cy="100" r="50" class="svg-redis-circle"/>
+                            <text x="625" y="92" text-anchor="middle" font-size="12" class="svg-redis-text">Long-term</text>
+                            <text x="625" y="110" text-anchor="middle" font-size="12" class="svg-redis-text">Memory</text>
+                        </svg>
+                    </div>
+                </div>
+                <!-- Diagram 2: RAG -->
+                <div>
+                    <div class="diagram-label">Retrieval-Augmented Generation (RAG)</div>
+                    <div class="how-it-works-steps">
+                        <ol>
+                            <li>A user asks a question.</li>
+                            <li>The app retrieves the relevant document or chunk from Redis.</li>
+                            <li>The question and relevant document are sent to an LLM.</li>
+                            <li>The LLM generates an answer using its knowledge plus the retrieved information.</li>
+                            <li>The app returns the answer to the user.</li>
+                        </ol>
+                    </div>
+                    <div class="how-it-works-diagram">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 180" width="700" height="180">
+                            <defs>
+                                <marker id="uc9b-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                                    <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                                </marker>
+                            </defs>
+                            <!-- Question -->
+                            <rect x="20" y="50" width="100" height="45" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="70" y="68" text-anchor="middle" font-size="18">❓</text>
+                            <text x="70" y="86" text-anchor="middle" font-size="13" font-weight="600">Question</text>
+                            <!-- Arrow → Retrieval -->
+                            <line x1="120" y1="72" x2="180" y2="72" class="svg-arrow" stroke-width="2" marker-end="url(#uc9b-arrow)"/>
+                            <!-- Retrieval (Redis) -->
+                            <circle cx="250" cy="72" r="50" class="svg-redis-circle"/>
+                            <text x="250" y="64" text-anchor="middle" font-size="12" class="svg-redis-text">Redis</text>
+                            <text x="250" y="82" text-anchor="middle" font-size="10" class="svg-redis-text">Retrieval</text>
+                            <!-- Documents below -->
+                            <rect x="205" y="140" width="90" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="250" y="163" text-anchor="middle" font-size="12" font-weight="600">📄 Docs</text>
+                            <line x1="250" y1="140" x2="250" y2="124" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9b-arrow)"/>
+                            <!-- Arrow → LLM -->
+                            <line x1="300" y1="72" x2="380" y2="72" class="svg-arrow" stroke-width="2" marker-end="url(#uc9b-arrow)"/>
+                            <!-- LLM -->
+                            <rect x="390" y="45" width="130" height="55" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="455" y="68" text-anchor="middle" font-size="18">🧠</text>
+                            <text x="455" y="88" text-anchor="middle" font-size="12" font-weight="600">LLM Generation</text>
+                            <!-- Arrow → Answer -->
+                            <line x1="520" y1="72" x2="570" y2="72" class="svg-arrow" stroke-width="2" marker-end="url(#uc9b-arrow)"/>
+                            <!-- Answer -->
+                            <rect x="580" y="50" width="100" height="45" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="630" y="68" text-anchor="middle" font-size="18">💡</text>
+                            <text x="630" y="86" text-anchor="middle" font-size="13" font-weight="600">Answer</text>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->
             <section class="panel demo-panel">
