@@ -255,6 +255,61 @@ docker compose --profile workshop up -d --build
 
 ---
 
+## UC11: Real-time Transaction Monitoring
+
+### What to say
+"Banks need to monitor transactions in real time — TPS, amounts, risk scores. Redis Time Series is purpose-built for this. TS.ADD ingests data points, TS.RANGE with AGGREGATION queries them in time buckets. You get a live dashboard with sub-millisecond queries, automatic retention, and built-in aggregation — no external time series DB needed."
+
+### Demo steps
+1. Click "Start Simulation" — watch the chart build up (~2 TPS)
+2. Point out the metrics cards: TPS, total count, average amount
+3. Click "Inject Anomaly" — see the spike in the chart and the High Risk % jump
+4. Click "Stop" to pause, then "Reset" to clear
+5. Show the Redis CLI tab — explain TS.CREATE, TS.ADD, TS.RANGE
+
+### Key Redis commands
+- `TS.CREATE` — create a time series with retention and duplicate policy
+- `TS.ADD` — add a data point (key, timestamp, value)
+- `TS.RANGE` + `AGGREGATION` — query with SUM/AVG/MAX in time buckets
+
+### Talking points
+- Redis 8 includes Time Series natively — no separate module
+- Automatic retention: data older than 1 hour is pruned
+- DUPLICATE_POLICY SUM: multiple adds in the same millisecond are summed
+- AGGREGATION in TS.RANGE: server-side aggregation, not client-side
+- Perfect for real-time dashboards, alerting, and anomaly detection
+
+---
+
+## UC12: ATM & Branch Finder (Geospatial)
+
+### What to say
+"Location matters in banking. Customers need to find the nearest ATM or branch, filtered by services. Redis Geospatial gives you sub-millisecond radius search. Combine it with JSON + Query Engine for rich filtering — geo plus type, services, hours — all in one query."
+
+### Demo steps
+1. Start with Native Geospatial tab — click Puerta del Sol preset
+2. Search with 2km radius — show ATMs and branches on the map
+3. Point out the GEOSEARCH command — simple, fast, returns distance
+4. Switch to JSON + Query Engine tab — same location
+5. Filter by type: ATM only — show how the FT.SEARCH query adds @type:{atm}
+6. Filter by service: advisor — only branches with advisor service
+7. Compare: native is simpler, RQE adds rich filtering in a single query
+
+### Key Redis commands to highlight
+- `GEOADD` — add coordinates to a sorted set
+- `GEOSEARCH` — radius search with distance, sorted
+- `JSON.SET` — store rich documents with location field
+- `FT.CREATE` with `GEO` + `TAG` fields — index for geo+filter queries
+- `FT.SEARCH` with `@location:[lng lat radius km]` — geo filter in RQE
+
+### Talking points
+- Native geo: O(N+log(M)) — extremely fast for pure proximity
+- RQE geo: combines geo with any other filter in a single query — no application-side filtering
+- Both approaches use the same Redis instance — no external geo database needed
+- Real-world: branch locators, delivery radius, fraud geo-fencing
+
+---
+
 ## Closing
 
 ### Key takeaways
