@@ -298,30 +298,35 @@
 
             addMessage('assistant', data.response);
 
-            // Show inline sources summary in chat bubble
-            if ((data.memoriesRetrieved && data.memoriesRetrieved.length > 0) ||
-                (data.kbDocsRetrieved && data.kbDocsRetrieved.length > 0)) {
-                var sourcesHtml = '<div style="margin-top:8px; padding:8px 12px; background:var(--bg-secondary); border-radius:var(--border-radius); border:1px solid var(--border-color); font-size:0.75rem;">';
-                sourcesHtml += '<div style="font-weight:600; color:var(--redis-primary); margin-bottom:4px;">📚 Context used (Redis Vector Search):</div>';
-                if (data.kbDocsRetrieved && data.kbDocsRetrieved.length > 0) {
-                    data.kbDocsRetrieved.forEach(function(doc) {
-                        sourcesHtml += '<div style="color:var(--text-muted);">📄 ' + escapeHtml(doc.title || doc.id || '') + '</div>';
-                    });
-                }
-                if (data.memoriesRetrieved && data.memoriesRetrieved.length > 0) {
-                    data.memoriesRetrieved.forEach(function(mem) {
-                        sourcesHtml += '<div style="color:var(--text-muted);">🧠 ' + escapeHtml(mem.summary || mem.id || '') + '</div>';
-                    });
-                }
-                sourcesHtml += '</div>';
-                // Append to the last assistant message bubble
-                var lastMsg = chatMessages.lastElementChild;
-                if (lastMsg) lastMsg.innerHTML += sourcesHtml;
-            }
-
+            // Update inspection panels first (critical for demo visibility)
             updateShortTermMemory();
             updateMemoryResults(data.memoriesRetrieved);
             updateRagResults(data.kbDocsRetrieved);
+
+            // Show inline sources summary in chat bubble (nice-to-have)
+            try {
+                if ((data.memoriesRetrieved && data.memoriesRetrieved.length > 0) ||
+                    (data.kbDocsRetrieved && data.kbDocsRetrieved.length > 0)) {
+                    var sourcesHtml = '<div style="margin-top:8px; padding:8px 12px; background:var(--bg-secondary); border-radius:var(--border-radius); border:1px solid var(--border-color); font-size:0.75rem;">';
+                    sourcesHtml += '<div style="font-weight:600; color:var(--redis-primary); margin-bottom:4px;">📚 Context used (Redis Vector Search):</div>';
+                    if (data.kbDocsRetrieved && data.kbDocsRetrieved.length > 0) {
+                        data.kbDocsRetrieved.forEach(function(doc) {
+                            sourcesHtml += '<div style="color:var(--text-muted);">📄 ' + escapeHtml(doc.title || doc.id || '') + '</div>';
+                        });
+                    }
+                    if (data.memoriesRetrieved && data.memoriesRetrieved.length > 0) {
+                        data.memoriesRetrieved.forEach(function(mem) {
+                            sourcesHtml += '<div style="color:var(--text-muted);">🧠 ' + escapeHtml(mem.summary || mem.id || '') + '</div>';
+                        });
+                    }
+                    sourcesHtml += '</div>';
+                    // Append to the last assistant message bubble
+                    var lastMsg = chatMessages.lastElementChild;
+                    if (lastMsg) lastMsg.innerHTML += sourcesHtml;
+                }
+            } catch (e) {
+                console.warn('Could not render inline sources:', e);
+            }
 
             if (data.redisCommands) {
                 commandsCard.style.display = '';
@@ -330,7 +335,8 @@
             if (data.latencyMs !== undefined) {
                 latencyDisplay.textContent = '⏱ Total latency: ' + data.latencyMs + 'ms';
             }
-        }).catch(function () {
+        }).catch(function (err) {
+            console.error('UC9 chat error:', err);
             removeTypingIndicator();
             setInputEnabled(true);
             addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
