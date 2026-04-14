@@ -32,16 +32,30 @@ public class RedisSearchHelper {
     }
 
     /**
+     * Resolve a StatefulRedisConnection from the native connection object.
+     * Handles StatefulRedisConnection, async commands, and sync commands wrappers.
+     */
+    @SuppressWarnings("unchecked")
+    private StatefulRedisConnection<byte[], byte[]> resolveStatefulConnection(Object nativeConn) {
+        if (nativeConn instanceof StatefulRedisConnection<?, ?> src) {
+            return (StatefulRedisConnection<byte[], byte[]>) src;
+        } else if (nativeConn instanceof io.lettuce.core.api.async.RedisAsyncCommands<?, ?> asyncCommands) {
+            return (StatefulRedisConnection<byte[], byte[]>) asyncCommands.getStatefulConnection();
+        } else if (nativeConn instanceof io.lettuce.core.api.sync.RedisCommands<?, ?> syncCommands) {
+            return (StatefulRedisConnection<byte[], byte[]>) syncCommands.getStatefulConnection();
+        } else {
+            throw new IllegalStateException("Unsupported native connection type: " + nativeConn.getClass());
+        }
+    }
+
+    /**
      * Execute FT.SEARCH using Lettuce's native dispatch with NestedMultiOutput.
      * Returns raw List&lt;Object&gt; result for callers that need custom parsing.
      */
     @SuppressWarnings("unchecked")
     public List<Object> ftSearchRaw(String indexName, String query, String... extraArgs) {
         return redisTemplate.execute((org.springframework.data.redis.core.RedisCallback<List<Object>>) connection -> {
-            Object nativeConn = connection.getNativeConnection();
-            if (!(nativeConn instanceof StatefulRedisConnection<?, ?> statefulConn)) {
-                throw new IllegalStateException("Expected StatefulRedisConnection but got " + nativeConn.getClass());
-            }
+            StatefulRedisConnection<byte[], byte[]> statefulConn = resolveStatefulConnection(connection.getNativeConnection());
 
             ByteArrayCodec codec = ByteArrayCodec.INSTANCE;
             CommandArgs<byte[], byte[]> args = new CommandArgs<>(codec);
@@ -52,8 +66,7 @@ public class RedisSearchHelper {
             }
 
             NestedMultiOutput<byte[], byte[]> output = new NestedMultiOutput<>(codec);
-            var typedConn = (StatefulRedisConnection<byte[], byte[]>) statefulConn;
-            return typedConn.sync().dispatch(FT_SEARCH, output, args);
+            return statefulConn.sync().dispatch(FT_SEARCH, output, args);
         });
     }
 
@@ -71,10 +84,7 @@ public class RedisSearchHelper {
     @SuppressWarnings("unchecked")
     public List<Object> ftSearchWithBinaryArgs(String indexName, byte[][] allArgs) {
         return redisTemplate.execute((org.springframework.data.redis.core.RedisCallback<List<Object>>) connection -> {
-            Object nativeConn = connection.getNativeConnection();
-            if (!(nativeConn instanceof StatefulRedisConnection<?, ?> statefulConn)) {
-                throw new IllegalStateException("Expected StatefulRedisConnection but got " + nativeConn.getClass());
-            }
+            StatefulRedisConnection<byte[], byte[]> statefulConn = resolveStatefulConnection(connection.getNativeConnection());
 
             ByteArrayCodec codec = ByteArrayCodec.INSTANCE;
             CommandArgs<byte[], byte[]> args = new CommandArgs<>(codec);
@@ -84,8 +94,7 @@ public class RedisSearchHelper {
             }
 
             NestedMultiOutput<byte[], byte[]> output = new NestedMultiOutput<>(codec);
-            var typedConn = (StatefulRedisConnection<byte[], byte[]>) statefulConn;
-            return typedConn.sync().dispatch(FT_SEARCH, output, args);
+            return statefulConn.sync().dispatch(FT_SEARCH, output, args);
         });
     }
 
