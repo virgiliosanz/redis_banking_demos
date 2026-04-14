@@ -18,14 +18,16 @@ public class DocumentSearchService {
     private static final Logger log = LoggerFactory.getLogger(DocumentSearchService.class);
     private static final String INDEX_NAME = "idx:regulations";
     private static final String DOC_PREFIX = "workshop:docs:regulation:";
-    private static final int VECTOR_DIM = 768;
+    private static final int VECTOR_DIM = 1536;
 
     private final StringRedisTemplate redis;
     private final RedisSearchHelper redisSearchHelper;
+    private final OpenAiService openAiService;
 
-    public DocumentSearchService(StringRedisTemplate redis, RedisSearchHelper redisSearchHelper) {
+    public DocumentSearchService(StringRedisTemplate redis, RedisSearchHelper redisSearchHelper, OpenAiService openAiService) {
         this.redis = redis;
         this.redisSearchHelper = redisSearchHelper;
+        this.openAiService = openAiService;
     }
 
     /**
@@ -51,8 +53,8 @@ public class DocumentSearchService {
      * Vector similarity search using FT.SEARCH with KNN.
      */
     public Map<String, Object> vectorSearch(String query) {
-        // Generate query vector from the search text
-        float[] queryVector = DocumentDataLoader.generateVector(query);
+        // Use real embeddings if OpenAI is configured, otherwise mock vectors
+        float[] queryVector = getQueryVector(query);
         byte[] vectorBytes = floatArrayToBytes(queryVector);
 
         List<Map<String, Object>> results = executeVectorSearch(vectorBytes, "*", 10);
@@ -71,7 +73,8 @@ public class DocumentSearchService {
      */
     public Map<String, Object> hybridSearch(String query) {
         String escaped = escapeQuery(query);
-        float[] queryVector = DocumentDataLoader.generateVector(query);
+        // Use real embeddings if OpenAI is configured, otherwise mock vectors
+        float[] queryVector = getQueryVector(query);
         byte[] vectorBytes = floatArrayToBytes(queryVector);
 
         // Use the text query as pre-filter for KNN
@@ -107,6 +110,20 @@ public class DocumentSearchService {
     }
 
     // --- Private helpers ---
+
+    /**
+     * Get query vector: real OpenAI embedding if configured, deterministic mock otherwise.
+     */
+    private float[] getQueryVector(String query) {
+        if (openAiService.isConfigured()) {
+            try {
+                return openAiService.getEmbedding(query);
+            } catch (Exception e) {
+                log.warn("Failed to get OpenAI embedding, falling back to mock vector: {}", e.getMessage());
+            }
+        }
+        return DocumentDataLoader.generateVector(query);
+    }
 
     private List<Map<String, Object>> executeFtSearch(String query, byte[] vectorBytes) {
         List<Object> rawResults = redisSearchHelper.ftSearchRaw(INDEX_NAME, query,
