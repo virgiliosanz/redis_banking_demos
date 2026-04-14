@@ -21,15 +21,15 @@
             </a>
             <select class="nav-select" id="useCaseSelect" onchange="if(this.value) window.location.href=this.value">
                 <option value="" disabled>Select Use Case</option>
-                <option th:value="@{/usecase/1}" th:selected="${#httpServletRequest.requestURI == '/usecase/1'}">1. Authentication Token Store</option>
-                <option th:value="@{/usecase/2}" th:selected="${#httpServletRequest.requestURI == '/usecase/2'}">2. Session Storage</option>
-                <option th:value="@{/usecase/3}" th:selected="${#httpServletRequest.requestURI == '/usecase/3'}">3. User Profile Storage</option>
-                <option th:value="@{/usecase/4}" th:selected="${#httpServletRequest.requestURI == '/usecase/4'}">4. Rate Limiting</option>
-                <option th:value="@{/usecase/5}" th:selected="${#httpServletRequest.requestURI == '/usecase/5'}">5. Transaction Deduplication</option>
-                <option th:value="@{/usecase/6}" th:selected="${#httpServletRequest.requestURI == '/usecase/6'}">6. Fraud Detection</option>
-                <option th:value="@{/usecase/7}" th:selected="${#httpServletRequest.requestURI == '/usecase/7'}">7. Feature Store</option>
-                <option th:value="@{/usecase/8}" th:selected="${#httpServletRequest.requestURI == '/usecase/8'}">8. Document Database</option>
-                <option th:value="@{/usecase/9}" th:selected="${#httpServletRequest.requestURI == '/usecase/9'}">9. AI Agent Memory + RAG</option>
+                <option th:value="@{/usecase/1}">1. Authentication Token Store</option>
+                <option th:value="@{/usecase/2}">2. Session Storage</option>
+                <option th:value="@{/usecase/3}">3. User Profile Storage</option>
+                <option th:value="@{/usecase/4}">4. Rate Limiting</option>
+                <option th:value="@{/usecase/5}">5. Transaction Deduplication</option>
+                <option th:value="@{/usecase/6}">6. Fraud Detection</option>
+                <option th:value="@{/usecase/7}">7. Feature Store</option>
+                <option th:value="@{/usecase/8}">8. Document Database</option>
+                <option th:value="@{/usecase/9}">9. AI Agent Memory + RAG</option>
             </select>
             <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
                 <span class="theme-icon-light">☀️</span>
