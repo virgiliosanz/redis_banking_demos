@@ -233,13 +233,15 @@
                 var sources = JSON.parse(e.data);
                 displaySources(sources);
 
-                // Also update the memory inspection panels with source data
+                // Update the memory inspection panels with source data
                 if (sources.memories) updateMemoryResults(sources.memories);
                 if (sources.kbDocs) updateRagResults(sources.kbDocs);
                 if (sources.redisCommands) {
                     commandsCard.style.display = '';
                     commandsOutput.textContent = sources.redisCommands.join('\n');
                 }
+                // Update short-term memory panel as soon as sources arrive
+                updateShortTermMemory();
             } catch (err) { /* ignore parse errors */ }
         });
 
@@ -271,8 +273,10 @@
             removeTypingIndicator();
             hideStreamingIndicator();
             if (!fullResponse) {
-                msgDiv.innerHTML = '<span style="color:var(--redis-primary);">Error connecting to AI service. Retrying may help.</span>';
+                msgDiv.innerHTML = '<span style="color:var(--redis-primary);">⚠️ Error connecting to AI service. Check your OpenAI API key or try again.</span>';
             }
+            // Update short-term memory even on error (conversation may have been saved server-side)
+            updateShortTermMemory();
             setInputEnabled(true);
         };
     }
