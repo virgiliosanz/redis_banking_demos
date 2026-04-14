@@ -31,13 +31,22 @@
             });
         }
 
-        // Highlight active nav link
-        const path = window.location.pathname;
-        document.querySelectorAll('.nav-link').forEach(function (link) {
-            if (link.getAttribute('href') === path) {
-                link.classList.add('active');
+        // Set active option in nav select based on current path
+        var navSelect = document.getElementById('useCaseSelect');
+        if (navSelect) {
+            var path = window.location.pathname;
+            var matched = false;
+            for (var i = 0; i < navSelect.options.length; i++) {
+                if (navSelect.options[i].value === path) {
+                    navSelect.selectedIndex = i;
+                    matched = true;
+                    break;
+                }
             }
-        });
+            if (!matched) {
+                navSelect.selectedIndex = 0;
+            }
+        }
     });
 
     // --- Utility: POST JSON ---

@@ -121,12 +121,32 @@ a:hover {
     font-size: 0.85rem;
 }
 
-.nav-links {
-    display: flex;
-    gap: calc(var(--spacing-unit) * 0.5);
-    overflow-x: auto;
-    flex: 1;
-    scrollbar-width: none;
+.nav-select {
+    font-family: var(--font-primary);
+    font-size: 0.85rem;
+    background: transparent;
+    color: inherit;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-unit) calc(var(--spacing-unit) * 2);
+    cursor: pointer;
+    outline: none;
+    appearance: auto;
+    max-width: 320px;
+}
+
+.nav-select:hover {
+    border-color: var(--redis-primary);
+}
+
+.nav-select:focus {
+    border-color: var(--redis-primary);
+    box-shadow: 0 0 0 2px rgba(255, 68, 56, 0.15);
+}
+
+.nav-select option {
+    background: var(--bg-primary);
+    color: var(--text-primary);
 }
 
 /* --- Main Content --- */
