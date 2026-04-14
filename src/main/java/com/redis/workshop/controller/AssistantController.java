@@ -1,20 +1,26 @@
 package com.redis.workshop.controller;
 
 import com.redis.workshop.service.AssistantService;
+import com.redis.workshop.service.OpenAiService;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/assistant")
 public class AssistantController {
 
     private final AssistantService assistantService;
+    private final OpenAiService openAiService;
 
-    public AssistantController(AssistantService assistantService) {
+    public AssistantController(AssistantService assistantService, OpenAiService openAiService) {
         this.assistantService = assistantService;
+        this.openAiService = openAiService;
     }
 
     /**
@@ -64,6 +70,41 @@ public class AssistantController {
     @GetMapping("/kb")
     public ResponseEntity<List<Map<String, String>>> listKB() {
         return ResponseEntity.ok(assistantService.listKBArticles());
+    }
+
+    /**
+     * Streaming chat via SSE (requires OpenAI API key).
+     * GET /api/assistant/chat/stream?sessionId=...&message=...&userName=...
+     */
+    @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter chatStream(
+            @RequestParam String sessionId,
+            @RequestParam(defaultValue = "Demo User") String userName,
+            @RequestParam String message) {
+
+        SseEmitter emitter = new SseEmitter(60000L); // 60s timeout
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                assistantService.chatStream(sessionId, userName, message, emitter);
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            }
+        });
+
+        return emitter;
+    }
+
+    /**
+     * Check if OpenAI is configured.
+     * GET /api/assistant/status
+     */
+    @GetMapping("/status")
+    public ResponseEntity<Map<String, Object>> status() {
+        return ResponseEntity.ok(Map.of(
+                "openaiConfigured", openAiService.isConfigured(),
+                "mode", openAiService.isConfigured() ? "openai" : "mock"
+        ));
     }
 
     /**

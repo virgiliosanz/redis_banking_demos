@@ -4,8 +4,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -16,24 +19,28 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class AssistantService {
 
+    private static final Logger log = LoggerFactory.getLogger(AssistantService.class);
+
     private static final String CONV_PREFIX = "workshop:assistant:conversation:";
     private static final String MEMORY_PREFIX = "workshop:assistant:memory:";
     private static final String KB_PREFIX = "workshop:assistant:kb:";
     private static final String MEMORY_INDEX = "idx:assistant_memory";
     private static final String KB_INDEX = "idx:assistant_kb";
-    private static final int VECTOR_DIM = 768;
+    private static final int VECTOR_DIM = 1536;
     private static final long CONV_TTL_SECONDS = 600;
     private static final int MAX_MESSAGES = 20;
 
     private final StringRedisTemplate redis;
+    private final OpenAiService openAiService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // Pre-loaded data for keyword matching
+    // Pre-loaded data for keyword matching (fallback)
     private final List<Map<String, String>> memories = new ArrayList<>();
     private final List<Map<String, String>> kbArticles = new ArrayList<>();
 
-    public AssistantService(StringRedisTemplate redis) {
+    public AssistantService(StringRedisTemplate redis, OpenAiService openAiService) {
         this.redis = redis;
+        this.openAiService = openAiService;
     }
 
     @PostConstruct
@@ -68,9 +75,23 @@ public class AssistantService {
         );
         memories.addAll(items);
 
-        for (var mem : items) {
+        // Generate embeddings — batch real or individual mock
+        List<float[]> vectors;
+        if (openAiService.isConfigured()) {
+            log.info("UC9: Generating real embeddings for {} memories via OpenAI...", items.size());
+            List<String> texts = items.stream()
+                    .map(m -> m.get("summary") + " " + m.get("tags") + " " + m.get("detail"))
+                    .toList();
+            vectors = openAiService.getEmbeddings(texts);
+        } else {
+            vectors = items.stream()
+                    .map(m -> generateMockVector(m.get("summary") + " " + m.get("tags")))
+                    .toList();
+        }
+
+        for (int i = 0; i < items.size(); i++) {
+            var mem = items.get(i);
             String key = MEMORY_PREFIX + mem.get("id");
-            float[] vector = generateMockVector(mem.get("summary") + " " + mem.get("tags"));
             Map<String, String> hash = new LinkedHashMap<>();
             hash.put("id", mem.get("id"));
             hash.put("summary", mem.get("summary"));
@@ -78,7 +99,7 @@ public class AssistantService {
             hash.put("date", mem.get("date"));
             hash.put("tags", mem.get("tags"));
             redis.opsForHash().putAll(key, hash);
-            storeVectorField(key, vector);
+            storeVectorField(key, vectors.get(i));
         }
     }
 
@@ -119,16 +140,30 @@ public class AssistantService {
         );
         kbArticles.addAll(articles);
 
-        for (var art : articles) {
+        // Generate embeddings — batch real or individual mock
+        List<float[]> vectors;
+        if (openAiService.isConfigured()) {
+            log.info("UC9: Generating real embeddings for {} KB articles via OpenAI...", articles.size());
+            List<String> texts = articles.stream()
+                    .map(a -> a.get("title") + " " + a.get("tags") + " " + a.get("content"))
+                    .toList();
+            vectors = openAiService.getEmbeddings(texts);
+        } else {
+            vectors = articles.stream()
+                    .map(a -> generateMockVector(a.get("title") + " " + a.get("tags")))
+                    .toList();
+        }
+
+        for (int i = 0; i < articles.size(); i++) {
+            var art = articles.get(i);
             String key = KB_PREFIX + art.get("id");
-            float[] vector = generateMockVector(art.get("title") + " " + art.get("tags"));
             Map<String, String> hash = new LinkedHashMap<>();
             hash.put("id", art.get("id"));
             hash.put("title", art.get("title"));
             hash.put("content", art.get("content"));
             hash.put("tags", art.get("tags"));
             redis.opsForHash().putAll(key, hash);
-            storeVectorField(key, vector);
+            storeVectorField(key, vectors.get(i));
         }
     }
 
@@ -216,14 +251,34 @@ public class AssistantService {
                     messageHistory.size() - MAX_MESSAGES, messageHistory.size()));
         }
 
-        // 3. Retrieve relevant long-term memories (keyword-based mock)
-        List<Map<String, String>> relevantMemories = findRelevantMemories(userMessage);
+        // 3-5. Retrieve context and generate response
+        List<Map<String, String>> relevantMemories;
+        List<Map<String, String>> relevantDocs;
+        String responseText;
 
-        // 4. Retrieve relevant KB documents (keyword-based mock)
-        List<Map<String, String>> relevantDocs = findRelevantKBDocs(userMessage);
-
-        // 5. Generate mock response
-        String responseText = generateResponse(userMessage, relevantMemories, relevantDocs);
+        if (openAiService.isConfigured()) {
+            // Real vector search + convert results for response format
+            List<Map<String, Object>> memResults = vectorSearch(MEMORY_INDEX, userMessage, 3);
+            relevantMemories = new ArrayList<>();
+            for (var m : memResults) {
+                Map<String, String> flat = new LinkedHashMap<>();
+                m.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
+                relevantMemories.add(flat);
+            }
+            List<Map<String, Object>> kbResults = vectorSearch(KB_INDEX, userMessage, 3);
+            relevantDocs = new ArrayList<>();
+            for (var d : kbResults) {
+                Map<String, String> flat = new LinkedHashMap<>();
+                d.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
+                relevantDocs.add(flat);
+            }
+            responseText = generateResponse(userMessage, relevantMemories, relevantDocs);
+        } else {
+            // Keyword-based mock fallback
+            relevantMemories = findRelevantMemories(userMessage);
+            relevantDocs = findRelevantKBDocs(userMessage);
+            responseText = generateResponse(userMessage, relevantMemories, relevantDocs);
+        }
 
         // 6. Append assistant message
         Map<String, String> assistantMsg = new LinkedHashMap<>();
@@ -304,6 +359,177 @@ public class AssistantService {
             result.add(item);
         }
         return result;
+    }
+
+    // ── Vector Search (real KNN via FT.SEARCH) ────────────────────────
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> vectorSearch(String indexName, String query, int k) {
+        float[] queryVector = openAiService.getEmbedding(query);
+        byte[] vectorBytes = vectorToBytes(queryVector);
+
+        // FT.SEARCH <idx> "*=>[KNN <k> @vector $BLOB]" PARAMS 2 BLOB <bytes> DIALECT 2
+        List<byte[]> argList = new ArrayList<>();
+        argList.add(indexName.getBytes());
+        argList.add(("*=>[KNN " + k + " @vector $BLOB]").getBytes());
+        argList.add("PARAMS".getBytes());
+        argList.add("2".getBytes());
+        argList.add("BLOB".getBytes());
+        argList.add(vectorBytes);
+        argList.add("DIALECT".getBytes());
+        argList.add("2".getBytes());
+        byte[][] args = argList.toArray(new byte[0][]);
+
+        List<Object> rawResult = (List<Object>) redis.execute(
+                (org.springframework.data.redis.core.RedisCallback<Object>) conn ->
+                        conn.execute("FT.SEARCH", args));
+
+        List<Map<String, Object>> results = new ArrayList<>();
+        if (rawResult == null || rawResult.isEmpty()) return results;
+
+        // Parse FT.SEARCH response: [totalCount, key1, [field, value, ...], key2, [field, value, ...], ...]
+        for (int i = 1; i < rawResult.size(); i += 2) {
+            String redisKey = rawResult.get(i) instanceof byte[]
+                    ? new String((byte[]) rawResult.get(i)) : rawResult.get(i).toString();
+            if (i + 1 >= rawResult.size()) break;
+            List<Object> fields = (List<Object>) rawResult.get(i + 1);
+            Map<String, Object> doc = new LinkedHashMap<>();
+            doc.put("redisKey", redisKey);
+            for (int j = 0; j < fields.size() - 1; j += 2) {
+                String fieldName = fields.get(j) instanceof byte[]
+                        ? new String((byte[]) fields.get(j)) : fields.get(j).toString();
+                String fieldValue = fields.get(j + 1) instanceof byte[]
+                        ? new String((byte[]) fields.get(j + 1)) : fields.get(j + 1).toString();
+                if (!"vector".equals(fieldName)) {
+                    if ("__vector_score".equals(fieldName)) {
+                        doc.put("score", fieldValue);
+                    } else {
+                        doc.put(fieldName, fieldValue);
+                    }
+                }
+            }
+            results.add(doc);
+        }
+        return results;
+    }
+
+    // ── Streaming Chat (OpenAI) ─────────────────────────────────────────
+    public void chatStream(String sessionId, String userName, String userMessage, SseEmitter emitter) {
+        long startTime = System.currentTimeMillis();
+        String convKey = CONV_PREFIX + sessionId;
+
+        // 1. Load or create conversation
+        Map<Object, Object> convData = redis.opsForHash().entries(convKey);
+        List<Map<String, String>> messageHistory;
+        if (convData.isEmpty()) {
+            messageHistory = new ArrayList<>();
+            redis.opsForHash().put(convKey, "created_at", Instant.now().toString());
+            redis.opsForHash().put(convKey, "user_name", userName);
+        } else {
+            messageHistory = parseMessages(convData.getOrDefault("messages", "[]").toString());
+        }
+
+        // 2. Append user message
+        Map<String, String> userMsg = new LinkedHashMap<>();
+        userMsg.put("role", "user");
+        userMsg.put("content", userMessage);
+        userMsg.put("timestamp", Instant.now().toString());
+        messageHistory.add(userMsg);
+        if (messageHistory.size() > MAX_MESSAGES) {
+            messageHistory = new ArrayList<>(messageHistory.subList(
+                    messageHistory.size() - MAX_MESSAGES, messageHistory.size()));
+        }
+
+        // 3. Vector search for relevant context
+        List<Map<String, Object>> relevantMemories = vectorSearch(MEMORY_INDEX, userMessage, 3);
+        List<Map<String, Object>> relevantDocs = vectorSearch(KB_INDEX, userMessage, 3);
+
+        // 4. Send "sources" event before streaming starts
+        try {
+            Map<String, Object> sourcesData = new LinkedHashMap<>();
+            sourcesData.put("memories", relevantMemories);
+            sourcesData.put("kbDocs", relevantDocs);
+            sourcesData.put("redisCommands", List.of(
+                    "FT.SEARCH " + MEMORY_INDEX + " \"*=>[KNN 3 @vector $BLOB]\" PARAMS 2 BLOB <query_embedding> DIALECT 2",
+                    "FT.SEARCH " + KB_INDEX + " \"*=>[KNN 3 @vector $BLOB]\" PARAMS 2 BLOB <query_embedding> DIALECT 2"
+            ));
+            emitter.send(SseEmitter.event().name("sources").data(objectMapper.writeValueAsString(sourcesData)));
+        } catch (Exception e) {
+            log.error("Failed to send sources event", e);
+        }
+
+        // 5. Build OpenAI messages
+        String systemPrompt = buildSystemPrompt(relevantMemories, relevantDocs);
+        List<Map<String, String>> openAiMessages = new ArrayList<>();
+        openAiMessages.add(Map.of("role", "system", "content", systemPrompt));
+        for (var msg : messageHistory) {
+            openAiMessages.add(Map.of("role", msg.get("role"), "content", msg.get("content")));
+        }
+
+        // 6. Stream OpenAI response
+        String responseText = openAiService.streamChatCompletion(openAiMessages, emitter);
+
+        // 7. Save assistant message to conversation
+        Map<String, String> assistantMsg = new LinkedHashMap<>();
+        assistantMsg.put("role", "assistant");
+        assistantMsg.put("content", responseText);
+        assistantMsg.put("timestamp", Instant.now().toString());
+        messageHistory.add(assistantMsg);
+        if (messageHistory.size() > MAX_MESSAGES) {
+            messageHistory = new ArrayList<>(messageHistory.subList(
+                    messageHistory.size() - MAX_MESSAGES, messageHistory.size()));
+        }
+
+        try {
+            String messagesJson = objectMapper.writeValueAsString(messageHistory);
+            redis.opsForHash().put(convKey, "messages", messagesJson);
+            redis.opsForHash().put(convKey, "last_active", Instant.now().toString());
+            redis.opsForHash().put(convKey, "user_name", userName);
+            redis.expire(convKey, CONV_TTL_SECONDS, TimeUnit.SECONDS);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize messages", e);
+        }
+
+        // 8. Send "done" event
+        long latencyMs = System.currentTimeMillis() - startTime;
+        try {
+            Map<String, Object> doneData = new LinkedHashMap<>();
+            doneData.put("conversationLength", messageHistory.size());
+            doneData.put("latencyMs", latencyMs);
+            doneData.put("sessionId", sessionId);
+            emitter.send(SseEmitter.event().name("done").data(objectMapper.writeValueAsString(doneData)));
+            emitter.complete();
+        } catch (Exception e) {
+            log.error("Failed to send done event", e);
+        }
+    }
+
+    private String buildSystemPrompt(List<Map<String, Object>> memories, List<Map<String, Object>> kbDocs) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("You are a helpful AI banking assistant. Answer questions based on the provided context.\n\n");
+
+        if (!kbDocs.isEmpty()) {
+            sb.append("## Relevant Knowledge Base Articles:\n");
+            for (var doc : kbDocs) {
+                sb.append("- [").append(doc.get("id")).append("] ").append(doc.get("title")).append(": ");
+                sb.append(doc.get("content")).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        if (!memories.isEmpty()) {
+            sb.append("## Relevant Past Interactions:\n");
+            for (var mem : memories) {
+                sb.append("- [").append(mem.get("id")).append("] ").append(mem.get("summary")).append(": ");
+                sb.append(mem.get("detail")).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        sb.append("Use the above context to provide accurate, helpful responses. ");
+        sb.append("If referencing specific documents or memories, mention their IDs. ");
+        sb.append("Be concise and professional.");
+
+        return sb.toString();
     }
 
     // ── Keyword-based retrieval (mock for vector search) ────────────────
@@ -423,7 +649,7 @@ public class AssistantService {
     }
 
     /**
-     * Generate a deterministic pseudo-random 768-dim vector from content hash.
+     * Generate a deterministic pseudo-random vector from content hash (fallback when no OpenAI key).
      * Uses the content string's hash as a seed for reproducibility.
      */
     private float[] generateMockVector(String content) {

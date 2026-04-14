@@ -1,5 +1,6 @@
 package com.redis.workshop.config;
 
+import com.redis.workshop.service.OpenAiService;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,12 +19,14 @@ public class DocumentDataLoader {
     private static final Logger log = LoggerFactory.getLogger(DocumentDataLoader.class);
     private static final String DOC_PREFIX = "workshop:docs:regulation:";
     private static final String INDEX_NAME = "idx:regulations";
-    private static final int VECTOR_DIM = 768;
+    private static final int VECTOR_DIM = 1536;
 
     private final StringRedisTemplate redis;
+    private final OpenAiService openAiService;
 
-    public DocumentDataLoader(StringRedisTemplate redis) {
+    public DocumentDataLoader(StringRedisTemplate redis, OpenAiService openAiService) {
         this.redis = redis;
+        this.openAiService = openAiService;
     }
 
     @PostConstruct
@@ -162,10 +165,22 @@ public class DocumentDataLoader {
                 "PSD2 establishes clear liability rules for unauthorized payment transactions and requires payment service providers to implement robust fraud prevention measures.",
                 "Under PSD2, payment service providers bear liability for unauthorized transactions unless the payer acted fraudulently or with gross negligence. The payer's maximum liability for unauthorized transactions is limited to 50 EUR, provided they notify their bank without undue delay. Banks must implement real-time transaction monitoring, behavioral analytics, and device fingerprinting to detect and prevent fraud. Payment service providers must report fraud statistics to competent authorities on a semi-annual basis."));
 
-        // Add pre-computed vectors to each document
-        for (Map<String, Object> doc : docs) {
-            String seed = doc.get("title") + " " + doc.get("summary") + " " + doc.get("content");
-            doc.put("vector", generateVector(seed));
+        // Generate vectors — real embeddings if OpenAI configured, mock otherwise
+        if (openAiService.isConfigured()) {
+            log.info("UC6: Generating real embeddings for {} regulation documents via OpenAI...", docs.size());
+            List<String> texts = new ArrayList<>();
+            for (Map<String, Object> doc : docs) {
+                texts.add(doc.get("title") + " " + doc.get("summary") + " " + doc.get("content"));
+            }
+            List<float[]> embeddings = openAiService.getEmbeddings(texts);
+            for (int i = 0; i < docs.size(); i++) {
+                docs.get(i).put("vector", embeddings.get(i));
+            }
+        } else {
+            for (Map<String, Object> doc : docs) {
+                String seed = doc.get("title") + " " + doc.get("summary") + " " + doc.get("content");
+                doc.put("vector", generateVector(seed));
+            }
         }
 
         return docs;
