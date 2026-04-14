@@ -22,18 +22,19 @@ Each use case includes a **live interactive demo** and a **code showcase panel**
 
 ## Quick Start
 
-```sh
-# 1. Start Redis Stack
-docker compose up -d
+### Development mode (hot reload)
 
-# 2. Verify Redis is healthy
-docker compose ps
+```bash
+docker compose up -d          # Start Redis only
+./mvnw spring-boot:run        # Start app with hot reload
+# Open http://localhost:8080
+```
 
-# 3. Start the application
-./mvnw spring-boot:run
+### Workshop mode (no Java required)
 
-# 4. Open the workshop
-open http://localhost:8080
+```bash
+docker compose --profile workshop up -d --build   # Start Redis + App
+# Open http://localhost:8080
 ```
 
 ## Project Structure
@@ -70,12 +71,8 @@ src/main/resources/
 
 ## Redis Connection
 
-Default config connects to `localhost:6379`. Override with environment variables:
+Default config connects to `localhost:6379`. Override with Spring Boot environment variables:
 
 ```sh
-REDIS_HOST=myhost REDIS_PORT=6380 ./mvnw spring-boot:run
+SPRING_DATA_REDIS_HOST=myhost SPRING_DATA_REDIS_PORT=6380 ./mvnw spring-boot:run
 ```
-
-## RedisInsight
-
-Redis Stack includes RedisInsight at [http://localhost:8001](http://localhost:8001).

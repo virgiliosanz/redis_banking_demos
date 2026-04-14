@@ -1,5 +1,7 @@
-.git
-.secrets
-runtime
-docs
-projects
+target/
+.git/
+.idea/
+*.md
+docker-compose.yml
+Dockerfile
+.dockerignore
