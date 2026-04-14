@@ -274,6 +274,66 @@
 
             <hr class="guide-hr"/>
 
+            <!-- UC10 -->
+            <h2>UC10: Cache-Aside Pattern</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"This is what most people think of when they hear Redis — caching. But the cache-aside pattern is more than just GET/SET. You check Redis first, on a miss you fetch from the database and store the result with a TTL. Second request? Sub-millisecond. The key is the TTL — it controls freshness and auto-cleanup."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Select a banking product (e.g., "Fixed Rate Mortgage")</li>
+                <li>Click "Fetch Product" — first call is a CACHE MISS (~200ms)</li>
+                <li>Click "Fetch Product" again — now it's a CACHE HIT (&lt;1ms)</li>
+                <li>Show the latency difference in the stats panel</li>
+                <li>Click "Clear Cache" — evict the product</li>
+                <li>Fetch again — back to MISS, then HIT on second fetch</li>
+                <li>Show the hit ratio climbing as you make more requests</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>GET workshop:cache:product:{id}</code> — check cache</li>
+                <li><code>SET workshop:cache:product:{id} ... EX 300</code> — store with TTL</li>
+                <li><code>DEL</code> — cache eviction on data change</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>200x speedup: 200ms → &lt;1ms on cache hit</li>
+                <li>TTL = automatic freshness control, no stale data forever</li>
+                <li>Cache eviction on write for data consistency</li>
+                <li>Spring <code>@Cacheable</code> annotation for zero-code caching</li>
+                <li>Hit ratio is the key metric — aim for &gt;80% in production</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
+            <!-- UC11 -->
+            <h2>UC11: Real-time Transaction Monitoring</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"Banks need to monitor transactions in real time — TPS, amounts, risk scores. Redis Time Series is purpose-built for this. TS.ADD ingests data points, TS.RANGE with AGGREGATION queries them in time buckets. You get a live dashboard with sub-millisecond queries, automatic retention, and built-in aggregation — no external time series DB needed."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Click "Start Simulation" — watch the chart build up (~2 TPS)</li>
+                <li>Point out the metrics cards: TPS, total count, average amount</li>
+                <li>Click "Inject Anomaly" — see the spike in the chart and the High Risk % jump</li>
+                <li>Click "Stop" to pause, then "Reset" to clear</li>
+                <li>Show the Redis CLI tab — explain TS.CREATE, TS.ADD, TS.RANGE</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>TS.CREATE</code> — create a time series with retention and duplicate policy</li>
+                <li><code>TS.ADD</code> — add a data point (key, timestamp, value)</li>
+                <li><code>TS.RANGE</code> + <code>AGGREGATION</code> — query with SUM/AVG/MAX in time buckets</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>Redis 8 includes Time Series natively — no separate module</li>
+                <li>Automatic retention: data older than 1 hour is pruned</li>
+                <li>DUPLICATE_POLICY SUM: multiple adds in the same millisecond are summed</li>
+                <li>AGGREGATION in TS.RANGE: server-side aggregation, not client-side</li>
+                <li>Perfect for real-time dashboards, alerting, and anomaly detection</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
             <!-- Closing -->
             <h2>Closing</h2>
             <h3>Key takeaways</h3>

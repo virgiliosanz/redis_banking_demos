@@ -1266,3 +1266,102 @@ a:hover {
     margin-bottom: 8px;
     text-align: center;
 }
+
+/* --- UC10: Cache-Aside --- */
+.cache-product-cards {
+    display: flex;
+    gap: calc(var(--spacing-unit) * 1);
+    flex-wrap: wrap;
+    margin-bottom: calc(var(--spacing-unit) * 2);
+}
+
+.cache-product-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: calc(var(--spacing-unit) * 1.5);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    min-width: 120px;
+    text-align: center;
+    background: var(--bg-secondary);
+}
+
+.cache-product-card:hover {
+    border-color: var(--redis-primary);
+    background: rgba(255, 68, 56, 0.04);
+}
+
+.cache-product-card.selected {
+    border-color: var(--redis-primary);
+    background: rgba(255, 68, 56, 0.08);
+}
+
+.cache-card-icon { font-size: 1.5rem; }
+.cache-card-name { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); }
+.cache-card-type { font-size: 0.7rem; color: var(--text-muted); }
+
+.cache-status-badge {
+    padding: calc(var(--spacing-unit) * 1.5);
+    border-radius: var(--border-radius);
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: calc(var(--spacing-unit) * 2);
+    text-align: center;
+}
+
+.cache-status-badge.cache-hit {
+    background: rgba(5, 150, 105, 0.1);
+    color: #059669;
+    border: 1px solid rgba(5, 150, 105, 0.3);
+}
+
+.cache-status-badge.cache-miss {
+    background: rgba(245, 158, 11, 0.1);
+    color: #D97706;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.cache-stats {
+    display: flex;
+    gap: calc(var(--spacing-unit) * 2);
+    flex-wrap: wrap;
+    margin: calc(var(--spacing-unit) * 2) 0;
+    padding: calc(var(--spacing-unit) * 2);
+    background: var(--bg-secondary);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+}
+
+.cache-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 72px;
+}
+
+.cache-stat-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.cache-stat-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-code);
+}
+
+.data-grid {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    margin-bottom: calc(var(--spacing-unit) * 2);
+}

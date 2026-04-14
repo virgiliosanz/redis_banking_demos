@@ -227,6 +227,34 @@ docker compose --profile workshop up -d --build
 
 ---
 
+## UC10: Cache-Aside Pattern
+
+### What to say
+"This is what most people think of when they hear Redis — caching. But the cache-aside pattern is more than just GET/SET. You check Redis first, on a miss you fetch from the database and store the result with a TTL. Second request? Sub-millisecond. The key is the TTL — it controls freshness and auto-cleanup."
+
+### Demo steps
+1. Select a banking product (e.g., "Fixed Rate Mortgage")
+2. Click "Fetch Product" — first call is a CACHE MISS (~200ms)
+3. Click "Fetch Product" again — now it's a CACHE HIT (<1ms)
+4. Show the latency difference in the stats panel
+5. Click "Clear Cache" — evict the product
+6. Fetch again — back to MISS, then HIT on second fetch
+7. Show the hit ratio climbing as you make more requests
+
+### Key Redis commands to highlight
+- `GET workshop:cache:product:{id}` — check cache
+- `SET workshop:cache:product:{id} ... EX 300` — store with TTL
+- `DEL` — cache eviction on data change
+
+### Talking points
+- 200x speedup: 200ms → <1ms on cache hit
+- TTL = automatic freshness control, no stale data forever
+- Cache eviction on write for data consistency
+- Spring `@Cacheable` annotation for zero-code caching
+- Hit ratio is the key metric — aim for >80% in production
+
+---
+
 ## Closing
 
 ### Key takeaways
