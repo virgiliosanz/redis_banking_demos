@@ -154,8 +154,9 @@
 
     // --- Sources panel ---
     function scoreClass(score) {
-        if (score >= 0.8) return 'uc9-score-high';
-        if (score >= 0.5) return 'uc9-score-med';
+        var s = parseFloat(score);
+        if (s >= 0.8) return 'uc9-score-high';
+        if (s >= 0.5) return 'uc9-score-med';
         return 'uc9-score-low';
     }
 
@@ -170,7 +171,7 @@
                 html += '<div class="uc9-source-item">';
                 html += '<span class="uc9-source-key">' + escapeHtml(doc.redisKey || '') + '</span>';
                 if (doc.title) html += '<span class="uc9-source-title">' + escapeHtml(doc.title) + '</span>';
-                html += '<span class="uc9-source-score ' + scoreClass(doc.score) + '">Score: ' + (doc.score != null ? doc.score.toFixed(2) : '—') + '</span>';
+                html += '<span class="uc9-source-score ' + scoreClass(doc.score) + '">Score: ' + (doc.score != null ? parseFloat(doc.score).toFixed(2) : '—') + '</span>';
                 html += '</div>';
             });
             html += '</div>';
@@ -183,7 +184,7 @@
                 html += '<div class="uc9-source-item">';
                 html += '<span class="uc9-source-key">' + escapeHtml(mem.redisKey || '') + '</span>';
                 if (mem.summary) html += '<span class="uc9-source-title">' + escapeHtml(mem.summary) + '</span>';
-                html += '<span class="uc9-source-score ' + scoreClass(mem.score) + '">Score: ' + (mem.score != null ? mem.score.toFixed(2) : '—') + '</span>';
+                html += '<span class="uc9-source-score ' + scoreClass(mem.score) + '">Score: ' + (mem.score != null ? parseFloat(mem.score).toFixed(2) : '—') + '</span>';
                 html += '</div>';
             });
             html += '</div>';
@@ -242,7 +243,7 @@
                 }
                 // Update short-term memory panel as soon as sources arrive
                 updateShortTermMemory();
-            } catch (err) { /* ignore parse errors */ }
+            } catch (err) { console.error('UC9 sources handler error:', err); }
         });
 
         eventSource.addEventListener('token', function (e) {
