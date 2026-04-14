@@ -133,24 +133,25 @@
                 <div class="code-container code-tab-content active" id="tab-cli">
 <pre><code class="language-bash"># ═══ Redis Streams — Transaction Monitoring ═══
 
-# Add transaction events (auto-generated timestamp ID)
+# Add a transaction event to the stream
 XADD workshop:txmonitor:stream * \
-  amount 250.00 riskScore 35.0
+  amount 150.75 riskScore 25.3 \
+  type purchase merchant "Store ABC"
 
-XADD workshop:txmonitor:stream * \
-  amount 15000.00 riskScore 82.5
+# Read last 10 transactions
+XRANGE workshop:txmonitor:stream - + COUNT 10
 
-# Query last 60 seconds (IDs are ms-based)
-# From = now - 60000, To = now
-XRANGE workshop:txmonitor:stream 1713045540000 1713045600000
+# Read transactions from last 60 seconds
+# (replace &lt;timestamp_ms&gt; with epoch ms)
+XRANGE workshop:txmonitor:stream &lt;timestamp_ms&gt;-0 + COUNT 100
 
-# Stream length (total entries)
+# Count total transactions in the stream
 XLEN workshop:txmonitor:stream
 
-# Trim to keep last 10000 entries
+# Trim stream to last 10000 entries (retention)
 XTRIM workshop:txmonitor:stream MAXLEN ~ 10000
 
-# Read most recent 5 entries
+# Read transactions in reverse (most recent first)
 XREVRANGE workshop:txmonitor:stream + - COUNT 5</code></pre>
                 </div>
 
@@ -158,35 +159,39 @@ XREVRANGE workshop:txmonitor:stream + - COUNT 5</code></pre>
                 <div class="code-container code-tab-content" id="tab-java">
 <pre><code class="language-java">// ═══ Redis Streams with Spring Data Redis ═══
 
-// Add a transaction event — XADD
-Map&lt;String, String&gt; fields = Map.of(
-    "amount", "250.00",
-    "riskScore", "35.0");
-MapRecord&lt;String, String, String&gt; record =
-    StreamRecords.string(fields)
-        .withStreamKey("workshop:txmonitor:stream");
-redis.opsForStream().add(record);
+// Add a transaction to the stream
+Map&lt;String, String&gt; txData = Map.of(
+    "amount", String.valueOf(amount),
+    "riskScore", String.valueOf(riskScore),
+    "type", type,
+    "merchant", merchant
+);
+redisTemplate.opsForStream().add(
+    StreamRecords.string(txData)
+        .withStreamKey("workshop:txmonitor:stream")
+);
 
-// Trim to bound stream size — XTRIM
-redis.opsForStream().trim(STREAM_KEY, 10000);
+// Read transactions from last 60 seconds
+long fromTs = System.currentTimeMillis() - 60000;
+List&lt;MapRecord&lt;String, Object, Object&gt;&gt; records =
+    redisTemplate.opsForStream().range(
+        "workshop:txmonitor:stream",
+        Range.closed(fromTs + "-0", "+")
+    );
 
-// Query a time range — XRANGE
-// Stream IDs are timestamp-based: "1713045600000-0"
-String fromId = (now - 60000) + "-0";
-String toId = now + "-99999";
-List&lt;MapRecord&gt; records = redis.opsForStream()
-    .range(STREAM_KEY,
-        Range.closed(fromId, toId),
-        Limit.limit().count(10000));
+// Calculate metrics from stream data
+long totalCount = redisTemplate.opsForStream()
+    .size("workshop:txmonitor:stream");
 
-// Manual aggregation into 1-second buckets
-Map&lt;Long, BucketData&gt; buckets = new TreeMap&lt;&gt;();
-for (var rec : records) {
-    long ts = parseTimestamp(rec.getId());
-    long bucket = (ts / 1000) * 1000;
-    double amount = parseDouble(
-        rec.getValue().get("amount"));
-    // ... accumulate count, sum, avg per bucket
+// Aggregate: compute TPS, avg amount per second
+Map&lt;Long, List&lt;Double&gt;&gt; buckets = new TreeMap&lt;&gt;();
+for (var record : records) {
+    long ts = Long.parseLong(
+        record.getId().toString().split("-")[0]);
+    long bucket = ts / 1000 * 1000; // 1-second buckets
+    buckets.computeIfAbsent(bucket, k -&gt; new ArrayList&lt;&gt;())
+        .add(Double.parseDouble(
+            record.getValue().get("amount").toString()));
 }</code></pre>
                 </div>
             </section>
