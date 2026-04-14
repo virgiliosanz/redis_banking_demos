@@ -130,11 +130,11 @@
                 <h2>Code Showcase</h2>
                 <div class="code-container">
                     <div class="code-tabs">
-                        <button class="code-tab active" data-tab="java">Java</button>
-                        <button class="code-tab" data-tab="cli">Redis CLI</button>
+                        <button class="code-tab" data-tab="java">Java</button>
+                        <button class="code-tab active" data-tab="cli">Redis CLI</button>
                     </div>
 
-                    <div class="code-block active" id="tab-java">
+                    <div class="code-block" id="tab-java">
                         <pre><code class="language-java">// 1. Generate token &amp; store as Hash — HSET
 String tokenId = UUID.randomUUID().toString();
 String key = "workshop:auth:token:" + tokenId;
@@ -166,7 +166,7 @@ Long ttl = redis.getExpire(key,
 redis.delete(key);</code></pre>
                     </div>
 
-                    <div class="code-block" id="tab-cli">
+                    <div class="code-block active" id="tab-cli">
                         <pre><code class="language-bash"># 1. Store auth token as Hash
 HSET workshop:auth:token:a1b2c3d4-uuid \
   tokenId "a1b2c3d4-uuid" \

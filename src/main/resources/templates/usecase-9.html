@@ -199,11 +199,11 @@
                 <h2>Code Showcase</h2>
                 <div class="code-container">
                     <div class="code-tabs">
-                        <button class="code-tab active" data-tab="java">Java</button>
-                        <button class="code-tab" data-tab="cli">Redis CLI</button>
+                        <button class="code-tab" data-tab="java">Java</button>
+                        <button class="code-tab active" data-tab="cli">Redis CLI</button>
                     </div>
 
-                    <div class="code-block active" id="tab-java">
+                    <div class="code-block" id="tab-java">
                         <pre><code class="language-java">// 1. Short-term Memory — HSET + EXPIRE
 // Store conversation context as a Hash
 String convKey = "workshop:assistant:conversation:"
@@ -269,7 +269,7 @@ conn.hashCommands().hSet(
 // f) EXPIRE to refresh TTL</code></pre>
                     </div>
 
-                    <div class="code-block" id="tab-cli">
+                    <div class="code-block active" id="tab-cli">
                         <pre><code class="language-bash"># 1. Short-term Memory — conversation context
 HSET workshop:assistant:conversation:sess-001 \
   messages '[{"role":"user","content":"..."}]' \

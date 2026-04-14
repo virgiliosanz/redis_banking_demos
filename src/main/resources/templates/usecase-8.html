@@ -113,11 +113,11 @@
                 <h2>Code Showcase</h2>
                 <div class="code-container">
                     <div class="code-tabs">
-                        <button class="code-tab active" data-tab="java">Java</button>
-                        <button class="code-tab" data-tab="cli">Redis CLI</button>
+                        <button class="code-tab" data-tab="java">Java</button>
+                        <button class="code-tab active" data-tab="cli">Redis CLI</button>
                     </div>
 
-                    <div class="code-block active" id="tab-java">
+                    <div class="code-block" id="tab-java">
                         <pre><code class="language-java">// 1. Store regulation doc — JSON.SET
 String key = "workshop:docs:regulation:REG001";
 String json = """
@@ -182,7 +182,7 @@ redis.execute(conn -&gt; conn.execute(
   "DIALECT", "2"));</code></pre>
                     </div>
 
-                    <div class="code-block" id="tab-cli">
+                    <div class="code-block active" id="tab-cli">
                         <pre><code class="language-bash"># 1. Store document as JSON
 JSON.SET workshop:docs:regulation:REG001 $ '{
   "id": "REG001",
