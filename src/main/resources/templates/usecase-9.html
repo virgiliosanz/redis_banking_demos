@@ -126,46 +126,60 @@
 
         <section class="loaded-documents">
             <h3>📚 Knowledge Base Documents</h3>
-            <p class="loaded-docs-subtitle">These EU banking regulations are loaded into Redis as vector embeddings for semantic search:</p>
+            <p class="loaded-docs-subtitle">These banking articles are loaded into Redis as vector embeddings for semantic search:</p>
             <div class="doc-cards">
                 <div class="doc-card">
-                    <div class="doc-icon">📄</div>
+                    <div class="doc-icon">🏦</div>
                     <div class="doc-info">
-                        <h4>PSD2</h4>
-                        <p>Payment Services Directive 2 (2015/2366)</p>
-                        <span class="doc-tag">Open Banking</span>
-                        <span class="doc-tag">SCA</span>
-                        <span class="doc-tag">Payment Services</span>
+                        <h4>Account Types</h4>
+                        <p>Personal, Savings, Business &amp; Premium accounts</p>
+                        <span class="doc-tag">Accounts</span>
+                        <span class="doc-tag">Savings</span>
                     </div>
                 </div>
                 <div class="doc-card">
-                    <div class="doc-icon">📄</div>
+                    <div class="doc-icon">💸</div>
                     <div class="doc-info">
-                        <h4>DORA</h4>
-                        <p>Digital Operational Resilience Act (2022/2554)</p>
-                        <span class="doc-tag">ICT Risk</span>
-                        <span class="doc-tag">Resilience</span>
-                        <span class="doc-tag">Third-party Risk</span>
+                        <h4>Transfers &amp; Fees</h4>
+                        <p>SEPA, SWIFT, instant payments &amp; limits</p>
+                        <span class="doc-tag">SEPA</span>
+                        <span class="doc-tag">SWIFT</span>
                     </div>
                 </div>
                 <div class="doc-card">
-                    <div class="doc-icon">📄</div>
+                    <div class="doc-icon">🔒</div>
                     <div class="doc-info">
-                        <h4>MiFID II</h4>
-                        <p>Markets in Financial Instruments Directive (2014/65/EU)</p>
-                        <span class="doc-tag">Investment Services</span>
-                        <span class="doc-tag">Reporting</span>
-                        <span class="doc-tag">Best Execution</span>
+                        <h4>Card Security</h4>
+                        <p>3D Secure, fraud prevention &amp; contactless</p>
+                        <span class="doc-tag">Fraud</span>
+                        <span class="doc-tag">3D Secure</span>
                     </div>
                 </div>
                 <div class="doc-card">
-                    <div class="doc-icon">📄</div>
+                    <div class="doc-icon">📊</div>
                     <div class="doc-info">
-                        <h4>GDPR</h4>
-                        <p>General Data Protection Regulation (2016/679)</p>
-                        <span class="doc-tag">Data Protection</span>
-                        <span class="doc-tag">Consent</span>
-                        <span class="doc-tag">Right to Erasure</span>
+                        <h4>Investments</h4>
+                        <p>Portfolios, ETFs &amp; robo-advisor</p>
+                        <span class="doc-tag">ETF</span>
+                        <span class="doc-tag">Portfolio</span>
+                    </div>
+                </div>
+                <div class="doc-card">
+                    <div class="doc-icon">🏠</div>
+                    <div class="doc-info">
+                        <h4>Loans &amp; Mortgages</h4>
+                        <p>Personal loans, fixed &amp; variable mortgage rates</p>
+                        <span class="doc-tag">Mortgage</span>
+                        <span class="doc-tag">Rates</span>
+                    </div>
+                </div>
+                <div class="doc-card">
+                    <div class="doc-icon">🔗</div>
+                    <div class="doc-info">
+                        <h4>PSD2 &amp; Open Banking</h4>
+                        <p>SCA, AIS/PIS APIs &amp; developer portal</p>
+                        <span class="doc-tag">PSD2</span>
+                        <span class="doc-tag">API</span>
                     </div>
                 </div>
             </div>
@@ -187,11 +201,11 @@
                         <h3>💬 Chat with AI Assistant</h3>
                         <div id="chat-messages" style="max-height:320px; overflow-y:auto; margin-bottom:8px; padding:8px; background:var(--bg-secondary); border-radius:var(--border-radius); min-height:120px;">
                             <div class="chat-welcome" style="color:var(--text-muted); font-style:italic; padding:16px 0; text-align:center;">
-                                Ask a question about EU banking regulations (PSD2, GDPR, DORA, MiFID II) or try one of the example prompts below.
+                                Ask about banking services — accounts, transfers, investments, loans, cards, or regulations. Try the example prompts below!
                             </div>
                         </div>
                         <div style="display:flex; gap:8px; align-items:center;">
-                            <input type="text" id="chatInput" class="form-input" placeholder="Ask about PSD2, GDPR, DORA, MiFID II regulations..."
+                            <input type="text" id="chatInput" class="form-input" placeholder="Ask about accounts, transfers, investments, loans..."
                                    style="flex:1;"/>
                             <button id="sendBtn" class="btn btn-primary">Send</button>
                             <span id="streaming-indicator" style="display:none; font-size:0.75rem; color:var(--redis-primary); font-family:var(--font-code); white-space:nowrap;">
@@ -202,12 +216,12 @@
                         <div style="margin-top:8px;">
                             <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px;">Try these questions:</label>
                             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What are the key requirements of PSD2 for payment services?">💳 PSD2 requirements</button>
-                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="Explain GDPR data protection rights for banking customers">🔒 GDPR rights</button>
-                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="How does DORA affect operational resilience in financial institutions?">🛡️ DORA resilience</button>
-                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What are the MiFID II reporting requirements for investment firms?">📊 MiFID II reporting</button>
-                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What is strong customer authentication under PSD2?">🔐 SCA explained</button>
-                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="How should banks handle ICT third-party risk under DORA?">🔗 Third-party risk</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What are the international transfer fees for SEPA and SWIFT?">💸 Transfer fees</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="Tell me about card security and fraud prevention measures">🔒 Card security</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What investment products do you offer?">📊 Investments</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What are the mortgage rates and loan options?">🏠 Loans &amp; mortgages</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="How does PSD2 and Open Banking work with your API?">🔗 PSD2 &amp; Open Banking</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What types of accounts do you offer?">🏦 Account types</button>
                             </div>
                         </div>
                     </div>

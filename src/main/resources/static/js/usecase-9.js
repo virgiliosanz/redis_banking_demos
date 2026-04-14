@@ -297,6 +297,28 @@
             }
 
             addMessage('assistant', data.response);
+
+            // Show inline sources summary in chat bubble
+            if ((data.memoriesRetrieved && data.memoriesRetrieved.length > 0) ||
+                (data.kbDocsRetrieved && data.kbDocsRetrieved.length > 0)) {
+                var sourcesHtml = '<div style="margin-top:8px; padding:8px 12px; background:var(--bg-secondary); border-radius:var(--border-radius); border:1px solid var(--border-color); font-size:0.75rem;">';
+                sourcesHtml += '<div style="font-weight:600; color:var(--redis-primary); margin-bottom:4px;">📚 Context used (Redis Vector Search):</div>';
+                if (data.kbDocsRetrieved && data.kbDocsRetrieved.length > 0) {
+                    data.kbDocsRetrieved.forEach(function(doc) {
+                        sourcesHtml += '<div style="color:var(--text-muted);">📄 ' + escapeHtml(doc.title || doc.id || '') + '</div>';
+                    });
+                }
+                if (data.memoriesRetrieved && data.memoriesRetrieved.length > 0) {
+                    data.memoriesRetrieved.forEach(function(mem) {
+                        sourcesHtml += '<div style="color:var(--text-muted);">🧠 ' + escapeHtml(mem.summary || mem.id || '') + '</div>';
+                    });
+                }
+                sourcesHtml += '</div>';
+                // Append to the last assistant message bubble
+                var lastMsg = chatMessages.lastElementChild;
+                if (lastMsg) lastMsg.innerHTML += sourcesHtml;
+            }
+
             updateShortTermMemory();
             updateMemoryResults(data.memoriesRetrieved);
             updateRagResults(data.kbDocsRetrieved);
@@ -339,7 +361,7 @@
         resetBtn.textContent = 'Resetting...';
         window.workshopFetch('/api/assistant/reset', {}).then(function () {
             sessionId = 'sess-' + Math.random().toString(36).substring(2, 10);
-            chatMessages.innerHTML = '<div class="chat-welcome" style="color:var(--text-muted); font-style:italic; padding:16px 0; text-align:center;">Ask a question about EU banking regulations (PSD2, GDPR, DORA, MiFID II) or try one of the example prompts below.</div>';
+            chatMessages.innerHTML = '<div class="chat-welcome" style="color:var(--text-muted); font-style:italic; padding:16px 0; text-align:center;">Ask about banking services — accounts, transfers, investments, loans, cards, or regulations. Try the example prompts below!</div>';
             shortTermInfo.innerHTML = '<span style="color:var(--text-muted);">No active conversation yet.</span>';
             memoryResults.innerHTML = '<span style="color:var(--text-muted);">No memories retrieved yet.</span>';
             ragResults.innerHTML = '<span style="color:var(--text-muted);">No documents retrieved yet.</span>';
