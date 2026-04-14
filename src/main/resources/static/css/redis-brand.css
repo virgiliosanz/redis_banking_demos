@@ -1267,6 +1267,103 @@ a:hover {
     text-align: center;
 }
 
+/* Side-by-side How It Works panels (UC9) */
+.how-it-works-dual {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.how-it-works-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 24px;
+}
+
+.how-it-works-panel h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 16px 0;
+    text-align: center;
+}
+
+@media (max-width: 900px) {
+    .how-it-works-dual {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Loaded Documents / Knowledge Base (UC9) */
+.loaded-documents {
+    margin: 24px 0;
+    padding: 24px;
+    background: var(--bg-secondary);
+    border-radius: 5px;
+}
+
+.loaded-documents h3 {
+    margin: 0 0 8px 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.loaded-docs-subtitle {
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+}
+
+.doc-cards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.doc-card {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+}
+
+.doc-icon {
+    font-size: 32px;
+    flex-shrink: 0;
+}
+
+.doc-info h4 {
+    margin: 0 0 4px 0;
+    color: var(--text-primary);
+}
+
+.doc-info p {
+    margin: 0 0 8px 0;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.doc-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--redis-primary);
+    color: white;
+    border-radius: 3px;
+    font-size: 11px;
+    margin-right: 4px;
+    margin-bottom: 4px;
+}
+
+@media (max-width: 768px) {
+    .doc-cards {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* --- UC10: Cache-Aside --- */
 .cache-product-cards {
     display: flex;

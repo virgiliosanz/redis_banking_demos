@@ -14,10 +14,10 @@
 
         <section class="how-it-works">
             <h2>How it works</h2>
-            <div class="how-it-works-diagram-group">
-                <!-- Diagram 1: Agent Memory -->
-                <div>
-                    <div class="diagram-label">Agent Memory</div>
+            <div class="how-it-works-dual">
+                <!-- Panel 1: Agent Memory -->
+                <div class="how-it-works-panel">
+                    <h3>Agent Memory</h3>
                     <div class="how-it-works-steps">
                         <ol>
                             <li>User makes a request to an agent.</li>
@@ -73,9 +73,9 @@
                         </svg>
                     </div>
                 </div>
-                <!-- Diagram 2: RAG -->
-                <div>
-                    <div class="diagram-label">Retrieval-Augmented Generation (RAG)</div>
+                <!-- Panel 2: RAG -->
+                <div class="how-it-works-panel">
+                    <h3>RAG (Retrieval-Augmented Generation)</h3>
                     <div class="how-it-works-steps">
                         <ol>
                             <li>A user asks a question.</li>
@@ -119,6 +119,53 @@
                             <text x="630" y="68" text-anchor="middle" font-size="18">💡</text>
                             <text x="630" y="86" text-anchor="middle" font-size="13" font-weight="600">Answer</text>
                         </svg>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="loaded-documents">
+            <h3>📚 Knowledge Base Documents</h3>
+            <p class="loaded-docs-subtitle">These EU banking regulations are loaded into Redis as vector embeddings for semantic search:</p>
+            <div class="doc-cards">
+                <div class="doc-card">
+                    <div class="doc-icon">📄</div>
+                    <div class="doc-info">
+                        <h4>PSD2</h4>
+                        <p>Payment Services Directive 2 (2015/2366)</p>
+                        <span class="doc-tag">Open Banking</span>
+                        <span class="doc-tag">SCA</span>
+                        <span class="doc-tag">Payment Services</span>
+                    </div>
+                </div>
+                <div class="doc-card">
+                    <div class="doc-icon">📄</div>
+                    <div class="doc-info">
+                        <h4>DORA</h4>
+                        <p>Digital Operational Resilience Act (2022/2554)</p>
+                        <span class="doc-tag">ICT Risk</span>
+                        <span class="doc-tag">Resilience</span>
+                        <span class="doc-tag">Third-party Risk</span>
+                    </div>
+                </div>
+                <div class="doc-card">
+                    <div class="doc-icon">📄</div>
+                    <div class="doc-info">
+                        <h4>MiFID II</h4>
+                        <p>Markets in Financial Instruments Directive (2014/65/EU)</p>
+                        <span class="doc-tag">Investment Services</span>
+                        <span class="doc-tag">Reporting</span>
+                        <span class="doc-tag">Best Execution</span>
+                    </div>
+                </div>
+                <div class="doc-card">
+                    <div class="doc-icon">📄</div>
+                    <div class="doc-info">
+                        <h4>GDPR</h4>
+                        <p>General Data Protection Regulation (2016/679)</p>
+                        <span class="doc-tag">Data Protection</span>
+                        <span class="doc-tag">Consent</span>
+                        <span class="doc-tag">Right to Erasure</span>
                     </div>
                 </div>
             </div>
