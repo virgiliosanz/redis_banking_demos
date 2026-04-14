@@ -79,12 +79,12 @@
                             <label for="readDocId">Document ID</label>
                             <div style="display:flex; gap:8px;">
                                 <select id="readDocId" class="form-input" style="flex:1;">
-                                    <option value="REG001">REG001 — PSD2 Strong Customer Auth</option>
-                                    <option value="REG002">REG002 — GDPR Data Protection</option>
-                                    <option value="REG003">REG003 — MiFID II Transaction Reporting</option>
-                                    <option value="REG004">REG004 — Basel III Capital Requirements</option>
-                                    <option value="REG005">REG005 — PSD2 Open Banking APIs</option>
-                                    <option value="REG006">REG006 — GDPR Cross-border Transfers</option>
+                                    <option value="psd2:chunk:0">psd2:chunk:0 — PSD2 Payment Services</option>
+                                    <option value="gdpr:chunk:0">gdpr:chunk:0 — GDPR Data Protection</option>
+                                    <option value="dora:chunk:0">dora:chunk:0 — DORA Digital Resilience</option>
+                                    <option value="mifid2:chunk:0">mifid2:chunk:0 — MiFID II Investment</option>
+                                    <option value="psd2:chunk:10">psd2:chunk:10 — PSD2 Chapter 10</option>
+                                    <option value="gdpr:chunk:5">gdpr:chunk:5 — GDPR Chapter 5</option>
                                 </select>
                                 <button id="readDocBtn" class="btn btn-primary">Read</button>
                             </div>
@@ -103,11 +103,10 @@
                             <label>Document ID + JSONPath</label>
                             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                                 <select id="fieldDocId" class="form-input" style="flex:1; min-width:150px;">
-                                    <option value="REG001">REG001</option>
-                                    <option value="REG002">REG002</option>
-                                    <option value="REG003">REG003</option>
-                                    <option value="REG004">REG004</option>
-                                    <option value="REG005">REG005</option>
+                                    <option value="psd2:chunk:0">psd2:chunk:0</option>
+                                    <option value="gdpr:chunk:0">gdpr:chunk:0</option>
+                                    <option value="dora:chunk:0">dora:chunk:0</option>
+                                    <option value="mifid2:chunk:0">mifid2:chunk:0</option>
                                 </select>
                                 <select id="fieldPath" class="form-input" style="flex:1; min-width:120px;">
                                     <option value="title">$.title</option>

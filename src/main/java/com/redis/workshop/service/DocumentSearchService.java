@@ -116,16 +116,21 @@ public class DocumentSearchService {
     // --- CRUD operations ---
 
     /**
-     * Read a single document by ID using JSON.GET.
+     * Read a single document by ID using JSON.GET (excludes vector field for readability).
      */
     public Map<String, Object> getById(String id) {
         String key = DOC_PREFIX + id;
-        String redisCmd = "JSON.GET " + key + " $";
+        String redisCmd = "JSON.GET " + key + " $.id $.title $.category $.summary $.content $.tags";
 
         Object result = redis.execute(connection -> {
             return connection.execute("JSON.GET",
                     key.getBytes(StandardCharsets.UTF_8),
-                    "$".getBytes(StandardCharsets.UTF_8));
+                    "$.id".getBytes(StandardCharsets.UTF_8),
+                    "$.title".getBytes(StandardCharsets.UTF_8),
+                    "$.category".getBytes(StandardCharsets.UTF_8),
+                    "$.summary".getBytes(StandardCharsets.UTF_8),
+                    "$.content".getBytes(StandardCharsets.UTF_8),
+                    "$.tags".getBytes(StandardCharsets.UTF_8));
         }, true);
 
         Map<String, Object> response = new LinkedHashMap<>();
