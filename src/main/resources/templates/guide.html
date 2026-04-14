@@ -334,6 +334,38 @@
 
             <hr class="guide-hr"/>
 
+            <!-- UC12 -->
+            <h2>UC12: ATM &amp; Branch Finder (Geospatial)</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"Location matters in banking. Customers need to find the nearest ATM or branch, filtered by services. Redis Geospatial gives you sub-millisecond radius search. Combine it with JSON + Query Engine for rich filtering — geo plus type, services, hours — all in one query."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Start with Native Geospatial tab — click Puerta del Sol preset</li>
+                <li>Search with 2km radius — show ATMs and branches on the map</li>
+                <li>Point out the GEOSEARCH command — simple, fast, returns distance</li>
+                <li>Switch to JSON + Query Engine tab — same location</li>
+                <li>Filter by type: ATM only — show how the FT.SEARCH query adds @type:{atm}</li>
+                <li>Filter by service: advisor — only branches with advisor service</li>
+                <li>Compare: native is simpler, RQE adds rich filtering in a single query</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>GEOADD</code> — add coordinates to a sorted set</li>
+                <li><code>GEOSEARCH</code> — radius search with distance, sorted</li>
+                <li><code>JSON.SET</code> — store rich documents with location field</li>
+                <li><code>FT.CREATE</code> with <code>GEO</code> + <code>TAG</code> fields — index for geo+filter queries</li>
+                <li><code>FT.SEARCH</code> with <code>@location:[lng lat radius km]</code> — geo filter in RQE</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>Native geo: O(N+log(M)) — extremely fast for pure proximity</li>
+                <li>RQE geo: combines geo with any other filter in a single query — no application-side filtering</li>
+                <li>Both approaches use the same Redis instance — no external geo database needed</li>
+                <li>Real-world: branch locators, delivery radius, fraud geo-fencing</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
             <!-- Closing -->
             <h2>Closing</h2>
             <h3>Key takeaways</h3>

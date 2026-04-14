@@ -37,7 +37,16 @@ public class HomeController {
                     "icon", "📄", "features", "Vector · RQE · JSON"),
             Map.of("id", "9", "title", "AI Agent Memory + RAG",
                     "description", "AI assistant with short/long-term memory and RAG",
-                    "icon", "🤖", "features", "Hash · Vector · Streams · JSON · TTL")
+                    "icon", "🤖", "features", "Hash · Vector · Streams · JSON · TTL"),
+            Map.of("id", "10", "title", "Cache-Aside",
+                    "description", "Speed up data access with Redis cache — from 200ms to <1ms",
+                    "icon", "⚡", "features", "String · GET · SET EX · DEL"),
+            Map.of("id", "11", "title", "Transaction Monitoring",
+                    "description", "Live transaction metrics with Redis Time Series",
+                    "icon", "📈", "features", "Time Series · TS.ADD · TS.RANGE"),
+            Map.of("id", "12", "title", "ATM & Branch Finder",
+                    "description", "Find nearest ATMs and branches with Redis Geospatial",
+                    "icon", "📍", "features", "Geo · JSON · RQE · GEOSEARCH")
     );
 
     @GetMapping("/")

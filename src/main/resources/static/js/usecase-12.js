@@ -1,0 +1,212 @@
+/** UC12: ATM & Branch Finder — Redis Geospatial */
+(function () {
+    'use strict';
+
+    // --- State ---
+    var currentApproach = 'native';
+    var currentLat = 40.4168;
+    var currentLng = -3.7038;
+    var map, userMarker, radiusCircle;
+    var resultMarkers = [];
+
+    // --- DOM refs ---
+    var radiusSlider = document.getElementById('radiusSlider');
+    var radiusValue = document.getElementById('radiusValue');
+    var btnSearch = document.getElementById('btnSearch');
+    var commandBox = document.getElementById('commandBox');
+    var commandText = document.getElementById('commandText');
+    var resultsCount = document.getElementById('resultsCount');
+    var latencyBadge = document.getElementById('latencyBadge');
+    var resultsList = document.getElementById('resultsList');
+    var rqeFilters = document.getElementById('rqeFilters');
+    var filterType = document.getElementById('filterType');
+    var filterService = document.getElementById('filterService');
+
+    // --- Code tabs ---
+    document.querySelectorAll('.code-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            document.querySelectorAll('.code-tab').forEach(function (t) { t.classList.remove('active'); });
+            document.querySelectorAll('.code-tab-content').forEach(function (c) { c.classList.remove('active'); });
+            tab.classList.add('active');
+            var target = document.getElementById('tab-' + tab.getAttribute('data-tab'));
+            if (target) target.classList.add('active');
+        });
+    });
+
+    // --- Approach tabs ---
+    document.querySelectorAll('.geo-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            document.querySelectorAll('.geo-tab').forEach(function (t) { t.classList.remove('active'); });
+            tab.classList.add('active');
+            currentApproach = tab.getAttribute('data-approach');
+            rqeFilters.style.display = currentApproach === 'rqe' ? 'flex' : 'none';
+        });
+    });
+
+    // --- Preset locations ---
+    document.querySelectorAll('.geo-preset').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.geo-preset').forEach(function (b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            currentLat = parseFloat(btn.getAttribute('data-lat'));
+            currentLng = parseFloat(btn.getAttribute('data-lng'));
+            setUserLocation(currentLat, currentLng);
+        });
+    });
+
+    // --- Radius slider ---
+    radiusSlider.addEventListener('input', function () {
+        radiusValue.textContent = radiusSlider.value;
+        updateRadiusCircle();
+    });
+
+    // --- Initialize map ---
+    map = L.map('map').setView([currentLat, currentLng], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 18
+    }).addTo(map);
+
+    // Custom icons
+    var atmIcon = L.divIcon({
+        className: 'geo-marker-atm',
+        html: '<span style="font-size:22px">🏧</span>',
+        iconSize: [28, 28], iconAnchor: [14, 14]
+    });
+    var branchIcon = L.divIcon({
+        className: 'geo-marker-branch',
+        html: '<span style="font-size:22px">🏦</span>',
+        iconSize: [28, 28], iconAnchor: [14, 14]
+    });
+    var userIcon = L.divIcon({
+        className: 'geo-marker-user',
+        html: '<span style="font-size:26px">📍</span>',
+        iconSize: [28, 28], iconAnchor: [14, 28]
+    });
+
+    // Set initial user marker
+    setUserLocation(currentLat, currentLng);
+
+    // Click on map to set location
+    map.on('click', function (e) {
+        document.querySelectorAll('.geo-preset').forEach(function (b) { b.classList.remove('active'); });
+        currentLat = e.latlng.lat;
+        currentLng = e.latlng.lng;
+        setUserLocation(currentLat, currentLng);
+    });
+
+    function setUserLocation(lat, lng) {
+        if (userMarker) map.removeLayer(userMarker);
+        userMarker = L.marker([lat, lng], { icon: userIcon }).addTo(map);
+        userMarker.bindPopup('<strong>Your location</strong>').openPopup();
+        map.setView([lat, lng], 14);
+        updateRadiusCircle();
+    }
+
+    function updateRadiusCircle() {
+        var radius = parseFloat(radiusSlider.value) * 1000;
+        if (radiusCircle) map.removeLayer(radiusCircle);
+        radiusCircle = L.circle([currentLat, currentLng], {
+            radius: radius,
+            color: 'var(--redis-ink, #091A23)',
+            fillColor: '#DC382C',
+            fillOpacity: 0.08,
+            weight: 1.5,
+            dashArray: '6,4'
+        }).addTo(map);
+    }
+
+    // --- Search ---
+    btnSearch.addEventListener('click', doSearch);
+
+    function doSearch() {
+        var radius = parseFloat(radiusSlider.value);
+        var url;
+        if (currentApproach === 'native') {
+            url = '/api/geo/search/native?lng=' + currentLng + '&lat=' + currentLat + '&radius=' + radius;
+        } else {
+            url = '/api/geo/search/rqe?lng=' + currentLng + '&lat=' + currentLat + '&radius=' + radius;
+            if (filterType.value !== 'all') url += '&type=' + filterType.value;
+            if (filterService.value !== 'all') url += '&service=' + filterService.value;
+        }
+
+        btnSearch.disabled = true;
+        btnSearch.textContent = '⏳ Searching...';
+
+        fetch(url)
+            .then(function (r) { return r.json(); })
+            .then(function (data) { renderResults(data); })
+            .catch(function (err) { console.error(err); })
+            .finally(function () {
+                btnSearch.disabled = false;
+                btnSearch.textContent = '🔍 Search';
+            });
+    }
+
+    function renderResults(data) {
+        // Clear previous markers
+        resultMarkers.forEach(function (m) { map.removeLayer(m); });
+        resultMarkers = [];
+
+        // Show command
+        commandBox.style.display = 'block';
+        commandText.textContent = data.command || '';
+
+        // Show latency
+        latencyBadge.style.display = 'inline';
+        latencyBadge.textContent = data.latencyMs + ' ms';
+
+        var items = data.results || [];
+        resultsCount.textContent = items.length;
+
+        // Add markers
+        items.forEach(function (item) {
+            var icon = item.type === 'branch' ? branchIcon : atmIcon;
+            var marker = L.marker([item.lat, item.lng], { icon: icon }).addTo(map);
+            var services = Array.isArray(item.services) ? item.services.join(', ') : (item.services || '');
+            marker.bindPopup(
+                '<strong>' + (item.name || item.id) + '</strong><br/>' +
+                '<em>' + (item.type === 'branch' ? '🏦 Branch' : '🏧 ATM') + '</em><br/>' +
+                (item.address || '') + '<br/>' +
+                '📏 ' + item.distance + ' km<br/>' +
+                '🕐 ' + (item.hours || '') + '<br/>' +
+                '🔧 ' + services
+            );
+            resultMarkers.push(marker);
+        });
+
+        // Build results list
+        var html = '';
+        items.forEach(function (item) {
+            var typeLabel = item.type === 'branch' ? '🏦 Branch' : '🏧 ATM';
+            var services = Array.isArray(item.services) ? item.services : [];
+            var badges = services.map(function (s) {
+                return '<span class="geo-service-badge">' + s + '</span>';
+            }).join('');
+
+            html += '<div class="geo-result-item">' +
+                '<div class="geo-result-header">' +
+                '<span class="geo-result-name">' + typeLabel + ' ' + (item.name || item.id) + '</span>' +
+                '<span class="geo-result-distance">' + item.distance + ' km</span>' +
+                '</div>' +
+                '<div class="geo-result-address">' + (item.address || '') + '</div>' +
+                '<div class="geo-result-meta">' +
+                '<span>🕐 ' + (item.hours || '') + '</span>' +
+                '<span class="geo-result-services">' + badges + '</span>' +
+                '</div>' +
+                '</div>';
+        });
+
+        resultsList.innerHTML = html || '<div class="geo-no-results">No results found. Try increasing the radius.</div>';
+
+        // Fit map bounds
+        if (items.length > 0) {
+            var allPoints = [[currentLat, currentLng]];
+            items.forEach(function (item) { allPoints.push([item.lat, item.lng]); });
+            map.fitBounds(allPoints, { padding: [40, 40] });
+        }
+    }
+
+    // Auto-search on load
+    doSearch();
+})();
