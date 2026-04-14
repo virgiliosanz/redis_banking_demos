@@ -187,17 +187,28 @@
                         <h3>💬 Chat with AI Assistant</h3>
                         <div id="chat-messages" style="max-height:320px; overflow-y:auto; margin-bottom:8px; padding:8px; background:var(--bg-secondary); border-radius:var(--border-radius); min-height:120px;">
                             <div class="chat-welcome" style="color:var(--text-muted); font-style:italic; padding:16px 0; text-align:center;">
-                                Type a message below to start chatting. Try asking about transfers, accounts, or investments.
+                                Ask a question about EU banking regulations (PSD2, GDPR, DORA, MiFID II) or try one of the example prompts below.
                             </div>
                         </div>
                         <div style="display:flex; gap:8px; align-items:center;">
-                            <input type="text" id="chatInput" class="form-input" placeholder="Ask about transfers, accounts, loans..."
+                            <input type="text" id="chatInput" class="form-input" placeholder="Ask about PSD2, GDPR, DORA, MiFID II regulations..."
                                    style="flex:1;"/>
                             <button id="sendBtn" class="btn btn-primary">Send</button>
                             <span id="streaming-indicator" style="display:none; font-size:0.75rem; color:var(--redis-primary); font-family:var(--font-code); white-space:nowrap;">
                                 <span style="display:inline-block; width:8px; height:8px; background:var(--redis-primary); border-radius:50%; animation:uc9-pulse 1s infinite; vertical-align:middle; margin-right:4px;"></span>
                                 Streaming...
                             </span>
+                        </div>
+                        <div style="margin-top:8px;">
+                            <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px;">Try these questions:</label>
+                            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What are the key requirements of PSD2 for payment services?">💳 PSD2 requirements</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="Explain GDPR data protection rights for banking customers">🔒 GDPR rights</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="How does DORA affect operational resilience in financial institutions?">🛡️ DORA resilience</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What are the MiFID II reporting requirements for investment firms?">📊 MiFID II reporting</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What is strong customer authentication under PSD2?">🔐 SCA explained</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="How should banks handle ICT third-party risk under DORA?">🔗 Third-party risk</button>
+                            </div>
                         </div>
                     </div>
 

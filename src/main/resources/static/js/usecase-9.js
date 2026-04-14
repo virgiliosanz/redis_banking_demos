@@ -339,7 +339,7 @@
         resetBtn.textContent = 'Resetting...';
         window.workshopFetch('/api/assistant/reset', {}).then(function () {
             sessionId = 'sess-' + Math.random().toString(36).substring(2, 10);
-            chatMessages.innerHTML = '<div class="chat-welcome" style="color:var(--text-muted); font-style:italic; padding:16px 0; text-align:center;">Type a message below to start chatting. Try asking about transfers, accounts, or investments.</div>';
+            chatMessages.innerHTML = '<div class="chat-welcome" style="color:var(--text-muted); font-style:italic; padding:16px 0; text-align:center;">Ask a question about EU banking regulations (PSD2, GDPR, DORA, MiFID II) or try one of the example prompts below.</div>';
             shortTermInfo.innerHTML = '<span style="color:var(--text-muted);">No active conversation yet.</span>';
             memoryResults.innerHTML = '<span style="color:var(--text-muted);">No memories retrieved yet.</span>';
             ragResults.innerHTML = '<span style="color:var(--text-muted);">No documents retrieved yet.</span>';
@@ -348,6 +348,14 @@
             latencyDisplay.textContent = '';
             resetBtn.disabled = false;
             resetBtn.textContent = '🔄 Reset Demo';
+        });
+    });
+
+    // --- Example prompt buttons ---
+    document.querySelectorAll('.uc9-prompt').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            chatInput.value = btn.getAttribute('data-prompt');
+            sendMessage();
         });
     });
 
