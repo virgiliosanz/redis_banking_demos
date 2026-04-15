@@ -108,6 +108,15 @@ public class AssistantController {
     }
 
     /**
+     * Get semantic cache statistics.
+     * GET /api/assistant/cache/stats
+     */
+    @GetMapping("/cache/stats")
+    public ResponseEntity<Map<String, Object>> cacheStats() {
+        return ResponseEntity.ok(assistantService.getSemanticCacheStats());
+    }
+
+    /**
      * Reset all assistant data.
      * POST /api/assistant/reset
      */

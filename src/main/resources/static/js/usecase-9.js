@@ -26,6 +26,14 @@
     var streamingIndicator = document.getElementById('streaming-indicator');
     var sourcesPanel = document.getElementById('sourcesPanel');
     var sourcesContent = document.getElementById('sourcesContent');
+    var cacheStatusText = document.getElementById('cache-status-text');
+    var cacheIndicator = document.getElementById('cache-indicator');
+    var cacheBadge = document.getElementById('cache-badge');
+    var cacheLatencyEl = document.getElementById('cache-latency');
+    var cacheHitsEl = document.getElementById('cache-hits');
+    var cacheMissesEl = document.getElementById('cache-misses');
+    var cacheEntriesEl = document.getElementById('cache-entries');
+    var cacheHitRateEl = document.getElementById('cache-hit-rate');
 
     // --- Code Tabs ---
     window.initCodeTabs();
@@ -129,6 +137,40 @@
         ragResults.innerHTML = html;
     }
 
+    // --- Cache display ---
+    function showCacheBadge(isHit, latencyMs) {
+        if (!cacheIndicator || !cacheBadge) return;
+        cacheIndicator.style.display = '';
+        if (isHit) {
+            cacheBadge.textContent = '⚡ CACHE HIT';
+            cacheBadge.style.background = '#059669';
+            cacheBadge.style.color = '#fff';
+        } else {
+            cacheBadge.textContent = 'CACHE MISS';
+            cacheBadge.style.background = 'var(--bg-tertiary)';
+            cacheBadge.style.color = 'var(--text-muted)';
+        }
+        if (cacheLatencyEl && latencyMs !== undefined) {
+            cacheLatencyEl.textContent = latencyMs + 'ms';
+        }
+    }
+
+    function updateCacheStats() {
+        window.workshopGet('/api/assistant/cache/stats').then(function (data) {
+            if (!data) return;
+            if (cacheHitsEl) cacheHitsEl.textContent = data.hits || 0;
+            if (cacheMissesEl) cacheMissesEl.textContent = data.misses || 0;
+            if (cacheEntriesEl) cacheEntriesEl.textContent = data.cachedEntries || 0;
+            if (cacheHitRateEl) cacheHitRateEl.textContent = data.hitRate || 'N/A';
+            if (cacheStatusText) {
+                cacheStatusText.textContent = data.enabled
+                    ? '✅ Semantic cache active (threshold: ' + data.distanceThreshold + ')'
+                    : '⚠️ Disabled (no OpenAI key)';
+                cacheStatusText.style.color = data.enabled ? '#059669' : '#d97706';
+            }
+        }).catch(function () {});
+    }
+
     // --- Input control ---
     function setInputEnabled(enabled) {
         chatInput.disabled = !enabled;
@@ -227,6 +269,11 @@
                 var sources = JSON.parse(e.data);
                 displaySources(sources);
 
+                // Show cache badge from sources event
+                if (sources.semanticCacheHit !== undefined) {
+                    showCacheBadge(sources.semanticCacheHit);
+                }
+
                 // Update the memory inspection panels with source data
                 if (sources.memories) updateMemoryResults(sources.memories);
                 if (sources.kbDocs) updateRagResults(sources.kbDocs);
@@ -254,10 +301,14 @@
             hideStreamingIndicator();
             setInputEnabled(true);
             updateShortTermMemory();
+            updateCacheStats();
             try {
                 var meta = JSON.parse(e.data);
                 if (meta.latencyMs) {
                     latencyDisplay.textContent = '⏱ Total latency: ' + meta.latencyMs + 'ms';
+                }
+                if (meta.semanticCacheHit !== undefined) {
+                    showCacheBadge(meta.semanticCacheHit, meta.latencyMs);
                 }
             } catch (err) { /* ignore */ }
         });
@@ -326,6 +377,12 @@
                 console.warn('Could not render inline sources:', e);
             }
 
+            // Semantic cache indicator
+            if (data.semanticCacheEnabled) {
+                showCacheBadge(data.semanticCacheHit, data.cacheLatencyMs);
+            }
+            updateCacheStats();
+
             if (data.redisCommands) {
                 commandsCard.style.display = '';
                 commandsOutput.textContent = data.redisCommands.join('\n');
@@ -371,9 +428,11 @@
             ragResults.innerHTML = '<span style="color:var(--text-muted);">No documents retrieved yet.</span>';
             commandsCard.style.display = 'none';
             if (sourcesPanel) sourcesPanel.style.display = 'none';
+            if (cacheIndicator) cacheIndicator.style.display = 'none';
             latencyDisplay.textContent = '';
             resetBtn.disabled = false;
             resetBtn.textContent = '🔄 Reset Demo';
+            updateCacheStats();
         });
     });
 
@@ -400,6 +459,9 @@
         apiStatusText.innerHTML = '⚠️ Mock Mode';
         apiStatusText.style.color = '#d97706';
     });
+
+    // Fetch initial cache stats
+    updateCacheStats();
 
     // Focus input on load
     chatInput.focus();

@@ -226,6 +226,24 @@
                         </div>
                     </div>
 
+                    <!-- Semantic Cache Panel -->
+                    <div class="data-card" id="cache-panel" style="margin-top:16px;">
+                        <h3>⚡ Semantic Cache</h3>
+                        <div id="cache-status" style="margin-bottom:8px;">
+                            <span id="cache-status-text" style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted);">Checking cache status...</span>
+                        </div>
+                        <div id="cache-indicator" style="display:none; margin-bottom:8px;">
+                            <span id="cache-badge" style="display:inline-block; padding:4px 12px; border-radius:var(--border-radius); font-family:var(--font-code); font-size:0.75rem; font-weight:700;"></span>
+                            <span id="cache-latency" style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted); margin-left:8px;"></span>
+                        </div>
+                        <div id="cache-stats" style="font-size:0.8rem;">
+                            <div class="data-row"><span class="data-label">Hits</span><span class="data-value" id="cache-hits">0</span></div>
+                            <div class="data-row"><span class="data-label">Misses</span><span class="data-value" id="cache-misses">0</span></div>
+                            <div class="data-row"><span class="data-label">Cached Entries</span><span class="data-value" id="cache-entries">0</span></div>
+                            <div class="data-row"><span class="data-label">Hit Rate</span><span class="data-value" id="cache-hit-rate" style="color:var(--redis-primary); font-weight:600;">N/A</span></div>
+                        </div>
+                    </div>
+
                     <!-- Memory Inspection Panel -->
                     <div class="data-card" style="margin-top:16px;">
                         <h3>🔍 Memory Inspection</h3>
@@ -349,13 +367,36 @@ conn.hashCommands().hSet(
 //   RETURN 3 title content tags
 //   DIALECT 2
 
-// 6. Complete flow
-// a) HGETALL conversation (short-term)
-// b) FT.SEARCH memories (long-term)
-// c) FT.SEARCH knowledge base (RAG)
-// d) Generate response (mock LLM)
-// e) HSET conversation with new messages
-// f) EXPIRE to refresh TTL</code></pre>
+// 6. Semantic Cache — avoid redundant LLM calls
+// Create cache index
+// FT.CREATE idx:assistant_cache
+//   ON HASH PREFIX 1 workshop:assistant:cache:
+//   SCHEMA question TEXT
+//     vector VECTOR HNSW 6
+//       TYPE FLOAT32 DIM 1536
+//       DISTANCE_METRIC COSINE
+
+// Check cache before calling LLM
+// FT.SEARCH idx:assistant_cache
+//   "*=&gt;[KNN 1 @vector $BLOB]"
+//   PARAMS 2 BLOB &lt;question_embedding&gt;
+//   DIALECT 2
+// If distance &lt; 0.15 → CACHE HIT (instant!)
+
+// Store in cache after LLM response
+String cacheKey = "workshop:assistant:cache:" + id;
+redis.opsForHash().putAll(cacheKey, Map.of(
+    "question", userMessage,
+    "response", llmResponse
+));
+storeVectorField(cacheKey, embedding);
+redis.expire(cacheKey, 600, TimeUnit.SECONDS);
+
+// 7. Complete flow
+// a) FT.SEARCH cache (semantic cache check)
+// b) If MISS: FT.SEARCH memories + KB + LLM
+// c) HSET cache entry + EXPIRE 600s
+// d) HSET conversation + EXPIRE TTL</code></pre>
                     </div>
 
                     <div class="code-block active" id="tab-cli">
@@ -419,10 +460,34 @@ FT.SEARCH idx:assistant_kb \
   RETURN 3 title content tags \
   DIALECT 2
 
+# 7. Semantic Cache — skip LLM for similar questions
+FT.CREATE idx:assistant_cache \
+  ON HASH PREFIX 1 workshop:assistant:cache: \
+  SCHEMA \
+    question TEXT \
+    vector VECTOR HNSW 6 \
+      TYPE FLOAT32 DIM 1536 \
+      DISTANCE_METRIC COSINE
+
+# Check cache before calling LLM (KNN k=1)
+FT.SEARCH idx:assistant_cache \
+  "*=&gt;[KNN 1 @vector $BLOB]" \
+  PARAMS 2 BLOB "&lt;question_embedding&gt;" \
+  DIALECT 2
+# If distance &lt; 0.15 → return cached response!
+
+# Store in cache after LLM response
+HSET workshop:assistant:cache:cache-abc123 \
+  question "What is PSD2?" \
+  response "PSD2 is the Payment Services Directive..." \
+  vector "&lt;1536-dim FLOAT32 blob&gt;"
+EXPIRE workshop:assistant:cache:cache-abc123 600
+
 # Memory patterns summary:
 # SHORT-TERM: Hash + TTL (10 min window)
 # LONG-TERM:  Hash + Vector (KNN search)
 # RAG:        Hash + Vector (KNN search)
+# CACHE:      Hash + Vector (semantic dedup)
 # All served from Redis in &lt; 5ms total</code></pre>
                     </div>
                 </div>

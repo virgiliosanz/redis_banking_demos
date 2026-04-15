@@ -26,11 +26,19 @@ public class AssistantService {
     private static final String CONV_PREFIX = "workshop:assistant:conversation:";
     private static final String MEMORY_PREFIX = "workshop:assistant:memory:";
     private static final String KB_PREFIX = "workshop:assistant:kb:";
+    private static final String CACHE_PREFIX = "workshop:assistant:cache:";
     private static final String MEMORY_INDEX = "idx:assistant_memory";
     private static final String KB_INDEX = "idx:assistant_kb";
+    private static final String CACHE_INDEX = "idx:assistant_cache";
     private static final int VECTOR_DIM = 1536;
     private static final long CONV_TTL_SECONDS = 600;
+    private static final long CACHE_TTL_SECONDS = 600;
+    private static final double CACHE_DISTANCE_THRESHOLD = 0.15;
     private static final int MAX_MESSAGES = 20;
+
+    // Semantic cache stats
+    private final java.util.concurrent.atomic.AtomicLong cacheHits = new java.util.concurrent.atomic.AtomicLong(0);
+    private final java.util.concurrent.atomic.AtomicLong cacheMisses = new java.util.concurrent.atomic.AtomicLong(0);
 
     private final StringRedisTemplate redis;
     private final OpenAiService openAiService;
@@ -178,11 +186,14 @@ public class AssistantService {
         // Drop + recreate indexes via RedisCallback
         dropIndex(MEMORY_INDEX);
         dropIndex(KB_INDEX);
+        dropIndex(CACHE_INDEX);
 
         createVectorIndex(MEMORY_INDEX, MEMORY_PREFIX,
                 "summary TEXT tags TAG SEPARATOR , date TEXT");
         createVectorIndex(KB_INDEX, KB_PREFIX,
                 "title TEXT content TEXT tags TAG SEPARATOR ,");
+        createVectorIndex(CACHE_INDEX, CACHE_PREFIX,
+                "question TEXT");
     }
 
     private void dropIndex(String indexName) {
@@ -257,30 +268,51 @@ public class AssistantService {
                     messageHistory.size() - MAX_MESSAGES, messageHistory.size()));
         }
 
-        // 3-5. Retrieve context and generate response
+        // 3-5. Check semantic cache first, then retrieve context and generate response
         List<Map<String, String>> relevantMemories;
         List<Map<String, String>> relevantDocs;
         String responseText;
+        boolean semanticCacheHit = false;
+        long cacheCheckStart = System.currentTimeMillis();
 
         if (openAiService.isConfigured()) {
-            // Real vector search + convert results for response format
-            List<Map<String, Object>> memResults = vectorSearch(MEMORY_INDEX, userMessage, 3);
-            relevantMemories = new ArrayList<>();
-            for (var m : memResults) {
-                Map<String, String> flat = new LinkedHashMap<>();
-                m.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
-                relevantMemories.add(flat);
+            // Check semantic cache
+            Map<String, String> cached = checkSemanticCache(userMessage);
+            long cacheLatencyMs = System.currentTimeMillis() - cacheCheckStart;
+
+            if (cached != null) {
+                // Cache HIT
+                semanticCacheHit = true;
+                cacheHits.incrementAndGet();
+                responseText = cached.get("response");
+                relevantMemories = List.of();
+                relevantDocs = List.of();
+                log.info("UC9: Semantic cache HIT for question: {}", userMessage);
+            } else {
+                // Cache MISS — do full vector search + generate response
+                cacheMisses.incrementAndGet();
+                List<Map<String, Object>> memResults = vectorSearch(MEMORY_INDEX, userMessage, 3);
+                relevantMemories = new ArrayList<>();
+                for (var m : memResults) {
+                    Map<String, String> flat = new LinkedHashMap<>();
+                    m.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
+                    relevantMemories.add(flat);
+                }
+                List<Map<String, Object>> kbResults = vectorSearch(KB_INDEX, userMessage, 3);
+                relevantDocs = new ArrayList<>();
+                for (var d : kbResults) {
+                    Map<String, String> flat = new LinkedHashMap<>();
+                    d.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
+                    relevantDocs.add(flat);
+                }
+                responseText = generateResponse(userMessage, relevantMemories, relevantDocs);
+
+                // Store in cache
+                storeInSemanticCache(userMessage, responseText);
+                log.info("UC9: Semantic cache MISS — stored response for: {}", userMessage);
             }
-            List<Map<String, Object>> kbResults = vectorSearch(KB_INDEX, userMessage, 3);
-            relevantDocs = new ArrayList<>();
-            for (var d : kbResults) {
-                Map<String, String> flat = new LinkedHashMap<>();
-                d.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
-                relevantDocs.add(flat);
-            }
-            responseText = generateResponse(userMessage, relevantMemories, relevantDocs);
         } else {
-            // Keyword-based mock fallback
+            // Mock mode — skip semantic caching
             relevantMemories = findRelevantMemories(userMessage);
             relevantDocs = findRelevantKBDocs(userMessage);
             responseText = generateResponse(userMessage, relevantMemories, relevantDocs);
@@ -320,14 +352,29 @@ public class AssistantService {
         result.put("kbDocsRetrieved", relevantDocs);
         result.put("conversationLength", messageHistory.size());
         result.put("latencyMs", latencyMs);
-        result.put("redisCommands", List.of(
+        result.put("semanticCacheHit", semanticCacheHit);
+        result.put("semanticCacheEnabled", openAiService.isConfigured());
+        result.put("cacheLatencyMs", System.currentTimeMillis() - cacheCheckStart);
+
+        List<String> cmds = new ArrayList<>(List.of(
                 "HGETALL " + convKey,
                 "HSET " + convKey + " messages <JSON array>",
                 "HSET " + convKey + " last_active " + Instant.now(),
-                "EXPIRE " + convKey + " " + CONV_TTL_SECONDS,
-                "FT.SEARCH " + MEMORY_INDEX + " \"*=>[KNN 3 @vector $BLOB]\"",
-                "FT.SEARCH " + KB_INDEX + " \"*=>[KNN 3 @vector $BLOB]\""
+                "EXPIRE " + convKey + " " + CONV_TTL_SECONDS
         ));
+        if (openAiService.isConfigured()) {
+            cmds.add("FT.SEARCH " + CACHE_INDEX + " \"*=>[KNN 1 @vector $BLOB]\" — semantic cache lookup");
+            if (!semanticCacheHit) {
+                cmds.add("FT.SEARCH " + MEMORY_INDEX + " \"*=>[KNN 3 @vector $BLOB]\"");
+                cmds.add("FT.SEARCH " + KB_INDEX + " \"*=>[KNN 3 @vector $BLOB]\"");
+                cmds.add("HSET " + CACHE_PREFIX + "<id> question <q> response <r> vector <bytes>");
+                cmds.add("EXPIRE " + CACHE_PREFIX + "<id> " + CACHE_TTL_SECONDS);
+            }
+        } else {
+            cmds.add("FT.SEARCH " + MEMORY_INDEX + " (keyword fallback)");
+            cmds.add("FT.SEARCH " + KB_INDEX + " (keyword fallback)");
+        }
+        result.put("redisCommands", cmds);
         return result;
     }
 
@@ -429,34 +476,77 @@ public class AssistantService {
                     messageHistory.size() - MAX_MESSAGES, messageHistory.size()));
         }
 
-        // 3. Vector search for relevant context
-        List<Map<String, Object>> relevantMemories = vectorSearch(MEMORY_INDEX, userMessage, 3);
-        List<Map<String, Object>> relevantDocs = vectorSearch(KB_INDEX, userMessage, 3);
+        // 3. Check semantic cache first
+        boolean semanticCacheHit = false;
+        Map<String, String> cached = checkSemanticCache(userMessage);
+        String responseText;
 
-        // 4. Send "sources" event before streaming starts
-        try {
-            Map<String, Object> sourcesData = new LinkedHashMap<>();
-            sourcesData.put("memories", relevantMemories);
-            sourcesData.put("kbDocs", relevantDocs);
-            sourcesData.put("redisCommands", List.of(
-                    "FT.SEARCH " + MEMORY_INDEX + " \"*=>[KNN 3 @vector $BLOB]\" PARAMS 2 BLOB <query_embedding> DIALECT 2",
-                    "FT.SEARCH " + KB_INDEX + " \"*=>[KNN 3 @vector $BLOB]\" PARAMS 2 BLOB <query_embedding> DIALECT 2"
-            ));
-            emitter.send(SseEmitter.event().name("sources").data(objectMapper.writeValueAsString(sourcesData)));
-        } catch (Exception e) {
-            log.error("Failed to send sources event", e);
+        if (cached != null) {
+            // Cache HIT — return cached response directly (no streaming needed)
+            semanticCacheHit = true;
+            cacheHits.incrementAndGet();
+            responseText = cached.get("response");
+            log.info("UC9 Stream: Semantic cache HIT for: {}", userMessage);
+
+            // Send cache-hit event with sources
+            try {
+                Map<String, Object> sourcesData = new LinkedHashMap<>();
+                sourcesData.put("memories", List.of());
+                sourcesData.put("kbDocs", List.of());
+                sourcesData.put("semanticCacheHit", true);
+                sourcesData.put("redisCommands", List.of(
+                        "FT.SEARCH " + CACHE_INDEX + " \"*=>[KNN 1 @vector $BLOB]\" — CACHE HIT"
+                ));
+                emitter.send(SseEmitter.event().name("sources").data(objectMapper.writeValueAsString(sourcesData)));
+            } catch (Exception e) {
+                log.error("Failed to send sources event", e);
+            }
+
+            // Send cached response as a single token
+            try {
+                String tokenJson = objectMapper.writeValueAsString(Map.of("content", responseText));
+                emitter.send(SseEmitter.event().name("token").data(tokenJson));
+            } catch (Exception e) {
+                log.error("Failed to send cached response", e);
+            }
+        } else {
+            // Cache MISS — do full vector search + streaming
+            cacheMisses.incrementAndGet();
+
+            List<Map<String, Object>> relevantMemories = vectorSearch(MEMORY_INDEX, userMessage, 3);
+            List<Map<String, Object>> relevantDocs = vectorSearch(KB_INDEX, userMessage, 3);
+
+            // Send "sources" event before streaming starts
+            try {
+                Map<String, Object> sourcesData = new LinkedHashMap<>();
+                sourcesData.put("memories", relevantMemories);
+                sourcesData.put("kbDocs", relevantDocs);
+                sourcesData.put("semanticCacheHit", false);
+                sourcesData.put("redisCommands", List.of(
+                        "FT.SEARCH " + CACHE_INDEX + " \"*=>[KNN 1 @vector $BLOB]\" — CACHE MISS",
+                        "FT.SEARCH " + MEMORY_INDEX + " \"*=>[KNN 3 @vector $BLOB]\" PARAMS 2 BLOB <query_embedding> DIALECT 2",
+                        "FT.SEARCH " + KB_INDEX + " \"*=>[KNN 3 @vector $BLOB]\" PARAMS 2 BLOB <query_embedding> DIALECT 2"
+                ));
+                emitter.send(SseEmitter.event().name("sources").data(objectMapper.writeValueAsString(sourcesData)));
+            } catch (Exception e) {
+                log.error("Failed to send sources event", e);
+            }
+
+            // Build OpenAI messages
+            String systemPrompt = buildSystemPrompt(relevantMemories, relevantDocs);
+            List<Map<String, String>> openAiMessages = new ArrayList<>();
+            openAiMessages.add(Map.of("role", "system", "content", systemPrompt));
+            for (var msg : messageHistory) {
+                openAiMessages.add(Map.of("role", msg.get("role"), "content", msg.get("content")));
+            }
+
+            // Stream OpenAI response
+            responseText = openAiService.streamChatCompletion(openAiMessages, emitter);
+
+            // Store in cache
+            storeInSemanticCache(userMessage, responseText);
+            log.info("UC9 Stream: Semantic cache MISS — stored response for: {}", userMessage);
         }
-
-        // 5. Build OpenAI messages
-        String systemPrompt = buildSystemPrompt(relevantMemories, relevantDocs);
-        List<Map<String, String>> openAiMessages = new ArrayList<>();
-        openAiMessages.add(Map.of("role", "system", "content", systemPrompt));
-        for (var msg : messageHistory) {
-            openAiMessages.add(Map.of("role", msg.get("role"), "content", msg.get("content")));
-        }
-
-        // 6. Stream OpenAI response
-        String responseText = openAiService.streamChatCompletion(openAiMessages, emitter);
 
         // 7. Save assistant message to conversation
         Map<String, String> assistantMsg = new LinkedHashMap<>();
@@ -486,6 +576,8 @@ public class AssistantService {
             doneData.put("conversationLength", messageHistory.size());
             doneData.put("latencyMs", latencyMs);
             doneData.put("sessionId", sessionId);
+            doneData.put("semanticCacheHit", semanticCacheHit);
+            doneData.put("semanticCacheEnabled", true);
             emitter.send(SseEmitter.event().name("done").data(objectMapper.writeValueAsString(doneData)));
             emitter.complete();
         } catch (Exception e) {
@@ -616,15 +708,102 @@ public class AssistantService {
         return "I understand you're asking about \"" + query + "\". Let me look into that for you. Could you provide more details? You can ask about transfers, accounts, investments, loans, cards, insurance, or regulations.";
     }
 
+    // ── Semantic Cache ────────────────────────────────────────────────
+    /**
+     * Check semantic cache: KNN search for similar question.
+     * Returns cached response map if distance < threshold, null otherwise.
+     */
+    private Map<String, String> checkSemanticCache(String question) {
+        if (!openAiService.isConfigured()) return null;
+        try {
+            float[] queryVector = openAiService.getEmbedding(question);
+            byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
+
+            String knnQuery = "*=>[KNN 1 @vector $BLOB]";
+            byte[][] binaryArgs = new byte[][] {
+                    knnQuery.getBytes(),
+                    "PARAMS".getBytes(),
+                    "2".getBytes(),
+                    "BLOB".getBytes(),
+                    vectorBytes,
+                    "DIALECT".getBytes(),
+                    "2".getBytes()
+            };
+
+            List<Object> rawResult = redisSearchHelper.ftSearchWithBinaryArgs(CACHE_INDEX, binaryArgs);
+            List<Map<String, String>> parsed = redisSearchHelper.parseSearchResults(rawResult);
+
+            if (!parsed.isEmpty()) {
+                Map<String, String> topResult = parsed.get(0);
+                String scoreStr = topResult.getOrDefault("__vector_score", "1.0");
+                double distance = Double.parseDouble(scoreStr);
+                log.debug("UC9 Cache: top result distance={} threshold={}", distance, CACHE_DISTANCE_THRESHOLD);
+                if (distance < CACHE_DISTANCE_THRESHOLD) {
+                    return topResult;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("UC9: Semantic cache lookup failed: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Store question + response in semantic cache with vector and TTL.
+     */
+    private void storeInSemanticCache(String question, String response) {
+        if (!openAiService.isConfigured()) return;
+        try {
+            String cacheId = "cache-" + UUID.randomUUID().toString().substring(0, 8);
+            String key = CACHE_PREFIX + cacheId;
+
+            float[] embedding = openAiService.getEmbedding(question);
+
+            Map<String, String> hash = new LinkedHashMap<>();
+            hash.put("question", question);
+            hash.put("response", response);
+            redis.opsForHash().putAll(key, hash);
+            storeVectorField(key, embedding);
+            redis.expire(key, CACHE_TTL_SECONDS, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("UC9: Failed to store in semantic cache: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Get semantic cache statistics.
+     */
+    public Map<String, Object> getSemanticCacheStats() {
+        Map<String, Object> stats = new LinkedHashMap<>();
+        stats.put("enabled", openAiService.isConfigured());
+        stats.put("hits", cacheHits.get());
+        stats.put("misses", cacheMisses.get());
+        stats.put("distanceThreshold", CACHE_DISTANCE_THRESHOLD);
+        stats.put("ttlSeconds", CACHE_TTL_SECONDS);
+
+        // Count cached entries
+        Set<String> cacheKeys = redis.keys(CACHE_PREFIX + "*");
+        stats.put("cachedEntries", cacheKeys != null ? cacheKeys.size() : 0);
+
+        long total = cacheHits.get() + cacheMisses.get();
+        stats.put("hitRate", total > 0 ? String.format("%.1f%%", (cacheHits.get() * 100.0) / total) : "N/A");
+        return stats;
+    }
+
     // ── Reset ───────────────────────────────────────────────────────────
     public void reset() {
-        // Clean up conversation keys
+        // Clean up all keys
         Set<String> convKeys = redis.keys(CONV_PREFIX + "*");
         if (convKeys != null && !convKeys.isEmpty()) redis.delete(convKeys);
         Set<String> memKeys = redis.keys(MEMORY_PREFIX + "*");
         if (memKeys != null && !memKeys.isEmpty()) redis.delete(memKeys);
         Set<String> kbKeys = redis.keys(KB_PREFIX + "*");
         if (kbKeys != null && !kbKeys.isEmpty()) redis.delete(kbKeys);
+        Set<String> cacheKeys = redis.keys(CACHE_PREFIX + "*");
+        if (cacheKeys != null && !cacheKeys.isEmpty()) redis.delete(cacheKeys);
+        // Reset cache stats
+        cacheHits.set(0);
+        cacheMisses.set(0);
         // Reload data
         init();
     }
