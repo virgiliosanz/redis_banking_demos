@@ -23,8 +23,8 @@
     window.initCodeTabs();
 
     // --- Product type icons ---
-    var typeIcons = {
-        'Mortgage': '🏠', 'Savings': '💰', 'Credit Card': '💳', 'Business': '🏢'
+    var typeLabels = {
+        'Mortgage': 'MTG', 'Savings': 'SAV', 'Credit Card': 'CC', 'Business': 'BIZ'
     };
 
     // --- Load products ---
@@ -37,7 +37,7 @@
                     var card = document.createElement('div');
                     card.className = 'cache-product-card';
                     card.setAttribute('data-id', p.id);
-                    card.innerHTML = '<span class="cache-card-icon">' + (typeIcons[p.type] || '📦') + '</span>' +
+                    card.innerHTML = '<span class="cache-card-icon">' + (typeLabels[p.type] || 'PKG') + '</span>' +
                         '<span class="cache-card-name">' + p.name + '</span>' +
                         '<span class="cache-card-type">' + p.type + '</span>';
                     card.addEventListener('click', function () { selectProduct(p.id); });
@@ -64,14 +64,14 @@
             .then(function (data) {
                 if (data.error) {
                     cacheStatus.className = 'cache-status-badge cache-miss';
-                    cacheStatus.textContent = '❌ ' + data.error;
+                    cacheStatus.textContent = data.error;
                     resultData.innerHTML = '';
                     resultBox.style.display = 'block';
                     return;
                 }
                 var isHit = data.cacheHit;
                 cacheStatus.className = 'cache-status-badge ' + (isHit ? 'cache-hit' : 'cache-miss');
-                cacheStatus.innerHTML = (isHit ? '⚡ CACHE HIT' : '🗄️ CACHE MISS') +
+                cacheStatus.innerHTML = (isHit ? 'CACHE HIT' : 'CACHE MISS') +
                     ' — <strong>' + data.latencyMs + 'ms</strong> from ' + data.source;
 
                 var html = '';
@@ -88,7 +88,7 @@
             })
             .catch(function (err) {
                 cacheStatus.className = 'cache-status-badge cache-miss';
-                cacheStatus.textContent = '⚠️ Error: ' + err.message;
+                cacheStatus.textContent = 'Error: ' + err.message;
             })
             .finally(function () { btnFetch.disabled = false; });
     }

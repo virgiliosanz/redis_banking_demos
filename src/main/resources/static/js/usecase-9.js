@@ -118,7 +118,7 @@
         var html = '';
         memories.forEach(function (mem) {
             html += '<div style="padding:6px 0; border-bottom:1px solid var(--border-color);">';
-            html += '<div style="font-weight:600; font-size:0.8rem;">🧠 ' + escapeHtml(mem.summary) + '</div>';
+            html += '<div style="font-weight:600; font-size:0.8rem;">' + escapeHtml(mem.summary) + '</div>';
             html += '<div style="color:var(--text-muted); font-size:0.7rem;">' + escapeHtml(mem.date) + ' — Tags: ' + escapeHtml(mem.tags) + '</div>';
             html += '</div>';
         });
@@ -133,7 +133,7 @@
         var html = '';
         docs.forEach(function (doc) {
             html += '<div style="padding:6px 0; border-bottom:1px solid var(--border-color);">';
-            html += '<div style="font-weight:600; font-size:0.8rem;">📄 ' + escapeHtml(doc.title) + '</div>';
+            html += '<div style="font-weight:600; font-size:0.8rem;">' + escapeHtml(doc.title) + '</div>';
             html += '<div style="color:var(--text-muted); font-size:0.7rem;">Tags: ' + escapeHtml(doc.tags) + '</div>';
             html += '</div>';
         });
@@ -145,7 +145,7 @@
         if (!cacheIndicator || !cacheBadge) return;
         cacheIndicator.style.display = '';
         if (isHit) {
-            cacheBadge.textContent = '⚡ CACHE HIT';
+            cacheBadge.textContent = 'CACHE HIT';
             cacheBadge.style.background = '#059669';
             cacheBadge.style.color = '#fff';
         } else {
@@ -174,8 +174,8 @@
             if (cacheCostSavedEl) cacheCostSavedEl.textContent = data.estimatedCostSavedUsd || '$0.0000';
             if (cacheStatusText) {
                 cacheStatusText.textContent = data.enabled
-                    ? '✅ Semantic cache active (threshold: ' + data.distanceThreshold + ')'
-                    : '⚠️ Disabled (no OpenAI key)';
+                    ? 'Semantic cache active (threshold: ' + data.distanceThreshold + ')'
+                    : 'Disabled (no OpenAI key)';
                 cacheStatusText.style.color = data.enabled ? '#059669' : '#d97706';
             }
         }).catch(function () {});
@@ -211,7 +211,7 @@
 
         // Knowledge Base Documents
         if (sources.kbDocs && sources.kbDocs.length > 0) {
-            html += '<div class="uc9-sources-section"><h5>📄 Knowledge Base Documents</h5>';
+            html += '<div class="uc9-sources-section"><h5>Knowledge Base Documents</h5>';
             sources.kbDocs.forEach(function (doc) {
                 html += '<div class="uc9-source-item">';
                 html += '<span class="uc9-source-key">' + escapeHtml(doc.redisKey || '') + '</span>';
@@ -224,7 +224,7 @@
 
         // Memories
         if (sources.memories && sources.memories.length > 0) {
-            html += '<div class="uc9-sources-section"><h5>🧠 Relevant Memories</h5>';
+            html += '<div class="uc9-sources-section"><h5>Relevant Memories</h5>';
             sources.memories.forEach(function (mem) {
                 html += '<div class="uc9-source-item">';
                 html += '<span class="uc9-source-key">' + escapeHtml(mem.redisKey || '') + '</span>';
@@ -237,7 +237,7 @@
 
         // Redis Commands
         if (sources.redisCommands && sources.redisCommands.length > 0) {
-            html += '<div class="uc9-sources-section"><h5>⚡ Redis Commands Used</h5>';
+            html += '<div class="uc9-sources-section"><h5>Redis Commands Used</h5>';
             sources.redisCommands.forEach(function (cmd) {
                 html += '<code class="uc9-redis-cmd">' + escapeHtml(cmd) + '</code>';
             });
@@ -315,7 +315,7 @@
             try {
                 var meta = JSON.parse(e.data);
                 if (meta.latencyMs) {
-                    latencyDisplay.textContent = '⏱ Total latency: ' + meta.latencyMs + 'ms';
+                    latencyDisplay.textContent = 'Total latency: ' + meta.latencyMs + 'ms';
                 }
                 if (meta.semanticCacheHit !== undefined) {
                     showCacheBadge(meta.semanticCacheHit, meta.latencyMs, meta.tokensSaved);
@@ -328,7 +328,7 @@
             removeTypingIndicator();
             hideStreamingIndicator();
             if (!fullResponse) {
-                msgDiv.innerHTML = '<span style="color:var(--redis-primary);">⚠️ Error connecting to AI service. Check your OpenAI API key or try again.</span>';
+                msgDiv.innerHTML = '<span style="color:var(--redis-primary);">Error connecting to AI service. Check your OpenAI API key or try again.</span>';
             }
             // Update short-term memory even on error (conversation may have been saved server-side)
             updateShortTermMemory();
@@ -367,15 +367,15 @@
                 if ((data.memoriesRetrieved && data.memoriesRetrieved.length > 0) ||
                     (data.kbDocsRetrieved && data.kbDocsRetrieved.length > 0)) {
                     var sourcesHtml = '<div style="margin-top:8px; padding:8px 12px; background:var(--bg-secondary); border-radius:var(--border-radius); border:1px solid var(--border-color); font-size:0.75rem;">';
-                    sourcesHtml += '<div style="font-weight:600; color:var(--redis-primary); margin-bottom:4px;">📚 Context used (Redis Vector Search):</div>';
+                    sourcesHtml += '<div style="font-weight:600; color:var(--redis-primary); margin-bottom:4px;">Context used (Redis Vector Search):</div>';
                     if (data.kbDocsRetrieved && data.kbDocsRetrieved.length > 0) {
                         data.kbDocsRetrieved.forEach(function(doc) {
-                            sourcesHtml += '<div style="color:var(--text-muted);">📄 ' + escapeHtml(doc.title || doc.id || '') + '</div>';
+                            sourcesHtml += '<div style="color:var(--text-muted);">' + escapeHtml(doc.title || doc.id || '') + '</div>';
                         });
                     }
                     if (data.memoriesRetrieved && data.memoriesRetrieved.length > 0) {
                         data.memoriesRetrieved.forEach(function(mem) {
-                            sourcesHtml += '<div style="color:var(--text-muted);">🧠 ' + escapeHtml(mem.summary || mem.id || '') + '</div>';
+                            sourcesHtml += '<div style="color:var(--text-muted);">' + escapeHtml(mem.summary || mem.id || '') + '</div>';
                         });
                     }
                     sourcesHtml += '</div>';
@@ -398,7 +398,7 @@
                 commandsOutput.textContent = data.redisCommands.join('\n');
             }
             if (data.latencyMs !== undefined) {
-                latencyDisplay.textContent = '⏱ Total latency: ' + data.latencyMs + 'ms';
+                latencyDisplay.textContent = 'Total latency: ' + data.latencyMs + 'ms';
             }
         }).catch(function (err) {
             console.error('UC9 chat error:', err);
@@ -441,7 +441,7 @@
             if (cacheIndicator) cacheIndicator.style.display = 'none';
             latencyDisplay.textContent = '';
             resetBtn.disabled = false;
-            resetBtn.textContent = '🔄 Reset Demo';
+            resetBtn.textContent = 'Reset Demo';
             updateCacheStats();
         });
     });
@@ -458,15 +458,15 @@
     window.workshopGet('/api/assistant/status').then(function (data) {
         openaiConfigured = !!(data && data.openaiConfigured);
         if (openaiConfigured) {
-            apiStatusText.innerHTML = '✅ OpenAI Connected';
+            apiStatusText.innerHTML = 'OpenAI Connected';
             apiStatusText.style.color = '#059669';
         } else {
-            apiStatusText.innerHTML = '⚠️ Mock Mode <span style="font-weight:400;">(set OPENAI_API_KEY for real AI)</span>';
+            apiStatusText.innerHTML = 'Mock Mode <span style="font-weight:400;">(set OPENAI_API_KEY for real AI)</span>';
             apiStatusText.style.color = '#d97706';
         }
     }).catch(function () {
         openaiConfigured = false;
-        apiStatusText.innerHTML = '⚠️ Mock Mode';
+        apiStatusText.innerHTML = 'Mock Mode';
         apiStatusText.style.color = '#d97706';
     });
 

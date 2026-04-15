@@ -92,17 +92,17 @@
     // Custom icons
     var atmIcon = L.divIcon({
         className: 'geo-marker-atm',
-        html: '<span style="font-size:22px">🏧</span>',
+        html: '<span style="font-size:11px; font-weight:700; background:#FF4438; color:#fff; padding:3px 5px; border-radius:4px; line-height:1;">ATM</span>',
         iconSize: [28, 28], iconAnchor: [14, 14]
     });
     var branchIcon = L.divIcon({
         className: 'geo-marker-branch',
-        html: '<span style="font-size:22px">🏦</span>',
+        html: '<span style="font-size:11px; font-weight:700; background:#091A23; color:#fff; padding:3px 5px; border-radius:4px; line-height:1;">BR</span>',
         iconSize: [28, 28], iconAnchor: [14, 14]
     });
     var userIcon = L.divIcon({
         className: 'geo-marker-user',
-        html: '<span style="font-size:26px">📍</span>',
+        html: '<span style="font-size:14px; font-weight:700; background:#DC382C; color:#fff; padding:2px 6px; border-radius:50%; line-height:1;">You</span>',
         iconSize: [28, 28], iconAnchor: [14, 28]
     });
 
@@ -153,7 +153,7 @@
         }
 
         btnSearch.disabled = true;
-        btnSearch.textContent = '⏳ Searching...';
+        btnSearch.textContent = 'Searching...';
 
         fetch(url)
             .then(function (r) { return r.json(); })
@@ -161,7 +161,7 @@
             .catch(function (err) { console.error(err); })
             .finally(function () {
                 btnSearch.disabled = false;
-                btnSearch.textContent = '🔍 Search';
+                btnSearch.textContent = 'Search';
             });
     }
 
@@ -188,11 +188,11 @@
             var services = Array.isArray(item.services) ? item.services.join(', ') : (item.services || '');
             marker.bindPopup(
                 '<strong>' + (item.name || item.id) + '</strong><br/>' +
-                '<em>' + (item.type === 'branch' ? '🏦 Branch' : '🏧 ATM') + '</em><br/>' +
+                '<em>' + (item.type === 'branch' ? 'Branch' : 'ATM') + '</em><br/>' +
                 (item.address || '') + '<br/>' +
-                '📏 ' + item.distance + ' km<br/>' +
-                '🕐 ' + (item.hours || '') + '<br/>' +
-                '🔧 ' + services
+                'Distance: ' + item.distance + ' km<br/>' +
+                'Hours: ' + (item.hours || '') + '<br/>' +
+                'Services: ' + services
             );
             resultMarkers.push(marker);
         });
@@ -200,7 +200,7 @@
         // Build results list
         var html = '';
         items.forEach(function (item) {
-            var typeLabel = item.type === 'branch' ? '🏦 Branch' : '🏧 ATM';
+            var typeLabel = item.type === 'branch' ? 'Branch' : 'ATM';
             var services = Array.isArray(item.services) ? item.services : [];
             var badges = services.map(function (s) {
                 return '<span class="geo-service-badge">' + s + '</span>';
@@ -213,7 +213,7 @@
                 '</div>' +
                 '<div class="geo-result-address">' + (item.address || '') + '</div>' +
                 '<div class="geo-result-meta">' +
-                '<span>🕐 ' + (item.hours || '') + '</span>' +
+                '<span>' + (item.hours || '') + '</span>' +
                 '<span class="geo-result-services">' + badges + '</span>' +
                 '</div>' +
                 '</div>';

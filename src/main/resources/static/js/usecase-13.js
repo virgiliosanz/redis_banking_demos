@@ -85,12 +85,12 @@
             ttlSeconds: 30
         }).then(function (data) {
             btnAcquire.disabled = false;
-            btnAcquire.textContent = '🔒 Acquire Lock';
+            btnAcquire.textContent = 'Acquire Lock';
             showResult(data);
             refreshStatus();
         }).catch(function () {
             btnAcquire.disabled = false;
-            btnAcquire.textContent = '🔒 Acquire Lock';
+            btnAcquire.textContent = 'Acquire Lock';
         });
     });
 
@@ -106,7 +106,7 @@
             clientId: clientId
         }).then(function (data) {
             btnRelease.disabled = false;
-            btnRelease.textContent = '🔓 Release Lock';
+            btnRelease.textContent = 'Release Lock';
             showResult(data);
             if (data.released) {
                 updateLockDisplay({ locked: false });
@@ -114,7 +114,7 @@
             refreshStatus();
         }).catch(function () {
             btnRelease.disabled = false;
-            btnRelease.textContent = '🔓 Release Lock';
+            btnRelease.textContent = 'Release Lock';
         });
     });
 
@@ -132,7 +132,7 @@
             resourceId: resourceId
         }).then(function (data) {
             btnSimulate.disabled = false;
-            btnSimulate.textContent = '🏁 Simulate 3 Concurrent Clients';
+            btnSimulate.textContent = 'Simulate 3 Concurrent Clients';
             showResult(data);
             refreshStatus();
 
@@ -142,7 +142,7 @@
                 '<span style="color:var(--redis-red, #FF4438); font-weight:700;">' + (data.winner || 'none') + '</span></p>';
             if (data.attempts) {
                 data.attempts.forEach(function (a) {
-                    var icon = a.acquired ? '✅' : '❌';
+                    var icon = a.acquired ? '✓' : '✗';
                     var color = a.acquired ? 'var(--success, #2ECC71)' : 'var(--text-muted, #666)';
                     html += '<div style="padding:4px 8px; margin:4px 0; border-radius:5px; background:var(--bg-secondary, #f5f5f5);">';
                     html += icon + ' <strong>' + (a.clientId || a.client) + '</strong> — ';
@@ -155,7 +155,7 @@
             simulationResult.style.display = '';
         }).catch(function () {
             btnSimulate.disabled = false;
-            btnSimulate.textContent = '🏁 Simulate 3 Concurrent Clients';
+            btnSimulate.textContent = 'Simulate 3 Concurrent Clients';
         });
     });
 

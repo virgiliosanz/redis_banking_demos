@@ -110,12 +110,12 @@
 
         window.workshopFetch('/api/docs', body).then(function (data) {
             createDocBtn.disabled = false;
-            createDocBtn.textContent = '➕ Create Document';
+            createDocBtn.textContent = 'Create Document';
             showCmd('create-cmd', 'create-cmd-output', data.redisCommand);
             var container = document.getElementById('create-result');
             var doc = data.document || {};
             container.innerHTML = '<div class="data-card" style="border-left:3px solid #0a7e3e;">' +
-                '<div style="color:#0a7e3e; font-weight:700; margin-bottom:8px;">✅ Document Created</div>' +
+                '<div style="color:#0a7e3e; font-weight:700; margin-bottom:8px;">Document Created</div>' +
                 '<div style="font-family:var(--font-code); font-size:0.78rem; color:var(--text-muted); margin-bottom:4px;">Key: ' + escapeHtml(data.key || '') + '</div>' +
                 '<div style="font-family:var(--font-code); font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">ID: ' + escapeHtml(data.id || '') + '</div>' +
                 '<pre style="font-size:0.75rem; margin:0; white-space:pre-wrap; color:var(--text-secondary); font-family:var(--font-code);">' + escapeHtml(JSON.stringify(doc, null, 2)) + '</pre></div>';
@@ -125,7 +125,7 @@
             document.getElementById('createTags').value = '';
         }).catch(function () {
             createDocBtn.disabled = false;
-            createDocBtn.textContent = '➕ Create Document';
+            createDocBtn.textContent = 'Create Document';
             document.getElementById('create-result').innerHTML = '<p style="color:var(--redis-primary);">Failed to create document.</p>';
         });
     });
@@ -246,11 +246,11 @@
 
         window.workshopGet(url).then(function (data) {
             searchBtn.disabled = false;
-            searchBtn.textContent = '🔍 Search';
+            searchBtn.textContent = 'Search';
             renderSearchResults(data);
         }).catch(function () {
             searchBtn.disabled = false;
-            searchBtn.textContent = '🔍 Search';
+            searchBtn.textContent = 'Search';
             resultsContainer.innerHTML = '<p style="color:var(--redis-primary);">Search failed. Is Redis running?</p>';
         });
     }
@@ -270,7 +270,7 @@
             var warning = document.createElement('div');
             warning.id = 'mock-vectors-warning';
             warning.style.cssText = 'background:var(--bg-tertiary); border-left:3px solid var(--redis-primary); padding:8px 12px; margin-bottom:12px; font-size:0.8rem; color:var(--text-muted); border-radius:0 5px 5px 0;';
-            warning.innerHTML = '⚠️ Using mock vectors (no OpenAI API key). Similarity scores are not meaningful — configure <code>OPENAI_API_KEY</code> for real embeddings.';
+            warning.innerHTML = 'Using mock vectors (no OpenAI API key). Similarity scores are not meaningful — configure <code>OPENAI_API_KEY</code> for real embeddings.';
             resultsContainer.parentNode.insertBefore(warning, resultsContainer);
         }
 
@@ -304,9 +304,9 @@
     }
 
     function getModeLabel(mode) {
-        if (mode === 'vector') return '🧠 Vector (KNN)';
-        if (mode === 'hybrid') return '⚡ Hybrid (Text + KNN)';
-        return '📝 Full-Text (RQE)';
+        if (mode === 'vector') return 'Vector (KNN)';
+        if (mode === 'hybrid') return 'Hybrid (Text + KNN)';
+        return 'Full-Text (RQE)';
     }
 
     function formatScore(score, mode) {
