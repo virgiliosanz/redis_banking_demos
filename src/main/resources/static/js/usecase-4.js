@@ -43,11 +43,11 @@
     function showStatus(allowed, data) {
         if (allowed) {
             statusBox.className = 'rl-status rl-status-ok';
-            statusIcon.textContent = '✅';
+            statusIcon.textContent = '\u2713';
             statusText.textContent = '200 OK — Request ' + data.currentCount + '/' + data.limit + ' allowed';
         } else {
             statusBox.className = 'rl-status rl-status-blocked';
-            statusIcon.textContent = '🚫';
+            statusIcon.textContent = '\u2717';
             statusText.textContent = '429 Too Many Requests — retry after ' + data.retryAfter + 's';
         }
     }
@@ -103,7 +103,7 @@
             })
             .catch(function (err) {
                 statusBox.className = 'rl-status rl-status-blocked';
-                statusIcon.textContent = '⚠️';
+                statusIcon.textContent = '!';
                 statusText.textContent = 'Error: ' + err.message;
             })
             .finally(function () { btnCallApi.disabled = false; });
@@ -132,7 +132,7 @@
             .then(function () {
                 updateGauge(limit, limit);
                 statusBox.className = 'rl-status rl-status-ok';
-                statusIcon.textContent = '✅';
+                statusIcon.textContent = '\u2713';
                 statusText.textContent = 'Rate limit reset — ready for new requests';
                 ttlBox.style.display = 'none';
                 clearInterval(ttlInterval);
@@ -149,7 +149,7 @@
                 updateGauge(data.remaining, data.limit);
                 if (!data.active) {
                     statusBox.className = 'rl-status rl-status-ok';
-                    statusIcon.textContent = '✅';
+                    statusIcon.textContent = '\u2713';
                     statusText.textContent = 'Window expired — counter reset. Ready for new requests!';
                 }
             });

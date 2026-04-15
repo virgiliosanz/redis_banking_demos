@@ -76,7 +76,7 @@
                 var color = RISK_COLORS[e.riskLevel] || RISK_COLORS.LOW;
                 var ts = e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : '';
                 var cardShort = (e.card || '').substring((e.card || '').length - 4);
-                var geo = e.geoAnomaly === 'true' ? ' ⚠️' : '';
+                var geo = e.geoAnomaly === 'true' ? ' [!]' : '';
                 html += '<tr>' +
                     '<td><span class="status-badge fraud-badge-' + level + '">' + (e.riskLevel || '') + '</span></td>' +
                     '<td style="font-weight:700;color:' + color + '">' + (e.riskScore || 0) + '</td>' +
@@ -122,7 +122,7 @@
         burstBtn.addEventListener('click', function () {
             var data = getFormData();
             burstBtn.disabled = true;
-            burstBtn.textContent = '⚡ Sending...';
+            burstBtn.textContent = 'Sending...';
             var chain = Promise.resolve();
             for (var i = 0; i < 5; i++) {
                 chain = chain.then(function () {
@@ -133,7 +133,7 @@
             }
             chain.finally(function () {
                 burstBtn.disabled = false;
-                burstBtn.textContent = '⚡ Rapid-fire (5 txs)';
+                burstBtn.textContent = 'Rapid-fire (5 txs)';
             });
         });
 

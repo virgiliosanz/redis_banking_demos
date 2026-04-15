@@ -25,7 +25,7 @@
             var accepted = data.status === 'ACCEPTED';
             resultBox.style.display = 'block';
             resultBox.className = 'result-box ' + (accepted ? 'result-accepted' : 'result-duplicate');
-            resultIcon.textContent = accepted ? '✅' : '🚫';
+            resultIcon.textContent = accepted ? '\u2713' : '\u2717';
             resultStatus.textContent = accepted ? 'Payment Accepted' : 'Duplicate Detected!';
             resultDetails.innerHTML =
                 '<span class="detail-label">Hash:</span> <code>' + data.txHash + '</code><br>' +
@@ -72,7 +72,7 @@
                 .catch(function (err) {
                     resultBox.style.display = 'block';
                     resultBox.className = 'result-box result-duplicate';
-                    resultIcon.textContent = '❌';
+                    resultIcon.textContent = '\u2717';
                     resultStatus.textContent = 'Error';
                     resultDetails.textContent = err.message;
                 })
@@ -95,14 +95,14 @@
         doubleClickBtn.addEventListener('click', function () {
             var data = getFormData();
             doubleClickBtn.disabled = true;
-            doubleClickBtn.textContent = '⚡ Sending...';
+            doubleClickBtn.textContent = 'Sending...';
             submitPayment(data).then(function () {
                 return new Promise(function (resolve) { setTimeout(resolve, 100); });
             }).then(function () {
                 return submitPayment(data);
             }).finally(function () {
                 doubleClickBtn.disabled = false;
-                doubleClickBtn.textContent = '⚡ Double-Click Simulation';
+                doubleClickBtn.textContent = 'Double-Click Simulation';
             });
         });
 

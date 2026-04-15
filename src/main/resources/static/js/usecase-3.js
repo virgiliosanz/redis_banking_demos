@@ -53,14 +53,14 @@
         editCard.style.display = '';
         ttlContainer.style.display = '';
         syncBtn.disabled = false;
-        redisKeyDisplay.textContent = '📦 ' + data.redisKey;
+        redisKeyDisplay.textContent = data.redisKey;
 
         var rows = '';
         var keys = Object.keys(data).sort();
         keys.forEach(function (key) {
             if (key === 'redisKey' || key === 'ttl' || key === 'fieldCount' || key === 'sources') return;
             var label = key.replace(/^(account_|activity_|pref_)/, function (m) {
-                return m === 'account_' ? '🏦 ' : m === 'activity_' ? '📊 ' : '⚙️ ';
+                return m === 'account_' ? 'Account: ' : m === 'activity_' ? 'Activity: ' : 'Pref: ';
             });
             rows += buildRow(label, data[key], key.startsWith('account_balance'));
         });
@@ -92,13 +92,13 @@
         window.workshopFetch('/api/profile/load/' + userId, {})
             .then(function (data) {
                 loadBtn.disabled = false;
-                loadBtn.textContent = '📥 Load Profile from DBs';
+                loadBtn.textContent = 'Load Profile from DBs';
                 if (data.error) return;
                 displayProfile(data);
             })
             .catch(function () {
                 loadBtn.disabled = false;
-                loadBtn.textContent = '📥 Load Profile from DBs';
+                loadBtn.textContent = 'Load Profile from DBs';
             });
     });
 
@@ -126,7 +126,7 @@
             .then(function (data) {
                 syncResult.style.display = '';
                 syncResult.className = 'alert alert-success';
-                syncResult.innerHTML = '✅ ' + data.message;
+                syncResult.innerHTML = '&#10003; ' + data.message;
             });
     });
 

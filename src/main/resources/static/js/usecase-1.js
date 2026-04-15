@@ -116,13 +116,13 @@
         window.workshopFetch('/api/auth/login', { username: username, password: password })
             .then(function (data) {
                 loginBtn.disabled = false;
-                loginBtn.textContent = '🔑 Login & Generate Token';
+                loginBtn.textContent = 'Login & Generate Token';
                 if (data.error) { loginError.textContent = data.error; loginError.style.display = ''; }
                 else { showToken(data); }
             })
             .catch(function () {
                 loginBtn.disabled = false;
-                loginBtn.textContent = '🔑 Login & Generate Token';
+                loginBtn.textContent = 'Login & Generate Token';
                 loginError.textContent = 'Network error — is the server running?';
                 loginError.style.display = '';
             });
@@ -139,10 +139,10 @@
                 validateResult.style.display = '';
                 if (data.valid) {
                     validateResult.className = 'alert alert-success';
-                    validateResult.innerHTML = '✅ Token is <strong>valid</strong>. TTL: ' + data.ttl + 's remaining.';
+                    validateResult.innerHTML = '&#10003; Token is <strong>valid</strong>. TTL: ' + data.ttl + 's remaining.';
                 } else {
                     validateResult.className = 'alert alert-error';
-                    validateResult.innerHTML = '❌ Token is <strong>invalid</strong> or expired.';
+                    validateResult.innerHTML = '&#10007; Token is <strong>invalid</strong> or expired.';
                 }
             });
     });
