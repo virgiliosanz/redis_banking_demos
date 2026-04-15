@@ -1,7 +1,7 @@
 # Redis Banking Workshop — Presenter Guide
 
 ## Overview
-Duration: ~2 hours
+Duration: ~3 hours
 Audience: Technical architects and developers from banking sector
 Format: Live demo with Redis, Spring Boot application
 
@@ -182,13 +182,19 @@ docker compose --profile workshop up -d --build
 "Redis 8 includes a full document database with JSON support and a powerful query engine. You can store regulation documents, search them with full-text queries, and even do vector similarity search — all from Redis, with sub-10ms response times."
 
 ### Demo steps
-1. Type a full-text search query (e.g., "customer authentication")
-2. Show results with relevance scores
-3. Switch to vector search mode — find semantically similar documents
-4. Try hybrid search — combine text filter + vector similarity
+1. Create a document — show JSON.SET storing a regulation document
+2. Read by ID — show JSON.GET retrieving the full document
+3. Read a specific field — show JSON.GET $.title returning just the title
+4. Query by field — show FT.SEARCH @category:{PSD2} filtering by tag
+5. Type a full-text search query (e.g., "customer authentication")
+6. Show results with relevance scores
+7. Switch to vector search mode — find semantically similar documents
+8. Try hybrid search — combine text filter + vector similarity
 
 ### Key Redis commands to highlight
 - `JSON.SET` — store documents
+- `JSON.GET` — read full document or specific path
+- `JSON.MGET` — batch read multiple documents
 - `FT.CREATE` — index with TEXT + VECTOR fields
 - `FT.SEARCH` — full-text query
 - `FT.SEARCH ... KNN` — vector similarity
@@ -204,7 +210,7 @@ docker compose --profile workshop up -d --build
 ## UC9: AI Agent Memory + RAG
 
 ### What to say
-"AI agents need memory — both short-term (current conversation) and long-term (past interactions). Redis provides both, plus RAG retrieval for knowledge base search. This is the architecture behind every serious AI banking assistant."
+"AI agents need memory — both short-term (current conversation) and long-term (past interactions). Redis provides both, plus RAG retrieval for knowledge base search and semantic caching to avoid redundant LLM calls. This is the architecture behind every serious AI banking assistant."
 
 ### Demo steps
 1. Start a conversation — ask about wire transfers
@@ -212,17 +218,21 @@ docker compose --profile workshop up -d --build
 3. Ask a follow-up — agent recalls context from short-term memory
 4. Ask about a topic from past interactions — agent retrieves from long-term memory (vector search)
 5. Ask a regulatory question — agent pulls from knowledge base (RAG)
-6. Show which memories and KB docs were retrieved
+6. Ask the same question twice — second response is instant (CACHE HIT)
+7. Show cache stats — hit ratio and latency savings
+8. Show which memories and KB docs were retrieved
 
 ### Key Redis commands to highlight
 - `HSET` + `EXPIRE` — short-term conversation memory
 - `JSON.SET` + `FT.SEARCH KNN` — long-term memory retrieval
 - `FT.SEARCH KNN` — RAG document retrieval
+- `FT.SEARCH KNN` — vector similarity for semantic cache lookup
 
 ### Talking points
 - Short-term memory: Redis Hash with TTL = automatic cleanup
 - Long-term memory: vector search over past interactions
 - RAG: same Redis instance serves as vector store
+- Semantic caching: vector similarity matches semantically equivalent questions, reducing LLM API costs
 - No external vector database needed — Redis does it all
 
 ---
@@ -311,14 +321,41 @@ docker compose --profile workshop up -d --build
 
 ---
 
+## UC13: Distributed Locking
+
+### What to say
+"When transferring money between accounts, you need to lock the source account to prevent concurrent modifications. Redis gives you distributed locking with SET NX EX — atomic, with automatic expiry. The Lua script ensures safe release: only the lock holder can unlock."
+
+### Demo steps
+1. Select an account and a client ID
+2. Click "Acquire Lock" — see it locked with TTL countdown
+3. Try to acquire with a different client — see it denied (NX guarantee)
+4. Release the lock — see it go to UNLOCKED
+5. Click "Simulate Contention" — 3 concurrent clients race for the lock, only one wins
+6. Show the Lua script for safe release in the code showcase
+
+### Key Redis commands to highlight
+- `SET workshop:lock:{resourceId} {clientId} NX EX 30` — atomic lock acquisition
+- `EVAL "if GET == expected then DEL" 1 key value` — Lua safe release
+- `GET` + `TTL` — lock inspection
+
+### Talking points
+- SET NX = atomic mutual exclusion, no race conditions
+- EX = automatic expiry prevents deadlocks from crashed clients
+- Lua script = safe release (only the lock holder can unlock)
+- Real-world: account transfers, order processing, inventory management
+
+---
+
 ## Closing
 
 ### Key takeaways
 1. Redis is not just a cache — it's a real-time data platform
-2. One database for sessions, rate limiting, fraud detection, feature store, document search, AND AI memory
-3. Sub-millisecond latency for all operations
-4. Built-in search engine (full-text + vector) since Redis 8
-5. Active-Active for multi-geo banking requirements
+2. One database for sessions, rate limiting, fraud detection, feature store, document search, AI memory, semantic caching, distributed locking, and more
+3. 13 use cases — all running on a single Redis instance
+4. Sub-millisecond latency for all operations
+5. Built-in search engine (full-text + vector) since Redis 8
+6. Active-Active for multi-geo banking requirements
 
 ### Questions?
 Open any demo and let the audience try it themselves.

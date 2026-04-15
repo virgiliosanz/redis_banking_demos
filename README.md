@@ -1,19 +1,25 @@
 # Redis Banking Workshop Demo
 
-Spring Boot 3.x workshop application showcasing **7 Redis use cases** for banking.
+Spring Boot 3.x workshop application showcasing **13 Redis use cases** for banking.
 Each use case includes a **live interactive demo** and a **code showcase panel** with curated Redis snippets.
 
 ## Use Cases
 
 | # | Demo | Key Redis Features |
 |---|------|--------------------|
-| 1 | Session Management + Auth Token | Hash, JSON, TTL |
-| 2 | Rate Limiting (Open Banking / PSD2) | String INCR, EXPIRE |
-| 3 | Transaction Deduplication | Set/Bloom Filter, Hash + TTL |
-| 4 | Real-time Fraud Detection | Sorted Set, Streams, RQE |
-| 5 | Feature Store (Risk Scoring) | Hash, TTL, RQE |
-| 6 | Document Search (Full-text + Vector) | Vector, RQE, JSON |
-| 7 | AI Banking Assistant (Memory + RAG) | Hash, Vector, Streams, JSON, TTL |
+| 1 | Authentication Token Store | Hash, TTL, HSET, HGET |
+| 2 | Session Storage | Hash, TTL, HGETALL |
+| 3 | User Profile Storage | Hash, HSET, HGETALL, HINCRBY |
+| 4 | Rate Limiting (Open Banking / PSD2) | String INCR, EXPIRE |
+| 5 | Transaction Deduplication | SET NX EX, Hash, TTL |
+| 6 | Fraud Detection (Risk Scoring) | Sorted Set, Streams, RQE |
+| 7 | Feature Store | Hash, TTL, RQE |
+| 8 | Document Database | JSON, RQE, Vector, Full-text |
+| 9 | AI Banking Assistant (Memory + RAG + Semantic Cache) | Hash, Vector, JSON, TTL, Streams |
+| 10 | Cache-Aside Pattern | String GET/SET EX, DEL |
+| 11 | Real-time Transaction Monitoring | Streams, XADD, XRANGE, XLEN |
+| 12 | ATM & Branch Finder (Geospatial) | Geo, JSON, RQE, GEOSEARCH |
+| 13 | Distributed Locking | SET NX EX, Lua, EVAL, TTL |
 
 ## Prerequisites
 
@@ -47,19 +53,18 @@ src/main/java/com/redis/workshop/
 ├── controller/
 │   ├── HomeController.java         # Landing page
 │   └── UseCaseController.java      # Use case routing
-├── service/                        # Business logic (per use case)
-└── model/                          # Domain models
+└── service/                        # Business logic (per use case)
 
 src/main/resources/
 ├── application.yml                 # Redis + Thymeleaf config
 ├── templates/
 │   ├── layout.html                 # Shared layout with nav
-│   ├── index.html                  # Landing page (7 cards)
-│   └── usecase-{1..7}.html         # Use case pages
+│   ├── index.html                  # Landing page (13 cards)
+│   └── usecase-{1..13}.html        # Use case pages
 └── static/
     ├── css/redis-brand.css         # Redis brand design tokens
     ├── js/main.js                  # Dark mode toggle + utils
-    ├── js/usecase-{1..7}.js        # Per-use-case JS
+    ├── js/usecase-{1..13}.js       # Per-use-case JS
     └── vendor/prism/               # Syntax highlighting
 ```
 
@@ -67,7 +72,7 @@ src/main/resources/
 
 - **Backend**: Spring Boot 3.4.x, Spring Data Redis (Lettuce), Java 17
 - **Frontend**: Thymeleaf + Vanilla JS, Redis brand CSS, Prism.js
-- **Database**: Redis Stack 7.4.2 (RQE, RedisJSON, RedisSearch, vector support)
+- **Database**: Redis 8 (RQE, JSON, Search, vector support)
 
 ## Redis Connection
 
