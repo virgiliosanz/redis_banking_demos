@@ -39,6 +39,8 @@ public class AssistantService {
     // Semantic cache stats
     private final java.util.concurrent.atomic.AtomicLong cacheHits = new java.util.concurrent.atomic.AtomicLong(0);
     private final java.util.concurrent.atomic.AtomicLong cacheMisses = new java.util.concurrent.atomic.AtomicLong(0);
+    private final java.util.concurrent.atomic.AtomicLong tokensUsed = new java.util.concurrent.atomic.AtomicLong(0);
+    private final java.util.concurrent.atomic.AtomicLong tokensSaved = new java.util.concurrent.atomic.AtomicLong(0);
 
     private final StringRedisTemplate redis;
     private final OpenAiService openAiService;
@@ -55,6 +57,11 @@ public class AssistantService {
         this.openAiService = openAiService;
         this.redisSearchHelper = redisSearchHelper;
         this.objectMapper = objectMapper;
+    }
+
+    private int estimateTokens(String text) {
+        if (text == null || text.isEmpty()) return 0;
+        return Math.max(1, text.length() / 4);
     }
 
     @PostConstruct
@@ -285,9 +292,11 @@ public class AssistantService {
                 semanticCacheHit = true;
                 cacheHits.incrementAndGet();
                 responseText = cached.get("response");
+                int savedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
+                tokensSaved.addAndGet(savedTokens);
                 relevantMemories = List.of();
                 relevantDocs = List.of();
-                log.info("UC9: Semantic cache HIT for question: {}", userMessage);
+                log.info("UC9: Semantic cache HIT for question: {} (~{} tokens saved)", userMessage, savedTokens);
             } else {
                 // Cache MISS — do full vector search + generate response
                 cacheMisses.incrementAndGet();
@@ -307,9 +316,12 @@ public class AssistantService {
                 }
                 responseText = generateResponse(userMessage, relevantMemories, relevantDocs);
 
+                int usedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
+                tokensUsed.addAndGet(usedTokens);
+
                 // Store in cache
                 storeInSemanticCache(userMessage, responseText);
-                log.info("UC9: Semantic cache MISS — stored response for: {}", userMessage);
+                log.info("UC9: Semantic cache MISS — stored response for: {} (~{} tokens used)", userMessage, usedTokens);
             }
         } else {
             // Mock mode — skip semantic caching
@@ -355,6 +367,12 @@ public class AssistantService {
         result.put("semanticCacheHit", semanticCacheHit);
         result.put("semanticCacheEnabled", openAiService.isConfigured());
         result.put("cacheLatencyMs", System.currentTimeMillis() - cacheCheckStart);
+        int chatTokens = estimateTokens(userMessage) + estimateTokens(responseText);
+        if (semanticCacheHit) {
+            result.put("tokensSaved", chatTokens);
+        } else {
+            result.put("tokensUsed", chatTokens);
+        }
 
         List<String> cmds = new ArrayList<>(List.of(
                 "HGETALL " + convKey,
@@ -486,7 +504,9 @@ public class AssistantService {
             semanticCacheHit = true;
             cacheHits.incrementAndGet();
             responseText = cached.get("response");
-            log.info("UC9 Stream: Semantic cache HIT for: {}", userMessage);
+            int savedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
+            tokensSaved.addAndGet(savedTokens);
+            log.info("UC9 Stream: Semantic cache HIT for: {} (~{} tokens saved)", userMessage, savedTokens);
 
             // Send cache-hit event with sources
             try {
@@ -543,9 +563,12 @@ public class AssistantService {
             // Stream OpenAI response
             responseText = openAiService.streamChatCompletion(openAiMessages, emitter);
 
+            int usedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
+            tokensUsed.addAndGet(usedTokens);
+
             // Store in cache
             storeInSemanticCache(userMessage, responseText);
-            log.info("UC9 Stream: Semantic cache MISS — stored response for: {}", userMessage);
+            log.info("UC9 Stream: Semantic cache MISS — stored response for: {} (~{} tokens used)", userMessage, usedTokens);
         }
 
         // 7. Save assistant message to conversation
@@ -578,6 +601,12 @@ public class AssistantService {
             doneData.put("sessionId", sessionId);
             doneData.put("semanticCacheHit", semanticCacheHit);
             doneData.put("semanticCacheEnabled", true);
+            int doneTokens = estimateTokens(userMessage) + estimateTokens(responseText);
+            if (semanticCacheHit) {
+                doneData.put("tokensSaved", doneTokens);
+            } else {
+                doneData.put("tokensUsed", doneTokens);
+            }
             emitter.send(SseEmitter.event().name("done").data(objectMapper.writeValueAsString(doneData)));
             emitter.complete();
         } catch (Exception e) {
@@ -787,6 +816,11 @@ public class AssistantService {
 
         long total = cacheHits.get() + cacheMisses.get();
         stats.put("hitRate", total > 0 ? String.format("%.1f%%", (cacheHits.get() * 100.0) / total) : "N/A");
+        stats.put("tokensUsed", tokensUsed.get());
+        stats.put("tokensSaved", tokensSaved.get());
+        // Estimated cost savings (GPT-4o pricing: ~$5/1M input, ~$15/1M output — simplified to ~$10/1M average)
+        double costSavedUsd = (tokensSaved.get() / 1_000_000.0) * 10.0;
+        stats.put("estimatedCostSavedUsd", String.format("$%.4f", costSavedUsd));
         return stats;
     }
 
@@ -804,6 +838,8 @@ public class AssistantService {
         // Reset cache stats
         cacheHits.set(0);
         cacheMisses.set(0);
+        tokensUsed.set(0);
+        tokensSaved.set(0);
         // Reload data
         init();
     }

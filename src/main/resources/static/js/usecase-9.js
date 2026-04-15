@@ -34,6 +34,9 @@
     var cacheMissesEl = document.getElementById('cache-misses');
     var cacheEntriesEl = document.getElementById('cache-entries');
     var cacheHitRateEl = document.getElementById('cache-hit-rate');
+    var cacheTokensUsedEl = document.getElementById('cache-tokens-used');
+    var cacheTokensSavedEl = document.getElementById('cache-tokens-saved');
+    var cacheCostSavedEl = document.getElementById('cache-cost-saved');
 
     // --- Code Tabs ---
     window.initCodeTabs();
@@ -138,7 +141,7 @@
     }
 
     // --- Cache display ---
-    function showCacheBadge(isHit, latencyMs) {
+    function showCacheBadge(isHit, latencyMs, tokensSaved) {
         if (!cacheIndicator || !cacheBadge) return;
         cacheIndicator.style.display = '';
         if (isHit) {
@@ -151,7 +154,11 @@
             cacheBadge.style.color = 'var(--text-muted)';
         }
         if (cacheLatencyEl && latencyMs !== undefined) {
-            cacheLatencyEl.textContent = latencyMs + 'ms';
+            if (isHit && tokensSaved) {
+                cacheLatencyEl.textContent = latencyMs + 'ms | ~' + tokensSaved + ' tokens saved';
+            } else {
+                cacheLatencyEl.textContent = latencyMs + 'ms';
+            }
         }
     }
 
@@ -162,6 +169,9 @@
             if (cacheMissesEl) cacheMissesEl.textContent = data.misses || 0;
             if (cacheEntriesEl) cacheEntriesEl.textContent = data.cachedEntries || 0;
             if (cacheHitRateEl) cacheHitRateEl.textContent = data.hitRate || 'N/A';
+            if (cacheTokensUsedEl) cacheTokensUsedEl.textContent = (data.tokensUsed || 0).toLocaleString();
+            if (cacheTokensSavedEl) cacheTokensSavedEl.textContent = (data.tokensSaved || 0).toLocaleString();
+            if (cacheCostSavedEl) cacheCostSavedEl.textContent = data.estimatedCostSavedUsd || '$0.0000';
             if (cacheStatusText) {
                 cacheStatusText.textContent = data.enabled
                     ? '✅ Semantic cache active (threshold: ' + data.distanceThreshold + ')'
@@ -308,7 +318,7 @@
                     latencyDisplay.textContent = '⏱ Total latency: ' + meta.latencyMs + 'ms';
                 }
                 if (meta.semanticCacheHit !== undefined) {
-                    showCacheBadge(meta.semanticCacheHit, meta.latencyMs);
+                    showCacheBadge(meta.semanticCacheHit, meta.latencyMs, meta.tokensSaved);
                 }
             } catch (err) { /* ignore */ }
         });
@@ -379,7 +389,7 @@
 
             // Semantic cache indicator
             if (data.semanticCacheEnabled) {
-                showCacheBadge(data.semanticCacheHit, data.cacheLatencyMs);
+                showCacheBadge(data.semanticCacheHit, data.cacheLatencyMs, data.tokensSaved);
             }
             updateCacheStats();
 
