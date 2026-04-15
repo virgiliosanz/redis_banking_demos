@@ -52,6 +52,11 @@
                 <li><code>EXPIRE</code> — auto-cleanup</li>
                 <li><code>HGET</code> / <code>EXISTS</code> — validate token</li>
             </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>Hash:</strong> A token has multiple fields (userId, role, issuedAt, device). Hash stores them as a single unit — one key, multiple fields. Alternative would be a JSON string, but Hash lets you read/write individual fields without deserializing.</li>
+                <li><strong>TTL (EXPIRE):</strong> Tokens must expire. Instead of running a cleanup job ("delete all tokens older than X"), Redis auto-deletes the key when the TTL hits zero. Zero maintenance, zero memory leaks.</li>
+            </ul>
             <h3>Talking points</h3>
             <ul>
                 <li>Sub-millisecond token validation vs database lookup</li>
@@ -76,6 +81,11 @@
             <ul>
                 <li><code>HSET</code> / <code>HGETALL</code> — session CRUD</li>
                 <li><code>EXPIRE</code> — auto-cleanup on inactivity</li>
+            </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>Hash:</strong> A session is a collection of key-value pairs (userName, lastPage, cart, preferences). Hash maps directly to this shape. HSET/HGET let you update individual fields without reading the whole session — important when sessions are large.</li>
+                <li><strong>TTL:</strong> Abandoned sessions auto-expire. No background cleanup process needed. TTL resets on each interaction (EXPIRE), so active sessions stay alive.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
@@ -103,6 +113,11 @@
                 <li><code>HGETALL</code> — single read for complete profile</li>
                 <li>Pipeline for multi-DB aggregation</li>
             </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>Hash:</strong> A user profile is naturally a flat map of fields (name, email, accountType, lastLogin, preferences). Hash is the perfect fit — HGETALL returns the complete profile in one call, HSET updates specific fields without touching the rest.</li>
+                <li><strong>HINCRBY:</strong> For numeric fields like loginCount or transactionCount, HINCRBY increments atomically — no read-modify-write cycle, no race conditions between concurrent requests.</li>
+            </ul>
             <h3>Talking points</h3>
             <ul>
                 <li>Single source of truth during the session</li>
@@ -129,6 +144,11 @@
                 <li><code>EXPIRE</code> — window reset</li>
                 <li><code>ZADD</code> + <code>ZRANGEBYSCORE</code> — sliding window</li>
             </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>String + INCR:</strong> For fixed-window rate limiting, a String counter is the simplest approach. INCR is atomic — even under 10,000 concurrent requests, the count is always accurate. One key per window (e.g., "api:user123:202501151430"), TTL auto-deletes old windows.</li>
+                <li><strong>Sorted Set (ZADD + ZRANGEBYSCORE):</strong> For sliding-window rate limiting, each request is a member scored by its timestamp. ZRANGEBYSCORE counts requests in the last N seconds. More precise than fixed windows, slightly more memory.</li>
+            </ul>
             <h3>Talking points</h3>
             <ul>
                 <li>Atomic operations = no race conditions under load</li>
@@ -153,6 +173,11 @@
             <ul>
                 <li><code>SET key value NX EX ttl</code> — atomic check-and-set</li>
                 <li><code>BF.ADD</code> / <code>BF.EXISTS</code> — probabilistic dedup</li>
+            </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>String with SET NX EX:</strong> The transaction hash becomes the key. NX (Not eXists) ensures the SET only succeeds once — if the key already exists, the transaction is a duplicate. EX adds a TTL so the dedup window is time-bounded (e.g., 24h). One command, two guarantees: uniqueness + auto-cleanup.</li>
+                <li><strong>Bloom Filter (BF.ADD/BF.EXISTS):</strong> For millions of transactions per day, storing every hash as a key uses significant memory. A Bloom filter answers "have I seen this before?" with 99.97% accuracy using a fraction of the memory. Trade-off: tiny false-positive rate, but zero false-negatives.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
@@ -181,6 +206,12 @@
                 <li><code>XADD</code> / <code>XRANGE</code> — transaction stream</li>
                 <li><code>HGETALL</code> — feature retrieval</li>
             </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>Hash (feature store):</strong> Each customer's fraud features (avg amount, tx count, last location, risk score) are stored as Hash fields. HGETALL retrieves the entire feature vector in &lt;1ms — critical when the scoring model needs to evaluate in real time.</li>
+                <li><strong>Sorted Set (velocity tracking):</strong> ZADD stores each transaction scored by timestamp. ZRANGEBYSCORE with a time window (last 5 minutes) instantly counts recent transactions. This is how velocity checks work — "how many transactions in the last X minutes?"</li>
+                <li><strong>Stream (audit trail):</strong> XADD appends each transaction event with all fields. Streams are append-only, time-ordered, and support range queries — perfect for audit logs and model retraining pipelines.</li>
+            </ul>
             <h3>Talking points</h3>
             <ul>
                 <li>60x faster than traditional database for feature serving</li>
@@ -208,6 +239,11 @@
                 <li><code>HINCRBY</code> — real-time feature updates</li>
                 <li><code>FT.SEARCH</code> — query features via RQE</li>
             </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>Hash:</strong> ML features are naturally key-value pairs (feature_name → value). Hash stores the complete feature vector for a client. HGETALL serves the model in &lt;1ms. HINCRBY updates counters (tx_count, login_count) without read-modify-write.</li>
+                <li><strong>Redis Query Engine (FT.SEARCH):</strong> Unlike a plain key lookup, RQE lets you query across all feature vectors — "find all clients where risk_score > 0.8 AND region = EU". This enables batch monitoring and model validation without scanning every key.</li>
+            </ul>
             <h3>Talking points</h3>
             <ul>
                 <li>Online feature store for ML model serving</li>
@@ -234,6 +270,12 @@
                 <li><code>FT.CREATE</code> — index with TEXT + VECTOR fields</li>
                 <li><code>FT.SEARCH</code> — full-text query</li>
                 <li><code>FT.SEARCH ... KNN</code> — vector similarity</li>
+            </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>JSON (JSON.SET):</strong> Regulation documents have nested structure (title, sections, metadata, tags). JSON preserves this hierarchy natively. You can query nested fields with JSONPath.</li>
+                <li><strong>RQE with TEXT fields:</strong> FT.CREATE indexes specific JSON fields for full-text search. The query engine handles stemming, stop words, and relevance scoring — like Elasticsearch, but inside Redis.</li>
+                <li><strong>RQE with VECTOR fields:</strong> Same index can include vector embeddings. KNN search finds semantically similar documents even when the exact words differ. One index, two search modes (text + vector), combined in a single query.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
@@ -263,6 +305,12 @@
                 <li><code>HSET</code> + <code>EXPIRE</code> — short-term conversation memory</li>
                 <li><code>JSON.SET</code> + <code>FT.SEARCH KNN</code> — long-term memory retrieval</li>
                 <li><code>FT.SEARCH KNN</code> — RAG document retrieval</li>
+            </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>Hash + TTL (short-term memory):</strong> The current conversation is a Hash with a TTL. Each message is a field. TTL auto-expires the conversation after inactivity — no memory leaks, no cleanup jobs. Hash lets you append messages with HSET without reading the full conversation.</li>
+                <li><strong>Vector index (long-term memory + RAG):</strong> Past interactions and KB documents are stored with vector embeddings. FT.SEARCH KNN finds the most relevant memories/documents by semantic similarity — not keyword matching. This is how the agent "remembers" relevant past conversations and retrieves knowledge.</li>
+                <li><strong>Semantic cache (Vector + TTL):</strong> Identical or similar questions hit a vector cache before calling the LLM. Saves tokens, reduces latency, cuts costs. TTL ensures the cache stays fresh.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
@@ -294,6 +342,12 @@
                 <li><code>SET workshop:cache:product:{id} ... EX 300</code> — store with TTL</li>
                 <li><code>DEL</code> — cache eviction on data change</li>
             </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>String (GET/SET):</strong> The simplest Redis data structure — one key, one value. For caching serialized objects, String is all you need. GET is O(1), SET EX combines write + TTL in one command.</li>
+                <li><strong>TTL (EX):</strong> Controls cache freshness. A 5-minute TTL means data is never more than 5 minutes stale. When the TTL expires, the next request triggers a fresh database fetch. No invalidation logic needed for time-based freshness.</li>
+                <li><strong>DEL:</strong> For write-through invalidation — when the source data changes, DEL the cached key. Next read triggers a fresh fetch. Simple, reliable, consistent.</li>
+            </ul>
             <h3>Talking points</h3>
             <ul>
                 <li>200x speedup: 200ms → &lt;1ms on cache hit</li>
@@ -323,6 +377,12 @@
                 <li><code>XRANGE</code> — query entries in a timestamp range</li>
                 <li><code>XLEN</code> — get total stream length</li>
                 <li><code>XTRIM</code> — bound the stream with MAXLEN</li>
+            </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>Stream (XADD/XRANGE):</strong> Streams are an append-only log with auto-generated timestamp IDs. XADD writes a transaction event with all its fields (amount, type, risk). XRANGE reads entries in a time window. This is exactly what event sourcing needs — ordered, timestamped, queryable.</li>
+                <li><strong>XLEN:</strong> Returns the stream length in O(1) — useful for total transaction count without scanning.</li>
+                <li><strong>XTRIM MAXLEN:</strong> Bounds the stream to prevent unbounded growth. Keep the last 10,000 entries, older ones auto-deleted. Memory-safe by design.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
@@ -357,6 +417,11 @@
                 <li><code>FT.CREATE</code> with <code>GEO</code> + <code>TAG</code> fields — index for geo+filter queries</li>
                 <li><code>FT.SEARCH</code> with <code>@location:[lng lat radius km]</code> — geo filter in RQE</li>
             </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>Geo (GEOADD/GEOSEARCH):</strong> Redis Geo stores coordinates in a Sorted Set using geohash encoding. GEOSEARCH returns all points within a radius, sorted by distance — sub-millisecond for thousands of locations. No external geo database needed.</li>
+                <li><strong>JSON + RQE (FT.SEARCH with GEO field):</strong> When you need geo + filtering (e.g., "ATMs within 2km that have deposit service"), JSON stores rich location documents and RQE combines geo radius with TAG/TEXT filters in a single query. More powerful than native geo, same Redis instance.</li>
+            </ul>
             <h3>Talking points</h3>
             <ul>
                 <li>Native geo: O(N+log(M)) — extremely fast for pure proximity</li>
@@ -367,12 +432,48 @@
 
             <hr class="guide-hr"/>
 
+            <!-- UC13 -->
+            <h2>UC13: Distributed Locking</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"Wire transfers need mutual exclusion — you can't have two processes debiting the same account at once. Redis gives you distributed locking with a single command: SET key value NX EX. NX means 'only set if the key doesn't exist' — that's your lock. EX gives it a TTL — that's your deadlock prevention. And a Lua script ensures only the lock owner can release it."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Select two accounts for a wire transfer</li>
+                <li>Click "Transfer" — watch both accounts get locked (SET NX EX)</li>
+                <li>Try a concurrent transfer on the same account — see it denied (lock held)</li>
+                <li>Watch the lock auto-expire via TTL countdown</li>
+                <li>Click "Release Lock" — see the Lua script verify ownership before deleting</li>
+                <li>Show what happens when a lock holder crashes — TTL releases automatically</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>SET workshop:lock:{accountId} {clientId} NX EX 30</code> — atomic lock acquire</li>
+                <li><code>EVAL</code> with Lua script — safe release (check owner, then DEL)</li>
+                <li><code>TTL</code> — inspect remaining lock time</li>
+                <li><code>GET</code> — check current lock holder</li>
+            </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>String with NX:</strong> The NX flag makes SET atomic — only one client can set the key. This IS the lock. No race conditions, no two-phase locking needed.</li>
+                <li><strong>EX (TTL):</strong> Prevents deadlocks. If the lock holder crashes, the key expires automatically. No manual cleanup, no orphaned locks.</li>
+                <li><strong>Lua scripting (EVAL):</strong> The release must be atomic — check owner AND delete in one step. Without Lua, another client could acquire between your GET and DEL. Lua runs server-side as a single atomic operation.</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>SET NX EX is the foundation of the Redlock algorithm</li>
+                <li>Lua scripts run atomically on the server — no interleaving</li>
+                <li>TTL = automatic deadlock prevention, even if the holder crashes</li>
+                <li>In production: consider Redlock for multi-instance Redis setups</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
             <!-- Closing -->
             <h2>Closing</h2>
             <h3>Key takeaways</h3>
             <ol>
                 <li>Redis is not just a cache — it's a real-time data platform</li>
-                <li>One database for sessions, rate limiting, fraud detection, feature store, document search, AND AI memory</li>
+                <li>One database for sessions, rate limiting, fraud detection, feature store, document search, AI memory, AND distributed locking</li>
                 <li>Sub-millisecond latency for all operations</li>
                 <li>Built-in search engine (full-text + vector) since Redis 8</li>
                 <li>Active-Active for multi-geo banking requirements</li>
