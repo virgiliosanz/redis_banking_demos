@@ -20,16 +20,7 @@
     var selectedProductId = null;
 
     // --- Code tabs ---
-    document.querySelectorAll('.code-tab').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            document.querySelectorAll('.code-tab').forEach(function (t) { t.classList.remove('active'); });
-            document.querySelectorAll('.code-tab-content').forEach(function (c) { c.classList.remove('active'); });
-            tab.classList.add('active');
-            var target = document.getElementById('tab-' + tab.getAttribute('data-tab'));
-            if (target) target.classList.add('active');
-            if (window.Prism) Prism.highlightAll();
-        });
-    });
+    window.initCodeTabs();
 
     // --- Product type icons ---
     var typeIcons = {

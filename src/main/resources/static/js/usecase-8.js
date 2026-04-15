@@ -13,14 +13,7 @@
     }
 
     // --- Code Tabs ---
-    document.querySelectorAll('.code-tab').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            document.querySelectorAll('.code-tab').forEach(function (t) { t.classList.remove('active'); });
-            document.querySelectorAll('.code-block').forEach(function (b) { b.classList.remove('active'); });
-            tab.classList.add('active');
-            document.getElementById('tab-' + tab.getAttribute('data-tab')).classList.add('active');
-        });
-    });
+    window.initCodeTabs();
 
     // --- Main Tab Toggle (CRUD / Search) ---
     var crudTab = document.getElementById('crud-tab');

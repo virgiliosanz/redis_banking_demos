@@ -7,8 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -55,7 +53,7 @@ public class DocumentSearchService {
     public Map<String, Object> vectorSearch(String query) {
         // Use real embeddings if OpenAI is configured, otherwise mock vectors
         float[] queryVector = getQueryVector(query);
-        byte[] vectorBytes = floatArrayToBytes(queryVector);
+        byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
 
         List<Map<String, Object>> results = executeVectorSearch(vectorBytes, "*", 10);
 
@@ -77,7 +75,7 @@ public class DocumentSearchService {
         String escaped = escapeQuery(query);
         // Use real embeddings if OpenAI is configured, otherwise mock vectors
         float[] queryVector = getQueryVector(query);
-        byte[] vectorBytes = floatArrayToBytes(queryVector);
+        byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
 
         // Use the text query as pre-filter for KNN
         String preFilter = "(" + escaped + ")";
@@ -142,7 +140,7 @@ public class DocumentSearchService {
             return response;
         }
 
-        String json = decodeObject(result);
+        String json = RedisSearchHelper.toStr(result);
         response.put("status", "OK");
         response.put("id", id);
         response.put("key", key);
@@ -173,7 +171,7 @@ public class DocumentSearchService {
             return response;
         }
 
-        String json = decodeObject(result);
+        String json = RedisSearchHelper.toStr(result);
         response.put("status", "OK");
         response.put("id", id);
         response.put("key", key);
@@ -198,7 +196,7 @@ public class DocumentSearchService {
         fullDoc.put("content", doc.getOrDefault("content", ""));
         fullDoc.put("tags", doc.getOrDefault("tags", "custom"));
         // Add a mock vector so it's indexed for search
-        fullDoc.put("vector", generateMockVector(fullDoc.get("title") + " " + fullDoc.get("summary")));
+        fullDoc.put("vector", DocumentDataLoader.generateVector(fullDoc.get("title") + " " + fullDoc.get("summary")));
 
         String json = toSimpleJson(fullDoc);
         String redisCmd = "JSON.SET " + key + " $ '" + json.replace("'", "\\'") + "'";
@@ -326,7 +324,7 @@ public class DocumentSearchService {
         int step = withScores ? 3 : 2;
         // First element is the total count
         for (int i = 1; i < list.size(); i += step) {
-            String docKey = decodeObject(list.get(i));
+            String docKey = RedisSearchHelper.toStr(list.get(i));
 
             double ftScore = 0.0;
             Object fieldsObj;
@@ -334,7 +332,7 @@ public class DocumentSearchService {
                 if (i + 2 >= list.size()) break;
                 // Parse the relevance score returned by RediSearch
                 try {
-                    ftScore = Double.parseDouble(decodeObject(list.get(i + 1)));
+                    ftScore = Double.parseDouble(RedisSearchHelper.toStr(list.get(i + 1)));
                 } catch (NumberFormatException e) {
                     ftScore = 0.0;
                 }
@@ -353,8 +351,8 @@ public class DocumentSearchService {
             }
 
             for (int j = 0; j + 1 < fields.size(); j += 2) {
-                String fieldName = decodeObject(fields.get(j));
-                String fieldValue = decodeObject(fields.get(j + 1));
+                String fieldName = RedisSearchHelper.toStr(fields.get(j));
+                String fieldValue = RedisSearchHelper.toStr(fields.get(j + 1));
                 if ("$.id".equals(fieldName)) {
                     // JSON path returns quoted value
                     doc.put("id", fieldValue.replace("\"", "").replace("[", "").replace("]", ""));
@@ -411,7 +409,7 @@ public class DocumentSearchService {
         }, true);
 
         if (result == null) return null;
-        String json = decodeObject(result);
+        String json = RedisSearchHelper.toStr(result);
         if (json == null || json.isEmpty()) return null;
 
         // Simple parse of the JSON response
@@ -435,25 +433,9 @@ public class DocumentSearchService {
         return json.substring(start, end);
     }
 
-    private String decodeObject(Object obj) {
-        if (obj == null) return "";
-        if (obj instanceof byte[] b) return new String(b, StandardCharsets.UTF_8);
-        return obj.toString();
-    }
-
-    private static byte[] floatArrayToBytes(float[] arr) {
-        ByteBuffer buffer = ByteBuffer.allocate(arr.length * 4).order(ByteOrder.LITTLE_ENDIAN);
-        for (float f : arr) buffer.putFloat(f);
-        return buffer.array();
-    }
-
     private static String escapeQuery(String query) {
         // Escape RediSearch special characters but keep spaces for multi-word search
         return query.replaceAll("([{}\\[\\]()\\\\@!\"~*<>:;./^$|&#+=-])", "\\\\$1");
-    }
-
-    private float[] generateMockVector(String text) {
-        return DocumentDataLoader.generateVector(text);
     }
 
     private String toSimpleJson(Map<String, Object> map) {

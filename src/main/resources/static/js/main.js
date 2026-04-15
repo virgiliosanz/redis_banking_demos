@@ -67,4 +67,18 @@
     window.formatJson = function (obj) {
         return JSON.stringify(obj, null, 2);
     };
+
+    // --- Code Tabs: shared initializer ---
+    window.initCodeTabs = function () {
+        document.querySelectorAll('.code-tab').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                document.querySelectorAll('.code-tab').forEach(function (t) { t.classList.remove('active'); });
+                document.querySelectorAll('.code-block, .code-tab-content').forEach(function (c) { c.classList.remove('active'); });
+                tab.classList.add('active');
+                var target = document.getElementById('tab-' + tab.getAttribute('data-tab'));
+                if (target) target.classList.add('active');
+                if (window.Prism) Prism.highlightAll();
+            });
+        });
+    };
 })();

@@ -20,15 +20,7 @@
     var ttlInterval = null;
 
     // --- Code tabs ---
-    document.querySelectorAll('.code-tab').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            document.querySelectorAll('.code-tab').forEach(function (t) { t.classList.remove('active'); });
-            document.querySelectorAll('.code-tab-content').forEach(function (c) { c.classList.remove('active'); });
-            tab.classList.add('active');
-            var target = document.getElementById('tab-' + tab.getAttribute('data-tab'));
-            if (target) target.classList.add('active');
-        });
-    });
+    window.initCodeTabs();
 
     // --- Gauge update ---
     function updateGauge(remaining, max) {
@@ -171,10 +163,5 @@
     // Load initial status
     refreshStatus();
 
-    // Re-highlight code after tab switch
-    document.querySelectorAll('.code-tab').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            if (window.Prism) Prism.highlightAll();
-        });
-    });
+
 })();

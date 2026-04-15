@@ -263,7 +263,7 @@ public class GeoFinderService {
 
         for (int i = 1; i < list.size(); i += 2) {
             if (i + 1 >= list.size()) break;
-            String docKey = decodeObj(list.get(i));
+            String docKey = RedisSearchHelper.toStr(list.get(i));
             Object fieldsObj = list.get(i + 1);
             if (!(fieldsObj instanceof List<?> fields)) continue;
 
@@ -273,8 +273,8 @@ public class GeoFinderService {
             doc.put("id", id);
 
             for (int j = 0; j + 1 < fields.size(); j += 2) {
-                String fn = decodeObj(fields.get(j));
-                String fv = decodeObj(fields.get(j + 1));
+                String fn = RedisSearchHelper.toStr(fields.get(j));
+                String fv = RedisSearchHelper.toStr(fields.get(j + 1));
                 // JSON fields come as $. path with JSON arrays
                 if ("$".equals(fn)) {
                     try {
@@ -296,11 +296,7 @@ public class GeoFinderService {
         return results;
     }
 
-    private String decodeObj(Object obj) {
-        if (obj == null) return "";
-        if (obj instanceof byte[] b) return new String(b, StandardCharsets.UTF_8);
-        return obj.toString();
-    }
+
 
     /** Haversine formula — distance in km */
     private double haversine(double lat1, double lon1, double lat2, double lon2) {
