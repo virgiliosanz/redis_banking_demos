@@ -123,6 +123,30 @@ a:hover {
     font-size: 0.85rem;
 }
 
+.theme-toggle {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.theme-toggle:hover {
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+}
+
+.theme-icon-light { display: block; }
+.theme-icon-dark { display: none; }
+
+[data-theme="dark"] .theme-icon-light { display: none; }
+[data-theme="dark"] .theme-icon-dark { display: block; }
+
 .nav-select {
     font-family: var(--font-primary);
     font-size: 0.85rem;
@@ -213,7 +237,17 @@ a:hover {
     align-items: center;
 }
 
-.card-icon { font-size: 1.75rem; }
+.card-icon {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+
+.card-icon-light { display: inline-block; }
+.card-icon-dark { display: none; }
+
+[data-theme="dark"] .card-icon-light { display: none; }
+[data-theme="dark"] .card-icon-dark { display: inline-block; }
 
 .card-number {
     font-family: var(--font-code);
