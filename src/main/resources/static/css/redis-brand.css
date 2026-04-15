@@ -1378,6 +1378,18 @@ a:hover {
     border-radius: 5px;
 }
 
+.doc-title-link {
+    color: var(--text-primary);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--text-muted);
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.doc-title-link:hover {
+    color: var(--redis-primary);
+    border-bottom-color: var(--redis-primary);
+}
+
 .doc-icon {
     font-size: 32px;
     flex-shrink: 0;

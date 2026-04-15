@@ -73,6 +73,19 @@ public class AssistantController {
     }
 
     /**
+     * Get a single knowledge base article by ID.
+     * GET /api/assistant/kb/{id}
+     */
+    @GetMapping("/kb/{id}")
+    public ResponseEntity<Map<String, String>> getKBArticle(@PathVariable String id) {
+        Map<String, String> article = assistantService.getKBArticle(id);
+        if (article == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "Article not found: " + id));
+        }
+        return ResponseEntity.ok(article);
+    }
+
+    /**
      * Streaming chat via SSE (requires OpenAI API key).
      * GET /api/assistant/chat/stream?sessionId=...&message=...&userName=...
      */

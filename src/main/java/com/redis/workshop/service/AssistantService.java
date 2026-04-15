@@ -443,6 +443,22 @@ public class AssistantService {
         return result;
     }
 
+    /** Get a single KB article by ID with full content. */
+    public Map<String, String> getKBArticle(String id) {
+        for (var art : kbArticles) {
+            if (art.get("id").equals(id)) {
+                Map<String, String> result = new LinkedHashMap<>();
+                result.put("id", art.get("id"));
+                result.put("title", art.get("title"));
+                result.put("content", art.get("content"));
+                result.put("tags", art.get("tags"));
+                result.put("source", art.get("source"));
+                return result;
+            }
+        }
+        return null;
+    }
+
     // ── Vector Search (real KNN via FT.SEARCH) ────────────────────────
     private List<Map<String, Object>> vectorSearch(String indexName, String query, int k) {
         float[] queryVector = openAiService.getEmbedding(query);
