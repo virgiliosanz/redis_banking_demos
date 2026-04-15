@@ -30,20 +30,20 @@
                         </marker>
                     </defs>
                     <rect x="10" y="30" width="120" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                    <text x="70" y="55" text-anchor="middle" font-size="12" font-weight="600">🏦 Client A</text>
+                    <text x="70" y="55" text-anchor="middle" font-size="12" font-weight="600">Client A</text>
                     <rect x="10" y="90" width="120" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                    <text x="70" y="115" text-anchor="middle" font-size="12" font-weight="600">🏦 Client B</text>
+                    <text x="70" y="115" text-anchor="middle" font-size="12" font-weight="600">Client B</text>
                     <line x1="130" y1="50" x2="250" y2="80" class="svg-arrow" stroke-width="2" marker-end="url(#uc13-arrow)"/>
                     <line x1="130" y1="110" x2="250" y2="80" class="svg-arrow" stroke-width="2" marker-end="url(#uc13-arrow)"/>
                     <rect x="250" y="55" width="180" height="50" rx="5" ry="5" class="svg-box svg-box-accent" stroke-width="1"/>
-                    <text x="340" y="75" text-anchor="middle" font-size="12" font-weight="600">⬡ Redis</text>
+                    <text x="340" y="75" text-anchor="middle" font-size="12" font-weight="600">Redis</text>
                     <text x="340" y="95" text-anchor="middle" font-size="11">SET key NX EX 30</text>
                     <line x1="430" y1="80" x2="520" y2="50" class="svg-arrow" stroke-width="2" marker-end="url(#uc13-arrow)"/>
                     <line x1="430" y1="80" x2="520" y2="110" class="svg-arrow" stroke-width="2" marker-end="url(#uc13-arrow)"/>
                     <rect x="520" y="25" width="160" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                    <text x="600" y="50" text-anchor="middle" font-size="12" font-weight="600">✅ Lock Acquired</text>
+                    <text x="600" y="50" text-anchor="middle" font-size="12" font-weight="600">Lock Acquired</text>
                     <rect x="520" y="85" width="160" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                    <text x="600" y="110" text-anchor="middle" font-size="12" font-weight="600">❌ Lock Denied</text>
+                    <text x="600" y="110" text-anchor="middle" font-size="12" font-weight="600">Lock Denied</text>
                 </svg>
             </div>
         </section>
@@ -75,7 +75,7 @@
 
                     <!-- Lock status -->
                     <div id="lockStatus" class="data-card" style="margin-bottom:16px;">
-                        <h3>🔒 Lock Status</h3>
+                        <h3>Lock Status</h3>
                         <div id="lockStatusContent" style="text-align:center; padding:16px;">
                             <span class="status-badge" id="lockBadge">● UNKNOWN</span>
                             <div id="lockHolder" style="margin-top:8px; font-size:0.9rem; color:var(--text-muted);"></div>
@@ -85,25 +85,25 @@
 
                     <!-- Actions -->
                     <div class="form-actions" style="margin-bottom:16px;">
-                        <button id="btnAcquire" class="btn btn-primary">🔒 Acquire Lock</button>
-                        <button id="btnRelease" class="btn btn-secondary">🔓 Release Lock</button>
-                        <button id="btnRefresh" class="btn btn-outline">↻ Refresh Status</button>
+                        <button id="btnAcquire" class="btn btn-primary">Acquire Lock</button>
+                        <button id="btnRelease" class="btn btn-secondary">Release Lock</button>
+                        <button id="btnRefresh" class="btn btn-outline">Refresh Status</button>
                     </div>
 
                     <!-- Contention simulation -->
                     <div class="data-card">
-                        <h3>⚡ Contention Simulation</h3>
+                        <h3>Contention Simulation</h3>
                         <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
                             3 concurrent services try to lock the same account simultaneously.
                             Only one wins — Redis SET NX guarantees mutual exclusion.
                         </p>
-                        <button id="btnSimulate" class="btn btn-primary" style="width:100%;">🏁 Simulate 3 Concurrent Clients</button>
+                        <button id="btnSimulate" class="btn btn-primary" style="width:100%;">Simulate 3 Concurrent Clients</button>
                         <div id="simulationResult" style="display:none; margin-top:12px;"></div>
                     </div>
 
                     <!-- Result log -->
                     <div id="resultLog" class="data-card" style="margin-top:16px; display:none;">
-                        <h3>📋 Last Operation</h3>
+                        <h3>Last Operation</h3>
                         <pre id="resultJson" class="result-json" style="font-size:0.8rem; max-height:200px; overflow:auto;"></pre>
                     </div>
                 </div>

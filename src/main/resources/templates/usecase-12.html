@@ -31,7 +31,7 @@
                         </marker>
                     </defs>
                     <rect x="20" y="60" width="100" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                    <text x="70" y="85" text-anchor="middle" font-size="20">📍</text>
+                    <text x="70" y="85" text-anchor="middle" font-size="13" font-weight="600">Loc</text>
                     <text x="70" y="105" text-anchor="middle" font-size="13" font-weight="600">Location</text>
                     <circle cx="165" cy="78" r="12" class="svg-step-circle"/>
                     <text x="165" y="83" text-anchor="middle" font-size="11" class="svg-step-text">1</text>
@@ -43,10 +43,10 @@
                     <text x="390" y="83" text-anchor="middle" font-size="11" class="svg-step-text">2</text>
                     <line x1="355" y1="75" x2="440" y2="50" class="svg-arrow" stroke-width="2" marker-end="url(#uc12-arrow)"/>
                     <rect x="450" y="25" width="140" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                    <text x="520" y="50" text-anchor="middle" font-size="12" font-weight="600">🏧 GEOSEARCH</text>
+                    <text x="520" y="50" text-anchor="middle" font-size="12" font-weight="600">GEOSEARCH</text>
                     <line x1="355" y1="105" x2="440" y2="130" class="svg-arrow" stroke-width="2" marker-end="url(#uc12-arrow)"/>
                     <rect x="450" y="110" width="140" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                    <text x="520" y="135" text-anchor="middle" font-size="12" font-weight="600">🔍 FT.SEARCH</text>
+                    <text x="520" y="135" text-anchor="middle" font-size="12" font-weight="600">FT.SEARCH</text>
                 </svg>
             </div>
         </section>
@@ -58,8 +58,8 @@
                 <div id="demo-container" class="demo-container">
                     <!-- Approach tabs -->
                     <div class="geo-tabs">
-                        <button class="geo-tab active" data-approach="native">🏧 Native Geospatial</button>
-                        <button class="geo-tab" data-approach="rqe">🔍 JSON + Query Engine</button>
+                        <button class="geo-tab active" data-approach="native">Native Geospatial</button>
+                        <button class="geo-tab" data-approach="rqe">JSON + Query Engine</button>
                     </div>
 
                     <!-- Preset locations -->
@@ -104,15 +104,15 @@
                     <div style="margin-bottom:12px;">
                         <label style="font-size:0.8rem; color:var(--text-muted);">Quick scenarios:</label>
                         <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
-                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4168" data-lng="-3.7038" data-radius="2" data-approach="native">📍 Sol — 2km</button>
-                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4530" data-lng="-3.6883" data-radius="3" data-approach="native">🏢 Chamartín — 3km</button>
-                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4065" data-lng="-3.6895" data-radius="1" data-approach="rqe" data-type="atm">🏧 ATMs near Atocha</button>
-                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4372" data-lng="-3.6920" data-radius="2" data-approach="rqe" data-type="branch">🏦 Branches Castellana</button>
+                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4168" data-lng="-3.7038" data-radius="2" data-approach="native">Sol — 2km</button>
+                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4530" data-lng="-3.6883" data-radius="3" data-approach="native">Chamartín — 3km</button>
+                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4065" data-lng="-3.6895" data-radius="1" data-approach="rqe" data-type="atm">ATMs near Atocha</button>
+                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4372" data-lng="-3.6920" data-radius="2" data-approach="rqe" data-type="branch">Branches Castellana</button>
                         </div>
                     </div>
 
                     <!-- Search button -->
-                    <button id="btnSearch" class="rl-btn rl-btn-primary" style="width:100%;margin-bottom:16px;">🔍 Search</button>
+                    <button id="btnSearch" class="rl-btn rl-btn-primary" style="width:100%;margin-bottom:16px;">Search</button>
 
                     <!-- Map -->
                     <div id="map" style="height:360px;border-radius:5px;margin-bottom:16px;"></div>
