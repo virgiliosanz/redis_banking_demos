@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${useCaseTitle}">Distributed Locking</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">UC13</span>
+            <h1 th:text="${useCaseTitle}">Distributed Locking</h1>
+        </div>
+
+        <section class="how-it-works">
+            <h2>How it works</h2>
+            <div class="how-it-works-steps">
+                <ol>
+                    <li><strong>Lock request:</strong> Client sends <code>SET workshop:lock:{accountId} {clientId} NX EX 30</code> — atomic acquire with TTL.</li>
+                    <li><strong>NX guarantee:</strong> Only the first client succeeds. Others get a denial — mutual exclusion enforced by Redis.</li>
+                    <li><strong>Safe release:</strong> A Lua script checks that the caller owns the lock before deleting — prevents accidental release.</li>
+                    <li><strong>Auto-expiry:</strong> EX ensures locks are released even if the holder crashes — no deadlocks.</li>
+                </ol>
+            </div>
+            <div class="how-it-works-diagram">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 160" width="700" height="160">
+                    <defs>
+                        <marker id="uc13-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" class="svg-arrow-head"/>
+                        </marker>
+                    </defs>
+                    <rect x="10" y="30" width="120" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="70" y="55" text-anchor="middle" font-size="12" font-weight="600">🏦 Client A</text>
+                    <rect x="10" y="90" width="120" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="70" y="115" text-anchor="middle" font-size="12" font-weight="600">🏦 Client B</text>
+                    <line x1="130" y1="50" x2="250" y2="80" class="svg-arrow" stroke-width="2" marker-end="url(#uc13-arrow)"/>
+                    <line x1="130" y1="110" x2="250" y2="80" class="svg-arrow" stroke-width="2" marker-end="url(#uc13-arrow)"/>
+                    <rect x="250" y="55" width="180" height="50" rx="5" ry="5" class="svg-box svg-box-accent" stroke-width="1"/>
+                    <text x="340" y="75" text-anchor="middle" font-size="12" font-weight="600">⬡ Redis</text>
+                    <text x="340" y="95" text-anchor="middle" font-size="11">SET key NX EX 30</text>
+                    <line x1="430" y1="80" x2="520" y2="50" class="svg-arrow" stroke-width="2" marker-end="url(#uc13-arrow)"/>
+                    <line x1="430" y1="80" x2="520" y2="110" class="svg-arrow" stroke-width="2" marker-end="url(#uc13-arrow)"/>
+                    <rect x="520" y="25" width="160" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="600" y="50" text-anchor="middle" font-size="12" font-weight="600">✅ Lock Acquired</text>
+                    <rect x="520" y="85" width="160" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="600" y="110" text-anchor="middle" font-size="12" font-weight="600">❌ Lock Denied</text>
+                </svg>
+            </div>
+        </section>
+
+        <div class="usecase-panels">
+            <!-- LEFT: Live Demo Panel -->
+            <section class="panel demo-panel">
+                <h2>Live Demo</h2>
+                <div id="demo-container" class="demo-container">
+                    <p class="demo-scenario">
+                        <strong>Scenario:</strong> Lock a bank account during a wire transfer.
+                        Only one service instance can hold the lock — others are denied until it's released or expires.
+                    </p>
+
+                    <!-- Resource selector -->
+                    <div class="form-group">
+                        <label for="resourceSelect">Account to Lock</label>
+                        <select id="resourceSelect" class="form-control">
+                            <option value="acc-1001">ACC-1001 — Ana García (Savings)</option>
+                            <option value="acc-1002">ACC-1002 — Carlos Ruiz (Current)</option>
+                            <option value="acc-1003">ACC-1003 — María López (Business)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="clientIdInput">Client ID (who acquires the lock)</label>
+                        <input type="text" id="clientIdInput" class="form-input" value="transfer-svc-1" placeholder="e.g. transfer-svc-1"/>
+                    </div>
+
+                    <!-- Lock status -->
+                    <div id="lockStatus" class="data-card" style="margin-bottom:16px;">
+                        <h3>🔒 Lock Status</h3>
+                        <div id="lockStatusContent" style="text-align:center; padding:16px;">
+                            <span class="status-badge" id="lockBadge">● UNKNOWN</span>
+                            <div id="lockHolder" style="margin-top:8px; font-size:0.9rem; color:var(--text-muted);"></div>
+                            <div id="lockTtl" style="margin-top:4px; font-size:1.4rem; font-weight:700; font-family:var(--font-mono);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="form-actions" style="margin-bottom:16px;">
+                        <button id="btnAcquire" class="btn btn-primary">🔒 Acquire Lock</button>
+                        <button id="btnRelease" class="btn btn-secondary">🔓 Release Lock</button>
+                        <button id="btnRefresh" class="btn btn-outline">↻ Refresh Status</button>
+                    </div>
+
+                    <!-- Contention simulation -->
+                    <div class="data-card">
+                        <h3>⚡ Contention Simulation</h3>
+                        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
+                            3 concurrent services try to lock the same account simultaneously.
+                            Only one wins — Redis SET NX guarantees mutual exclusion.
+                        </p>
+                        <button id="btnSimulate" class="btn btn-primary" style="width:100%;">🏁 Simulate 3 Concurrent Clients</button>
+                        <div id="simulationResult" style="display:none; margin-top:12px;"></div>
+                    </div>
+
+                    <!-- Result log -->
+                    <div id="resultLog" class="data-card" style="margin-top:16px; display:none;">
+                        <h3>📋 Last Operation</h3>
+                        <pre id="resultJson" class="result-json" style="font-size:0.8rem; max-height:200px; overflow:auto;"></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT: Code Showcase Panel -->
+            <section class="panel code-panel">
+                <h2>Code Showcase</h2>
+                <div class="code-container">
+                    <div class="code-tabs">
+                        <button class="code-tab" data-tab="java">Java</button>
+                        <button class="code-tab active" data-tab="cli">Redis CLI</button>
+                    </div>
+
+                    <div class="code-block" id="tab-java">
+                        <pre><code class="language-java">// 1. Acquire lock — SET NX EX (atomic)
+String key = "workshop:lock:" + accountId;
+Boolean acquired = redis.opsForValue()
+    .setIfAbsent(key, clientId,
+        Duration.ofSeconds(30));  // NX + EX
+
+if (acquired) {
+    // Lock acquired — proceed with transfer
+} else {
+    // Lock held by another client — retry or fail
+}
+
+// 2. Safe release — Lua script
+// Only delete if WE hold the lock
+String luaScript =
+    "if redis.call('GET', KEYS[1]) == ARGV[1] then " +
+    "  return redis.call('DEL', KEYS[1]) " +
+    "else " +
+    "  return 0 " +
+    "end";
+
+Long result = redis.execute(
+    new DefaultRedisScript&lt;&gt;(luaScript, Long.class),
+    List.of(key),   // KEYS[1]
+    clientId         // ARGV[1]
+);
+// result == 1 → released, 0 → not our lock
+
+// 3. Check lock status
+String holder = redis.opsForValue().get(key);
+Long ttl = redis.getExpire(key, TimeUnit.SECONDS);</code></pre>
+                    </div>
+
+                    <div class="code-block active" id="tab-cli">
+                        <pre><code class="language-bash"># 1. Acquire lock (atomic SET NX EX)
+SET workshop:lock:acc-1001 transfer-svc-1 NX EX 30
+# → OK if acquired, (nil) if already held
+
+# 2. Check who holds the lock
+GET workshop:lock:acc-1001
+# → "transfer-svc-1"
+
+# 3. Check remaining TTL
+TTL workshop:lock:acc-1001
+# → 28 (seconds remaining)
+
+# 4. Try to acquire from another client (DENIED)
+SET workshop:lock:acc-1001 transfer-svc-2 NX EX 30
+# → (nil)  ← NX prevents overwrite
+
+# 5. Safe release with Lua script
+EVAL "if redis.call('GET', KEYS[1]) == ARGV[1] \
+  then return redis.call('DEL', KEYS[1]) \
+  else return 0 end" \
+  1 workshop:lock:acc-1001 transfer-svc-1
+# → 1 (released)
+
+# 6. Wrong client tries to release (DENIED)
+EVAL "if redis.call('GET', KEYS[1]) == ARGV[1] \
+  then return redis.call('DEL', KEYS[1]) \
+  else return 0 end" \
+  1 workshop:lock:acc-1001 transfer-svc-2
+# → 0 (not your lock!)</code></pre>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div layout:fragment="scripts">
+        <script th:src="@{/js/usecase-13.js}"></script>
+    </div>
+</body>
+</html>

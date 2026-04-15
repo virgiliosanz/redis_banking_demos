@@ -24,7 +24,8 @@ public class UseCaseController {
             Map.entry(9, "AI Agent Memory + RAG"),
             Map.entry(10, "Cache-Aside Pattern"),
             Map.entry(11, "Real-time Transaction Monitoring"),
-            Map.entry(12, "ATM & Branch Finder (Geospatial)")
+            Map.entry(12, "ATM & Branch Finder (Geospatial)"),
+            Map.entry(13, "Distributed Locking")
     );
 
     @GetMapping("/{id}")

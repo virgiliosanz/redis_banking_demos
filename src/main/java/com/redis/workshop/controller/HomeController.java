@@ -46,7 +46,10 @@ public class HomeController {
                     "icon", "📈", "features", "Streams · XADD · XRANGE · XLEN"),
             Map.of("id", "12", "title", "ATM & Branch Finder",
                     "description", "Find nearest ATMs and branches with Redis Geospatial",
-                    "icon", "📍", "features", "Geo · JSON · RQE · GEOSEARCH")
+                    "icon", "📍", "features", "Geo · JSON · RQE · GEOSEARCH"),
+            Map.of("id", "13", "title", "Distributed Locking",
+                    "description", "Lock accounts during wire transfers with SET NX EX + Lua",
+                    "icon", "🔒", "features", "SET NX EX · Lua · EVAL · TTL")
     );
 
     @GetMapping("/")
