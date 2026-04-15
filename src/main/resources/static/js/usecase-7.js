@@ -1,205 +1,151 @@
 /**
- * UC7: AI Banking Assistant — Memory + RAG
- * Chat interface with short-term, long-term memory and RAG inspection
+ * UC7: Feature Store for Risk Scoring
+ * Interactive demo: client feature dashboard, transaction simulator
  */
 (function () {
     'use strict';
 
-    // --- State ---
-    var sessionId = 'sess-' + Math.random().toString(36).substring(2, 10);
-    var userName = 'Demo User';
-
     // --- DOM refs ---
-    var chatMessages = document.getElementById('chat-messages');
-    var chatInput = document.getElementById('chatInput');
-    var sendBtn = document.getElementById('sendBtn');
-    var shortTermInfo = document.getElementById('short-term-info');
-    var memoryResults = document.getElementById('memory-results');
-    var ragResults = document.getElementById('rag-results');
+    var clientSelect = document.getElementById('clientSelect');
+    var featureCard = document.getElementById('feature-card');
+    var featureTable = document.getElementById('feature-table');
+    var redisKeyDisplay = document.getElementById('redis-key-display');
+    var riskBadgeContainer = document.getElementById('risk-badge-container');
+    var riskBadge = document.getElementById('risk-badge');
+    var simulateBtn = document.getElementById('simulateBtn');
+    var txAmount = document.getElementById('txAmount');
+    var txCountry = document.getElementById('txCountry');
     var commandsCard = document.getElementById('commands-card');
     var commandsOutput = document.getElementById('commands-output');
-    var latencyDisplay = document.getElementById('latency-display');
-    var resetBtn = document.getElementById('resetBtn');
+
+    // Feature labels for display
+    var FEATURE_LABELS = {
+        tx_count_1h: 'Transactions (1h)',
+        tx_count_24h: 'Transactions (24h)',
+        tx_amount_avg_24h: 'Avg Amount 24h (€)',
+        tx_amount_max_24h: 'Max Amount 24h (€)',
+        distinct_countries_7d: 'Distinct Countries (7d)',
+        distinct_devices_30d: 'Distinct Devices (30d)',
+        last_tx_timestamp: 'Last Transaction',
+        risk_score: 'Risk Score'
+    };
 
     // --- Code Tabs ---
-    document.querySelectorAll('.code-tab').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            document.querySelectorAll('.code-tab').forEach(function (t) { t.classList.remove('active'); });
-            document.querySelectorAll('.code-block').forEach(function (b) { b.classList.remove('active'); });
-            tab.classList.add('active');
-            document.getElementById('tab-' + tab.getAttribute('data-tab')).classList.add('active');
-        });
-    });
+    window.initCodeTabs();
 
     // --- Helpers ---
-    function escapeHtml(text) {
-        var div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+    function buildRow(label, value, highlight) {
+        var cls = highlight ? ' style="font-weight:700; color:var(--redis-primary);"' : '';
+        return '<div class="data-row"><span class="data-label">' + label +
+               '</span><span class="data-value"' + cls + '>' + value + '</span></div>';
     }
 
-    function formatMarkdown(text) {
-        // Simple markdown: **bold**, *italic*, bullet points, newlines
-        var html = escapeHtml(text);
-        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-        html = html.replace(/^• (.+)$/gm, '<span style="display:block; padding-left:16px;">• $1</span>');
-        html = html.replace(/\n/g, '<br/>');
-        return html;
+    function formatTimestamp(ts) {
+        if (!ts || ts === '0') return '—';
+        var d = new Date(parseInt(ts));
+        return d.toLocaleTimeString() + ' ' + d.toLocaleDateString();
     }
 
-    function addMessage(role, content) {
-        // Remove welcome message
-        var welcome = chatMessages.querySelector('.chat-welcome');
-        if (welcome) welcome.remove();
-
-        var msgDiv = document.createElement('div');
-        msgDiv.style.cssText = 'margin-bottom:12px; padding:10px 14px; border-radius:var(--border-radius); max-width:90%; font-size:0.85rem; line-height:1.5;';
-
-        if (role === 'user') {
-            msgDiv.style.cssText += 'background:var(--redis-primary); color:#fff; margin-left:auto; text-align:right;';
-            msgDiv.innerHTML = escapeHtml(content);
-        } else {
-            msgDiv.style.cssText += 'background:var(--bg-tertiary); color:var(--text-primary);';
-            msgDiv.innerHTML = formatMarkdown(content);
-        }
-
-        chatMessages.appendChild(msgDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+    function getRiskLevel(score) {
+        var s = parseInt(score);
+        if (s >= 70) return { label: 'HIGH RISK (' + s + ')', bg: 'rgba(255,68,56,0.15)', color: '#FF4438' };
+        if (s >= 40) return { label: 'MEDIUM RISK (' + s + ')', bg: 'rgba(255,170,0,0.15)', color: '#cc8800' };
+        return { label: 'LOW RISK (' + s + ')', bg: 'rgba(10,126,62,0.15)', color: '#0a7e3e' };
     }
 
-    function addTypingIndicator() {
-        var ind = document.createElement('div');
-        ind.id = 'typing-indicator';
-        ind.style.cssText = 'margin-bottom:12px; padding:10px 14px; border-radius:var(--border-radius); background:var(--bg-tertiary); color:var(--text-muted); font-size:0.85rem; font-style:italic;';
-        ind.textContent = 'AI is thinking...';
-        chatMessages.appendChild(ind);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-
-    function removeTypingIndicator() {
-        var ind = document.getElementById('typing-indicator');
-        if (ind) ind.remove();
-    }
-
-    // --- Update Memory Inspection Panel ---
-    function updateShortTermMemory() {
-        window.workshopGet('/api/assistant/conversation/' + sessionId).then(function (data) {
-            if (!data.exists) {
-                shortTermInfo.innerHTML = '<span style="color:var(--text-muted);">No active conversation yet.</span>';
-                return;
+    // --- Load clients into selector ---
+    function loadClients() {
+        window.workshopGet('/api/features/clients').then(function (clients) {
+            clientSelect.innerHTML = '';
+            clients.forEach(function (c) {
+                var opt = document.createElement('option');
+                opt.value = c.clientId;
+                opt.textContent = c.clientId + ' — ' + c.name + ' (' + c.segment + ')';
+                clientSelect.appendChild(opt);
+            });
+            if (clients.length > 0) {
+                loadFeatures(clients[0].clientId);
             }
-            var msgs = data.messages || [];
-            var html = '';
-            html += '<div class="data-row"><span class="data-label">Redis Key</span><span class="data-value" style="font-family:var(--font-code); font-size:0.7rem;">' + escapeHtml(data.redisKey) + '</span></div>';
-            html += '<div class="data-row"><span class="data-label">Messages</span><span class="data-value">' + msgs.length + '</span></div>';
-            html += '<div class="data-row"><span class="data-label">TTL</span><span class="data-value" style="color:var(--redis-primary); font-weight:600;">' + data.ttl + 's</span></div>';
-            html += '<div class="data-row"><span class="data-label">User</span><span class="data-value">' + escapeHtml(data.userName || '') + '</span></div>';
-            html += '<div class="data-row"><span class="data-label">Last Active</span><span class="data-value" style="font-size:0.75rem;">' + (data.lastActive || '—') + '</span></div>';
-            shortTermInfo.innerHTML = html;
         });
     }
 
-    function updateMemoryResults(memories) {
-        if (!memories || memories.length === 0) {
-            memoryResults.innerHTML = '<span style="color:var(--text-muted);">No relevant memories found for this query.</span>';
+    // --- Load and display features for a client ---
+    function loadFeatures(clientId) {
+        window.workshopGet('/api/features/client/' + clientId).then(function (data) {
+            if (data.error) return;
+
+            featureCard.style.display = '';
+            riskBadgeContainer.style.display = '';
+            redisKeyDisplay.textContent = data.redisKey;
+
+            var features = data.features;
+            var rows = '';
+            var keys = Object.keys(FEATURE_LABELS);
+            keys.forEach(function (key) {
+                var val = features[key] || '—';
+                var label = FEATURE_LABELS[key];
+                if (key === 'last_tx_timestamp') {
+                    val = formatTimestamp(val);
+                }
+                var isRisk = (key === 'risk_score');
+                rows += buildRow(label, val, isRisk);
+            });
+            featureTable.innerHTML = rows;
+
+            // Risk badge
+            var risk = getRiskLevel(features.risk_score || '0');
+            riskBadge.textContent = risk.label;
+            riskBadge.style.background = risk.bg;
+            riskBadge.style.color = risk.color;
+        });
+    }
+
+    // --- Client selector change ---
+    clientSelect.addEventListener('change', function () {
+        loadFeatures(clientSelect.value);
+        commandsCard.style.display = 'none';
+    });
+
+    // --- Simulate transaction ---
+    simulateBtn.addEventListener('click', function () {
+        var clientId = clientSelect.value;
+        var amount = parseFloat(txAmount.value);
+        if (!amount || amount <= 0) {
+            txAmount.style.borderColor = 'var(--redis-primary)';
             return;
         }
-        var html = '';
-        memories.forEach(function (mem) {
-            html += '<div style="padding:6px 0; border-bottom:1px solid var(--border-color);">';
-            html += '<div style="font-weight:600; font-size:0.8rem;">🧠 ' + escapeHtml(mem.summary) + '</div>';
-            html += '<div style="color:var(--text-muted); font-size:0.7rem;">' + escapeHtml(mem.date) + ' — Tags: ' + escapeHtml(mem.tags) + '</div>';
-            html += '</div>';
-        });
-        memoryResults.innerHTML = html;
-    }
+        txAmount.style.borderColor = '';
 
-    function updateRagResults(docs) {
-        if (!docs || docs.length === 0) {
-            ragResults.innerHTML = '<span style="color:var(--text-muted);">No relevant documents found for this query.</span>';
-            return;
-        }
-        var html = '';
-        docs.forEach(function (doc) {
-            html += '<div style="padding:6px 0; border-bottom:1px solid var(--border-color);">';
-            html += '<div style="font-weight:600; font-size:0.8rem;">📄 ' + escapeHtml(doc.title) + '</div>';
-            html += '<div style="color:var(--text-muted); font-size:0.7rem;">Tags: ' + escapeHtml(doc.tags) + '</div>';
-            html += '</div>';
-        });
-        ragResults.innerHTML = html;
-    }
+        simulateBtn.disabled = true;
+        simulateBtn.textContent = 'Processing...';
 
-    // --- Send Message ---
-    function sendMessage() {
-        var message = chatInput.value.trim();
-        if (!message) return;
-
-        chatInput.value = '';
-        sendBtn.disabled = true;
-        sendBtn.textContent = '...';
-
-        addMessage('user', message);
-        addTypingIndicator();
-
-        window.workshopFetch('/api/assistant/chat', {
-            sessionId: sessionId,
-            userName: userName,
-            message: message
+        window.workshopFetch('/api/features/simulate', {
+            clientId: clientId,
+            amount: amount,
+            country: txCountry.value
         }).then(function (data) {
-            removeTypingIndicator();
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Send';
+            simulateBtn.disabled = false;
+            simulateBtn.textContent = 'Simulate Transaction';
 
-            if (data.error) {
-                addMessage('assistant', 'Sorry, something went wrong: ' + data.error);
-                return;
-            }
-
-            addMessage('assistant', data.response);
-
-            // Update inspection panels
-            updateShortTermMemory();
-            updateMemoryResults(data.memoriesRetrieved);
-            updateRagResults(data.kbDocsRetrieved);
-
-            // Show Redis commands
+            // Show executed Redis commands
             if (data.redisCommands) {
                 commandsCard.style.display = '';
                 commandsOutput.textContent = data.redisCommands.join('\n');
             }
-            if (data.latencyMs !== undefined) {
-                latencyDisplay.textContent = '⏱ Total latency: ' + data.latencyMs + 'ms';
-            }
+
+            // Refresh feature dashboard
+            loadFeatures(clientId);
         }).catch(function () {
-            removeTypingIndicator();
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Send';
-            addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
-        });
-    }
-
-    // --- Event Listeners ---
-    sendBtn.addEventListener('click', sendMessage);
-    chatInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') sendMessage();
-    });
-
-    resetBtn.addEventListener('click', function () {
-        resetBtn.disabled = true;
-        resetBtn.textContent = 'Resetting...';
-        window.workshopFetch('/api/assistant/reset', {}).then(function () {
-            sessionId = 'sess-' + Math.random().toString(36).substring(2, 10);
-            chatMessages.innerHTML = '<div class="chat-welcome" style="color:var(--text-muted); font-style:italic; padding:16px 0; text-align:center;">Type a message below to start chatting. Try asking about transfers, accounts, or investments.</div>';
-            shortTermInfo.innerHTML = '<span style="color:var(--text-muted);">No active conversation yet.</span>';
-            memoryResults.innerHTML = '<span style="color:var(--text-muted);">No memories retrieved yet.</span>';
-            ragResults.innerHTML = '<span style="color:var(--text-muted);">No documents retrieved yet.</span>';
-            commandsCard.style.display = 'none';
-            resetBtn.disabled = false;
-            resetBtn.textContent = '🔄 Reset Demo';
+            simulateBtn.disabled = false;
+            simulateBtn.textContent = 'Simulate Transaction';
         });
     });
 
-    // Focus input on load
-    chatInput.focus();
+    // Enter key on amount field
+    txAmount.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') simulateBtn.click();
+    });
+
+    // --- Init ---
+    loadClients();
 })();

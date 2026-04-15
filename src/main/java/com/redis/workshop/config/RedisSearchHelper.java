@@ -5,9 +5,13 @@ import io.lettuce.core.codec.ByteArrayCodec;
 import io.lettuce.core.output.NestedMultiOutput;
 import io.lettuce.core.protocol.CommandArgs;
 import io.lettuce.core.protocol.ProtocolKeyword;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -19,6 +23,8 @@ import java.util.*;
  */
 @Component
 public class RedisSearchHelper {
+
+    private static final Logger log = LoggerFactory.getLogger(RedisSearchHelper.class);
 
     private static final ProtocolKeyword FT_SEARCH = new ProtocolKeyword() {
         @Override public byte[] getBytes() { return "FT.SEARCH".getBytes(StandardCharsets.UTF_8); }
@@ -66,7 +72,8 @@ public class RedisSearchHelper {
             }
 
             NestedMultiOutput<byte[], byte[]> output = new NestedMultiOutput<>(codec);
-            return statefulConn.sync().dispatch(FT_SEARCH, output, args);
+            List<Object> result = statefulConn.sync().dispatch(FT_SEARCH, output, args);
+            return result;
         });
     }
 
@@ -94,7 +101,8 @@ public class RedisSearchHelper {
             }
 
             NestedMultiOutput<byte[], byte[]> output = new NestedMultiOutput<>(codec);
-            return statefulConn.sync().dispatch(FT_SEARCH, output, args);
+            List<Object> result = statefulConn.sync().dispatch(FT_SEARCH, output, args);
+            return result;
         });
     }
 
@@ -128,5 +136,16 @@ public class RedisSearchHelper {
         if (obj instanceof byte[] bytes) return new String(bytes, StandardCharsets.UTF_8);
         if (obj instanceof String s) return s;
         return obj.toString();
+    }
+
+    /**
+     * Convert float[] to little-endian byte array for Redis FLOAT32 vectors.
+     */
+    public static byte[] vectorToBytes(float[] vector) {
+        ByteBuffer buffer = ByteBuffer.allocate(vector.length * 4).order(ByteOrder.LITTLE_ENDIAN);
+        for (float f : vector) {
+            buffer.putFloat(f);
+        }
+        return buffer.array();
     }
 }

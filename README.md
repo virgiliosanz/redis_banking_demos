@@ -63,6 +63,7 @@ src/main/resources/
 │   └── usecase-{1..13}.html        # Use case pages
 └── static/
     ├── css/redis-brand.css         # Redis brand design tokens
+    ├── img/icons/{light,dark}/   # Redis brand icons per theme
     ├── js/main.js                  # Dark mode toggle + utils
     ├── js/usecase-{1..13}.js       # Per-use-case JS
     └── vendor/prism/               # Syntax highlighting
@@ -73,6 +74,14 @@ src/main/resources/
 - **Backend**: Spring Boot 3.4.x, Spring Data Redis (Lettuce), Java 17
 - **Frontend**: Thymeleaf + Vanilla JS, Redis brand CSS, Prism.js
 - **Database**: Redis 8 (RQE, JSON, Search, vector support)
+
+## UI Features
+
+- **Redis brand icons** — Each use case card uses official Redis PNG icons with automatic light/dark theme switching
+- **Dark/light mode** — Clean SVG toggle (sun/moon) with system preference detection
+- **No emojis** — All UI elements use text labels and SVG icons for a professional look
+- **Code showcase** — Each use case includes curated Java + Redis CLI snippets with Prism.js syntax highlighting
+- **Responsive layout** — Two-panel grid (demo + code) that adapts to mobile
 
 ## Redis Connection
 
