@@ -1220,6 +1220,15 @@ a:hover {
     fill: #FF4438;
 }
 
+.how-it-works-diagram svg .svg-redis-box {
+    fill: var(--bg-secondary);
+    stroke: var(--redis-primary);
+}
+
+.how-it-works-diagram svg .svg-muted-text {
+    fill: var(--text-muted);
+}
+
 .how-it-works-diagram svg .svg-step-circle {
     fill: #FF4438;
 }
