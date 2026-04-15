@@ -32,9 +32,9 @@
                     <rect x="20" y="20" width="130" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
                     <text x="85" y="43" text-anchor="middle" font-size="12">&lt;/&gt; Web App</text>
                     <rect x="20" y="65" width="130" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                    <text x="85" y="88" text-anchor="middle" font-size="12">📱 Mobile App</text>
+                    <text x="85" y="88" text-anchor="middle" font-size="12">Mobile App</text>
                     <rect x="20" y="110" width="130" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                    <text x="85" y="133" text-anchor="middle" font-size="12">⭐ AI Agent</text>
+                    <text x="85" y="133" text-anchor="middle" font-size="12">AI Agent</text>
                     <!-- Step 1 -->
                     <circle cx="200" cy="63" r="12" class="svg-step-circle"/>
                     <text x="200" y="68" text-anchor="middle" font-size="11" class="svg-step-text">1</text>
@@ -65,8 +65,8 @@
 
                 <!-- Main Tab Toggle -->
                 <div style="display:flex; gap:8px; margin-bottom:16px;">
-                    <button class="btn btn-sm doc-mode-btn active" id="tab-crud-btn" data-main-tab="crud">📝 CRUD Operations</button>
-                    <button class="btn btn-sm doc-mode-btn" id="tab-search-btn" data-main-tab="search">🔍 Search</button>
+                    <button class="btn btn-sm doc-mode-btn active" id="tab-crud-btn" data-main-tab="crud">CRUD Operations</button>
+                    <button class="btn btn-sm doc-mode-btn" id="tab-search-btn" data-main-tab="search">Search</button>
                 </div>
 
                 <!-- ====== CRUD TAB ====== -->
@@ -74,7 +74,7 @@
 
                     <!-- Section 1: Read Document by ID -->
                     <div class="data-card" style="margin-bottom:16px;">
-                        <h3>📖 Read Document by ID</h3>
+                        <h3>Read Document by ID</h3>
                         <div class="form-group">
                             <label for="readDocId">Document ID</label>
                             <div style="display:flex; gap:8px;">
@@ -98,7 +98,7 @@
 
                     <!-- Section 2: Read Specific Field -->
                     <div class="data-card" style="margin-bottom:16px;">
-                        <h3>🔎 Read Specific Field</h3>
+                        <h3>Read Specific Field</h3>
                         <div class="form-group">
                             <label>Document ID + JSONPath</label>
                             <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -127,7 +127,7 @@
 
                     <!-- Section 3: Create Document -->
                     <div class="data-card" style="margin-bottom:16px;">
-                        <h3>➕ Create Document</h3>
+                        <h3>Create Document</h3>
                         <div class="form-group">
                             <label for="createTitle">Title</label>
                             <input type="text" id="createTitle" class="form-input" placeholder="e.g. AML Transaction Monitoring"/>
@@ -151,7 +151,7 @@
                             <label for="createTags">Tags (comma-separated)</label>
                             <input type="text" id="createTags" class="form-input" placeholder="e.g. aml,monitoring,transactions"/>
                         </div>
-                        <button id="createDocBtn" class="btn btn-primary" style="width:100%;">➕ Create Document</button>
+                        <button id="createDocBtn" class="btn btn-primary" style="width:100%;">Create Document</button>
                         <div id="create-cmd" class="data-card" style="display:none; background:var(--bg-tertiary); margin-top:8px;">
                             <h3>Redis Command</h3>
                             <pre id="create-cmd-output" style="font-size:0.72rem; margin:0; white-space:pre-wrap; color:var(--text-secondary); font-family:var(--font-code);"></pre>
@@ -161,7 +161,7 @@
 
                     <!-- Section 4: Query by Field -->
                     <div class="data-card" style="margin-bottom:16px;">
-                        <h3>🔍 Query by Field</h3>
+                        <h3>Query by Field</h3>
                         <div class="form-group">
                             <label>Field + Value</label>
                             <div style="display:flex; gap:8px;">
@@ -194,9 +194,9 @@
                     <div class="form-group">
                         <label>Search Mode</label>
                         <div id="mode-toggle" style="display:flex; gap:8px;">
-                            <button class="btn btn-sm doc-mode-btn active" data-mode="full-text">📝 Full-Text</button>
-                            <button class="btn btn-sm doc-mode-btn" data-mode="vector">🧠 Vector</button>
-                            <button class="btn btn-sm doc-mode-btn" data-mode="hybrid">⚡ Hybrid</button>
+                            <button class="btn btn-sm doc-mode-btn active" data-mode="full-text">Full-Text</button>
+                            <button class="btn btn-sm doc-mode-btn" data-mode="vector">Vector</button>
+                            <button class="btn btn-sm doc-mode-btn" data-mode="hybrid">Hybrid</button>
                         </div>
                     </div>
 
@@ -205,18 +205,18 @@
                         <label for="searchInput">Search Regulation Documents</label>
                         <div style="display:flex; gap:8px;">
                             <input type="text" id="searchInput" class="form-input" placeholder="e.g. payment services, data protection, capital requirements..." style="flex:1;"/>
-                            <button id="searchBtn" class="btn btn-primary">🔍 Search</button>
+                            <button id="searchBtn" class="btn btn-primary">Search</button>
                         </div>
                     </div>
 
                     <!-- Quick Searches -->
                     <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
-                        <button class="btn btn-sm btn-secondary doc-quick" data-q="payment services">💳 payment services</button>
-                        <button class="btn btn-sm btn-secondary doc-quick" data-q="data protection rights">🔒 data protection rights</button>
-                        <button class="btn btn-sm btn-secondary doc-quick" data-q="operational resilience">🛡️ operational resilience</button>
-                        <button class="btn btn-sm btn-secondary doc-quick" data-q="third party risk">🔗 third-party risk</button>
-                        <button class="btn btn-sm btn-secondary doc-quick" data-q="strong customer authentication">🔐 strong authentication</button>
-                        <button class="btn btn-sm btn-secondary doc-quick" data-q="incident reporting">📋 incident reporting</button>
+                        <button class="btn btn-sm btn-secondary doc-quick" data-q="payment services">payment services</button>
+                        <button class="btn btn-sm btn-secondary doc-quick" data-q="data protection rights">data protection rights</button>
+                        <button class="btn btn-sm btn-secondary doc-quick" data-q="operational resilience">operational resilience</button>
+                        <button class="btn btn-sm btn-secondary doc-quick" data-q="third party risk">third-party risk</button>
+                        <button class="btn btn-sm btn-secondary doc-quick" data-q="strong customer authentication">strong authentication</button>
+                        <button class="btn btn-sm btn-secondary doc-quick" data-q="incident reporting">incident reporting</button>
                     </div>
 
                     <!-- Redis Command Executed -->

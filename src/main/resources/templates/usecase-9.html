@@ -36,14 +36,13 @@
                             </defs>
                             <!-- User -->
                             <rect x="20" y="70" width="90" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                            <text x="65" y="95" text-anchor="middle" font-size="20">👤</text>
-                            <text x="65" y="115" text-anchor="middle" font-size="13" font-weight="600">User</text>
+                            <text x="65" y="95" text-anchor="middle" font-size="12" font-weight="600">User</text>
+                            <text x="65" y="115" text-anchor="middle" font-size="10" class="svg-label">Request</text>
                             <!-- Arrow User ↔ Agent -->
                             <line x1="110" y1="100" x2="170" y2="100" class="svg-arrow" stroke-width="2" marker-end="url(#uc9a-arrow)"/>
                             <!-- AI Agent -->
                             <rect x="180" y="70" width="110" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                            <text x="235" y="95" text-anchor="middle" font-size="18">🤖</text>
-                            <text x="235" y="115" text-anchor="middle" font-size="13" font-weight="600">AI Agent</text>
+                            <text x="235" y="97" text-anchor="middle" font-size="13" font-weight="600">AI Agent</text>
                             <!-- Tools above agent -->
                             <rect x="140" y="10" width="55" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
                             <text x="167" y="30" text-anchor="middle" font-size="10">Tool 1</text>
@@ -56,7 +55,7 @@
                             <line x1="260" y1="70" x2="290" y2="42" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9a-arrow)"/>
                             <!-- LLM below agent -->
                             <rect x="195" y="160" width="80" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                            <text x="235" y="183" text-anchor="middle" font-size="12" font-weight="600">🧠 LLM</text>
+                            <text x="235" y="183" text-anchor="middle" font-size="12" font-weight="600">LLM</text>
                             <line x1="235" y1="130" x2="235" y2="158" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9a-arrow)"/>
                             <!-- Arrow Agent → Short-term memory -->
                             <line x1="290" y1="100" x2="370" y2="100" class="svg-arrow" stroke-width="2" marker-end="url(#uc9a-arrow)"/>
@@ -94,7 +93,7 @@
                             </defs>
                             <!-- Question -->
                             <rect x="20" y="50" width="100" height="45" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                            <text x="70" y="68" text-anchor="middle" font-size="18">❓</text>
+                            <text x="70" y="68" text-anchor="middle" font-size="12" font-weight="600">Q</text>
                             <text x="70" y="86" text-anchor="middle" font-size="13" font-weight="600">Question</text>
                             <!-- Arrow → Retrieval -->
                             <line x1="120" y1="72" x2="180" y2="72" class="svg-arrow" stroke-width="2" marker-end="url(#uc9b-arrow)"/>
@@ -104,19 +103,19 @@
                             <text x="250" y="82" text-anchor="middle" font-size="10" class="svg-redis-text">Retrieval</text>
                             <!-- Documents below -->
                             <rect x="205" y="140" width="90" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                            <text x="250" y="163" text-anchor="middle" font-size="12" font-weight="600">📄 Docs</text>
+                            <text x="250" y="163" text-anchor="middle" font-size="12" font-weight="600">Docs</text>
                             <line x1="250" y1="140" x2="250" y2="124" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9b-arrow)"/>
                             <!-- Arrow → LLM -->
                             <line x1="300" y1="72" x2="380" y2="72" class="svg-arrow" stroke-width="2" marker-end="url(#uc9b-arrow)"/>
                             <!-- LLM -->
                             <rect x="390" y="45" width="130" height="55" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                            <text x="455" y="68" text-anchor="middle" font-size="18">🧠</text>
+                            <text x="455" y="68" text-anchor="middle" font-size="12" font-weight="600">LLM</text>
                             <text x="455" y="88" text-anchor="middle" font-size="12" font-weight="600">LLM Generation</text>
                             <!-- Arrow → Answer -->
                             <line x1="520" y1="72" x2="570" y2="72" class="svg-arrow" stroke-width="2" marker-end="url(#uc9b-arrow)"/>
                             <!-- Answer -->
                             <rect x="580" y="50" width="100" height="45" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                            <text x="630" y="68" text-anchor="middle" font-size="18">💡</text>
+                            <text x="630" y="68" text-anchor="middle" font-size="12" font-weight="600">A</text>
                             <text x="630" y="86" text-anchor="middle" font-size="13" font-weight="600">Answer</text>
                         </svg>
                     </div>
@@ -234,7 +233,7 @@
 
                     <!-- Chat Interface -->
                     <div class="data-card" id="chat-card">
-                        <h3>💬 Chat with AI Assistant</h3>
+                        <h3>Chat with AI Assistant</h3>
                         <div id="chat-messages" style="max-height:320px; overflow-y:auto; margin-bottom:8px; padding:8px; background:var(--bg-secondary); border-radius:var(--border-radius); min-height:120px;">
                             <div class="chat-welcome" style="color:var(--text-muted); font-style:italic; padding:16px 0; text-align:center;">
                                 Ask about banking services — accounts, transfers, investments, loans, cards, or regulations. Try the example prompts below!
@@ -252,19 +251,19 @@
                         <div style="margin-top:8px;">
                             <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px;">Try these questions:</label>
                             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What are the international transfer fees for SEPA and SWIFT?">💸 Transfer fees</button>
-                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="Tell me about card security and fraud prevention measures">🔒 Card security</button>
-                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What investment products do you offer?">📊 Investments</button>
-                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What are the mortgage rates and loan options?">🏠 Loans &amp; mortgages</button>
-                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="How does PSD2 and Open Banking work with your API?">🔗 PSD2 &amp; Open Banking</button>
-                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What types of accounts do you offer?">🏦 Account types</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What are the international transfer fees for SEPA and SWIFT?">Transfer fees</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="Tell me about card security and fraud prevention measures">Card security</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What investment products do you offer?">Investments</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What are the mortgage rates and loan options?">Loans &amp; mortgages</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="How does PSD2 and Open Banking work with your API?">PSD2 &amp; Open Banking</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What types of accounts do you offer?">Account types</button>
                             </div>
                         </div>
                     </div>
 
                     <!-- Semantic Cache Panel -->
                     <div class="data-card" id="cache-panel" style="margin-top:16px;">
-                        <h3>⚡ Semantic Cache</h3>
+                        <h3>Semantic Cache</h3>
                         <div id="cache-status" style="margin-bottom:8px;">
                             <span id="cache-status-text" style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted);">Checking cache status...</span>
                         </div>
@@ -285,7 +284,7 @@
 
                     <!-- Memory Inspection Panel -->
                     <div class="data-card" style="margin-top:16px;">
-                        <h3>🔍 Memory Inspection</h3>
+                        <h3>Memory Inspection</h3>
 
                         <!-- Short-term Memory -->
                         <div style="margin-bottom:12px;">
@@ -320,7 +319,7 @@
 
                     <!-- Sources Panel (SSE mode only) -->
                     <div id="sourcesPanel" class="data-card" style="margin-top:16px; display:none; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:var(--border-radius); padding:16px;">
-                        <h3 style="margin-bottom:12px;">🔍 Redis Context Sources</h3>
+                        <h3 style="margin-bottom:12px;">Redis Context Sources</h3>
                         <div id="sourcesContent">
                             <!-- Populated by JS on SSE sources event -->
                         </div>
@@ -328,14 +327,14 @@
 
                     <!-- Redis Commands Executed -->
                     <div id="commands-card" class="data-card" style="margin-top:16px; display:none;">
-                        <h3>⚡ Redis Commands Executed</h3>
+                        <h3>Redis Commands Executed</h3>
                         <pre id="commands-output" style="font-size:0.75rem; margin:0; white-space:pre-wrap; color:var(--text-secondary);"></pre>
                         <div id="latency-display" style="font-family:var(--font-code); font-size:0.75rem; color:var(--redis-primary); margin-top:8px;"></div>
                     </div>
 
                     <!-- Reset button -->
                     <div style="margin-top:16px; text-align:right;">
-                        <button id="resetBtn" class="btn btn-outline btn-sm">🔄 Reset Demo</button>
+                        <button id="resetBtn" class="btn btn-outline btn-sm">Reset Demo</button>
                     </div>
                 </div>
             </section>
