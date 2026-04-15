@@ -108,6 +108,9 @@
             btnRelease.disabled = false;
             btnRelease.textContent = '🔓 Release Lock';
             showResult(data);
+            if (data.released) {
+                updateLockDisplay({ locked: false });
+            }
             refreshStatus();
         }).catch(function () {
             btnRelease.disabled = false;
@@ -154,6 +157,12 @@
             btnSimulate.disabled = false;
             btnSimulate.textContent = '🏁 Simulate 3 Concurrent Clients';
         });
+    });
+
+    // Refresh lock status when resource changes
+    resourceSelect.addEventListener('change', function () {
+        simulationResult.style.display = 'none';
+        refreshStatus();
     });
 
     // Initial status check
