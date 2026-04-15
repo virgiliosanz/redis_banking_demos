@@ -41,9 +41,9 @@
         if (pct > 50) {
             gaugeFill.style.background = 'var(--redis-primary)';
         } else if (pct > 20) {
-            gaugeFill.style.background = '#F59E0B';
+            gaugeFill.style.background = getComputedStyle(document.documentElement).getPropertyValue('--color-warning').trim();
         } else {
-            gaugeFill.style.background = '#EF4444';
+            gaugeFill.style.background = getComputedStyle(document.documentElement).getPropertyValue('--color-danger').trim();
         }
     }
 

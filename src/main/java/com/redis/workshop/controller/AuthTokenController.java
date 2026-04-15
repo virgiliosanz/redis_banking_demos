@@ -90,7 +90,7 @@ public class AuthTokenController {
      */
     @GetMapping("/token/{token}")
     public ResponseEntity<?> getTokenInfo(@PathVariable String token) {
-        Map<String, Object> info = authTokenService.getTokenInfo(token);
+        Map<String, Object> info = authTokenService.validateToken(token);
         if (info == null) {
             return ResponseEntity.status(404)
                     .body(Map.of("error", "Token not found or expired"));

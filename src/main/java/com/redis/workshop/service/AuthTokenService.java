@@ -102,10 +102,5 @@ public class AuthTokenService {
         return Boolean.TRUE.equals(redis.delete(tokenKey));
     }
 
-    /**
-     * Get token info for demo inspection.
-     */
-    public Map<String, Object> getTokenInfo(String tokenId) {
-        return validateToken(tokenId);
-    }
+
 }

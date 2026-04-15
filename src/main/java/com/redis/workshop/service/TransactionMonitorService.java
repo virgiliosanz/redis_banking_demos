@@ -1,6 +1,8 @@
 package com.redis.workshop.service;
 
 import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.Limit;
 import org.springframework.data.redis.connection.stream.MapRecord;
@@ -21,6 +23,7 @@ import java.util.concurrent.*;
 @Service
 public class TransactionMonitorService {
 
+    private static final Logger log = LoggerFactory.getLogger(TransactionMonitorService.class);
     private final StringRedisTemplate redis;
     private ScheduledExecutorService simulator;
     private volatile boolean simulating = false;
@@ -134,7 +137,7 @@ public class TransactionMonitorService {
             double riskScore = random.nextDouble() * 50; // normal: 0-50
             addTransaction(amount, riskScore);
         } catch (Exception e) {
-            System.err.println("Failed to generate transaction: " + e.getMessage());
+            log.error("Failed to generate transaction: {}", e.getMessage());
         }
     }
 

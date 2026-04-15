@@ -12,8 +12,7 @@ import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+import com.redis.workshop.config.DocumentDataLoader;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -36,16 +35,18 @@ public class AssistantService {
     private final StringRedisTemplate redis;
     private final OpenAiService openAiService;
     private final RedisSearchHelper redisSearchHelper;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     // Pre-loaded data for keyword matching (fallback)
     private final List<Map<String, String>> memories = new ArrayList<>();
     private final List<Map<String, String>> kbArticles = new ArrayList<>();
 
-    public AssistantService(StringRedisTemplate redis, OpenAiService openAiService, RedisSearchHelper redisSearchHelper) {
+    public AssistantService(StringRedisTemplate redis, OpenAiService openAiService,
+                            RedisSearchHelper redisSearchHelper, ObjectMapper objectMapper) {
         this.redis = redis;
         this.openAiService = openAiService;
         this.redisSearchHelper = redisSearchHelper;
+        this.objectMapper = objectMapper;
     }
 
     @PostConstruct
@@ -90,7 +91,7 @@ public class AssistantService {
             vectors = openAiService.getEmbeddings(texts);
         } else {
             vectors = items.stream()
-                    .map(m -> generateMockVector(m.get("summary") + " " + m.get("tags")))
+                    .map(m -> DocumentDataLoader.generateVector(m.get("summary") + " " + m.get("tags")))
                     .toList();
         }
 
@@ -155,7 +156,7 @@ public class AssistantService {
             vectors = openAiService.getEmbeddings(texts);
         } else {
             vectors = articles.stream()
-                    .map(a -> generateMockVector(a.get("title") + " " + a.get("tags")))
+                    .map(a -> DocumentDataLoader.generateVector(a.get("title") + " " + a.get("tags")))
                     .toList();
         }
 
@@ -223,7 +224,7 @@ public class AssistantService {
             redis.execute((org.springframework.data.redis.core.RedisCallback<Object>) conn ->
                     conn.execute("FT.CREATE", args));
         } catch (Exception e) {
-            System.out.println("Index creation note (" + indexName + "): " + e.getMessage());
+            log.info("Index creation note ({}): {}", indexName, e.getMessage());
         }
     }
 
@@ -369,7 +370,7 @@ public class AssistantService {
     // ── Vector Search (real KNN via FT.SEARCH) ────────────────────────
     private List<Map<String, Object>> vectorSearch(String indexName, String query, int k) {
         float[] queryVector = openAiService.getEmbedding(query);
-        byte[] vectorBytes = vectorToBytes(queryVector);
+        byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
 
         // FT.SEARCH <idx> "*=>[KNN <k> @vector $BLOB]" PARAMS 2 BLOB <bytes> DIALECT 2
         String knnQuery = "*=>[KNN " + k + " @vector $BLOB]";
@@ -638,46 +639,14 @@ public class AssistantService {
     }
 
     /**
-     * Generate a deterministic pseudo-random vector from content hash (fallback when no OpenAI key).
-     * Uses the content string's hash as a seed for reproducibility.
-     */
-    private float[] generateMockVector(String content) {
-        float[] vector = new float[VECTOR_DIM];
-        long seed = content.hashCode();
-        Random rng = new Random(seed);
-        double norm = 0;
-        for (int i = 0; i < VECTOR_DIM; i++) {
-            vector[i] = (float) (rng.nextGaussian());
-            norm += vector[i] * vector[i];
-        }
-        // Normalize to unit vector
-        norm = Math.sqrt(norm);
-        for (int i = 0; i < VECTOR_DIM; i++) {
-            vector[i] /= (float) norm;
-        }
-        return vector;
-    }
-
-    /**
      * Store vector field as raw bytes using RedisCallback (required for HNSW indexing).
      */
     private void storeVectorField(String key, float[] vector) {
         byte[] keyBytes = key.getBytes();
-        byte[] vectorBytes = vectorToBytes(vector);
+        byte[] vectorBytes = RedisSearchHelper.vectorToBytes(vector);
         redis.execute((org.springframework.data.redis.core.RedisCallback<Object>) conn -> {
             conn.hashCommands().hSet(keyBytes, "vector".getBytes(), vectorBytes);
             return null;
         });
-    }
-
-    /**
-     * Convert float[] to little-endian byte array for Redis FLOAT32 vectors.
-     */
-    private byte[] vectorToBytes(float[] vector) {
-        ByteBuffer buffer = ByteBuffer.allocate(vector.length * 4).order(ByteOrder.LITTLE_ENDIAN);
-        for (float f : vector) {
-            buffer.putFloat(f);
-        }
-        return buffer.array();
     }
 }
