@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title layout:title-pattern="$CONTENT_TITLE — Redis Banking Workshop">Redis Banking Workshop</title>
+    <title layout:title-pattern="$CONTENT_TITLE — Banking Workshop">Banking Workshop</title>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
@@ -16,8 +16,12 @@
     <nav class="top-nav">
         <div class="nav-container">
             <a th:href="@{/}" class="nav-brand">
-                <span class="nav-logo">⬡</span>
-                <span class="nav-title">Redis Banking Workshop</span>
+                <svg class="nav-logo-svg" viewBox="0 0 32 32" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M30.8 17.4c-1.2.7-7.5 3.2-8.8 3.9-1.4.7-2.1.7-3.2.1-1.1-.5-8-3.3-9.2-3.9-1.2-.6-1.2-1 0-1.5s7.6-3 8.8-3.5c1.2-.5 2-.6 3.2 0 1.2.5 7.6 3.1 8.8 3.6 1.2.5 1.5.9.4 1.3z" fill="#FF4438"/>
+                    <path d="M30.8 14.2c-1.2.7-7.5 3.2-8.8 3.9-1.4.7-2.1.7-3.2.1-1.1-.5-8-3.3-9.2-3.9-1.2-.6-1.2-1 0-1.5s7.6-3 8.8-3.5c1.2-.5 2-.6 3.2 0 1.2.5 7.6 3.1 8.8 3.6 1.2.5 1.5.9.4 1.3z" fill="#FF4438" opacity="0.7"/>
+                    <path d="M30.8 11c-1.2.7-7.5 3.2-8.8 3.9-1.4.7-2.1.7-3.2.1-1.1-.5-8-3.3-9.2-3.9-1.2-.6-1.2-1 0-1.5s7.6-3 8.8-3.5c1.2-.5 2-.6 3.2 0 1.2.5 7.6 3.1 8.8 3.6 1.2.5 1.5.9.4 1.3z" fill="#FF4438" opacity="0.4"/>
+                </svg>
+                <span class="nav-title">Banking Workshop</span>
             </a>
             <select class="nav-select" id="useCaseSelect" onchange="if(this.value) window.location.href=this.value">
                 <option value="" disabled>Select Use Case</option>
@@ -48,7 +52,7 @@
 
     <footer class="site-footer">
         <div class="footer-container">
-            <p>Redis Banking Workshop Demo &mdash; Built with Spring Boot 3.x &amp; Redis Stack</p>
+            <p>Banking Workshop Demo &mdash; Built with Spring Boot 3.x &amp; Redis Stack</p>
         </div>
     </footer>
 

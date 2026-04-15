@@ -114,9 +114,8 @@ a:hover {
     white-space: nowrap;
 }
 
-.nav-logo {
-    color: var(--redis-primary);
-    font-size: 1.5rem;
+.nav-logo-svg {
+    flex-shrink: 0;
 }
 
 .nav-title {

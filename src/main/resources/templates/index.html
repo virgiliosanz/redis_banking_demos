@@ -7,9 +7,6 @@
 </head>
 <body>
     <div layout:fragment="content">
-        <section class="hero">
-        </section>
-
         <section class="use-case-grid">
             <a th:each="uc : ${useCases}"
                th:href="@{'/usecase/' + ${uc.id}}"
