@@ -130,34 +130,44 @@ public class AssistantService {
         var articles = List.of(
             Map.of("id", "kb-001", "title", "Account Types & Features",
                     "content", "We offer Personal Current, Savings, Business Current, and Premium accounts. Personal Current has no monthly fee, free debit card, and mobile banking. Savings offers 2.1% AER on balances over €1,000. Business Current includes invoicing tools and multi-user access. Premium includes concierge service, travel insurance, and priority support.",
-                    "tags", "account,types,savings,business,premium,current"),
+                    "tags", "account,types,savings,business,premium,current",
+                    "source", "Product Catalogue 2024"),
             Map.of("id", "kb-002", "title", "International Transfer Limits & Fees",
                     "content", "SEPA transfers: free for amounts under €50,000, €0.50 fee above. Processing time: 1 business day. SWIFT transfers: €35 flat fee, 2-4 business days. Daily limit: €100,000 (Personal), €500,000 (Business). Instant SEPA (SCT Inst): €1 fee, limit €100,000, processed in under 10 seconds.",
-                    "tags", "transfer,international,sepa,swift,fees,limits"),
+                    "tags", "transfer,international,sepa,swift,fees,limits",
+                    "source", "SEPA Regulation Guide v3.2"),
             Map.of("id", "kb-003", "title", "Card Security & Fraud Prevention",
                     "content", "All cards support 3D Secure 2.0 for online purchases. Real-time transaction monitoring flags unusual patterns. Instant card freeze via mobile app. Contactless limit: €50 per transaction, €150 cumulative before PIN required. Virtual cards available for online shopping. Zero liability for unauthorized transactions reported within 48 hours.",
-                    "tags", "card,security,fraud,3dsecure,contactless,virtual"),
+                    "tags", "card,security,fraud,3dsecure,contactless,virtual",
+                    "source", "Security Policy Handbook"),
             Map.of("id", "kb-004", "title", "Investment Products Overview",
                     "content", "Managed portfolios: Conservative (bonds 70%, equities 30%), Balanced (50/50), Growth (equities 80%, bonds 20%). Minimum investment: €5,000. Robo-advisor available for automated rebalancing. ETF marketplace with 500+ funds. No commission on EU-listed ETFs. Custody fee: 0.15% annually.",
-                    "tags", "investment,portfolio,etf,managed,robo,bonds,equities"),
+                    "tags", "investment,portfolio,etf,managed,robo,bonds,equities",
+                    "source", "MiFID II Product Sheet"),
             Map.of("id", "kb-005", "title", "Loan & Mortgage Rates",
                     "content", "Personal loans: 5.9% APR (€1,000-€50,000), terms 1-7 years. Mortgage: fixed 2.8% (10yr), 3.1% (20yr), 3.4% (30yr). Variable: Euribor 12M + 0.85%. Green mortgage discount: -0.2% for energy-efficient homes (EPC A/B). Early repayment fee: 0.5% of outstanding balance.",
-                    "tags", "loan,mortgage,rates,personal,euribor,green"),
+                    "tags", "loan,mortgage,rates,personal,euribor,green",
+                    "source", "Lending Terms Q1 2025"),
             Map.of("id", "kb-006", "title", "Insurance Products",
                     "content", "Home insurance from €15/month covering fire, theft, water damage. Travel insurance: €4.99/trip or €49/year for unlimited trips. Life insurance: term life from €12/month (€100,000 coverage). Payment protection insurance for loans: covers unemployment and illness. All policies managed via the mobile app.",
-                    "tags", "insurance,home,travel,life,payment,protection"),
+                    "tags", "insurance,home,travel,life,payment,protection",
+                    "source", "Insurance Partner Brochure"),
             Map.of("id", "kb-007", "title", "Open Banking & PSD2 Compliance",
                     "content", "Fully PSD2 compliant with strong customer authentication (SCA). Account Information Service (AIS) API for aggregating accounts from other banks. Payment Initiation Service (PIS) API for third-party payment initiation. Developer portal with sandbox environment. OAuth 2.0 + OpenID Connect for authorization. Rate limit: 4 requests/second per TPP.",
-                    "tags", "openbanking,psd2,api,sca,ais,pis,oauth"),
+                    "tags", "openbanking,psd2,api,sca,ais,pis,oauth",
+                    "source", "PSD2 Technical Standards"),
             Map.of("id", "kb-008", "title", "SEPA & Cross-Border Payments",
                     "content", "SEPA Credit Transfer (SCT): 1 business day across 36 countries. SEPA Instant (SCT Inst): under 10 seconds, available 24/7/365. SEPA Direct Debit (SDD): for recurring payments, 14-day refund period. Non-EUR transfers via SWIFT: GBP, USD, CHF, JPY supported. FX markup: 0.3% above mid-market rate.",
-                    "tags", "sepa,cross-border,payments,instant,direct-debit,swift,fx"),
+                    "tags", "sepa,cross-border,payments,instant,direct-debit,swift,fx",
+                    "source", "EPC SEPA Rulebook 2024"),
             Map.of("id", "kb-009", "title", "Digital Banking Features",
                     "content", "Mobile app: biometric login, instant notifications, spending analytics, budget categories. Online banking: full account management, batch payments, statement download (PDF/CSV/MT940). API access for Business accounts. Multi-currency wallets for EUR, GBP, USD. Scheduled transfers and standing orders.",
-                    "tags", "digital,mobile,app,online,banking,api,notifications"),
+                    "tags", "digital,mobile,app,online,banking,api,notifications",
+                    "source", "Digital Strategy Roadmap"),
             Map.of("id", "kb-010", "title", "Regulatory Compliance (MiFID II, GDPR)",
                     "content", "MiFID II: suitability assessments for investment products, cost transparency reports, best execution policy. GDPR: data minimization, right to erasure, data portability, consent management. AML/KYC: identity verification via video call or in-branch, ongoing transaction monitoring, PEP and sanctions screening.",
-                    "tags", "compliance,mifid,gdpr,aml,kyc,regulation")
+                    "tags", "compliance,mifid,gdpr,aml,kyc,regulation",
+                    "source", "Compliance Manual v5.1")
         );
         kbArticles.addAll(articles);
 
@@ -183,6 +193,7 @@ public class AssistantService {
             hash.put("title", art.get("title"));
             hash.put("content", art.get("content"));
             hash.put("tags", art.get("tags"));
+            hash.put("source", art.get("source"));
             redis.opsForHash().putAll(key, hash);
             storeVectorField(key, vectors.get(i));
         }

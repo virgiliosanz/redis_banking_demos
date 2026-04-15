@@ -1392,6 +1392,13 @@ a:hover {
     font-size: 13px;
 }
 
+.doc-source {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 4px;
+}
+
 .doc-tag {
     display: inline-block;
     padding: 2px 8px;
