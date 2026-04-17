@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${useCaseTitle}">Real-time Transaction Monitoring</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">UC11</span>
+            <h1 th:text="${useCaseTitle}">Real-time Transaction Monitoring</h1>
+        </div>
+        <p class="usecase-subtitle">Live transaction metrics with Redis Streams &mdash; XADD, XRANGE, XLEN with manual aggregation.</p>
+
+        <section class="how-it-works">
+            <h2>How it works</h2>
+            <div class="how-it-works-steps">
+                <ol>
+                    <li><strong>Ingest:</strong> Each transaction is written to a Redis Stream with XADD — amount and risk score as fields.</li>
+                    <li><strong>Store:</strong> Redis Streams store timestamped entries with automatic IDs (ms-precision). XTRIM MAXLEN keeps the stream bounded.</li>
+                    <li><strong>Query:</strong> XRANGE reads entries in a time window. The app aggregates into 1-second buckets (COUNT, AVG, SUM) for the dashboard.</li>
+                    <li><strong>Detect:</strong> Anomaly bursts (spike in volume + high amounts) are instantly visible in the aggregated stream data.</li>
+                </ol>
+            </div>
+            <div class="how-it-works-diagram">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 200" width="700" height="200">
+                    <defs>
+                        <marker id="uc11-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                            <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                        </marker>
+                    </defs>
+                    <!-- Sources -->
+                    <rect x="15" y="30" width="110" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="70" y="52" text-anchor="middle" font-size="12" font-weight="600">Payments</text>
+                    <rect x="15" y="80" width="110" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="70" y="102" text-anchor="middle" font-size="12" font-weight="600">ATM</text>
+                    <rect x="15" y="130" width="110" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="70" y="152" text-anchor="middle" font-size="12" font-weight="600">Mobile</text>
+                    <!-- Arrows to Redis -->
+                    <line x1="125" y1="47" x2="215" y2="85" class="svg-arrow" stroke-width="2" marker-end="url(#uc11-arrow)"/>
+                    <line x1="125" y1="97" x2="215" y2="95" class="svg-arrow" stroke-width="2" marker-end="url(#uc11-arrow)"/>
+                    <line x1="125" y1="147" x2="215" y2="105" class="svg-arrow" stroke-width="2" marker-end="url(#uc11-arrow)"/>
+                    <text x="170" y="75" text-anchor="middle" font-size="10" class="svg-label">XADD</text>
+                    <!-- Redis -->
+                    <circle cx="290" cy="95" r="60" class="svg-redis-circle"/>
+                    <text x="290" y="85" text-anchor="middle" font-size="15" class="svg-redis-text">Redis</text>
+                    <text x="290" y="103" text-anchor="middle" font-size="11" class="svg-redis-text">Streams</text>
+                    <!-- Arrow Redis → App -->
+                    <line x1="350" y1="95" x2="430" y2="95" class="svg-arrow" stroke-width="2" marker-end="url(#uc11-arrow)"/>
+                    <text x="390" y="85" text-anchor="middle" font-size="10" class="svg-label">XRANGE</text>
+                    <!-- Dashboard -->
+                    <rect x="440" y="55" width="140" height="80" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="510" y="82" text-anchor="middle" font-size="13" font-weight="600">Dashboard</text>
+                    <text x="510" y="100" text-anchor="middle" font-size="11" class="svg-label">TPS · Amounts</text>
+                    <text x="510" y="116" text-anchor="middle" font-size="11" class="svg-label">Risk · Anomalies</text>
+                    <!-- Alert -->
+                    <line x1="580" y1="75" x2="640" y2="55" class="svg-arrow" stroke-width="2" marker-end="url(#uc11-arrow)"/>
+                    <text x="660" y="52" text-anchor="middle" font-size="11" class="svg-label">Alert</text>
+                </svg>
+            </div>
+        </section>
+
+        <div class="usecase-panels">
+            <!-- LEFT: Live Demo Panel -->
+            <section class="panel demo-panel">
+                <h2>Live Demo</h2>
+                <div id="demo-container" class="demo-container">
+                    <p class="demo-scenario">
+                        <strong>Scenario:</strong> Monitor banking transactions in real time.
+                        Start the simulation to generate ~2 TPS, then inject an anomaly burst to see a spike.
+                    </p>
+
+                    <!-- Controls -->
+                    <div class="rl-actions">
+                        <button id="btnStart" class="rl-btn rl-btn-primary">Start Simulation</button>
+                        <button id="btnStop" class="rl-btn rl-btn-secondary" disabled>Stop</button>
+                        <button id="btnAnomaly" class="rl-btn rl-btn-outline">Inject Anomaly</button>
+                        <button id="btnReset" class="rl-btn rl-btn-outline">Reset</button>
+                    </div>
+
+
+                    <!-- Metrics cards -->
+                    <div class="tm-metrics">
+                        <div class="tm-metric-card">
+                            <div class="tm-metric-value" id="metricTps">0.0</div>
+                            <div class="tm-metric-label">TPS</div>
+                        </div>
+                        <div class="tm-metric-card">
+                            <div class="tm-metric-value" id="metricTotal">0</div>
+                            <div class="tm-metric-label">Total (60s)</div>
+                        </div>
+                        <div class="tm-metric-card">
+                            <div class="tm-metric-value" id="metricAvgAmt">€0</div>
+                            <div class="tm-metric-label">Avg Amount</div>
+                        </div>
+                        <div class="tm-metric-card">
+                            <div class="tm-metric-value" id="metricMaxAmt">€0</div>
+                            <div class="tm-metric-label">Max Amount</div>
+                        </div>
+                        <div class="tm-metric-card">
+                            <div class="tm-metric-value" id="metricRisk">0%</div>
+                            <div class="tm-metric-label">High Risk</div>
+                        </div>
+                    </div>
+
+                    <!-- Charts -->
+                    <div class="tm-chart-section">
+                        <h3>Transactions / second (last 60s)</h3>
+                        <div class="tm-chart-wrapper">
+                            <canvas id="chartCount"></canvas>
+                        </div>
+                    </div>
+                    <div class="tm-chart-section">
+                        <h3>Average Amount (last 60s)</h3>
+                        <div class="tm-chart-wrapper">
+                            <canvas id="chartAmount"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT: Code Showcase Panel -->
+            <section class="panel code-panel">
+                <h2>Code Showcase</h2>
+
+                <div class="code-tabs">
+                    <button class="code-tab active" data-tab="cli">Redis CLI</button>
+                    <button class="code-tab" data-tab="java">Java</button>
+                </div>
+
+                <!-- Redis CLI -->
+                <div class="code-container code-tab-content active" id="tab-cli">
+<pre><code class="language-bash"># ═══ Redis Streams — Transaction Monitoring ═══
+
+# Add a transaction event to the stream
+XADD workshop:txmonitor:stream * \
+  amount 150.75 riskScore 25.3 \
+  type purchase merchant "Store ABC"
+
+# Read last 10 transactions
+XRANGE workshop:txmonitor:stream - + COUNT 10
+
+# Read transactions from last 60 seconds
+# (replace &lt;timestamp_ms&gt; with epoch ms)
+XRANGE workshop:txmonitor:stream &lt;timestamp_ms&gt;-0 + COUNT 100
+
+# Count total transactions in the stream
+XLEN workshop:txmonitor:stream
+
+# Trim stream to last 10000 entries (retention)
+XTRIM workshop:txmonitor:stream MAXLEN ~ 10000
+
+# Read transactions in reverse (most recent first)
+XREVRANGE workshop:txmonitor:stream + - COUNT 5</code></pre>
+                </div>
+
+                <!-- Java -->
+                <div class="code-container code-tab-content" id="tab-java">
+<pre><code class="language-java">// ═══ Redis Streams with Spring Data Redis ═══
+
+// Add a transaction to the stream
+Map&lt;String, String&gt; txData = Map.of(
+    "amount", String.valueOf(amount),
+    "riskScore", String.valueOf(riskScore),
+    "type", type,
+    "merchant", merchant
+);
+redisTemplate.opsForStream().add(
+    StreamRecords.string(txData)
+        .withStreamKey("workshop:txmonitor:stream")
+);
+
+// Read transactions from last 60 seconds
+long fromTs = System.currentTimeMillis() - 60000;
+List&lt;MapRecord&lt;String, Object, Object&gt;&gt; records =
+    redisTemplate.opsForStream().range(
+        "workshop:txmonitor:stream",
+        Range.closed(fromTs + "-0", "+")
+    );
+
+// Calculate metrics from stream data
+long totalCount = redisTemplate.opsForStream()
+    .size("workshop:txmonitor:stream");
+
+// Aggregate: compute TPS, avg amount per second
+Map&lt;Long, List&lt;Double&gt;&gt; buckets = new TreeMap&lt;&gt;();
+for (var record : records) {
+    long ts = Long.parseLong(
+        record.getId().toString().split("-")[0]);
+    long bucket = ts / 1000 * 1000; // 1-second buckets
+    buckets.computeIfAbsent(bucket, k -&gt; new ArrayList&lt;&gt;())
+        .add(Double.parseDouble(
+            record.getValue().get("amount").toString()));
+}</code></pre>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div layout:fragment="scripts">
+        <script th:src="@{/js/usecase-11.js}"></script>
+    </div>
+</body>
+</html>

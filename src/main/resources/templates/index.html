@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Home</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <section class="use-case-grid">
+            <a th:each="uc : ${useCases}"
+               th:href="@{'/usecase/' + ${uc.id}}"
+               class="use-case-card">
+                <div class="card-header">
+                    <img class="card-icon card-icon-light" th:src="@{'/img/icons/light/' + ${uc.icon} + '.png'}" th:alt="${uc.title}" width="40" height="40"/>
+                    <img class="card-icon card-icon-dark" th:src="@{'/img/icons/dark/' + ${uc.icon} + '.png'}" th:alt="${uc.title}" width="40" height="40"/>
+                    <span class="card-number" th:text="'UC' + ${uc.id}"></span>
+                </div>
+                <h2 class="card-title" th:text="${uc.title}"></h2>
+                <p class="card-description" th:text="${uc.description}"></p>
+                <div class="card-features">
+                    <span class="card-feature-badge" th:text="${uc.features}"></span>
+                </div>
+            </a>
+        </section>
+
+        <div style="text-align: center; margin: 24px 0;">
+            <a th:href="@{/guide}" class="guide-link-text">Workshop Presenter Guide</a>
+        </div>
+
+        <div class="qr-section">
+            <div class="qr-code" id="qrCode"
+                 data-url="https://github.com/virgiliosanz/redis_banking_demos"></div>
+            <span class="qr-label">Scan to access the repo</span>
+        </div>
+    </div>
+    <div layout:fragment="scripts">
+        <script th:src="@{/vendor/qrcode/qrcode.min.js}"></script>
+        <script th:src="@{/js/qr-landing.js}"></script>
+    </div>
+</body>
+</html>

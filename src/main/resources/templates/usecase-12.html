@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${useCaseTitle}">ATM &amp; Branch Finder</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">UC12</span>
+            <h1 th:text="${useCaseTitle}">ATM &amp; Branch Finder (Geospatial)</h1>
+        </div>
+
+        <section class="how-it-works">
+            <h2>How it works</h2>
+            <div class="how-it-works-steps">
+                <ol>
+                    <li><strong>Data ingestion:</strong> ATMs and branches loaded with coordinates via <code>GEOADD</code> (native) and <code>JSON.SET</code> (RQE approach).</li>
+                    <li><strong>User selects location:</strong> Click the map or pick a preset location in Madrid.</li>
+                    <li><strong>Radius search:</strong> <code>GEOSEARCH</code> finds nearby points by distance. <code>FT.SEARCH</code> with GEO filter adds type/service filtering.</li>
+                    <li><strong>Results:</strong> Markers on map + sorted list with distance, type, and services.</li>
+                </ol>
+            </div>
+            <div class="how-it-works-diagram">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 200" width="700" height="200">
+                    <defs>
+                        <marker id="uc12-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                            <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                        </marker>
+                    </defs>
+                    <rect x="20" y="60" width="100" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="70" y="85" text-anchor="middle" font-size="13" font-weight="600">Loc</text>
+                    <text x="70" y="105" text-anchor="middle" font-size="13" font-weight="600">Location</text>
+                    <circle cx="165" cy="78" r="12" class="svg-step-circle"/>
+                    <text x="165" y="83" text-anchor="middle" font-size="11" class="svg-step-text">1</text>
+                    <line x1="120" y1="90" x2="230" y2="90" class="svg-arrow" stroke-width="2" marker-end="url(#uc12-arrow)"/>
+                    <circle cx="300" cy="90" r="55" class="svg-redis-circle"/>
+                    <text x="300" y="82" text-anchor="middle" font-size="16" class="svg-redis-text">Redis</text>
+                    <text x="300" y="100" text-anchor="middle" font-size="11" class="svg-redis-text">Geospatial</text>
+                    <circle cx="390" cy="78" r="12" class="svg-step-circle"/>
+                    <text x="390" y="83" text-anchor="middle" font-size="11" class="svg-step-text">2</text>
+                    <line x1="355" y1="75" x2="440" y2="50" class="svg-arrow" stroke-width="2" marker-end="url(#uc12-arrow)"/>
+                    <rect x="450" y="25" width="140" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="520" y="50" text-anchor="middle" font-size="12" font-weight="600">GEOSEARCH</text>
+                    <line x1="355" y1="105" x2="440" y2="130" class="svg-arrow" stroke-width="2" marker-end="url(#uc12-arrow)"/>
+                    <rect x="450" y="110" width="140" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="520" y="135" text-anchor="middle" font-size="12" font-weight="600">FT.SEARCH</text>
+                </svg>
+            </div>
+        </section>
+
+        <div class="usecase-panels">
+            <!-- LEFT: Live Demo Panel -->
+            <section class="panel demo-panel">
+                <h2>Live Demo</h2>
+                <div id="demo-container" class="demo-container">
+                    <!-- Approach tabs -->
+                    <div class="geo-tabs">
+                        <button class="geo-tab active" data-approach="native">Native Geospatial</button>
+                        <button class="geo-tab" data-approach="rqe">JSON + Query Engine</button>
+                    </div>
+
+                    <!-- Preset locations -->
+                    <div class="geo-presets">
+                        <span class="geo-presets-label">Location:</span>
+                        <button class="geo-preset active" data-lat="40.4168" data-lng="-3.7038">Puerta del Sol</button>
+                        <button class="geo-preset" data-lat="40.4065" data-lng="-3.6895">Atocha</button>
+                        <button class="geo-preset" data-lat="40.4372" data-lng="-3.6920">Castellana</button>
+                        <span class="geo-presets-hint">or click on map</span>
+                    </div>
+
+                    <!-- RQE filters (hidden when native tab active) -->
+                    <div id="rqeFilters" class="geo-filters" style="display:none;">
+                        <label>Type:
+                            <select id="filterType">
+                                <option value="all">All</option>
+                                <option value="atm">ATM</option>
+                                <option value="branch">Branch</option>
+                            </select>
+                        </label>
+                        <label>Service:
+                            <select id="filterService">
+                                <option value="all">All</option>
+                                <option value="withdrawal">Withdrawal</option>
+                                <option value="deposit">Deposit</option>
+                                <option value="advisor">Advisor</option>
+                                <option value="mortgage">Mortgage</option>
+                                <option value="insurance">Insurance</option>
+                                <option value="business">Business</option>
+                                <option value="private_banking">Private Banking</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <!-- Radius slider -->
+                    <div class="geo-radius">
+                        <label>Radius: <strong id="radiusValue">2</strong> km</label>
+                        <input type="range" id="radiusSlider" min="0.5" max="5" step="0.5" value="2"/>
+                    </div>
+
+                    <!-- Quick scenarios -->
+                    <div style="margin-bottom:12px;">
+                        <label style="font-size:0.8rem; color:var(--text-muted);">Quick scenarios:</label>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
+                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4168" data-lng="-3.7038" data-radius="2" data-approach="native">Sol — 2km</button>
+                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4530" data-lng="-3.6883" data-radius="3" data-approach="native">Chamartín — 3km</button>
+                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4065" data-lng="-3.6895" data-radius="1" data-approach="rqe" data-type="atm">ATMs near Atocha</button>
+                            <button class="btn btn-sm btn-secondary geo-scenario" data-lat="40.4372" data-lng="-3.6920" data-radius="2" data-approach="rqe" data-type="branch">Branches Castellana</button>
+                        </div>
+                    </div>
+
+                    <!-- Search button -->
+                    <button id="btnSearch" class="rl-btn rl-btn-primary" style="width:100%;margin-bottom:16px;">Search</button>
+
+                    <!-- Map -->
+                    <div id="map" style="height:360px;border-radius:5px;margin-bottom:16px;"></div>
+
+                    <!-- Command display -->
+                    <div id="commandBox" class="geo-command" style="display:none;">
+                        <strong>Redis command:</strong>
+                        <code id="commandText"></code>
+                    </div>
+
+                    <!-- Results -->
+                    <div class="geo-results-header">
+                        <span id="resultsCount">0</span> results
+                        <span id="latencyBadge" class="geo-latency" style="display:none;"></span>
+                    </div>
+                    <div id="resultsList" class="geo-results"></div>
+                </div>
+            </section>
+
+            <!-- RIGHT: Code Showcase Panel -->
+            <section class="panel code-panel">
+                <h2>Code Showcase</h2>
+
+                <div class="code-tabs">
+                    <button class="code-tab active" data-tab="cli">Redis CLI</button>
+                    <button class="code-tab" data-tab="java">Java</button>
+                </div>
+
+                <!-- Redis CLI -->
+                <div class="code-container code-tab-content active" id="tab-cli">
+<pre><code class="language-bash"># ═══ Approach 1: Native Geospatial ═══
+
+# Add ATM locations — GEOADD key lng lat member
+GEOADD workshop:geo:atms -3.7038 40.4168 "atm-001"
+GEOADD workshop:geo:atms -3.7056 40.4200 "atm-002"
+GEOADD workshop:geo:atms -3.6931 40.4194 "branch-001"
+
+# Store metadata in separate Hash
+HSET workshop:geo:meta:atm-001 name "Cajero Sol" \
+  type atm address "Puerta del Sol 1" hours 24h \
+  services "withdrawal,deposit,balance"
+
+# Find ATMs within 2km of Puerta del Sol
+GEOSEARCH workshop:geo:atms FROMLONLAT -3.7038 40.4168 \
+  BYRADIUS 2 km ASC COUNT 10 WITHDIST
+# → 1) "atm-001" "0.0000"
+# → 2) "atm-009" "0.3150"
+# → 3) "branch-007" "0.4820"
+
+# Distance between two points
+GEODIST workshop:geo:atms atm-001 branch-001 km
+# → "0.9510"
+
+# ═══ Approach 2: JSON + Redis Query Engine ═══
+
+# Store rich documents with JSON.SET
+JSON.SET workshop:geo:branch:atm-001 $ '{
+  "name": "Cajero Sol", "type": "atm",
+  "address": "Puerta del Sol 1, Madrid",
+  "services": ["withdrawal","deposit","balance"],
+  "hours": "24h",
+  "location": "-3.7038,40.4168"
+}'
+
+# Create index with GEO + TAG fields
+FT.CREATE idx:branches ON JSON
+  PREFIX 1 workshop:geo:branch:
+  SCHEMA
+    $.location AS location GEO
+    $.type AS type TAG
+    $.services[*] AS services TAG
+    $.name AS name TEXT
+    $.hours AS hours TAG
+
+# Geo search — all within 2km
+FT.SEARCH idx:branches
+  "@location:[-3.7038 40.4168 2 km]"
+
+# Geo + type filter — only ATMs within 2km
+FT.SEARCH idx:branches
+  "@location:[-3.7038 40.4168 2 km] @type:{atm}"
+
+# Geo + type + service filter
+FT.SEARCH idx:branches
+  "@location:[-3.7038 40.4168 2 km] @type:{branch} @services:{advisor}"</code></pre>
+                </div>
+
+                <!-- Java -->
+                <div class="code-container code-tab-content" id="tab-java">
+<pre><code class="language-java">// ═══ Approach 1: Native Geospatial ═══
+
+// GEOADD — add locations with coordinates
+redis.opsForGeo().add("workshop:geo:atms",
+    new Point(-3.7038, 40.4168), "atm-001");
+
+// GEOSEARCH — find within radius, sorted by distance
+GeoResults&lt;GeoLocation&lt;String&gt;&gt; results =
+    redis.opsForGeo().search("workshop:geo:atms",
+        GeoReference.fromCoordinate(-3.7038, 40.4168),
+        new Distance(2, Metrics.KILOMETERS),
+        GeoSearchCommandArgs.newGeoSearchArgs()
+            .includeDistance()
+            .sortAscending()
+            .limit(20));
+
+// Enrich with metadata from Hash
+for (var r : results) {
+    String id = r.getContent().getName();
+    Map meta = redis.opsForHash()
+        .entries("workshop:geo:meta:" + id);
+    // meta has: name, type, address, services
+}
+
+// ═══ Approach 2: JSON + Query Engine ═══
+
+// JSON.SET — store rich document
+redis.execute(conn -&gt; conn.execute(
+    "JSON.SET", "workshop:geo:branch:atm-001",
+    "$", jsonString));
+
+// FT.CREATE — index with GEO field
+redis.execute(conn -&gt; conn.execute(
+    "FT.CREATE", "idx:branches",
+    "ON", "JSON",
+    "PREFIX", "1", "workshop:geo:branch:",
+    "SCHEMA",
+    "$.location", "AS", "location", "GEO",
+    "$.type", "AS", "type", "TAG",
+    "$.services[*]", "AS", "services", "TAG",
+    "$.name", "AS", "name", "TEXT"));
+
+// FT.SEARCH — geo + filters
+String query = "@location:[-3.7038 40.4168 2 km]"
+    + " @type:{atm}"
+    + " @services:{deposit}";
+redis.execute(conn -&gt; conn.execute(
+    "FT.SEARCH", "idx:branches", query));</code></pre>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div layout:fragment="scripts">
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script th:src="@{/js/usecase-12.js}"></script>
+    </div>
+</body>
+</html>

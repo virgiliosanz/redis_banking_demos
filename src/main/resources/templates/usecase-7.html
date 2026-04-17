@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${useCaseTitle}">Feature Store</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">UC7</span>
+            <h1 th:text="${useCaseTitle}">Feature Store (Risk Scoring)</h1>
+        </div>
+
+        <section class="how-it-works">
+            <h2>How it works</h2>
+            <div class="how-it-works-steps">
+                <ol>
+                    <li>Client features (transaction velocity, amounts, countries, devices) are pre-computed and stored in Redis Hashes.</li>
+                    <li>When a new transaction arrives, features are updated atomically using HINCRBY and HSET — no read-modify-write cycle needed.</li>
+                    <li>The risk scoring model retrieves all features with HGETALL in sub-millisecond latency.</li>
+                    <li>A risk score (0-100) is computed from the features and written back to Redis for the next evaluation.</li>
+                </ol>
+            </div>
+            <div class="how-it-works-diagram">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 220" width="750" height="220">
+                    <defs>
+                        <marker id="uc7-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                            <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                        </marker>
+                    </defs>
+
+                    <!-- 1. Transaction Event -->
+                    <rect x="10" y="70" width="130" height="70" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="75" y="95" text-anchor="middle" font-size="12" font-weight="600">TX</text>
+                    <text x="75" y="115" text-anchor="middle" font-size="11" font-weight="600">New Transaction</text>
+                    <text x="75" y="130" text-anchor="middle" font-size="9" class="svg-muted-text">amount, country</text>
+
+                    <!-- Step 1 -->
+                    <circle cx="170" cy="85" r="12" class="svg-step-circle"/>
+                    <text x="170" y="90" text-anchor="middle" font-size="11" class="svg-step-text">1</text>
+
+                    <!-- Arrow → Redis -->
+                    <line x1="142" y1="95" x2="245" y2="95" class="svg-arrow" stroke-width="2" marker-end="url(#uc7-arrow)"/>
+                    <text x="195" y="85" text-anchor="middle" font-size="9" class="svg-muted-text">HINCRBY</text>
+                    <text x="195" y="115" text-anchor="middle" font-size="9" class="svg-muted-text">HSET</text>
+
+                    <!-- Redis (Online Feature Store) -->
+                    <rect x="250" y="30" width="180" height="150" rx="10" ry="10" class="svg-redis-box" stroke-width="2"/>
+                    <text x="340" y="55" text-anchor="middle" font-size="14" class="svg-redis-text" font-weight="700">Redis</text>
+                    <text x="340" y="72" text-anchor="middle" font-size="10" class="svg-redis-text">Online Feature Store</text>
+                    <!-- Hash representation -->
+                    <rect x="270" y="82" width="140" height="85" rx="5" ry="5" class="svg-box" stroke-width="1" opacity="0.6"/>
+                    <text x="340" y="100" text-anchor="middle" font-size="9" font-family="monospace">tx_count_1h: 5</text>
+                    <text x="340" y="114" text-anchor="middle" font-size="9" font-family="monospace">tx_amount_avg: 450</text>
+                    <text x="340" y="128" text-anchor="middle" font-size="9" font-family="monospace">countries_7d: 3</text>
+                    <text x="340" y="142" text-anchor="middle" font-size="9" font-family="monospace">devices_30d: 4</text>
+                    <text x="340" y="156" text-anchor="middle" font-size="9" font-family="monospace" font-weight="700">risk_score: 47</text>
+
+                    <!-- Step 2 -->
+                    <circle cx="460" cy="75" r="12" class="svg-step-circle"/>
+                    <text x="460" y="80" text-anchor="middle" font-size="11" class="svg-step-text">2</text>
+
+                    <!-- Arrow Redis → Scoring -->
+                    <line x1="432" y1="95" x2="510" y2="95" class="svg-arrow" stroke-width="2" marker-end="url(#uc7-arrow)"/>
+                    <text x="475" y="115" text-anchor="middle" font-size="9" class="svg-muted-text">HGETALL</text>
+                    <text x="475" y="127" text-anchor="middle" font-size="9" class="svg-muted-text">&lt;1ms</text>
+
+                    <!-- Risk Scoring Model -->
+                    <rect x="515" y="55" width="130" height="80" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="580" y="82" text-anchor="middle" font-size="12" font-weight="600">Model</text>
+                    <text x="580" y="102" text-anchor="middle" font-size="11" font-weight="600">Risk Scoring</text>
+                    <text x="580" y="118" text-anchor="middle" font-size="9" class="svg-muted-text">score 0-100</text>
+
+                    <!-- Step 3 -->
+                    <circle cx="670" cy="75" r="12" class="svg-step-circle"/>
+                    <text x="670" y="80" text-anchor="middle" font-size="11" class="svg-step-text">3</text>
+
+                    <!-- Arrow Scoring → Result -->
+                    <line x1="647" y1="95" x2="690" y2="95" class="svg-arrow" stroke-width="2" marker-end="url(#uc7-arrow)"/>
+
+                    <!-- Result -->
+                    <rect x="695" y="70" width="45" height="50" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="717" y="92" text-anchor="middle" font-size="10" font-weight="600">OK</text>
+                    <text x="717" y="110" text-anchor="middle" font-size="8" font-weight="600">Allow</text>
+
+                    <!-- Feedback arrow: score written back to Redis -->
+                    <path d="M 580 137 L 580 195 L 340 195 L 340 182" class="svg-arrow" stroke-width="1.5" fill="none" stroke-dasharray="5,3" marker-end="url(#uc7-arrow)"/>
+                    <text x="460" y="210" text-anchor="middle" font-size="9" class="svg-muted-text">HSET risk_score (write back)</text>
+
+                    <!-- Step 4 -->
+                    <circle cx="460" cy="195" r="12" class="svg-step-circle"/>
+                    <text x="460" y="200" text-anchor="middle" font-size="11" class="svg-step-text">4</text>
+                </svg>
+            </div>
+        </section>
+
+        <div class="usecase-panels">
+            <!-- LEFT: Live Demo Panel -->
+            <section class="panel demo-panel">
+                <h2>Live Demo</h2>
+                <div id="demo-container" class="demo-container">
+
+                    <!-- Client Selector -->
+                    <div class="form-group">
+                        <label for="clientSelect">Select Client</label>
+                        <select id="clientSelect" class="form-control"></select>
+                    </div>
+
+                    <!-- Risk Score Badge -->
+                    <div id="risk-badge-container" style="text-align:center; margin-bottom:16px; display:none;">
+                        <div id="risk-badge" style="display:inline-block; padding:8px 24px; border-radius:5px; font-weight:700; font-size:1.1rem;"></div>
+                    </div>
+
+                    <!-- Feature Dashboard Table -->
+                    <div class="data-card" id="feature-card" style="display:none;">
+                        <h3>Feature Vector (Redis Hash)</h3>
+                        <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;" id="redis-key-display"></div>
+                        <div id="feature-table"></div>
+                    </div>
+
+                    <!-- Transaction Simulator -->
+                    <div class="data-card" style="margin-top:16px;">
+                        <h3>Simulate Transaction</h3>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label for="txAmount">Amount (€)</label>
+                            <input type="number" id="txAmount" class="form-input" placeholder="500.00" step="0.01" min="1"/>
+                        </div>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label for="txCountry">Country</label>
+                            <select id="txCountry" class="form-control">
+                                <option value="ES">Spain</option>
+                                <option value="UK">United Kingdom</option>
+                                <option value="DE">Germany</option>
+                                <option value="US">United States</option>
+                                <option value="RU">Russia</option>
+                                <option value="CN">China</option>
+                                <option value="NG">Nigeria</option>
+                            </select>
+                        </div>
+                        <button id="simulateBtn" class="btn btn-primary" style="width:100%;">
+                            Simulate Transaction
+                        </button>
+                    </div>
+
+                    <!-- Redis Commands Executed -->
+                    <div id="commands-card" class="data-card" style="margin-top:16px; display:none;">
+                        <h3>Redis Commands Executed</h3>
+                        <pre id="commands-output" style="font-size:0.75rem; margin:0; white-space:pre-wrap; color:var(--text-secondary);"></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT: Code Showcase Panel -->
+            <section class="panel code-panel">
+                <h2>Code Showcase</h2>
+                <div class="code-container">
+                    <div class="code-tabs">
+                        <button class="code-tab" data-tab="java">Java</button>
+                        <button class="code-tab active" data-tab="cli">Redis CLI</button>
+                    </div>
+
+                    <div class="code-block" id="tab-java">
+                        <pre><code class="language-java">// 1. Store client features — HSET (bulk)
+String key = "workshop:features:client:C1001";
+
+Map&lt;String, String&gt; features = Map.of(
+    "tx_count_1h",         "2",
+    "tx_count_24h",        "5",
+    "tx_amount_avg_24h",   "120.50",
+    "tx_amount_max_24h",   "250.00",
+    "distinct_countries_7d","1",
+    "distinct_devices_30d", "2",
+    "risk_score",           "12"
+);
+
+// HSET — write all features atomically
+redis.opsForHash().putAll(key, features);
+
+// 2. Read full feature vector — HGETALL
+Map&lt;Object, Object&gt; allFeatures =
+    redis.opsForHash().entries(key);
+// Returns ALL fields in ~0.1ms (vs 50-200ms
+// from a data warehouse query)
+
+// 3. Atomic counter update — HINCRBY
+// New transaction arrives → increment counters
+redis.opsForHash().increment(key,
+    "tx_count_1h", 1);
+redis.opsForHash().increment(key,
+    "tx_count_24h", 1);
+
+// 4. Update computed features — HSET
+redis.opsForHash().put(key,
+    "tx_amount_avg_24h", "135.25");
+redis.opsForHash().put(key,
+    "risk_score", "15");
+
+// 5. Pipeline for bulk updates
+// (multiple HSET in one round-trip)
+redis.executePipelined((RedisCallback&lt;Object&gt;) conn -&gt; {
+    byte[] k = key.getBytes();
+    conn.hashCommands().hSet(k,
+        "tx_count_1h".getBytes(), "3".getBytes());
+    conn.hashCommands().hSet(k,
+        "last_tx_timestamp".getBytes(),
+        String.valueOf(now).getBytes());
+    conn.hashCommands().hSet(k,
+        "risk_score".getBytes(), "18".getBytes());
+    return null;
+});
+
+// 6. Read single feature — HGET
+String riskScore = (String) redis.opsForHash()
+    .get(key, "risk_score");</code></pre>
+                    </div>
+
+                    <div class="code-block active" id="tab-cli">
+                        <pre><code class="language-bash"># 1. Store feature vector (bulk HSET)
+HSET workshop:features:client:C1001 \
+  tx_count_1h 2 \
+  tx_count_24h 5 \
+  tx_amount_avg_24h "120.50" \
+  tx_amount_max_24h "250.00" \
+  distinct_countries_7d 1 \
+  distinct_devices_30d 2 \
+  risk_score 12
+
+# 2. Read full feature vector (~0.1ms)
+HGETALL workshop:features:client:C1001
+
+# 3. Atomic counter increment
+HINCRBY workshop:features:client:C1001 \
+  tx_count_1h 1
+HINCRBY workshop:features:client:C1001 \
+  tx_count_24h 1
+
+# 4. Update computed features
+HSET workshop:features:client:C1001 \
+  tx_amount_avg_24h "135.25" \
+  risk_score 15
+
+# 5. Read single feature
+HGET workshop:features:client:C1001 risk_score
+
+# 6. Feature store vs data warehouse
+# Redis Hash: HGETALL → ~0.1ms latency
+# SQL query:  SELECT * FROM features
+#             WHERE client_id = 'C1001'
+#             → 50-200ms latency
+#
+# For real-time ML scoring, sub-ms
+# feature retrieval is critical.</code></pre>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div layout:fragment="scripts">
+        <script th:src="@{/js/usecase-7.js}"></script>
+    </div>
+</body>
+</html>

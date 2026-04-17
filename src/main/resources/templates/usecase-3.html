@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${useCaseTitle}">User Profile Storage</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">UC3</span>
+            <h1 th:text="${useCaseTitle}">User Profile Storage</h1>
+        </div>
+
+        <section class="how-it-works">
+            <h2>How it works</h2>
+            <div class="how-it-works-steps">
+                <ol>
+                    <li>User profile data is aggregated from multiple databases into Redis for fast access.</li>
+                    <li>When a user logs in, the app fetches the complete profile from Redis. Updates are written to the profile.</li>
+                    <li>When the session ends, profile updates can be written back to the source databases.</li>
+                </ol>
+            </div>
+            <div class="how-it-works-diagram">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 220" width="700" height="220">
+                    <defs>
+                        <marker id="uc3-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                            <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                        </marker>
+                    </defs>
+                    <!-- User -->
+                    <rect x="20" y="60" width="100" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="70" y="85" text-anchor="middle" font-size="14" font-weight="600">User</text>
+                    <text x="70" y="105" text-anchor="middle" font-size="14" font-weight="600">User</text>
+                    <!-- Arrow User ↔ Web App -->
+                    <line x1="120" y1="90" x2="200" y2="90" class="svg-arrow" stroke-width="2" marker-end="url(#uc3-arrow)"/>
+                    <!-- Web App -->
+                    <rect x="210" y="60" width="130" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="275" y="95" text-anchor="middle" font-size="14" font-weight="600">Web App</text>
+                    <!-- Step 2 circle -->
+                    <circle cx="390" cy="78" r="12" class="svg-step-circle"/>
+                    <text x="390" y="83" text-anchor="middle" font-size="11" class="svg-step-text">2</text>
+                    <!-- Arrow Web App ↔ Redis -->
+                    <line x1="340" y1="90" x2="430" y2="90" class="svg-arrow" stroke-width="2" marker-end="url(#uc3-arrow)"/>
+                    <!-- Redis circle -->
+                    <circle cx="500" cy="90" r="55" class="svg-redis-circle"/>
+                    <text x="500" y="82" text-anchor="middle" font-size="16" class="svg-redis-text">Redis</text>
+                    <text x="500" y="100" text-anchor="middle" font-size="11" class="svg-redis-text">Profile Store</text>
+                    <!-- DB icons -->
+                    <rect x="580" y="30" width="100" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="630" y="50" text-anchor="middle" font-size="12">Accounts</text>
+                    <rect x="580" y="75" width="100" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="630" y="95" text-anchor="middle" font-size="12">Activity</text>
+                    <rect x="580" y="120" width="100" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="630" y="140" text-anchor="middle" font-size="12">Prefs</text>
+                    <!-- Step 1 circle -->
+                    <circle cx="572" cy="45" r="12" class="svg-step-circle"/>
+                    <text x="572" y="50" text-anchor="middle" font-size="11" class="svg-step-text">1</text>
+                    <!-- Step 3 circle -->
+                    <circle cx="572" cy="135" r="12" class="svg-step-circle"/>
+                    <text x="572" y="140" text-anchor="middle" font-size="11" class="svg-step-text">3</text>
+                    <!-- Arrows Redis ↔ DBs -->
+                    <line x1="555" y1="75" x2="578" y2="48" class="svg-arrow" stroke-width="2" marker-end="url(#uc3-arrow)"/>
+                    <line x1="555" y1="90" x2="578" y2="90" class="svg-arrow" stroke-width="2" marker-end="url(#uc3-arrow)"/>
+                    <line x1="555" y1="105" x2="578" y2="132" class="svg-arrow" stroke-width="2" marker-end="url(#uc3-arrow)"/>
+                </svg>
+            </div>
+        </section>
+
+        <div class="usecase-panels">
+            <!-- LEFT: Live Demo Panel -->
+            <section class="panel demo-panel">
+                <h2>Live Demo</h2>
+                <div id="demo-container" class="demo-container">
+                    <p class="demo-scenario">
+                        <strong>Scenario:</strong> Aggregate a user profile from 3 separate databases
+                        (Accounts, Activity, Preferences) into a single Redis Hash for fast access.
+                    </p>
+
+                    <!-- User Selector -->
+                    <div class="form-group">
+                        <label for="userSelect">Select User</label>
+                        <select id="userSelect" class="form-control"></select>
+                    </div>
+
+                    <div class="form-actions" style="margin-bottom:16px;">
+                        <button id="loadBtn" class="btn btn-primary">Load Profile from DBs</button>
+                        <button id="syncBtn" class="btn btn-secondary" disabled>Sync Back to DBs</button>
+                    </div>
+
+                    <!-- Profile Display -->
+                    <div id="profile-card" class="data-card" style="display:none;">
+                        <h3>Aggregated Profile (Redis Hash)</h3>
+                        <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;" id="redis-key-display"></div>
+                        <div id="profile-data"></div>
+                    </div>
+
+                    <!-- Inline Edit -->
+                    <div id="edit-card" class="data-card" style="display:none; margin-top:16px;">
+                        <h3>Update Profile Field</h3>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label for="editField">Field</label>
+                            <select id="editField" class="form-control">
+                                <option value="pref_language">Language</option>
+                                <option value="pref_notifications">Notifications</option>
+                                <option value="pref_theme">Theme</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label for="editValue">New Value</label>
+                            <input type="text" id="editValue" class="form-input" placeholder="Enter new value"/>
+                        </div>
+                        <button id="updateBtn" class="btn btn-secondary" style="width:100%;">Update Field</button>
+                    </div>
+
+                    <!-- TTL bar -->
+                    <div id="ttl-container" style="display:none; margin-top:16px;">
+                        <div class="ttl-bar-container">
+                            <div class="ttl-bar-label">
+                                <span>TTL</span>
+                                <span id="ttl-value">600s</span>
+                            </div>
+                            <div class="ttl-bar">
+                                <div class="ttl-bar-fill" id="ttl-fill" style="width:100%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="sync-result" style="display:none; margin-top:12px;"></div>
+                </div>
+            </section>
+
+            <!-- RIGHT: Code Showcase Panel -->
+            <section class="panel code-panel">
+                <h2>Code Showcase</h2>
+                <div class="code-container">
+                    <div class="code-tabs">
+                        <button class="code-tab" data-tab="java">Java</button>
+                        <button class="code-tab active" data-tab="cli">Redis CLI</button>
+                    </div>
+
+                    <div class="code-block" id="tab-java">
+                        <pre><code class="language-java">// 1. Aggregate from multiple DBs — HSET
+String key = "workshop:profile:user:" + userId;
+
+Map&lt;String, String&gt; profile = new HashMap&lt;&gt;();
+
+// From Accounts DB
+profile.put("account_number", "ES76-0128...");
+profile.put("account_balance", "12450.75");
+profile.put("account_type", "Premium Savings");
+
+// From Activity DB
+profile.put("activity_lastLogin", "2024-04-12");
+profile.put("activity_recentTxCount", "14");
+
+// From Preferences DB
+profile.put("pref_language", "es");
+profile.put("pref_notifications", "email");
+
+// HSET — store all fields in one call
+redis.opsForHash().putAll(key, profile);
+
+// EXPIRE — auto-cleanup
+redis.expire(key, 600, TimeUnit.SECONDS);
+
+// 2. Read full profile — HGETALL
+Map&lt;Object, Object&gt; data =
+    redis.opsForHash().entries(key);
+
+// 3. Update single field — HSET
+redis.opsForHash()
+    .put(key, "pref_language", "en");
+
+// 4. Atomic counter — HINCRBY
+redis.opsForHash()
+    .increment(key, "activity_loginCount", 1);</code></pre>
+                    </div>
+
+                    <div class="code-block active" id="tab-cli">
+                        <pre><code class="language-bash"># 1. Store aggregated profile
+HSET workshop:profile:user:U1001 \
+  account_number "ES76-0128-0001..." \
+  account_balance "12450.75" \
+  account_type "Premium Savings" \
+  activity_lastLogin "2024-04-12" \
+  activity_recentTxCount "14" \
+  pref_language "es" \
+  pref_notifications "email" \
+  pref_theme "light"
+
+# 2. Set TTL
+EXPIRE workshop:profile:user:U1001 600
+
+# 3. Read full profile
+HGETALL workshop:profile:user:U1001
+
+# 4. Update single field
+HSET workshop:profile:user:U1001 \
+  pref_language "en"
+
+# 5. Atomic increment
+HINCRBY workshop:profile:user:U1001 \
+  activity_loginCount 1
+
+# 6. Read single field
+HGET workshop:profile:user:U1001 \
+  account_balance</code></pre>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div layout:fragment="scripts">
+        <script th:src="@{/js/usecase-3.js}"></script>
+    </div>
+</body>
+</html>

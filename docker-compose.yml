@@ -1,0 +1,44 @@
+services:
+  redis:
+    image: redis:8.0-M02
+    container_name: workshop-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - workshop-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: workshop-app
+    profiles:
+      - workshop
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATA_REDIS_HOST=redis
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: workshop-redis-insight
+    ports:
+      - "5540:5540"
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - workshop
+
+volumes:
+  workshop-redis-data:

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${useCaseTitle}">Real-time Fraud Detection</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">UC6</span>
+            <h1 th:text="${useCaseTitle}">Real-time Fraud Detection</h1>
+        </div>
+        <p class="usecase-subtitle">Transaction Risk Scoring &mdash; velocity checks with Sorted Sets, event logging with Streams, geographic anomaly detection.</p>
+
+        <section class="how-it-works">
+            <h2>How it works</h2>
+            <div class="how-it-works-steps">
+                <ol>
+                    <li>Transaction data flows through an orchestration system to Redis, which serves as the online feature store.</li>
+                    <li>Account, customer, and transaction features are stored in Redis Hashes for sub-millisecond access.</li>
+                    <li>A real-time scoring microservice queries Redis features to evaluate fraud risk.</li>
+                    <li>Redis Active-Active provides multi-geo replication with 99.999% SLA.</li>
+                </ol>
+            </div>
+            <div class="how-it-works-diagram">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 300" width="700" height="300">
+                    <defs>
+                        <marker id="uc6-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                            <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                        </marker>
+                    </defs>
+                    <!-- Transactions -->
+                    <rect x="15" y="50" width="120" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="75" y="75" text-anchor="middle" font-size="13" font-weight="600">Transactions</text>
+                    <!-- Arrow → Orchestration -->
+                    <line x1="135" y1="70" x2="185" y2="70" class="svg-arrow" stroke-width="2" marker-end="url(#uc6-arrow)"/>
+                    <!-- Orchestration -->
+                    <rect x="195" y="45" width="130" height="50" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="260" y="66" text-anchor="middle" font-size="12" font-weight="600">Orchestration</text>
+                    <text x="260" y="82" text-anchor="middle" font-size="11" class="svg-label">System</text>
+                    <!-- Fraud Management (above) -->
+                    <rect x="190" y="0" width="140" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="260" y="22" text-anchor="middle" font-size="12" font-weight="600">Fraud Management</text>
+                    <line x1="260" y1="45" x2="260" y2="37" class="svg-arrow" stroke-width="2" marker-end="url(#uc6-arrow)"/>
+                    <!-- Real-time Scoring (right of orchestration) -->
+                    <rect x="370" y="45" width="130" height="50" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="435" y="66" text-anchor="middle" font-size="12" font-weight="600">Real-time Scoring</text>
+                    <text x="435" y="82" text-anchor="middle" font-size="11" class="svg-label">INFERENCE</text>
+                    <line x1="325" y1="70" x2="368" y2="70" class="svg-arrow" stroke-width="2" marker-end="url(#uc6-arrow)"/>
+                    <!-- Feature boxes (bottom area with red border) -->
+                    <rect x="50" y="120" width="440" height="65" rx="5" ry="5" fill="none" stroke="#FF4438" stroke-width="2" stroke-dasharray="5,3"/>
+                    <text x="270" y="138" text-anchor="middle" font-size="11" class="svg-label">Features</text>
+                    <!-- Account -->
+                    <rect x="65" y="145" width="120" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="125" y="165" text-anchor="middle" font-size="11" font-weight="600">ACCOUNT</text>
+                    <!-- Customer -->
+                    <rect x="210" y="145" width="120" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="270" y="165" text-anchor="middle" font-size="11" font-weight="600">CUSTOMER</text>
+                    <!-- Transaction -->
+                    <rect x="355" y="145" width="120" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="415" y="165" text-anchor="middle" font-size="11" font-weight="600">TRANSACTION</text>
+                    <!-- Arrow features → Redis -->
+                    <line x1="270" y1="185" x2="270" y2="215" class="svg-arrow" stroke-width="2"/>
+                    <line x1="270" y1="215" x2="480" y2="215" class="svg-arrow" stroke-width="2" marker-end="url(#uc6-arrow)"/>
+                    <!-- Redis circle -->
+                    <circle cx="560" cy="215" r="55" class="svg-redis-circle"/>
+                    <text x="560" y="208" text-anchor="middle" font-size="14" class="svg-redis-text">Redis</text>
+                    <text x="560" y="226" text-anchor="middle" font-size="10" class="svg-redis-text">Active-Active</text>
+                    <!-- Labels to the right -->
+                    <text x="560" y="285" text-anchor="middle" font-size="10" class="svg-label">Online feature store</text>
+                    <text x="560" y="298" text-anchor="middle" font-size="10" class="svg-label">Hash | 99.999% SLA</text>
+                    <!-- Arrow Scoring → Redis -->
+                    <line x1="500" y1="80" x2="560" y2="158" class="svg-arrow" stroke-width="2" marker-end="url(#uc6-arrow)"/>
+                    <text x="545" y="112" text-anchor="middle" font-size="11" class="svg-label">query</text>
+                </svg>
+            </div>
+        </section>
+
+        <div class="usecase-panels">
+            <!-- LEFT: Live Demo Panel -->
+            <section class="panel demo-panel">
+                <h2>Live Demo</h2>
+                <div id="demo-container" class="demo-container">
+                    <!-- Transaction Form -->
+                    <form id="fraudForm" class="demo-form" autocomplete="off">
+                        <div class="form-group">
+                            <label for="cardNumber">Card Number</label>
+                            <select id="cardNumber" class="form-control">
+                                <option value="4000-1234-5678-9010">4000-1234-5678-9010 (Alice — ES)</option>
+                                <option value="4000-2345-6789-0123">4000-2345-6789-0123 (Bob — ES)</option>
+                                <option value="4000-3456-7890-1234">4000-3456-7890-1234 (Carlos — FR)</option>
+                                <option value="4000-4567-8901-2345">4000-4567-8901-2345 (Diana — DE)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="amount">Amount (&euro;)</label>
+                            <input type="number" id="amount" class="form-control" value="150.00" min="0.01" step="0.01" />
+                        </div>
+                        <div class="form-group">
+                            <label for="merchant">Merchant</label>
+                            <select id="merchant" class="form-control">
+                                <option value="Amazon ES">Amazon ES</option>
+                                <option value="El Corte Inglés">El Corte Inglés</option>
+                                <option value="Luxury Watches Ltd">Luxury Watches Ltd</option>
+                                <option value="ATM Withdrawal">ATM Withdrawal</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="country">Country</label>
+                            <select id="country" class="form-control">
+                                <option value="ES">Spain (ES)</option>
+                                <option value="FR">France (FR)</option>
+                                <option value="DE">Germany (DE)</option>
+                                <option value="NG">Nigeria (NG)</option>
+                                <option value="RU">Russia (RU)</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="evaluateBtn">Evaluate Transaction</button>
+                            <button type="button" class="btn btn-secondary" id="burstBtn">Rapid-fire (5 txs)</button>
+                            <button type="button" class="btn btn-outline" id="resetBtn">Reset</button>
+                        </div>
+                    </form>
+
+                    <!-- Risk Score Display -->
+                    <div id="riskDisplay" class="fraud-risk-display" style="display:none;">
+                        <div class="fraud-risk-header">
+                            <span class="fraud-risk-label">Risk Score</span>
+                            <span id="riskScore" class="fraud-risk-score">0</span>
+                        </div>
+                        <div class="fraud-gauge-bar">
+                            <div id="riskGaugeFill" class="fraud-gauge-fill" style="width:0%"></div>
+                        </div>
+                        <div id="riskLevel" class="fraud-risk-level">LOW</div>
+                        <div id="riskFactors" class="fraud-risk-factors"></div>
+                    </div>
+
+                    <!-- Transaction Stream -->
+                    <h3 class="log-title">Transaction Stream</h3>
+                    <div id="txStream" class="tx-log">
+                        <p class="placeholder-text">No evaluations yet. Submit a transaction above.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT: Code Showcase Panel -->
+            <section class="panel code-panel">
+                <h2>Code Showcase</h2>
+                <div class="code-container">
+                    <h3 class="code-section-title">1. Velocity Tracking (Sorted Set)</h3>
+                    <pre><code class="language-java">// ZADD — record each transaction with timestamp as score
+String velocityKey = "workshop:fraud:velocity:" + cardNumber;
+long now = Instant.now().toEpochMilli();
+
+redis.opsForZSet().add(velocityKey, txId, now);
+
+// ZRANGEBYSCORE — count txs in last 5 minutes
+long windowStart = now - (300 * 1000); // 5 min ago
+Set&lt;String&gt; recentTxs = redis.opsForZSet()
+    .rangeByScore(velocityKey, windowStart, now);
+
+int velocityCount = recentTxs.size();
+// velocityCount &gt; 5 → HIGH RISK!
+
+// Clean expired entries
+redis.opsForZSet()
+    .removeRangeByScore(velocityKey, 0, windowStart - 1);</code></pre>
+
+                    <h3 class="code-section-title">2. Redis CLI — Velocity Check</h3>
+                    <pre><code class="language-bash"># Add transaction with timestamp as score
+ZADD workshop:fraud:velocity:4000-1234 1713045600000 "tx-abc123"
+# → (integer) 1
+
+# Count transactions in last 5 minutes
+ZRANGEBYSCORE workshop:fraud:velocity:4000-1234 1713045300000 1713045600000
+# → 1) "tx-prev001"
+# → 2) "tx-prev002"
+# → 3) "tx-abc123"
+# 3 transactions → elevated velocity
+
+# Clean old entries
+ZREMRANGEBYSCORE workshop:fraud:velocity:4000-1234 0 1713045299999</code></pre>
+
+                    <h3 class="code-section-title">3. Event Stream (Redis Streams)</h3>
+                    <pre><code class="language-java">// XADD — log every fraud evaluation to a stream
+Map&lt;String, String&gt; entry = Map.of(
+    "txId", txId,
+    "card", cardNumber,
+    "amount", String.valueOf(amount),
+    "riskScore", String.valueOf(riskScore),
+    "riskLevel", riskLevel
+);
+
+redis.opsForStream().add(
+    StreamRecords.string(entry)
+        .withStreamKey("workshop:fraud:stream"));
+
+// XREVRANGE — read most recent evaluations
+redis.opsForStream().reverseRange(
+    "workshop:fraud:stream",
+    Range.unbounded(),
+    Limit.limit().count(20));</code></pre>
+
+                    <h3 class="code-section-title">4. Redis CLI — Stream Commands</h3>
+                    <pre><code class="language-bash"># Log a fraud evaluation event
+XADD workshop:fraud:stream * txId "tx-abc123" card "4000-1234" amount "15000.00" riskScore "75" riskLevel "CRITICAL"
+# → "1713045600000-0"
+
+# Read last 5 evaluations
+XREVRANGE workshop:fraud:stream + - COUNT 5
+
+# Stream length
+XLEN workshop:fraud:stream
+
+# Trim to last 50 entries
+XTRIM workshop:fraud:stream MAXLEN ~ 50</code></pre>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div layout:fragment="scripts">
+        <script th:src="@{/js/usecase-6.js}"></script>
+    </div>
+</body>
+</html>

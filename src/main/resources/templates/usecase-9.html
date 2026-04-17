@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${useCaseTitle}">AI Banking Assistant</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">UC9</span>
+            <h1 th:text="${useCaseTitle}">AI Banking Assistant (Memory + RAG)</h1>
+        </div>
+
+        <section class="how-it-works">
+            <h2>How it works</h2>
+            <div class="how-it-works-dual">
+                <!-- Panel 1: Agent Memory -->
+                <div class="how-it-works-panel">
+                    <h3>Agent Memory</h3>
+                    <div class="how-it-works-steps">
+                        <ol>
+                            <li>User makes a request to an agent.</li>
+                            <li>The agent generates a plan.</li>
+                            <li>The agent calls tools or an LLM for information.</li>
+                            <li>The agent stores information in short-term memory.</li>
+                            <li>Some information will be stored for long-term, while other info will only be saved temporarily.</li>
+                        </ol>
+                    </div>
+                    <div class="how-it-works-diagram">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 220" width="700" height="220">
+                            <defs>
+                                <marker id="uc9a-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                                    <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                                </marker>
+                            </defs>
+                            <!-- User -->
+                            <rect x="20" y="70" width="90" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="65" y="95" text-anchor="middle" font-size="12" font-weight="600">User</text>
+                            <text x="65" y="115" text-anchor="middle" font-size="10" class="svg-label">Request</text>
+                            <!-- Arrow User ↔ Agent -->
+                            <line x1="110" y1="100" x2="170" y2="100" class="svg-arrow" stroke-width="2" marker-end="url(#uc9a-arrow)"/>
+                            <!-- AI Agent -->
+                            <rect x="180" y="70" width="110" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="235" y="97" text-anchor="middle" font-size="13" font-weight="600">AI Agent</text>
+                            <!-- Tools above agent -->
+                            <rect x="140" y="10" width="55" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="167" y="30" text-anchor="middle" font-size="10">Tool 1</text>
+                            <rect x="205" y="10" width="55" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="232" y="30" text-anchor="middle" font-size="10">Tool 2</text>
+                            <rect x="270" y="10" width="55" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="297" y="30" text-anchor="middle" font-size="10">Tool 3</text>
+                            <line x1="210" y1="70" x2="180" y2="42" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9a-arrow)"/>
+                            <line x1="235" y1="70" x2="235" y2="42" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9a-arrow)"/>
+                            <line x1="260" y1="70" x2="290" y2="42" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9a-arrow)"/>
+                            <!-- LLM below agent -->
+                            <rect x="195" y="160" width="80" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="235" y="183" text-anchor="middle" font-size="12" font-weight="600">LLM</text>
+                            <line x1="235" y1="130" x2="235" y2="158" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9a-arrow)"/>
+                            <!-- Arrow Agent → Short-term memory -->
+                            <line x1="290" y1="100" x2="370" y2="100" class="svg-arrow" stroke-width="2" marker-end="url(#uc9a-arrow)"/>
+                            <!-- Short-term memory -->
+                            <rect x="380" y="70" width="120" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="440" y="95" text-anchor="middle" font-size="12" font-weight="600">Short-term</text>
+                            <text x="440" y="112" text-anchor="middle" font-size="12" font-weight="600">Memory</text>
+                            <!-- Arrow → Long-term memory -->
+                            <line x1="500" y1="100" x2="560" y2="100" class="svg-arrow" stroke-width="2" marker-end="url(#uc9a-arrow)"/>
+                            <!-- Long-term memory (Redis) -->
+                            <circle cx="625" cy="100" r="50" class="svg-redis-circle"/>
+                            <text x="625" y="92" text-anchor="middle" font-size="12" class="svg-redis-text">Long-term</text>
+                            <text x="625" y="110" text-anchor="middle" font-size="12" class="svg-redis-text">Memory</text>
+                        </svg>
+                    </div>
+                </div>
+                <!-- Panel 2: RAG -->
+                <div class="how-it-works-panel">
+                    <h3>RAG (Retrieval-Augmented Generation)</h3>
+                    <div class="how-it-works-steps">
+                        <ol>
+                            <li>A user asks a question.</li>
+                            <li>The app retrieves the relevant document or chunk from Redis.</li>
+                            <li>The question and relevant document are sent to an LLM.</li>
+                            <li>The LLM generates an answer using its knowledge plus the retrieved information.</li>
+                            <li>The app returns the answer to the user.</li>
+                        </ol>
+                    </div>
+                    <div class="how-it-works-diagram">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 180" width="700" height="180">
+                            <defs>
+                                <marker id="uc9b-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                                    <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                                </marker>
+                            </defs>
+                            <!-- Question -->
+                            <rect x="20" y="50" width="100" height="45" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="70" y="68" text-anchor="middle" font-size="12" font-weight="600">Q</text>
+                            <text x="70" y="86" text-anchor="middle" font-size="13" font-weight="600">Question</text>
+                            <!-- Arrow → Retrieval -->
+                            <line x1="120" y1="72" x2="180" y2="72" class="svg-arrow" stroke-width="2" marker-end="url(#uc9b-arrow)"/>
+                            <!-- Retrieval (Redis) -->
+                            <circle cx="250" cy="72" r="50" class="svg-redis-circle"/>
+                            <text x="250" y="64" text-anchor="middle" font-size="12" class="svg-redis-text">Redis</text>
+                            <text x="250" y="82" text-anchor="middle" font-size="10" class="svg-redis-text">Retrieval</text>
+                            <!-- Documents below -->
+                            <rect x="205" y="140" width="90" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="250" y="163" text-anchor="middle" font-size="12" font-weight="600">Docs</text>
+                            <line x1="250" y1="140" x2="250" y2="124" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9b-arrow)"/>
+                            <!-- Arrow → LLM -->
+                            <line x1="300" y1="72" x2="380" y2="72" class="svg-arrow" stroke-width="2" marker-end="url(#uc9b-arrow)"/>
+                            <!-- LLM -->
+                            <rect x="390" y="45" width="130" height="55" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="455" y="68" text-anchor="middle" font-size="12" font-weight="600">LLM</text>
+                            <text x="455" y="88" text-anchor="middle" font-size="12" font-weight="600">LLM Generation</text>
+                            <!-- Arrow → Answer -->
+                            <line x1="520" y1="72" x2="570" y2="72" class="svg-arrow" stroke-width="2" marker-end="url(#uc9b-arrow)"/>
+                            <!-- Answer -->
+                            <rect x="580" y="50" width="100" height="45" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                            <text x="630" y="68" text-anchor="middle" font-size="12" font-weight="600">A</text>
+                            <text x="630" y="86" text-anchor="middle" font-size="13" font-weight="600">Answer</text>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="loaded-documents">
+            <details class="kb-section" open>
+                <summary><h3>Banking Knowledge Base <span class="doc-count">(10 articles)</span></h3></summary>
+                <p class="loaded-docs-subtitle">Internal banking articles loaded as vector embeddings for the AI assistant's RAG pipeline:</p>
+                <div class="doc-cards">
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/assistant/kb/kb-001/view" target="_blank" class="doc-title-link">Account Types &amp; Features</a></h4>
+                            <p>Personal, Savings, Business &amp; Premium accounts</p>
+                            <span class="doc-tag">Accounts</span>
+                            <span class="doc-tag">Savings</span>
+                            <div class="doc-source">Product Catalogue 2024</div>
+                        </div>
+                    </div>
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/assistant/kb/kb-002/view" target="_blank" class="doc-title-link">Transfers &amp; Fees</a></h4>
+                            <p>SEPA, SWIFT, instant payments &amp; limits</p>
+                            <span class="doc-tag">SEPA</span>
+                            <span class="doc-tag">SWIFT</span>
+                            <div class="doc-source">SEPA Regulation Guide v3.2</div>
+                        </div>
+                    </div>
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/assistant/kb/kb-003/view" target="_blank" class="doc-title-link">Card Security</a></h4>
+                            <p>3D Secure, fraud prevention &amp; contactless</p>
+                            <span class="doc-tag">Fraud</span>
+                            <span class="doc-tag">3D Secure</span>
+                            <div class="doc-source">Security Policy Handbook</div>
+                        </div>
+                    </div>
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/assistant/kb/kb-004/view" target="_blank" class="doc-title-link">Investments</a></h4>
+                            <p>Portfolios, ETFs &amp; robo-advisor</p>
+                            <span class="doc-tag">ETF</span>
+                            <span class="doc-tag">Portfolio</span>
+                            <div class="doc-source">MiFID II Product Sheet</div>
+                        </div>
+                    </div>
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/assistant/kb/kb-005/view" target="_blank" class="doc-title-link">Loans &amp; Mortgages</a></h4>
+                            <p>Personal loans, fixed &amp; variable mortgage rates</p>
+                            <span class="doc-tag">Mortgage</span>
+                            <span class="doc-tag">Rates</span>
+                            <div class="doc-source">Lending Terms Q1 2025</div>
+                        </div>
+                    </div>
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/assistant/kb/kb-006/view" target="_blank" class="doc-title-link">Insurance</a></h4>
+                            <p>Home, travel, life &amp; payment protection</p>
+                            <span class="doc-tag">Insurance</span>
+                            <span class="doc-tag">Protection</span>
+                            <div class="doc-source">Insurance Partner Brochure</div>
+                        </div>
+                    </div>
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/assistant/kb/kb-007/view" target="_blank" class="doc-title-link">PSD2 &amp; Open Banking</a></h4>
+                            <p>SCA, AIS/PIS APIs &amp; developer portal</p>
+                            <span class="doc-tag">PSD2</span>
+                            <span class="doc-tag">API</span>
+                            <div class="doc-source">PSD2 Technical Standards</div>
+                        </div>
+                    </div>
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/assistant/kb/kb-008/view" target="_blank" class="doc-title-link">SEPA Payments</a></h4>
+                            <p>Cross-border, instant &amp; direct debit</p>
+                            <span class="doc-tag">SEPA</span>
+                            <span class="doc-tag">Payments</span>
+                            <div class="doc-source">EPC SEPA Rulebook 2024</div>
+                        </div>
+                    </div>
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/assistant/kb/kb-009/view" target="_blank" class="doc-title-link">Digital Banking</a></h4>
+                            <p>Mobile app, online banking &amp; API access</p>
+                            <span class="doc-tag">Mobile</span>
+                            <span class="doc-tag">Digital</span>
+                            <div class="doc-source">Digital Strategy Roadmap</div>
+                        </div>
+                    </div>
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/assistant/kb/kb-010/view" target="_blank" class="doc-title-link">Regulatory Compliance</a></h4>
+                            <p>MiFID II, GDPR, AML/KYC</p>
+                            <span class="doc-tag">MiFID</span>
+                            <span class="doc-tag">GDPR</span>
+                            <div class="doc-source">Compliance Manual v5.1</div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <details class="kb-section">
+                <summary><h3>Regulation Documents <span class="doc-count">(5 PDFs)</span></h3></summary>
+                <p class="loaded-docs-subtitle">Official EU banking regulation PDFs, chunked and embedded for semantic search:</p>
+                <div class="doc-cards">
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/documents/pdf/psd2" target="_blank" class="doc-title-link">PSD2 — Payment Services Directive 2</a></h4>
+                            <p>Open banking, strong customer authentication, third-party provider access</p>
+                            <span class="doc-tag">PSD2</span>
+                            <span class="doc-tag">Open Banking</span>
+                            <div class="doc-source">Official EU Regulation</div>
+                        </div>
+                    </div>
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/documents/pdf/dora" target="_blank" class="doc-title-link">DORA — Digital Operational Resilience Act</a></h4>
+                            <p>ICT risk management, incident reporting, digital resilience testing</p>
+                            <span class="doc-tag">DORA</span>
+                            <span class="doc-tag">Resilience</span>
+                            <div class="doc-source">Official EU Regulation</div>
+                        </div>
+                    </div>
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/documents/pdf/mifid2" target="_blank" class="doc-title-link">MiFID II — Markets in Financial Instruments</a></h4>
+                            <p>Investor protection, market transparency, trading venue rules</p>
+                            <span class="doc-tag">MiFID II</span>
+                            <span class="doc-tag">Markets</span>
+                            <div class="doc-source">Official EU Regulation</div>
+                        </div>
+                    </div>
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/documents/pdf/gdpr" target="_blank" class="doc-title-link">GDPR — General Data Protection Regulation</a></h4>
+                            <p>Personal data protection, consent management, data subject rights</p>
+                            <span class="doc-tag">GDPR</span>
+                            <span class="doc-tag">Privacy</span>
+                            <div class="doc-source">Official EU Regulation</div>
+                        </div>
+                    </div>
+                    <div class="doc-card">
+                        <div class="doc-info">
+                            <h4><a href="/api/documents/pdf/euaiact" target="_blank" class="doc-title-link">EU AI Act — Artificial Intelligence Act</a></h4>
+                            <p>AI risk classification, PII in automated decisions, high-risk AI systems in banking</p>
+                            <span class="doc-tag">AI Act</span>
+                            <span class="doc-tag">PII</span>
+                            <div class="doc-source">Official EU Regulation</div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </section>
+
+        <div class="usecase-panels">
+            <!-- LEFT: Live Demo Panel -->
+            <section class="panel demo-panel">
+                <h2>Live Demo</h2>
+                <div id="demo-container" class="demo-container">
+
+                    <!-- API Status Indicator -->
+                    <div id="api-status" style="margin-bottom:8px; font-family:var(--font-code); font-size:0.75rem; padding:6px 12px; border-radius:var(--border-radius); display:inline-block;">
+                        <span id="api-status-text" style="color:var(--text-muted);">Checking API status...</span>
+                    </div>
+
+                    <!-- Chat Interface -->
+                    <div class="data-card" id="chat-card">
+                        <h3>Chat with AI Assistant</h3>
+                        <div id="chat-messages" style="max-height:320px; overflow-y:auto; margin-bottom:8px; padding:8px; background:var(--bg-secondary); border-radius:var(--border-radius); min-height:120px;">
+                            <div class="chat-welcome" style="color:var(--text-muted); font-style:italic; padding:16px 0; text-align:center;">
+                                Ask about banking services — accounts, transfers, investments, loans, cards, or regulations. Try the example prompts below!
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input type="text" id="chatInput" class="form-input" placeholder="Ask about accounts, transfers, investments, loans..."
+                                   style="flex:1;"/>
+                            <button id="sendBtn" class="btn btn-primary">Send</button>
+                            <span id="streaming-indicator" style="display:none; font-size:0.75rem; color:var(--redis-primary); font-family:var(--font-code); white-space:nowrap;">
+                                <span style="display:inline-block; width:8px; height:8px; background:var(--redis-primary); border-radius:50%; animation:uc9-pulse 1s infinite; vertical-align:middle; margin-right:4px;"></span>
+                                Streaming...
+                            </span>
+                        </div>
+                        <div style="margin-top:8px;">
+                            <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px;">Try these questions:</label>
+                            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What are the international transfer fees for SEPA and SWIFT?">Transfer fees</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="Tell me about card security and fraud prevention measures">Card security</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What investment products do you offer?">Investments</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What are the mortgage rates and loan options?">Loans &amp; mortgages</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="How does PSD2 and Open Banking work with your API?">PSD2 &amp; Open Banking</button>
+                                <button class="btn btn-sm btn-secondary uc9-prompt" data-prompt="What types of accounts do you offer?">Account types</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Semantic Cache Panel -->
+                    <div class="data-card" id="cache-panel" style="margin-top:16px;">
+                        <h3>Semantic Cache</h3>
+                        <div id="cache-status" style="margin-bottom:8px;">
+                            <span id="cache-status-text" style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted);">Checking cache status...</span>
+                        </div>
+                        <div id="cache-indicator" style="display:none; margin-bottom:8px;">
+                            <span id="cache-badge" style="display:inline-block; padding:4px 12px; border-radius:var(--border-radius); font-family:var(--font-code); font-size:0.75rem; font-weight:700;"></span>
+                            <span id="cache-latency" style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted); margin-left:8px;"></span>
+                        </div>
+                        <div id="cache-stats" style="font-size:0.8rem;">
+                            <div class="data-row"><span class="data-label">Hits</span><span class="data-value" id="cache-hits">0</span></div>
+                            <div class="data-row"><span class="data-label">Misses</span><span class="data-value" id="cache-misses">0</span></div>
+                            <div class="data-row"><span class="data-label">Cached Entries</span><span class="data-value" id="cache-entries">0</span></div>
+                            <div class="data-row"><span class="data-label">Hit Rate</span><span class="data-value" id="cache-hit-rate" style="color:var(--redis-primary); font-weight:600;">N/A</span></div>
+                            <div class="data-row"><span class="data-label">Tokens Used</span><span class="data-value" id="cache-tokens-used">0</span></div>
+                            <div class="data-row"><span class="data-label">Tokens Saved</span><span class="data-value" id="cache-tokens-saved" style="color:#059669; font-weight:600;">0</span></div>
+                            <div class="data-row"><span class="data-label">Est. Cost Saved</span><span class="data-value" id="cache-cost-saved" style="color:#059669; font-weight:600;">$0.0000</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Memory Inspection Panel -->
+                    <div class="data-card" style="margin-top:16px;">
+                        <h3>Memory Inspection</h3>
+
+                        <!-- Short-term Memory -->
+                        <div style="margin-bottom:12px;">
+                            <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--redis-primary); font-weight:600; margin-bottom:4px;">
+                                SHORT-TERM MEMORY (Redis Hash + TTL)
+                            </div>
+                            <div id="short-term-info" style="font-size:0.8rem; color:var(--text-muted);">
+                                No active conversation yet.
+                            </div>
+                        </div>
+
+                        <!-- Retrieved Long-term Memories -->
+                        <div style="margin-bottom:12px;">
+                            <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--redis-primary); font-weight:600; margin-bottom:4px;">
+                                LONG-TERM MEMORY RETRIEVED (Vector Search)
+                            </div>
+                            <div id="memory-results" style="font-size:0.8rem; color:var(--text-muted);">
+                                No memories retrieved yet.
+                            </div>
+                        </div>
+
+                        <!-- Retrieved RAG Documents -->
+                        <div>
+                            <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--redis-primary); font-weight:600; margin-bottom:4px;">
+                                RAG DOCUMENTS RETRIEVED (Vector Search)
+                            </div>
+                            <div id="rag-results" style="font-size:0.8rem; color:var(--text-muted);">
+                                No documents retrieved yet.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sources Panel (SSE mode only) -->
+                    <div id="sourcesPanel" class="data-card" style="margin-top:16px; display:none; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:var(--border-radius); padding:16px;">
+                        <h3 style="margin-bottom:12px;">Redis Context Sources</h3>
+                        <div id="sourcesContent">
+                            <!-- Populated by JS on SSE sources event -->
+                        </div>
+                    </div>
+
+                    <!-- Redis Commands Executed -->
+                    <div id="commands-card" class="data-card" style="margin-top:16px; display:none;">
+                        <h3>Redis Commands Executed</h3>
+                        <pre id="commands-output" style="font-size:0.75rem; margin:0; white-space:pre-wrap; color:var(--text-secondary);"></pre>
+                        <div id="latency-display" style="font-family:var(--font-code); font-size:0.75rem; color:var(--redis-primary); margin-top:8px;"></div>
+                    </div>
+
+                    <!-- Reset button -->
+                    <div style="margin-top:16px; text-align:right;">
+                        <button id="resetBtn" class="btn btn-outline btn-sm">Reset Demo</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT: Code Showcase Panel -->
+            <section class="panel code-panel">
+                <h2>Code Showcase</h2>
+                <div class="code-container">
+                    <div class="code-tabs">
+                        <button class="code-tab" data-tab="java">Java</button>
+                        <button class="code-tab active" data-tab="cli">Redis CLI</button>
+                    </div>
+
+                    <div class="code-block" id="tab-java">
+                        <pre><code class="language-java">// 1. Short-term Memory — HSET + EXPIRE
+// Store conversation context as a Hash
+String convKey = "workshop:assistant:conversation:"
+    + sessionId;
+
+Map&lt;String, String&gt; convData = Map.of(
+    "messages", objectMapper.writeValueAsString(
+        messageHistory),
+    "created_at", Instant.now().toString(),
+    "last_active", Instant.now().toString(),
+    "user_name", userName
+);
+redis.opsForHash().putAll(convKey, convData);
+// TTL: auto-expire after 10 min of inactivity
+redis.expire(convKey, 600, TimeUnit.SECONDS);
+
+// 2. Long-term Memory — Hash + Vector
+// Store past interaction with embedding vector
+String memKey = "workshop:assistant:memory:mem-001";
+redis.opsForHash().putAll(memKey, Map.of(
+    "summary", "Asked about wire transfer fees",
+    "detail", "Customer inquired about SWIFT...",
+    "date", "2024-03-15",
+    "tags", "transfer,international,fees"
+));
+// Store vector as raw FLOAT32 bytes
+conn.hashCommands().hSet(
+    memKey.getBytes(),
+    "vector".getBytes(),
+    vectorToBytes(embedding)  // 768-dim float[]
+);
+
+// 3. FT.CREATE — Vector index for memories
+// FT.CREATE idx:assistant_memory
+//   ON HASH PREFIX 1 workshop:assistant:memory:
+//   SCHEMA
+//     summary TEXT
+//     tags TAG SEPARATOR ","
+//     vector VECTOR HNSW 6
+//       TYPE FLOAT32 DIM 768
+//       DISTANCE_METRIC COSINE
+
+// 4. FT.SEARCH KNN — Retrieve memories
+// FT.SEARCH idx:assistant_memory
+//   "*=&gt;[KNN 3 @vector $BLOB]"
+//   PARAMS 2 BLOB &lt;query_vector_bytes&gt;
+//   RETURN 3 summary detail date
+//   DIALECT 2
+
+// 5. RAG — Same pattern for knowledge base
+// FT.SEARCH idx:assistant_kb
+//   "*=&gt;[KNN 3 @vector $BLOB]"
+//   PARAMS 2 BLOB &lt;query_vector_bytes&gt;
+//   RETURN 3 title content tags
+//   DIALECT 2
+
+// 6. Semantic Cache — avoid redundant LLM calls
+// Create cache index
+// FT.CREATE idx:assistant_cache
+//   ON HASH PREFIX 1 workshop:assistant:cache:
+//   SCHEMA question TEXT
+//     vector VECTOR HNSW 6
+//       TYPE FLOAT32 DIM 1536
+//       DISTANCE_METRIC COSINE
+
+// Check cache before calling LLM
+// FT.SEARCH idx:assistant_cache
+//   "*=&gt;[KNN 1 @vector $BLOB]"
+//   PARAMS 2 BLOB &lt;question_embedding&gt;
+//   DIALECT 2
+// If distance &lt; 0.15 → CACHE HIT (instant!)
+
+// Store in cache after LLM response
+String cacheKey = "workshop:assistant:cache:" + id;
+redis.opsForHash().putAll(cacheKey, Map.of(
+    "question", userMessage,
+    "response", llmResponse
+));
+storeVectorField(cacheKey, embedding);
+redis.expire(cacheKey, 600, TimeUnit.SECONDS);
+
+// 7. Complete flow
+// a) FT.SEARCH cache (semantic cache check)
+// b) If MISS: FT.SEARCH memories + KB + LLM
+// c) HSET cache entry + EXPIRE 600s
+// d) HSET conversation + EXPIRE TTL</code></pre>
+                    </div>
+
+                    <div class="code-block active" id="tab-cli">
+                        <pre><code class="language-bash"># 1. Short-term Memory — conversation context
+HSET workshop:assistant:conversation:sess-001 \
+  messages '[{"role":"user","content":"..."}]' \
+  created_at "2024-03-15T10:00:00Z" \
+  last_active "2024-03-15T10:05:00Z" \
+  user_name "Demo User"
+
+# Auto-expire after 10 minutes
+EXPIRE workshop:assistant:conversation:sess-001 600
+
+# Read conversation
+HGETALL workshop:assistant:conversation:sess-001
+
+# Check remaining TTL
+TTL workshop:assistant:conversation:sess-001
+
+# 2. Long-term Memory — store with vector
+HSET workshop:assistant:memory:mem-001 \
+  summary "Asked about wire transfer fees" \
+  detail "Customer inquired about SWIFT..." \
+  date "2024-03-15" \
+  tags "transfer,international,fees" \
+  vector "&lt;768-dim FLOAT32 binary blob&gt;"
+
+# 3. Create vector index for memories
+FT.CREATE idx:assistant_memory \
+  ON HASH PREFIX 1 workshop:assistant:memory: \
+  SCHEMA \
+    summary TEXT \
+    tags TAG SEPARATOR "," \
+    date TEXT \
+    vector VECTOR HNSW 6 \
+      TYPE FLOAT32 DIM 768 \
+      DISTANCE_METRIC COSINE
+
+# 4. KNN search — find similar memories
+FT.SEARCH idx:assistant_memory \
+  "*=&gt;[KNN 3 @vector $BLOB]" \
+  PARAMS 2 BLOB "&lt;query_vector&gt;" \
+  RETURN 3 summary detail date \
+  DIALECT 2
+
+# 5. RAG knowledge base index
+FT.CREATE idx:assistant_kb \
+  ON HASH PREFIX 1 workshop:assistant:kb: \
+  SCHEMA \
+    title TEXT \
+    content TEXT \
+    tags TAG SEPARATOR "," \
+    vector VECTOR HNSW 6 \
+      TYPE FLOAT32 DIM 768 \
+      DISTANCE_METRIC COSINE
+
+# 6. KNN search — retrieve KB articles
+FT.SEARCH idx:assistant_kb \
+  "*=&gt;[KNN 3 @vector $BLOB]" \
+  PARAMS 2 BLOB "&lt;query_vector&gt;" \
+  RETURN 3 title content tags \
+  DIALECT 2
+
+# 7. Semantic Cache — skip LLM for similar questions
+FT.CREATE idx:assistant_cache \
+  ON HASH PREFIX 1 workshop:assistant:cache: \
+  SCHEMA \
+    question TEXT \
+    vector VECTOR HNSW 6 \
+      TYPE FLOAT32 DIM 1536 \
+      DISTANCE_METRIC COSINE
+
+# Check cache before calling LLM (KNN k=1)
+FT.SEARCH idx:assistant_cache \
+  "*=&gt;[KNN 1 @vector $BLOB]" \
+  PARAMS 2 BLOB "&lt;question_embedding&gt;" \
+  DIALECT 2
+# If distance &lt; 0.15 → return cached response!
+
+# Store in cache after LLM response
+HSET workshop:assistant:cache:cache-abc123 \
+  question "What is PSD2?" \
+  response "PSD2 is the Payment Services Directive..." \
+  vector "&lt;1536-dim FLOAT32 blob&gt;"
+EXPIRE workshop:assistant:cache:cache-abc123 600
+
+# Memory patterns summary:
+# SHORT-TERM: Hash + TTL (10 min window)
+# LONG-TERM:  Hash + Vector (KNN search)
+# RAG:        Hash + Vector (KNN search)
+# CACHE:      Hash + Vector (semantic dedup)
+# All served from Redis in &lt; 5ms total</code></pre>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div layout:fragment="scripts">
+        <style>
+            @keyframes uc9-pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.3; }
+            }
+            .uc9-source-item {
+                display: flex; gap: 8px; align-items: baseline; padding: 6px 0;
+                border-bottom: 1px solid var(--border-color); flex-wrap: wrap;
+            }
+            .uc9-source-item:last-child { border-bottom: none; }
+            .uc9-source-key {
+                font-family: var(--font-code); font-size: 0.7rem; color: var(--text-muted);
+                word-break: break-all;
+            }
+            .uc9-source-title {
+                font-size: 0.8rem; font-weight: 600; color: var(--text-primary); flex: 1;
+            }
+            .uc9-source-score {
+                font-family: var(--font-code); font-size: 0.7rem; padding: 2px 8px;
+                border-radius: var(--border-radius); white-space: nowrap;
+            }
+            .uc9-score-high { background: rgba(5, 150, 105, 0.15); color: #059669; }
+            .uc9-score-med  { background: rgba(217, 119, 6, 0.15); color: #d97706; }
+            .uc9-score-low  { background: rgba(107, 114, 128, 0.15); color: var(--text-muted); }
+            .uc9-redis-cmd {
+                display: block; font-family: var(--font-code); font-size: 0.7rem;
+                background: var(--bg-tertiary); padding: 6px 10px; border-radius: var(--border-radius);
+                margin-top: 4px; word-break: break-all; color: var(--text-secondary);
+            }
+            .uc9-sources-section { margin-bottom: 12px; }
+            .uc9-sources-section:last-child { margin-bottom: 0; }
+            .uc9-sources-section h5 {
+                font-size: 0.75rem; font-family: var(--font-code); color: var(--redis-primary);
+                text-transform: uppercase; margin-bottom: 4px; font-weight: 600;
+            }
+        </style>
+        <script th:src="@{/js/usecase-9.js}"></script>
+    </div>
+</body>
+</html>

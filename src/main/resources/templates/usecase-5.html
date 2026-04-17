@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${useCaseTitle}">Transaction Deduplication</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">UC5</span>
+            <h1 th:text="${useCaseTitle}">Transaction Deduplication</h1>
+        </div>
+        <p class="usecase-subtitle">Duplicate Payment Prevention &mdash; avoid double-charging on bank transfers using Redis SET with NX + EX flags.</p>
+
+        <section class="how-it-works">
+            <h2>How it works</h2>
+            <div class="how-it-works-steps">
+                <ol>
+                    <li>An application attempts to write data to a database.</li>
+                    <li>Deduplication check via hash stored in a Redis Set or probabilistic data type:
+                        <br/><strong>a.</strong> If data does not exist in Redis → allow the write to the database.
+                        <br/><strong>b.</strong> If data already exists → deny (duplicate detected).
+                    </li>
+                </ol>
+            </div>
+            <div class="how-it-works-diagram">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 200" width="700" height="200">
+                    <defs>
+                        <marker id="uc5-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                            <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                        </marker>
+                    </defs>
+                    <!-- App -->
+                    <rect x="20" y="55" width="100" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="70" y="80" text-anchor="middle" font-size="14" font-weight="600">App</text>
+                    <text x="70" y="100" text-anchor="middle" font-size="14" font-weight="600">App</text>
+                    <!-- Step 1 -->
+                    <circle cx="165" cy="73" r="12" class="svg-step-circle"/>
+                    <text x="165" y="78" text-anchor="middle" font-size="11" class="svg-step-text">1</text>
+                    <!-- Arrow App → Redis -->
+                    <line x1="120" y1="85" x2="240" y2="85" class="svg-arrow" stroke-width="2" marker-end="url(#uc5-arrow)"/>
+                    <!-- Redis circle -->
+                    <circle cx="310" cy="85" r="55" class="svg-redis-circle"/>
+                    <text x="310" y="78" text-anchor="middle" font-size="16" class="svg-redis-text">Redis</text>
+                    <text x="310" y="98" text-anchor="middle" font-size="11" class="svg-redis-text">Dedup Check</text>
+                    <!-- 2a: Allow → Database -->
+                    <line x1="365" y1="75" x2="460" y2="50" class="svg-arrow" stroke-width="2" marker-end="url(#uc5-arrow)"/>
+                    <text x="420" y="50" text-anchor="middle" font-size="11" class="svg-label">2a: New</text>
+                    <rect x="470" y="30" width="120" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="530" y="55" text-anchor="middle" font-size="13" font-weight="600">Database</text>
+                    <!-- 2b: Deny -->
+                    <line x1="365" y1="100" x2="460" y2="140" class="svg-arrow" stroke-width="2" marker-end="url(#uc5-arrow)"/>
+                    <text x="420" y="138" text-anchor="middle" font-size="11" class="svg-label">2b: Duplicate</text>
+                    <rect x="470" y="125" width="120" height="40" rx="5" ry="5" class="svg-deny-box"/>
+                    <text x="530" y="150" text-anchor="middle" font-size="14" class="svg-deny-text">Deny</text>
+                </svg>
+            </div>
+        </section>
+
+        <div class="usecase-panels">
+            <!-- LEFT: Live Demo Panel -->
+            <section class="panel demo-panel">
+                <h2>Live Demo</h2>
+                <div id="demo-container" class="demo-container">
+                    <!-- Payment Form -->
+                    <form id="paymentForm" class="demo-form" autocomplete="off">
+                        <div class="form-group">
+                            <label for="sender">Sender Account</label>
+                            <select id="sender" class="form-control">
+                                <option value="ES12-0001-ALICE">ES12-0001-ALICE (Alice)</option>
+                                <option value="ES34-0002-BOB">ES34-0002-BOB (Bob)</option>
+                                <option value="ES56-0003-CARLOS">ES56-0003-CARLOS (Carlos)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="receiver">Receiver Account</label>
+                            <select id="receiver" class="form-control">
+                                <option value="ES78-0004-DIANA">ES78-0004-DIANA (Diana)</option>
+                                <option value="ES90-0005-EVA" selected>ES90-0005-EVA (Eva)</option>
+                                <option value="ES11-0006-FRANK">ES11-0006-FRANK (Frank)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="amount">Amount (&euro;)</label>
+                            <input type="number" id="amount" class="form-control" value="250.00" min="0.01" step="0.01" />
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="payBtn">Pay Now</button>
+                            <button type="button" class="btn btn-secondary" id="doubleClickBtn">Double-Click Simulation</button>
+                            <button type="button" class="btn btn-outline" id="resetBtn">Reset Log</button>
+                        </div>
+                    </form>
+
+                    <!-- Result Display -->
+                    <div id="resultBox" class="result-box" style="display:none;">
+                        <div id="resultIcon" class="result-icon"></div>
+                        <div id="resultStatus" class="result-status"></div>
+                        <div id="resultDetails" class="result-details"></div>
+                    </div>
+
+                    <!-- Transaction Log -->
+                    <h3 class="log-title">Transaction Log</h3>
+                    <div id="txLog" class="tx-log">
+                        <p class="placeholder-text">No transactions yet. Submit a payment above.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT: Code Showcase Panel -->
+            <section class="panel code-panel">
+                <h2>Code Showcase</h2>
+                <div class="code-container">
+                    <h3 class="code-section-title">1. SETNX Pattern (SET NX EX)</h3>
+                    <pre><code class="language-java">// Atomic check-and-set: only succeeds if key doesn't exist
+// SET workshop:dedup:{txHash} "1" NX EX 300
+
+String txHash = sha256(sender + receiver + amount + timeWindow);
+String key = "workshop:dedup:" + txHash;
+
+// SET with NX (Not eXists) + EX (Expire) — atomic dedup!
+Boolean wasSet = redis.opsForValue()
+    .setIfAbsent(key, "1", Duration.ofSeconds(300));
+
+if (Boolean.TRUE.equals(wasSet)) {
+    // First time — process the payment
+    return "ACCEPTED";
+} else {
+    // Key already exists — duplicate detected!
+    return "DUPLICATE";
+}</code></pre>
+
+                    <h3 class="code-section-title">2. Redis CLI Equivalent</h3>
+                    <pre><code class="language-bash"># First attempt — key created, payment processed
+SET workshop:dedup:a1b2c3d4 "1" NX EX 300
+# → OK
+
+# Second attempt (within 5 min) — blocked!
+SET workshop:dedup:a1b2c3d4 "1" NX EX 300
+# → (nil)   ← duplicate detected
+
+# Check remaining TTL
+TTL workshop:dedup:a1b2c3d4
+# → (integer) 287
+
+# After TTL expires, same tx is accepted again
+SET workshop:dedup:a1b2c3d4 "1" NX EX 300
+# → OK</code></pre>
+
+                    <h3 class="code-section-title">3. Bloom Filter Alternative (High Volume)</h3>
+                    <pre><code class="language-bash"># For millions of tx/day, use a Bloom filter
+# Probabilistic — tiny false-positive rate, zero false-negatives
+# Much less memory than storing every key
+
+# Create filter (1M capacity, 0.01% error rate)
+BF.RESERVE workshop:dedup:bloom 0.0001 1000000
+
+# Check + add in one step
+BF.ADD workshop:dedup:bloom "a1b2c3d4e5f6"
+# → (integer) 1  ← new item, not seen before
+
+BF.ADD workshop:dedup:bloom "a1b2c3d4e5f6"
+# → (integer) 0  ← already exists = DUPLICATE
+
+# Check without adding
+BF.EXISTS workshop:dedup:bloom "a1b2c3d4e5f6"
+# → (integer) 1  ← exists</code></pre>
+
+                    <pre><code class="language-java">// Java equivalent with Lettuce + RedisBloom
+// Note: Bloom filters don't support per-item TTL
+// Combine with time-bucketed filter names:
+//   "workshop:dedup:bloom:2024-01-15-14"  (hourly bucket)
+
+// BF.ADD via Lettuce custom command
+Long added = redis.execute((RedisCallback&lt;Long&gt;) conn ->
+    conn.commands().execute("BF.ADD",
+        "workshop:dedup:bloom".getBytes(),
+        txHash.getBytes())
+);
+
+if (added == 1L) {
+    return "ACCEPTED";   // new transaction
+} else {
+    return "DUPLICATE";  // already seen
+}</code></pre>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div layout:fragment="scripts">
+        <script th:src="@{/js/usecase-5.js}"></script>
+    </div>
+</body>
+</html>
