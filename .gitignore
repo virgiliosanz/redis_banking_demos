@@ -1,15 +1,10 @@
+# OS
 .DS_Store
+
+# Environment
 .env
 .env.local
 .env.*.local
-__pycache__/
-.pytest_cache/
-/runtime/
-/config/ia-ops-sources.env
-.secrets/*
-!.secrets/README.md
-!.secrets/*.example
-
 
 # Java / Maven
 target/
@@ -18,7 +13,10 @@ target/
 *.war
 *.ear
 
-# IDE (Java)
+# Maven wrapper JAR (downloaded at build time)
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
 .idea/
 *.iml
 *.ipr
@@ -26,9 +24,7 @@ target/
 .project
 .classpath
 .settings/
-
-# Maven wrapper JAR (downloaded at build time)
-.mvn/wrapper/maven-wrapper.jar
+.vscode/
 
 # Spring Boot
 hs_err_pid*
