@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -24,6 +25,16 @@ class ApiEndpointTests {
 
     @Autowired
     private MockMvc mockMvc;
+
+    // -------- Health check --------
+    @Test
+    void healthCheck() throws Exception {
+        mockMvc.perform(get("/api/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.redis.status").value("UP"))
+                .andExpect(jsonPath("$.openai").exists());
+    }
 
     // -------- UC1: Authentication Token Store --------
     @Test
