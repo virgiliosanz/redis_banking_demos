@@ -47,7 +47,36 @@
                 navSelect.selectedIndex = 0;
             }
         }
+
+        initPresentationMode();
     });
+
+    // --- Presentation Mode ---
+    function initPresentationMode() {
+        // Only on use case pages (two-panel layout)
+        var panels = document.querySelector('.usecase-panels');
+        if (!panels) return;
+
+        var PM_KEY = 'presentationMode';
+        var toggle = document.createElement('button');
+        toggle.className = 'presentation-toggle';
+        toggle.type = 'button';
+        toggle.setAttribute('aria-label', 'Toggle presentation mode');
+
+        function updateMode(enabled) {
+            document.body.classList.toggle('presentation-mode', enabled);
+            toggle.textContent = enabled ? 'Exit Presentation' : 'Presentation Mode';
+            toggle.setAttribute('aria-pressed', String(enabled));
+            localStorage.setItem(PM_KEY, String(enabled));
+        }
+
+        toggle.addEventListener('click', function () {
+            updateMode(!document.body.classList.contains('presentation-mode'));
+        });
+
+        document.body.appendChild(toggle);
+        updateMode(localStorage.getItem(PM_KEY) === 'true');
+    }
 
     // --- Utility: POST JSON ---
     window.workshopFetch = function (url, data) {

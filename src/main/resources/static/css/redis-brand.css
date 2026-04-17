@@ -175,6 +175,20 @@ a:hover {
     color: var(--text-primary);
 }
 
+.nav-link {
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
+    border-radius: var(--border-radius);
+    transition: color var(--transition), background var(--transition);
+}
+
+.nav-link:hover {
+    color: var(--redis-primary);
+    background: var(--bg-tertiary);
+}
+
 /* --- Main Content --- */
 .main-content {
     max-width: 1280px;
@@ -1816,4 +1830,74 @@ a:hover {
     .tm-metrics {
         grid-template-columns: repeat(3, 1fr);
     }
+}
+
+/* --- Presentation Mode --- */
+.presentation-toggle {
+    position: fixed;
+    top: 80px;
+    right: 24px;
+    z-index: 100;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 2);
+    cursor: pointer;
+    font-family: var(--font-code);
+    font-size: 13px;
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.presentation-toggle:hover {
+    background: var(--redis-primary);
+    color: #FFFFFF;
+    border-color: var(--redis-primary);
+}
+
+.presentation-mode .code-panel {
+    display: none !important;
+}
+
+.presentation-mode .usecase-panels {
+    grid-template-columns: 1fr !important;
+}
+
+.presentation-mode .demo-panel {
+    grid-column: 1 / -1 !important;
+    max-width: 100% !important;
+}
+
+
+/* --- Landing QR Code --- */
+.qr-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(var(--spacing-unit) * 1);
+    margin: calc(var(--spacing-unit) * 3) 0;
+}
+
+.qr-code {
+    width: 160px;
+    height: 160px;
+    padding: calc(var(--spacing-unit) * 1);
+    background: #FFFFFF;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.qr-code svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.qr-label {
+    font-family: var(--font-code);
+    font-size: 12px;
+    color: var(--text-muted);
 }
