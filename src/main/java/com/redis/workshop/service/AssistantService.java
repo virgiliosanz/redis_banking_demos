@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.redis.workshop.config.RedisCommandLogger;
 import com.redis.workshop.config.RedisSearchHelper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.context.annotation.DependsOn;
@@ -46,17 +47,20 @@ public class AssistantService {
     private final OpenAiService openAiService;
     private final RedisSearchHelper redisSearchHelper;
     private final ObjectMapper objectMapper;
+    private final RedisCommandLogger commandLogger;
 
     // Pre-loaded data for keyword matching (fallback)
     private final List<Map<String, String>> memories = new ArrayList<>();
     private final List<Map<String, String>> kbArticles = new ArrayList<>();
 
     public AssistantService(StringRedisTemplate redis, OpenAiService openAiService,
-                            RedisSearchHelper redisSearchHelper, ObjectMapper objectMapper) {
+                            RedisSearchHelper redisSearchHelper, ObjectMapper objectMapper,
+                            RedisCommandLogger commandLogger) {
         this.redis = redis;
         this.openAiService = openAiService;
         this.redisSearchHelper = redisSearchHelper;
         this.objectMapper = objectMapper;
+        this.commandLogger = commandLogger;
     }
 
     private int estimateTokens(String text) {
@@ -264,6 +268,7 @@ public class AssistantService {
 
         // 1. Load or create conversation (short-term memory)
         Map<Object, Object> convData = redis.opsForHash().entries(convKey);
+        commandLogger.log("UC9", "HGETALL", convKey, "Load conversation (short-term memory)");
         List<Map<String, String>> messageHistory;
         if (convData.isEmpty()) {
             messageHistory = new ArrayList<>();
@@ -307,10 +312,12 @@ public class AssistantService {
                 tokensSaved.addAndGet(savedTokens);
                 relevantMemories = List.of();
                 relevantDocs = List.of();
+                commandLogger.log("UC9", "FT.SEARCH KNN", CACHE_INDEX, "Semantic cache HIT (vector trimmed)");
                 log.info("UC9: Semantic cache HIT for question: {} (~{} tokens saved)", userMessage, savedTokens);
             } else {
                 // Cache MISS — do full vector search + generate response
                 cacheMisses.incrementAndGet();
+                commandLogger.log("UC9", "FT.SEARCH KNN", CACHE_INDEX, "Semantic cache MISS (vector trimmed)");
                 List<Map<String, Object>> memResults = vectorSearch(MEMORY_INDEX, userMessage, 3);
                 relevantMemories = new ArrayList<>();
                 for (var m : memResults) {
@@ -318,6 +325,7 @@ public class AssistantService {
                     m.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
                     relevantMemories.add(flat);
                 }
+                commandLogger.log("UC9", "FT.SEARCH KNN", MEMORY_INDEX, "Find " + relevantMemories.size() + " relevant memories (vector trimmed)");
                 List<Map<String, Object>> kbResults = vectorSearch(KB_INDEX, userMessage, 3);
                 relevantDocs = new ArrayList<>();
                 for (var d : kbResults) {
@@ -325,6 +333,7 @@ public class AssistantService {
                     d.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
                     relevantDocs.add(flat);
                 }
+                commandLogger.log("UC9", "FT.SEARCH KNN", KB_INDEX, "Find " + relevantDocs.size() + " relevant KB docs (vector trimmed)");
                 responseText = generateResponse(userMessage, relevantMemories, relevantDocs);
 
                 int usedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
@@ -361,6 +370,8 @@ public class AssistantService {
             redis.opsForHash().put(convKey, "last_active", Instant.now().toString());
             redis.opsForHash().put(convKey, "user_name", userName);
             redis.expire(convKey, CONV_TTL_SECONDS, TimeUnit.SECONDS);
+            commandLogger.log("UC9", "HSET", convKey, "Store updated conversation");
+            commandLogger.log("UC9", "EXPIRE", convKey, CONV_TTL_SECONDS + "s TTL");
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize messages", e);
         }
@@ -501,6 +512,7 @@ public class AssistantService {
 
         // 1. Load or create conversation
         Map<Object, Object> convData = redis.opsForHash().entries(convKey);
+        commandLogger.log("UC9", "HGETALL", convKey, "Load conversation (short-term memory)");
         List<Map<String, String>> messageHistory;
         if (convData.isEmpty()) {
             messageHistory = new ArrayList<>();
@@ -533,6 +545,7 @@ public class AssistantService {
             responseText = cached.get("response");
             int savedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
             tokensSaved.addAndGet(savedTokens);
+            commandLogger.log("UC9", "FT.SEARCH KNN", CACHE_INDEX, "Semantic cache HIT (vector trimmed)");
             log.info("UC9 Stream: Semantic cache HIT for: {} (~{} tokens saved)", userMessage, savedTokens);
 
             // Send cache-hit event with sources
@@ -559,9 +572,12 @@ public class AssistantService {
         } else {
             // Cache MISS — do full vector search + streaming
             cacheMisses.incrementAndGet();
+            commandLogger.log("UC9", "FT.SEARCH KNN", CACHE_INDEX, "Semantic cache MISS (vector trimmed)");
 
             List<Map<String, Object>> relevantMemories = vectorSearch(MEMORY_INDEX, userMessage, 3);
+            commandLogger.log("UC9", "FT.SEARCH KNN", MEMORY_INDEX, "Find " + relevantMemories.size() + " relevant memories (vector trimmed)");
             List<Map<String, Object>> relevantDocs = vectorSearch(KB_INDEX, userMessage, 3);
+            commandLogger.log("UC9", "FT.SEARCH KNN", KB_INDEX, "Find " + relevantDocs.size() + " relevant KB docs (vector trimmed)");
 
             // Send "sources" event before streaming starts
             try {
@@ -615,6 +631,8 @@ public class AssistantService {
             redis.opsForHash().put(convKey, "last_active", Instant.now().toString());
             redis.opsForHash().put(convKey, "user_name", userName);
             redis.expire(convKey, CONV_TTL_SECONDS, TimeUnit.SECONDS);
+            commandLogger.log("UC9", "HSET", convKey, "Store updated conversation");
+            commandLogger.log("UC9", "EXPIRE", convKey, CONV_TTL_SECONDS + "s TTL");
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize messages", e);
         }
@@ -821,6 +839,8 @@ public class AssistantService {
             redis.opsForHash().putAll(key, hash);
             storeVectorField(key, embedding);
             redis.expire(key, CACHE_TTL_SECONDS, TimeUnit.SECONDS);
+            commandLogger.log("UC9", "HSET", key, "Cache response (vector trimmed)");
+            commandLogger.log("UC9", "EXPIRE", key, CACHE_TTL_SECONDS + "s TTL");
         } catch (Exception e) {
             log.warn("UC9: Failed to store in semantic cache: {}", e.getMessage());
         }
