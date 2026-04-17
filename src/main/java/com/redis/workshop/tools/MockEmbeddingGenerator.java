@@ -59,8 +59,8 @@ public class MockEmbeddingGenerator {
 
         ObjectMapper mapper = new ObjectMapper();
         mapper.writerWithDefaultPrettyPrinter().writeValue(new File(OUTPUT_FILE), allChunks);
-        System.out.println("\n✅ Saved " + allChunks.size() + " chunks with MOCK vectors to " + OUTPUT_FILE);
-        System.out.println("⚠️  These are mock vectors. For real embeddings, run EmbeddingGenerator with OPENAI_API_KEY.");
+        System.out.println("\nSaved " + allChunks.size() + " chunks with MOCK vectors to " + OUTPUT_FILE);
+        System.out.println("These are mock vectors. For real embeddings, run EmbeddingGenerator with OPENAI_API_KEY.");
     }
 
     private static float[] generateMockVector(String content) {

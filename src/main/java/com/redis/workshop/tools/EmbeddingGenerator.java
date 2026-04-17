@@ -84,7 +84,7 @@ public class EmbeddingGenerator {
 
         // Save to JSON
         mapper.writerWithDefaultPrettyPrinter().writeValue(new File(OUTPUT_FILE), allChunks);
-        System.out.println("\n✅ Saved " + allChunks.size() + " chunks with embeddings to " + OUTPUT_FILE);
+        System.out.println("\nSaved " + allChunks.size() + " chunks with embeddings to " + OUTPUT_FILE);
     }
 
     private static List<float[]> getEmbeddings(List<String> texts) throws Exception {

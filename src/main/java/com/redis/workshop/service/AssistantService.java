@@ -728,7 +728,7 @@ public class AssistantService {
         if (!kbDocs.isEmpty()) {
             sb.append("Based on our banking knowledge base, here's what I found:\n\n");
             for (var doc : kbDocs) {
-                sb.append("📄 **").append(doc.get("title")).append("**: ");
+                sb.append("**").append(doc.get("title")).append("**: ");
                 sb.append(doc.get("content")).append("\n\n");
             }
         }
@@ -737,7 +737,7 @@ public class AssistantService {
         if (!memories.isEmpty()) {
             sb.append("I also found relevant context from your previous interactions:\n\n");
             for (var mem : memories) {
-                sb.append("🧠 *").append(mem.get("summary")).append("* (").append(mem.get("date")).append("): ");
+                sb.append("*").append(mem.get("summary")).append("* (").append(mem.get("date")).append("): ");
                 sb.append(mem.get("detail")).append("\n\n");
             }
         }

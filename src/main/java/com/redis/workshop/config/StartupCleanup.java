@@ -24,8 +24,8 @@ public class StartupCleanup {
 
     @PostConstruct
     public void flush() {
-        log.info("🧹 Flushing Redis database for clean workshop state...");
+        log.info("Flushing Redis database for clean workshop state...");
         redis.getConnectionFactory().getConnection().serverCommands().flushAll();
-        log.info("✅ Redis flushed successfully");
+        log.info("Redis flushed successfully");
     }
 }
