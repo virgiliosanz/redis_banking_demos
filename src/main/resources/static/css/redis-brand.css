@@ -1213,6 +1213,37 @@ a:hover {
     margin-bottom: 16px;
 }
 
+/* Collapsible <details class="how-it-works"> */
+details.how-it-works > summary {
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    margin-bottom: 16px;
+}
+
+details.how-it-works > summary::-webkit-details-marker {
+    display: none;
+}
+
+details.how-it-works > summary h2 {
+    display: inline-block;
+    margin: 0;
+}
+
+details.how-it-works > summary h2::before {
+    content: "\25B6";
+    display: inline-block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-right: 10px;
+    transition: transform var(--transition);
+    transform: translateY(-2px);
+}
+
+details.how-it-works[open] > summary h2::before {
+    content: "\25BC";
+}
+
 .how-it-works-steps {
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);

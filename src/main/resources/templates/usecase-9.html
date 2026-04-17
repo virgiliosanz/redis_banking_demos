@@ -12,8 +12,8 @@
             <h1 th:text="${useCaseTitle}">AI Banking Assistant (Memory + RAG)</h1>
         </div>
 
-        <section class="how-it-works">
-            <h2>How it works</h2>
+        <details class="how-it-works" open>
+            <summary><h2>How it works</h2></summary>
             <div class="how-it-works-dual">
                 <!-- Panel 1: Agent Memory -->
                 <div class="how-it-works-panel">
@@ -121,7 +121,7 @@
                     </div>
                 </div>
             </div>
-        </section>
+        </details>
 
         <section class="loaded-documents">
             <details class="kb-section" open>
@@ -336,54 +336,39 @@
                         </div>
                     </div>
 
-                    <!-- Memory Inspection Panel -->
-                    <div class="data-card" style="margin-top:16px;">
-                        <h3>Memory Inspection</h3>
+                    <!-- Redis Context Panel — everything fetched from Redis and fed to the LLM -->
+                    <div class="data-card" id="redis-context-card" style="margin-top:16px;">
+                        <h3>Redis Context</h3>
+                        <p class="uc9-ctx-subtitle">
+                            Data fetched from Redis and sent to the LLM as context for this response.
+                            Use the <a href="/monitor" target="_blank">Redis Monitor</a> to see the commands executed.
+                        </p>
 
-                        <!-- Short-term Memory -->
-                        <div style="margin-bottom:12px;">
-                            <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--redis-primary); font-weight:600; margin-bottom:4px;">
-                                SHORT-TERM MEMORY (Redis Hash + TTL)
-                            </div>
-                            <div id="short-term-info" style="font-size:0.8rem; color:var(--text-muted);">
+                        <!-- 1. Conversation (Short-term Memory) -->
+                        <div class="uc9-ctx-section">
+                            <div class="uc9-ctx-section-title">Conversation <span class="uc9-ctx-tag">Short-term · Hash + TTL</span></div>
+                            <div id="short-term-info" class="uc9-ctx-section-body">
                                 No active conversation yet.
                             </div>
                         </div>
 
-                        <!-- Retrieved Long-term Memories -->
-                        <div style="margin-bottom:12px;">
-                            <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--redis-primary); font-weight:600; margin-bottom:4px;">
-                                LONG-TERM MEMORY RETRIEVED (Vector Search)
-                            </div>
-                            <div id="memory-results" style="font-size:0.8rem; color:var(--text-muted);">
+                        <!-- 2. Past Memories (Long-term Memory) -->
+                        <div class="uc9-ctx-section">
+                            <div class="uc9-ctx-section-title">Past Memories <span class="uc9-ctx-tag">Long-term · Vector KNN</span></div>
+                            <div id="memory-results" class="uc9-ctx-section-body">
                                 No memories retrieved yet.
                             </div>
                         </div>
 
-                        <!-- Retrieved RAG Documents -->
-                        <div>
-                            <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--redis-primary); font-weight:600; margin-bottom:4px;">
-                                RAG DOCUMENTS RETRIEVED (Vector Search)
-                            </div>
-                            <div id="rag-results" style="font-size:0.8rem; color:var(--text-muted);">
+                        <!-- 3. Knowledge Base (RAG) -->
+                        <div class="uc9-ctx-section">
+                            <div class="uc9-ctx-section-title">Knowledge Base <span class="uc9-ctx-tag">RAG · Vector KNN</span></div>
+                            <div id="rag-results" class="uc9-ctx-section-body">
                                 No documents retrieved yet.
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Sources Panel (SSE mode only) -->
-                    <div id="sourcesPanel" class="data-card" style="margin-top:16px; display:none; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:var(--border-radius); padding:16px;">
-                        <h3 style="margin-bottom:12px;">Redis Context Sources</h3>
-                        <div id="sourcesContent">
-                            <!-- Populated by JS on SSE sources event -->
-                        </div>
-                    </div>
-
-                    <!-- Redis Commands Executed -->
-                    <div id="commands-card" class="data-card" style="margin-top:16px; display:none;">
-                        <h3>Redis Commands Executed</h3>
-                        <pre id="commands-output" style="font-size:0.75rem; margin:0; white-space:pre-wrap; color:var(--text-secondary);"></pre>
-                        <div id="latency-display" style="font-family:var(--font-code); font-size:0.75rem; color:var(--redis-primary); margin-top:8px;"></div>
+                        <div id="latency-display" class="uc9-ctx-latency"></div>
                     </div>
 
                     <!-- Reset button -->
@@ -593,17 +578,47 @@ EXPIRE workshop:assistant:cache:cache-abc123 600
                 0%, 100% { opacity: 1; }
                 50% { opacity: 0.3; }
             }
+            /* Redis Context panel */
+            .uc9-ctx-subtitle {
+                font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;
+            }
+            .uc9-ctx-subtitle a { color: var(--redis-primary); }
+            .uc9-ctx-section { margin-bottom: 16px; }
+            .uc9-ctx-section:last-of-type { margin-bottom: 8px; }
+            .uc9-ctx-section-title {
+                font-size: 0.8rem; font-weight: 600; color: var(--text-primary);
+                margin-bottom: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            }
+            .uc9-ctx-tag {
+                font-family: var(--font-code); font-size: 0.65rem; font-weight: 500;
+                padding: 2px 8px; border-radius: var(--border-radius);
+                background: rgba(255, 68, 56, 0.08); color: var(--redis-primary);
+                text-transform: uppercase; letter-spacing: 0.03em;
+            }
+            .uc9-ctx-section-body {
+                font-size: 0.8rem; color: var(--text-muted);
+                padding: 8px 12px; background: var(--bg-secondary);
+                border-radius: var(--border-radius); border: 1px solid var(--border-color);
+            }
+            .uc9-ctx-latency {
+                font-family: var(--font-code); font-size: 0.75rem; color: var(--redis-primary);
+                margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 8px;
+            }
+            /* Source row used inside memories/KB lists */
             .uc9-source-item {
                 display: flex; gap: 8px; align-items: baseline; padding: 6px 0;
                 border-bottom: 1px solid var(--border-color); flex-wrap: wrap;
             }
-            .uc9-source-item:last-child { border-bottom: none; }
+            .uc9-source-item:last-child { border-bottom: none; padding-bottom: 0; }
             .uc9-source-key {
                 font-family: var(--font-code); font-size: 0.7rem; color: var(--text-muted);
                 word-break: break-all;
             }
             .uc9-source-title {
                 font-size: 0.8rem; font-weight: 600; color: var(--text-primary); flex: 1;
+            }
+            .uc9-source-meta {
+                font-size: 0.7rem; color: var(--text-muted); width: 100%;
             }
             .uc9-source-score {
                 font-family: var(--font-code); font-size: 0.7rem; padding: 2px 8px;
@@ -612,17 +627,6 @@ EXPIRE workshop:assistant:cache:cache-abc123 600
             .uc9-score-high { background: rgba(5, 150, 105, 0.15); color: #059669; }
             .uc9-score-med  { background: rgba(217, 119, 6, 0.15); color: #d97706; }
             .uc9-score-low  { background: rgba(107, 114, 128, 0.15); color: var(--text-muted); }
-            .uc9-redis-cmd {
-                display: block; font-family: var(--font-code); font-size: 0.7rem;
-                background: var(--bg-tertiary); padding: 6px 10px; border-radius: var(--border-radius);
-                margin-top: 4px; word-break: break-all; color: var(--text-secondary);
-            }
-            .uc9-sources-section { margin-bottom: 12px; }
-            .uc9-sources-section:last-child { margin-bottom: 0; }
-            .uc9-sources-section h5 {
-                font-size: 0.75rem; font-family: var(--font-code); color: var(--redis-primary);
-                text-transform: uppercase; margin-bottom: 4px; font-weight: 600;
-            }
         </style>
         <script th:src="@{/js/usecase-9.js}"></script>
     </div>

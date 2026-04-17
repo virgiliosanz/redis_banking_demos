@@ -13,8 +13,8 @@
         </div>
         <p class="usecase-subtitle">Live transaction metrics with Redis Streams &mdash; XADD, XRANGE, XLEN with manual aggregation.</p>
 
-        <section class="how-it-works">
-            <h2>How it works</h2>
+        <details class="how-it-works" open>
+            <summary><h2>How it works</h2></summary>
             <div class="how-it-works-steps">
                 <ol>
                     <li><strong>Ingest:</strong> Each transaction is written to a Redis Stream with XADD — amount and risk score as fields.</li>
@@ -59,7 +59,7 @@
                     <text x="660" y="52" text-anchor="middle" font-size="11" class="svg-label">Alert</text>
                 </svg>
             </div>
-        </section>
+        </details>
 
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->

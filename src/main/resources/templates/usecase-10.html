@@ -12,8 +12,8 @@
             <h1 th:text="${useCaseTitle}">Cache-Aside Pattern</h1>
         </div>
 
-        <section class="how-it-works">
-            <h2>How it works</h2>
+        <details class="how-it-works" open>
+            <summary><h2>How it works</h2></summary>
             <div class="how-it-works-steps">
                 <ol>
                     <li><strong>Read request:</strong> Application checks Redis cache first.</li>
@@ -59,7 +59,7 @@
                     <line x1="470" y1="170" x2="370" y2="140" class="svg-arrow" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#uc10-arrow)"/>
                 </svg>
             </div>
-        </section>
+        </details>
 
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->

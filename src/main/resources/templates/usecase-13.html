@@ -12,8 +12,8 @@
             <h1 th:text="${useCaseTitle}">Distributed Locking</h1>
         </div>
 
-        <section class="how-it-works">
-            <h2>How it works</h2>
+        <details class="how-it-works" open>
+            <summary><h2>How it works</h2></summary>
             <div class="how-it-works-steps">
                 <ol>
                     <li><strong>Lock request:</strong> Client sends <code>SET workshop:lock:{accountId} {clientId} NX EX 30</code> — atomic acquire with TTL.</li>
@@ -46,7 +46,7 @@
                     <text x="600" y="110" text-anchor="middle" font-size="12" font-weight="600">Lock Denied</text>
                 </svg>
             </div>
-        </section>
+        </details>
 
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->

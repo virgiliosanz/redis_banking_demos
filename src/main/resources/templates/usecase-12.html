@@ -13,8 +13,8 @@
             <h1 th:text="${useCaseTitle}">ATM &amp; Branch Finder (Geospatial)</h1>
         </div>
 
-        <section class="how-it-works">
-            <h2>How it works</h2>
+        <details class="how-it-works" open>
+            <summary><h2>How it works</h2></summary>
             <div class="how-it-works-steps">
                 <ol>
                     <li><strong>Data ingestion:</strong> ATMs and branches loaded with coordinates via <code>GEOADD</code> (native) and <code>JSON.SET</code> (RQE approach).</li>
@@ -49,7 +49,7 @@
                     <text x="520" y="135" text-anchor="middle" font-size="12" font-weight="600">FT.SEARCH</text>
                 </svg>
             </div>
-        </section>
+        </details>
 
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->

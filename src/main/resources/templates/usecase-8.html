@@ -12,8 +12,8 @@
             <h1 th:text="${useCaseTitle}">Document Search (Full-text + Vector)</h1>
         </div>
 
-        <section class="how-it-works">
-            <h2>How it works</h2>
+        <details class="how-it-works" open>
+            <summary><h2>How it works</h2></summary>
             <div class="how-it-works-steps">
                 <ol>
                     <li><strong>Create &amp; Store</strong> — Documents are stored as native JSON in Redis using JSON.SET, with full JSONPath support for partial reads and updates.</li>
@@ -56,7 +56,7 @@
                     <text x="550" y="92" text-anchor="middle" font-size="10" class="svg-redis-text">Document DB</text>
                 </svg>
             </div>
-        </section>
+        </details>
 
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->

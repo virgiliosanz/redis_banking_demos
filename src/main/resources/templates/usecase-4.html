@@ -12,8 +12,8 @@
             <h1 th:text="${useCaseTitle}">Rate Limiting (Open Banking / PSD2)</h1>
         </div>
 
-        <section class="how-it-works">
-            <h2>How it works</h2>
+        <details class="how-it-works" open>
+            <summary><h2>How it works</h2></summary>
             <div class="how-it-works-steps">
                 <ol>
                     <li><strong>Incoming request:</strong> A user or service sends a request.</li>
@@ -58,7 +58,7 @@
                     <text x="518" y="107" text-anchor="middle" font-size="11" class="svg-label">3B</text>
                 </svg>
             </div>
-        </section>
+        </details>
 
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->

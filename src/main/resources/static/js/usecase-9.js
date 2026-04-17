@@ -18,14 +18,10 @@
     var shortTermInfo = document.getElementById('short-term-info');
     var memoryResults = document.getElementById('memory-results');
     var ragResults = document.getElementById('rag-results');
-    var commandsCard = document.getElementById('commands-card');
-    var commandsOutput = document.getElementById('commands-output');
     var latencyDisplay = document.getElementById('latency-display');
     var resetBtn = document.getElementById('resetBtn');
     var apiStatusText = document.getElementById('api-status-text');
     var streamingIndicator = document.getElementById('streaming-indicator');
-    var sourcesPanel = document.getElementById('sourcesPanel');
-    var sourcesContent = document.getElementById('sourcesContent');
     var cacheStatusText = document.getElementById('cache-status-text');
     var cacheIndicator = document.getElementById('cache-indicator');
     var cacheBadge = document.getElementById('cache-badge');
@@ -110,16 +106,34 @@
         });
     }
 
+    function scoreClass(score) {
+        var s = parseFloat(score);
+        if (isNaN(s)) return 'uc9-score-low';
+        if (s >= 0.8) return 'uc9-score-high';
+        if (s >= 0.5) return 'uc9-score-med';
+        return 'uc9-score-low';
+    }
+
+    function scoreBadge(score) {
+        if (score == null || score === '') return '';
+        return '<span class="uc9-source-score ' + scoreClass(score) + '">Score: ' + parseFloat(score).toFixed(2) + '</span>';
+    }
+
     function updateMemoryResults(memories) {
         if (!memories || memories.length === 0) {
-            memoryResults.innerHTML = '<span style="color:var(--text-muted);">No relevant memories found for this query.</span>';
+            memoryResults.innerHTML = '<span>No memories retrieved for this query.</span>';
             return;
         }
         var html = '';
         memories.forEach(function (mem) {
-            html += '<div style="padding:6px 0; border-bottom:1px solid var(--border-color);">';
-            html += '<div style="font-weight:600; font-size:0.8rem;">' + escapeHtml(mem.summary) + '</div>';
-            html += '<div style="color:var(--text-muted); font-size:0.7rem;">' + escapeHtml(mem.date) + ' — Tags: ' + escapeHtml(mem.tags) + '</div>';
+            html += '<div class="uc9-source-item">';
+            if (mem.redisKey) html += '<span class="uc9-source-key">' + escapeHtml(mem.redisKey) + '</span>';
+            html += '<span class="uc9-source-title">' + escapeHtml(mem.summary || mem.id || '') + '</span>';
+            html += scoreBadge(mem.score);
+            var meta = [];
+            if (mem.date) meta.push(escapeHtml(mem.date));
+            if (mem.tags) meta.push('Tags: ' + escapeHtml(mem.tags));
+            if (meta.length) html += '<div class="uc9-source-meta">' + meta.join(' — ') + '</div>';
             html += '</div>';
         });
         memoryResults.innerHTML = html;
@@ -127,14 +141,16 @@
 
     function updateRagResults(docs) {
         if (!docs || docs.length === 0) {
-            ragResults.innerHTML = '<span style="color:var(--text-muted);">No relevant documents found for this query.</span>';
+            ragResults.innerHTML = '<span>No documents retrieved for this query.</span>';
             return;
         }
         var html = '';
         docs.forEach(function (doc) {
-            html += '<div style="padding:6px 0; border-bottom:1px solid var(--border-color);">';
-            html += '<div style="font-weight:600; font-size:0.8rem;">' + escapeHtml(doc.title) + '</div>';
-            html += '<div style="color:var(--text-muted); font-size:0.7rem;">Tags: ' + escapeHtml(doc.tags) + '</div>';
+            html += '<div class="uc9-source-item">';
+            if (doc.redisKey) html += '<span class="uc9-source-key">' + escapeHtml(doc.redisKey) + '</span>';
+            html += '<span class="uc9-source-title">' + escapeHtml(doc.title || doc.id || '') + '</span>';
+            html += scoreBadge(doc.score);
+            if (doc.tags) html += '<div class="uc9-source-meta">Tags: ' + escapeHtml(doc.tags) + '</div>';
             html += '</div>';
         });
         ragResults.innerHTML = html;
@@ -197,59 +213,6 @@
         if (streamingIndicator) streamingIndicator.style.display = 'none';
     }
 
-    // --- Sources panel ---
-    function scoreClass(score) {
-        var s = parseFloat(score);
-        if (s >= 0.8) return 'uc9-score-high';
-        if (s >= 0.5) return 'uc9-score-med';
-        return 'uc9-score-low';
-    }
-
-    function displaySources(sources) {
-        if (!sourcesPanel || !sourcesContent) return;
-        var html = '';
-
-        // Knowledge Base Documents
-        if (sources.kbDocs && sources.kbDocs.length > 0) {
-            html += '<div class="uc9-sources-section"><h5>Knowledge Base Documents</h5>';
-            sources.kbDocs.forEach(function (doc) {
-                html += '<div class="uc9-source-item">';
-                html += '<span class="uc9-source-key">' + escapeHtml(doc.redisKey || '') + '</span>';
-                if (doc.title) html += '<span class="uc9-source-title">' + escapeHtml(doc.title) + '</span>';
-                html += '<span class="uc9-source-score ' + scoreClass(doc.score) + '">Score: ' + (doc.score != null ? parseFloat(doc.score).toFixed(2) : '—') + '</span>';
-                html += '</div>';
-            });
-            html += '</div>';
-        }
-
-        // Memories
-        if (sources.memories && sources.memories.length > 0) {
-            html += '<div class="uc9-sources-section"><h5>Relevant Memories</h5>';
-            sources.memories.forEach(function (mem) {
-                html += '<div class="uc9-source-item">';
-                html += '<span class="uc9-source-key">' + escapeHtml(mem.redisKey || '') + '</span>';
-                if (mem.summary) html += '<span class="uc9-source-title">' + escapeHtml(mem.summary) + '</span>';
-                html += '<span class="uc9-source-score ' + scoreClass(mem.score) + '">Score: ' + (mem.score != null ? parseFloat(mem.score).toFixed(2) : '—') + '</span>';
-                html += '</div>';
-            });
-            html += '</div>';
-        }
-
-        // Redis Commands
-        if (sources.redisCommands && sources.redisCommands.length > 0) {
-            html += '<div class="uc9-sources-section"><h5>Redis Commands Used</h5>';
-            sources.redisCommands.forEach(function (cmd) {
-                html += '<code class="uc9-redis-cmd">' + escapeHtml(cmd) + '</code>';
-            });
-            html += '</div>';
-        }
-
-        if (html) {
-            sourcesContent.innerHTML = html;
-            sourcesPanel.style.display = '';
-        }
-    }
-
     // --- SSE Streaming send ---
     function sendMessageStream(message) {
         addMessage('user', message);
@@ -277,21 +240,15 @@
             removeTypingIndicator();
             try {
                 var sources = JSON.parse(e.data);
-                displaySources(sources);
 
                 // Show cache badge from sources event
                 if (sources.semanticCacheHit !== undefined) {
                     showCacheBadge(sources.semanticCacheHit);
                 }
 
-                // Update the memory inspection panels with source data
-                if (sources.memories) updateMemoryResults(sources.memories);
-                if (sources.kbDocs) updateRagResults(sources.kbDocs);
-                if (sources.redisCommands) {
-                    commandsCard.style.display = '';
-                    commandsOutput.textContent = sources.redisCommands.join('\n');
-                }
-                // Update short-term memory panel as soon as sources arrive
+                // Update unified Redis Context panel
+                updateMemoryResults(sources.memories);
+                updateRagResults(sources.kbDocs);
                 updateShortTermMemory();
             } catch (err) { console.error('UC9 sources handler error:', err); }
         });
@@ -357,35 +314,10 @@
 
             addMessage('assistant', data.response);
 
-            // Update inspection panels first (critical for demo visibility)
+            // Update unified Redis Context panel
             updateShortTermMemory();
             updateMemoryResults(data.memoriesRetrieved);
             updateRagResults(data.kbDocsRetrieved);
-
-            // Show inline sources summary in chat bubble (nice-to-have)
-            try {
-                if ((data.memoriesRetrieved && data.memoriesRetrieved.length > 0) ||
-                    (data.kbDocsRetrieved && data.kbDocsRetrieved.length > 0)) {
-                    var sourcesHtml = '<div style="margin-top:8px; padding:8px 12px; background:var(--bg-secondary); border-radius:var(--border-radius); border:1px solid var(--border-color); font-size:0.75rem;">';
-                    sourcesHtml += '<div style="font-weight:600; color:var(--redis-primary); margin-bottom:4px;">Context used (Redis Vector Search):</div>';
-                    if (data.kbDocsRetrieved && data.kbDocsRetrieved.length > 0) {
-                        data.kbDocsRetrieved.forEach(function(doc) {
-                            sourcesHtml += '<div style="color:var(--text-muted);">' + escapeHtml(doc.title || doc.id || '') + '</div>';
-                        });
-                    }
-                    if (data.memoriesRetrieved && data.memoriesRetrieved.length > 0) {
-                        data.memoriesRetrieved.forEach(function(mem) {
-                            sourcesHtml += '<div style="color:var(--text-muted);">' + escapeHtml(mem.summary || mem.id || '') + '</div>';
-                        });
-                    }
-                    sourcesHtml += '</div>';
-                    // Append to the last assistant message bubble
-                    var lastMsg = chatMessages.lastElementChild;
-                    if (lastMsg) lastMsg.innerHTML += sourcesHtml;
-                }
-            } catch (e) {
-                console.warn('Could not render inline sources:', e);
-            }
 
             // Semantic cache indicator
             if (data.semanticCacheEnabled) {
@@ -393,10 +325,6 @@
             }
             updateCacheStats();
 
-            if (data.redisCommands) {
-                commandsCard.style.display = '';
-                commandsOutput.textContent = data.redisCommands.join('\n');
-            }
             if (data.latencyMs !== undefined) {
                 latencyDisplay.textContent = 'Total latency: ' + data.latencyMs + 'ms';
             }
@@ -433,11 +361,9 @@
         window.workshopFetch('/api/assistant/reset', {}).then(function () {
             sessionId = 'sess-' + Math.random().toString(36).substring(2, 10);
             chatMessages.innerHTML = '<div class="chat-welcome" style="color:var(--text-muted); font-style:italic; padding:16px 0; text-align:center;">Ask about banking services — accounts, transfers, investments, loans, cards, or regulations. Try the example prompts below!</div>';
-            shortTermInfo.innerHTML = '<span style="color:var(--text-muted);">No active conversation yet.</span>';
-            memoryResults.innerHTML = '<span style="color:var(--text-muted);">No memories retrieved yet.</span>';
-            ragResults.innerHTML = '<span style="color:var(--text-muted);">No documents retrieved yet.</span>';
-            commandsCard.style.display = 'none';
-            if (sourcesPanel) sourcesPanel.style.display = 'none';
+            shortTermInfo.innerHTML = 'No active conversation yet.';
+            memoryResults.innerHTML = 'No memories retrieved yet.';
+            ragResults.innerHTML = 'No documents retrieved yet.';
             if (cacheIndicator) cacheIndicator.style.display = 'none';
             latencyDisplay.textContent = '';
             resetBtn.disabled = false;

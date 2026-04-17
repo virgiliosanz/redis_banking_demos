@@ -12,8 +12,8 @@
             <h1 th:text="${useCaseTitle}">User Profile Storage</h1>
         </div>
 
-        <section class="how-it-works">
-            <h2>How it works</h2>
+        <details class="how-it-works" open>
+            <summary><h2>How it works</h2></summary>
             <div class="how-it-works-steps">
                 <ol>
                     <li>User profile data is aggregated from multiple databases into Redis for fast access.</li>
@@ -65,7 +65,7 @@
                     <line x1="555" y1="105" x2="578" y2="132" class="svg-arrow" stroke-width="2" marker-end="url(#uc3-arrow)"/>
                 </svg>
             </div>
-        </section>
+        </details>
 
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->
