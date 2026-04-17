@@ -29,5 +29,16 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: redis-insight
+    ports:
+      - "5540:5540"
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - workshop
+
 volumes:
   redis-data:

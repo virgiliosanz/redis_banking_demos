@@ -67,6 +67,7 @@ docker compose --profile workshop down
 |---------|-------|------|-------------|
 | `redis` | `redis:8.0-M02` | 6379 | Redis 8 with RQE, JSON, Search, Vector support |
 | `app` | Built from `Dockerfile` | 8080 | Spring Boot application (workshop profile only) |
+| `redis-insight` | `redis/redisinsight:latest` | 5540 | Visual Redis browser (workshop profile only) |
 
 ### Redis container
 
@@ -96,6 +97,22 @@ The app uses a multi-stage Dockerfile:
 2. **Runtime stage**: JRE 21 only — runs the JAR (~200MB image)
 
 The app container automatically connects to the Redis container by service name (`SPRING_DATA_REDIS_HOST=redis`).
+
+### Redis Insight (workshop profile)
+
+[Redis Insight](https://redis.io/insight/) provides a visual interface to inspect keys, run commands, and monitor Redis in real time.
+
+It starts automatically with the workshop profile:
+
+```bash
+docker compose --profile workshop up -d --build
+# Redis Insight available at http://localhost:5540
+```
+
+On first launch, add a connection:
+- **Host**: `redis` (Docker network) or `localhost` (if accessing from host)
+- **Port**: `6379`
+- **Name**: Workshop
 
 ## Redis Connection
 
