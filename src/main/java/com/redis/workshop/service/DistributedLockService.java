@@ -52,7 +52,10 @@ public class DistributedLockService {
         Boolean acquired = redis.opsForValue().setIfAbsent(key, clientId,
                 java.time.Duration.ofSeconds(ttlSeconds));
         commandLogger.log("UC13", "SET NX EX", key,
-                "clientId=" + clientId + " " + (Boolean.TRUE.equals(acquired) ? "ACQUIRED" : "DENIED"));
+                "clientId=" + clientId + " " + (Boolean.TRUE.equals(acquired) ? "ACQUIRED" : "DENIED"),
+                "SET " + key + " " + clientId + " NX EX " + ttlSeconds,
+                Boolean.TRUE.equals(acquired) ? "OK (lock acquired)"
+                        : "nil (lock already held by other client)");
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("resourceId", resourceId);
@@ -85,8 +88,13 @@ public class DistributedLockService {
 
         Long released = redis.execute(RELEASE_SCRIPT,
                 Collections.singletonList(key), clientId);
+        boolean ok = released != null && released == 1L;
         commandLogger.log("UC13", "EVAL (Lua release)", key,
-                "clientId=" + clientId + " " + (released != null && released == 1L ? "RELEASED" : "DENIED"));
+                "clientId=" + clientId + " " + (ok ? "RELEASED" : "DENIED"),
+                "EVAL \"if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) else return 0 end\" 1 "
+                        + key + " " + clientId,
+                ok ? "(integer) 1 (lock released)"
+                        : "(integer) 0 (caller is not the lock holder — denied)");
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("resourceId", resourceId);

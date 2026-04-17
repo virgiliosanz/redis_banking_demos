@@ -23,21 +23,38 @@ public class RedisCommandLogger {
     private final Deque<Map<String, Object>> log = new ConcurrentLinkedDeque<>();
 
     public void log(String useCase, String command, String key) {
-        log(useCase, command, key, null);
+        log(useCase, command, key, null, null, null);
     }
 
     public void log(String useCase, String command, String key, String detail) {
+        log(useCase, command, key, detail, null, null);
+    }
+
+    public void log(String useCase, String command, String key, String detail,
+                    String fullCommand, String result) {
         Map<String, Object> entry = new LinkedHashMap<>();
         entry.put("timestamp", Instant.now().toString());
         entry.put("useCase", useCase);
         entry.put("command", command);
         entry.put("key", key);
         if (detail != null) entry.put("detail", detail);
+        if (fullCommand != null) entry.put("fullCommand", trimVectors(fullCommand));
+        if (result != null) entry.put("result", trimVectors(result));
 
         log.addFirst(entry);
         while (log.size() > MAX_ENTRIES) {
             log.removeLast();
         }
+    }
+
+    /**
+     * Trim vector arrays in strings to avoid flooding the UI.
+     * Replaces [0.123, 0.456, ...many floats...] with [vector trimmed].
+     */
+    private String trimVectors(String input) {
+        if (input == null) return null;
+        return input.replaceAll("\\[(-?\\d+\\.\\d+,\\s*){3,}(-?\\d+\\.\\d+)\\]",
+                "[vector trimmed]");
     }
 
     public List<Map<String, Object>> getRecentCommands(int limit) {

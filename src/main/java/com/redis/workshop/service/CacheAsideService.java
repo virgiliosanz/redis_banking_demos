@@ -97,7 +97,10 @@ public class CacheAsideService {
 
         // 1. Check cache (Redis GET)
         String cached = redis.opsForValue().get(cacheKey);
-        commandLogger.log("UC10", "GET", cacheKey, cached != null ? "HIT" : "MISS");
+        commandLogger.log("UC10", "GET", cacheKey, cached != null ? "HIT" : "MISS",
+                "GET " + cacheKey,
+                cached != null ? "\"<cached JSON, " + cached.length() + " chars>\" (HIT)"
+                        : "(nil) — cache MISS");
 
         if (cached != null) {
             // CACHE HIT
@@ -121,8 +124,11 @@ public class CacheAsideService {
         }
 
         // 3. Store in cache with TTL (SET with EX)
-        redis.opsForValue().set(cacheKey, serialize(product), Duration.ofSeconds(CACHE_TTL_SECONDS));
-        commandLogger.log("UC10", "SET EX", cacheKey, CACHE_TTL_SECONDS + "s");
+        String productJson = serialize(product);
+        redis.opsForValue().set(cacheKey, productJson, Duration.ofSeconds(CACHE_TTL_SECONDS));
+        commandLogger.log("UC10", "SET EX", cacheKey, CACHE_TTL_SECONDS + "s",
+                "SET " + cacheKey + " <json, " + productJson.length() + " chars> EX " + CACHE_TTL_SECONDS,
+                "OK");
 
         long latencyMs = (System.nanoTime() - start) / 1_000_000;
         totalMissLatencyMs.addAndGet(latencyMs);
@@ -133,7 +139,9 @@ public class CacheAsideService {
     public Map<String, Object> evictProduct(String productId) {
         String cacheKey = CACHE_PREFIX + productId;
         Boolean deleted = redis.delete(cacheKey);
-        commandLogger.log("UC10", "DEL", cacheKey);
+        commandLogger.log("UC10", "DEL", cacheKey, null,
+                "DEL " + cacheKey,
+                "(integer) " + (Boolean.TRUE.equals(deleted) ? "1 (evicted)" : "0 (not cached)"));
         return Map.of("evicted", Boolean.TRUE.equals(deleted), "productId", productId);
     }
 

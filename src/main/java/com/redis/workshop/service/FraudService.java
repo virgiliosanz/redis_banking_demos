@@ -64,12 +64,16 @@ public class FraudService {
         // 1. Velocity check — ZADD + ZRANGEBYSCORE
         String velocityKey = VELOCITY_KEY_PREFIX + cardNumber;
         redis.opsForZSet().add(velocityKey, txId, now);
-        commandLogger.log("UC6", "ZADD", velocityKey, txId);
+        commandLogger.log("UC6", "ZADD", velocityKey, txId,
+                "ZADD " + velocityKey + " " + now + " " + txId,
+                "(integer) 1 (new member added)");
         // Count transactions in the last N minutes
         long windowStart = now - (VELOCITY_WINDOW_SECONDS * 1000);
         Set<String> recentTxs = redis.opsForZSet().rangeByScore(velocityKey, windowStart, now);
         int velocityCount = recentTxs != null ? recentTxs.size() : 0;
-        commandLogger.log("UC6", "ZRANGEBYSCORE", velocityKey, "count=" + velocityCount);
+        commandLogger.log("UC6", "ZRANGEBYSCORE", velocityKey, "count=" + velocityCount,
+                "ZRANGEBYSCORE " + velocityKey + " " + windowStart + " " + now,
+                velocityCount + " txs in last " + (VELOCITY_WINDOW_SECONDS / 60) + " min");
 
         // Clean old entries outside window
         redis.opsForZSet().removeRangeByScore(velocityKey, 0, windowStart - 1);
@@ -120,8 +124,13 @@ public class FraudService {
 
         MapRecord<String, String, String> record = StreamRecords.string(streamEntry)
                 .withStreamKey(STREAM_KEY);
-        redis.opsForStream().add(record);
-        commandLogger.log("UC6", "XADD", STREAM_KEY, "risk=" + riskLevel);
+        var recordId = redis.opsForStream().add(record);
+        commandLogger.log("UC6", "XADD", STREAM_KEY, "risk=" + riskLevel,
+                "XADD " + STREAM_KEY + " * txId " + txId + " card " + cardNumber
+                        + " amount " + String.format("%.2f", amount) + " riskScore " + riskScore
+                        + " riskLevel " + riskLevel + " ... (" + streamEntry.size() + " fields)",
+                recordId != null ? "\"" + recordId.getValue() + "\" (stream ID)"
+                        : "stream entry added");
 
         // Trim stream to last 50 entries
         redis.opsForStream().trim(STREAM_KEY, 50);

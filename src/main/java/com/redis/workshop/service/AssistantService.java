@@ -268,7 +268,10 @@ public class AssistantService {
 
         // 1. Load or create conversation (short-term memory)
         Map<Object, Object> convData = redis.opsForHash().entries(convKey);
-        commandLogger.log("UC9", "HGETALL", convKey, "Load conversation (short-term memory)");
+        commandLogger.log("UC9", "HGETALL", convKey, "Load conversation (short-term memory)",
+                "HGETALL " + convKey,
+                convData.isEmpty() ? "(empty — new conversation)"
+                        : convData.size() + " fields (existing conversation)");
         List<Map<String, String>> messageHistory;
         if (convData.isEmpty()) {
             messageHistory = new ArrayList<>();
@@ -312,12 +315,16 @@ public class AssistantService {
                 tokensSaved.addAndGet(savedTokens);
                 relevantMemories = List.of();
                 relevantDocs = List.of();
-                commandLogger.log("UC9", "FT.SEARCH KNN", CACHE_INDEX, "Semantic cache HIT (vector trimmed)");
+                commandLogger.log("UC9", "FT.SEARCH KNN", CACHE_INDEX, "Semantic cache HIT (vector trimmed)",
+                        "FT.SEARCH " + CACHE_INDEX + " \"*=>[KNN 1 @vector $BLOB]\" PARAMS 2 BLOB <" + VECTOR_DIM + "-dim embedding> DIALECT 2",
+                        "1 result (distance < " + CACHE_DISTANCE_THRESHOLD + " — cache HIT)");
                 log.info("UC9: Semantic cache HIT for question: {} (~{} tokens saved)", userMessage, savedTokens);
             } else {
                 // Cache MISS — do full vector search + generate response
                 cacheMisses.incrementAndGet();
-                commandLogger.log("UC9", "FT.SEARCH KNN", CACHE_INDEX, "Semantic cache MISS (vector trimmed)");
+                commandLogger.log("UC9", "FT.SEARCH KNN", CACHE_INDEX, "Semantic cache MISS (vector trimmed)",
+                        "FT.SEARCH " + CACHE_INDEX + " \"*=>[KNN 1 @vector $BLOB]\" PARAMS 2 BLOB <" + VECTOR_DIM + "-dim embedding> DIALECT 2",
+                        "0 results above threshold (distance >= " + CACHE_DISTANCE_THRESHOLD + " — cache MISS)");
                 List<Map<String, Object>> memResults = vectorSearch(MEMORY_INDEX, userMessage, 3);
                 relevantMemories = new ArrayList<>();
                 for (var m : memResults) {
@@ -325,7 +332,10 @@ public class AssistantService {
                     m.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
                     relevantMemories.add(flat);
                 }
-                commandLogger.log("UC9", "FT.SEARCH KNN", MEMORY_INDEX, "Find " + relevantMemories.size() + " relevant memories (vector trimmed)");
+                commandLogger.log("UC9", "FT.SEARCH KNN", MEMORY_INDEX,
+                        "Find " + relevantMemories.size() + " relevant memories (vector trimmed)",
+                        "FT.SEARCH " + MEMORY_INDEX + " \"*=>[KNN 3 @vector $BLOB]\" PARAMS 2 BLOB <" + VECTOR_DIM + "-dim embedding> DIALECT 2",
+                        relevantMemories.size() + " memories returned (top-K by cosine similarity)");
                 List<Map<String, Object>> kbResults = vectorSearch(KB_INDEX, userMessage, 3);
                 relevantDocs = new ArrayList<>();
                 for (var d : kbResults) {
@@ -333,7 +343,10 @@ public class AssistantService {
                     d.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
                     relevantDocs.add(flat);
                 }
-                commandLogger.log("UC9", "FT.SEARCH KNN", KB_INDEX, "Find " + relevantDocs.size() + " relevant KB docs (vector trimmed)");
+                commandLogger.log("UC9", "FT.SEARCH KNN", KB_INDEX,
+                        "Find " + relevantDocs.size() + " relevant KB docs (vector trimmed)",
+                        "FT.SEARCH " + KB_INDEX + " \"*=>[KNN 3 @vector $BLOB]\" PARAMS 2 BLOB <" + VECTOR_DIM + "-dim embedding> DIALECT 2",
+                        relevantDocs.size() + " KB docs returned (top-K by cosine similarity)");
                 responseText = generateResponse(userMessage, relevantMemories, relevantDocs);
 
                 int usedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
@@ -370,8 +383,13 @@ public class AssistantService {
             redis.opsForHash().put(convKey, "last_active", Instant.now().toString());
             redis.opsForHash().put(convKey, "user_name", userName);
             redis.expire(convKey, CONV_TTL_SECONDS, TimeUnit.SECONDS);
-            commandLogger.log("UC9", "HSET", convKey, "Store updated conversation");
-            commandLogger.log("UC9", "EXPIRE", convKey, CONV_TTL_SECONDS + "s TTL");
+            commandLogger.log("UC9", "HSET", convKey, "Store updated conversation",
+                    "HSET " + convKey + " messages <json, " + messagesJson.length()
+                            + " chars> last_active <iso-timestamp> user_name " + userName,
+                    "(integer) 3 (fields updated)");
+            commandLogger.log("UC9", "EXPIRE", convKey, CONV_TTL_SECONDS + "s TTL",
+                    "EXPIRE " + convKey + " " + CONV_TTL_SECONDS,
+                    "(integer) 1");
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize messages", e);
         }
@@ -512,7 +530,10 @@ public class AssistantService {
 
         // 1. Load or create conversation
         Map<Object, Object> convData = redis.opsForHash().entries(convKey);
-        commandLogger.log("UC9", "HGETALL", convKey, "Load conversation (short-term memory)");
+        commandLogger.log("UC9", "HGETALL", convKey, "Load conversation (short-term memory)",
+                "HGETALL " + convKey,
+                convData.isEmpty() ? "(empty — new conversation)"
+                        : convData.size() + " fields (existing conversation)");
         List<Map<String, String>> messageHistory;
         if (convData.isEmpty()) {
             messageHistory = new ArrayList<>();
@@ -545,7 +566,9 @@ public class AssistantService {
             responseText = cached.get("response");
             int savedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
             tokensSaved.addAndGet(savedTokens);
-            commandLogger.log("UC9", "FT.SEARCH KNN", CACHE_INDEX, "Semantic cache HIT (vector trimmed)");
+            commandLogger.log("UC9", "FT.SEARCH KNN", CACHE_INDEX, "Semantic cache HIT (vector trimmed)",
+                    "FT.SEARCH " + CACHE_INDEX + " \"*=>[KNN 1 @vector $BLOB]\" PARAMS 2 BLOB <" + VECTOR_DIM + "-dim embedding> DIALECT 2",
+                    "1 result (distance < " + CACHE_DISTANCE_THRESHOLD + " — cache HIT)");
             log.info("UC9 Stream: Semantic cache HIT for: {} (~{} tokens saved)", userMessage, savedTokens);
 
             // Send cache-hit event with sources
@@ -572,12 +595,20 @@ public class AssistantService {
         } else {
             // Cache MISS — do full vector search + streaming
             cacheMisses.incrementAndGet();
-            commandLogger.log("UC9", "FT.SEARCH KNN", CACHE_INDEX, "Semantic cache MISS (vector trimmed)");
+            commandLogger.log("UC9", "FT.SEARCH KNN", CACHE_INDEX, "Semantic cache MISS (vector trimmed)",
+                    "FT.SEARCH " + CACHE_INDEX + " \"*=>[KNN 1 @vector $BLOB]\" PARAMS 2 BLOB <" + VECTOR_DIM + "-dim embedding> DIALECT 2",
+                    "0 results above threshold (distance >= " + CACHE_DISTANCE_THRESHOLD + " — cache MISS)");
 
             List<Map<String, Object>> relevantMemories = vectorSearch(MEMORY_INDEX, userMessage, 3);
-            commandLogger.log("UC9", "FT.SEARCH KNN", MEMORY_INDEX, "Find " + relevantMemories.size() + " relevant memories (vector trimmed)");
+            commandLogger.log("UC9", "FT.SEARCH KNN", MEMORY_INDEX,
+                    "Find " + relevantMemories.size() + " relevant memories (vector trimmed)",
+                    "FT.SEARCH " + MEMORY_INDEX + " \"*=>[KNN 3 @vector $BLOB]\" PARAMS 2 BLOB <" + VECTOR_DIM + "-dim embedding> DIALECT 2",
+                    relevantMemories.size() + " memories returned (top-K by cosine similarity)");
             List<Map<String, Object>> relevantDocs = vectorSearch(KB_INDEX, userMessage, 3);
-            commandLogger.log("UC9", "FT.SEARCH KNN", KB_INDEX, "Find " + relevantDocs.size() + " relevant KB docs (vector trimmed)");
+            commandLogger.log("UC9", "FT.SEARCH KNN", KB_INDEX,
+                    "Find " + relevantDocs.size() + " relevant KB docs (vector trimmed)",
+                    "FT.SEARCH " + KB_INDEX + " \"*=>[KNN 3 @vector $BLOB]\" PARAMS 2 BLOB <" + VECTOR_DIM + "-dim embedding> DIALECT 2",
+                    relevantDocs.size() + " KB docs returned (top-K by cosine similarity)");
 
             // Send "sources" event before streaming starts
             try {
@@ -631,8 +662,13 @@ public class AssistantService {
             redis.opsForHash().put(convKey, "last_active", Instant.now().toString());
             redis.opsForHash().put(convKey, "user_name", userName);
             redis.expire(convKey, CONV_TTL_SECONDS, TimeUnit.SECONDS);
-            commandLogger.log("UC9", "HSET", convKey, "Store updated conversation");
-            commandLogger.log("UC9", "EXPIRE", convKey, CONV_TTL_SECONDS + "s TTL");
+            commandLogger.log("UC9", "HSET", convKey, "Store updated conversation",
+                    "HSET " + convKey + " messages <json, " + messagesJson.length()
+                            + " chars> last_active <iso-timestamp> user_name " + userName,
+                    "(integer) 3 (fields updated)");
+            commandLogger.log("UC9", "EXPIRE", convKey, CONV_TTL_SECONDS + "s TTL",
+                    "EXPIRE " + convKey + " " + CONV_TTL_SECONDS,
+                    "(integer) 1");
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize messages", e);
         }
@@ -839,8 +875,13 @@ public class AssistantService {
             redis.opsForHash().putAll(key, hash);
             storeVectorField(key, embedding);
             redis.expire(key, CACHE_TTL_SECONDS, TimeUnit.SECONDS);
-            commandLogger.log("UC9", "HSET", key, "Cache response (vector trimmed)");
-            commandLogger.log("UC9", "EXPIRE", key, CACHE_TTL_SECONDS + "s TTL");
+            commandLogger.log("UC9", "HSET", key, "Cache response (vector trimmed)",
+                    "HSET " + key + " question \"" + question + "\" response <response text> vector <"
+                            + VECTOR_DIM + "-dim FLOAT32 embedding>",
+                    "(integer) 3 (fields stored, including vector blob)");
+            commandLogger.log("UC9", "EXPIRE", key, CACHE_TTL_SECONDS + "s TTL",
+                    "EXPIRE " + key + " " + CACHE_TTL_SECONDS,
+                    "(integer) 1");
         } catch (Exception e) {
             log.warn("UC9: Failed to store in semantic cache: {}", e.getMessage());
         }

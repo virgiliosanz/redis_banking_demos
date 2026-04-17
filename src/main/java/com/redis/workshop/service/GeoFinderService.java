@@ -150,7 +150,11 @@ public class GeoFinderService {
                                 .includeDistance()
                                 .sortAscending()
                                 .limit(20));
-        commandLogger.log("UC12", "GEOSEARCH", GEO_KEY, "radius=" + radiusKm + "km");
+        int geoHitCount = geoResults != null ? geoResults.getContent().size() : 0;
+        commandLogger.log("UC12", "GEOSEARCH", GEO_KEY, "radius=" + radiusKm + "km",
+                "GEOSEARCH " + GEO_KEY + " FROMLONLAT " + lng + " " + lat
+                        + " BYRADIUS " + radiusKm + " km ASC COUNT 20 WITHCOORD WITHDIST",
+                geoHitCount + " locations within " + radiusKm + " km (sorted by distance)");
 
         List<Map<String, Object>> locations = new ArrayList<>();
         if (geoResults != null) {
@@ -205,7 +209,13 @@ public class GeoFinderService {
         String ftQuery = query.toString();
 
         List<Object> rawResults = executeFtSearch(INDEX_NAME, ftQuery, "LIMIT", "0", "20");
-        commandLogger.log("UC12", "FT.SEARCH", INDEX_NAME, ftQuery);
+        int rqeHitCount = 0;
+        if (rawResults != null && !rawResults.isEmpty() && rawResults.get(0) instanceof Number n) {
+            rqeHitCount = n.intValue();
+        }
+        commandLogger.log("UC12", "FT.SEARCH", INDEX_NAME, ftQuery,
+                "FT.SEARCH " + INDEX_NAME + " \"" + ftQuery + "\" LIMIT 0 20",
+                rqeHitCount + " documents matched (JSON docs from " + BRANCH_PREFIX + "*)");
 
         List<Map<String, Object>> results = parseRqeResults(rawResults);
 

@@ -129,13 +129,38 @@
                     var detail = cmd.detail
                         ? '<span class="cmd-detail">' + escapeHtml(cmd.detail) + '</span>'
                         : '';
-                    return '<div class="command-entry">'
-                        + '<span class="cmd-time">' + escapeHtml(time) + '</span>'
+
+                    var hasExpanded = cmd.fullCommand || cmd.result;
+
+                    var summaryHtml = '<span class="cmd-time">' + escapeHtml(time) + '</span>'
                         + '<span class="cmd-uc">' + escapeHtml(cmd.useCase) + '</span>'
                         + '<span class="cmd-name">' + escapeHtml(cmd.command) + '</span>'
                         + '<span class="cmd-key">' + escapeHtml(cmd.key) + '</span>'
-                        + detail
-                        + '</div>';
+                        + detail;
+
+                    if (!hasExpanded) {
+                        return '<div class="command-entry">' + summaryHtml + '</div>';
+                    }
+
+                    var expandedHtml = '<div class="cmd-expanded">';
+                    if (cmd.fullCommand) {
+                        expandedHtml += '<div class="cmd-full">'
+                            + '<span class="cmd-label">Command:</span>'
+                            + '<code>' + escapeHtml(cmd.fullCommand) + '</code>'
+                            + '</div>';
+                    }
+                    if (cmd.result) {
+                        expandedHtml += '<div class="cmd-result">'
+                            + '<span class="cmd-label">Result:</span>'
+                            + '<code>' + escapeHtml(cmd.result) + '</code>'
+                            + '</div>';
+                    }
+                    expandedHtml += '</div>';
+
+                    return '<details class="command-entry">'
+                        + '<summary>' + summaryHtml + '</summary>'
+                        + expandedHtml
+                        + '</details>';
                 }).join('');
             })
             .catch(function (err) {

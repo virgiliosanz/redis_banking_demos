@@ -150,7 +150,9 @@ public class TransactionMonitorService {
             double riskScore = 70 + random.nextDouble() * 30;
             addTransaction(amount, riskScore);
         }
-        commandLogger.log("UC11", "XADD (x20)", STREAM_KEY, "anomaly burst");
+        commandLogger.log("UC11", "XADD (x20)", STREAM_KEY, "anomaly burst",
+                "XADD " + STREAM_KEY + " * amount <5000-20000> riskScore <70-100> (repeated 20x)",
+                "20 stream IDs generated (anomaly burst: high amounts + high risk scores)");
     }
 
     // ── Metrics endpoint ────────────────────────────────────────────────

@@ -68,10 +68,15 @@ public class AuthTokenService {
 
         // HSET — store token as Redis Hash
         redis.opsForHash().putAll(tokenKey, tokenData);
-        commandLogger.log("UC1", "HSET", tokenKey, "fields=" + tokenData.size());
+        commandLogger.log("UC1", "HSET", tokenKey, "fields=" + tokenData.size(),
+                "HSET " + tokenKey + " tokenId " + tokenId + " username " + username
+                        + " role \"" + info.get("role") + "\" ... (" + tokenData.size() + " fields)",
+                "(integer) " + tokenData.size() + " (fields added)");
         // EXPIRE — set TTL
         redis.expire(tokenKey, TOKEN_TTL_SECONDS, TimeUnit.SECONDS);
-        commandLogger.log("UC1", "EXPIRE", tokenKey, TOKEN_TTL_SECONDS + "s");
+        commandLogger.log("UC1", "EXPIRE", tokenKey, TOKEN_TTL_SECONDS + "s",
+                "EXPIRE " + tokenKey + " " + TOKEN_TTL_SECONDS,
+                "(integer) 1");
 
         Map<String, Object> result = new HashMap<>(tokenData);
         result.put("redisKey", tokenKey);
@@ -85,7 +90,10 @@ public class AuthTokenService {
     public Map<String, Object> validateToken(String tokenId) {
         String tokenKey = TOKEN_PREFIX + tokenId;
         Map<Object, Object> entries = redis.opsForHash().entries(tokenKey);
-        commandLogger.log("UC1", "HGETALL", tokenKey);
+        commandLogger.log("UC1", "HGETALL", tokenKey, null,
+                "HGETALL " + tokenKey,
+                entries.isEmpty() ? "(empty list — token expired or invalid)"
+                        : entries.size() + " fields returned");
         if (entries.isEmpty()) {
             return null;
         }
@@ -106,7 +114,9 @@ public class AuthTokenService {
     public boolean logout(String tokenId) {
         String tokenKey = TOKEN_PREFIX + tokenId;
         Boolean deleted = redis.delete(tokenKey);
-        commandLogger.log("UC1", "DEL", tokenKey);
+        commandLogger.log("UC1", "DEL", tokenKey, null,
+                "DEL " + tokenKey,
+                "(integer) " + (Boolean.TRUE.equals(deleted) ? "1 (deleted)" : "0 (not found)"));
         return Boolean.TRUE.equals(deleted);
     }
 

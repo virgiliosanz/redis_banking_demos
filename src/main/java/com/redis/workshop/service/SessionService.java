@@ -68,14 +68,22 @@ public class SessionService {
 
         // HSET — store session as Redis Hash
         redis.opsForHash().putAll(sessionKey, sessionData);
-        commandLogger.log("UC2", "HSET", sessionKey, "fields=" + sessionData.size());
+        commandLogger.log("UC2", "HSET", sessionKey, "fields=" + sessionData.size(),
+                "HSET " + sessionKey + " username " + username + " fullName \""
+                        + profile.get("fullName") + "\" token " + token + " ... ("
+                        + sessionData.size() + " fields)",
+                "(integer) " + sessionData.size() + " (fields added)");
         // EXPIRE — set TTL on session key
         redis.expire(sessionKey, SESSION_TTL_SECONDS, TimeUnit.SECONDS);
-        commandLogger.log("UC2", "EXPIRE", sessionKey, SESSION_TTL_SECONDS + "s");
+        commandLogger.log("UC2", "EXPIRE", sessionKey, SESSION_TTL_SECONDS + "s",
+                "EXPIRE " + sessionKey + " " + SESSION_TTL_SECONDS,
+                "(integer) 1");
 
         // SET — store token pointing back to username
         redis.opsForValue().set(tokenKey, username, SESSION_TTL_SECONDS, TimeUnit.SECONDS);
-        commandLogger.log("UC2", "SET EX", tokenKey, "user=" + username);
+        commandLogger.log("UC2", "SET EX", tokenKey, "user=" + username,
+                "SET " + tokenKey + " " + username + " EX " + SESSION_TTL_SECONDS,
+                "OK");
 
         Map<String, Object> result = new HashMap<>(sessionData);
         result.put("sessionKey", sessionKey);
@@ -90,7 +98,10 @@ public class SessionService {
     public Map<String, Object> getSession(String username) {
         String sessionKey = SESSION_PREFIX + username;
         Map<Object, Object> entries = redis.opsForHash().entries(sessionKey);
-        commandLogger.log("UC2", "HGETALL", sessionKey);
+        commandLogger.log("UC2", "HGETALL", sessionKey, null,
+                "HGETALL " + sessionKey,
+                entries.isEmpty() ? "(empty list — session expired or missing)"
+                        : entries.size() + " fields returned");
         if (entries.isEmpty()) {
             return null;
         }
@@ -124,13 +135,17 @@ public class SessionService {
 
         // DEL — remove session hash
         Boolean deleted = redis.delete(sessionKey);
-        commandLogger.log("UC2", "DEL", sessionKey);
+        commandLogger.log("UC2", "DEL", sessionKey, null,
+                "DEL " + sessionKey,
+                "(integer) " + (Boolean.TRUE.equals(deleted) ? "1 (deleted)" : "0 (not found)"));
 
         // DEL — remove auth token
         if (token != null) {
             String tokenKey = TOKEN_PREFIX + token.toString();
-            redis.delete(tokenKey);
-            commandLogger.log("UC2", "DEL", tokenKey);
+            Boolean tokDel = redis.delete(tokenKey);
+            commandLogger.log("UC2", "DEL", tokenKey, null,
+                    "DEL " + tokenKey,
+                    "(integer) " + (Boolean.TRUE.equals(tokDel) ? "1 (deleted)" : "0 (not found)"));
         }
 
         return Boolean.TRUE.equals(deleted);

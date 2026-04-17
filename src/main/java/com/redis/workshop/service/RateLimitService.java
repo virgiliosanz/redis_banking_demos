@@ -45,12 +45,16 @@ public class RateLimitService {
         if (currentCount == null) {
             currentCount = 1L;
         }
-        commandLogger.log("UC4", "INCR", key, "count=" + currentCount);
+        commandLogger.log("UC4", "INCR", key, "count=" + currentCount,
+                "INCR " + key,
+                "(integer) " + currentCount + (currentCount == 1 ? " (key created)" : ""));
 
         // Set TTL only on the first request of a new window
         if (currentCount == 1) {
             redis.expire(key, WINDOW_SECONDS, TimeUnit.SECONDS);
-            commandLogger.log("UC4", "EXPIRE", key, WINDOW_SECONDS + "s");
+            commandLogger.log("UC4", "EXPIRE", key, WINDOW_SECONDS + "s",
+                    "EXPIRE " + key + " " + WINDOW_SECONDS,
+                    "(integer) 1");
         }
 
         boolean allowed = currentCount <= MAX_REQUESTS;

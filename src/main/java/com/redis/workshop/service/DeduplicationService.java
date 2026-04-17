@@ -41,7 +41,9 @@ public class DeduplicationService {
 
         boolean accepted = Boolean.TRUE.equals(wasSet);
         String status = accepted ? "ACCEPTED" : "DUPLICATE";
-        commandLogger.log("UC5", "SET NX EX", key, status);
+        commandLogger.log("UC5", "SET NX EX", key, status,
+                "SET " + key + " 1 NX EX " + TTL_SECONDS,
+                accepted ? "OK (new key created)" : "nil (duplicate — key already exists)");
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("status", status);

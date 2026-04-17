@@ -2079,3 +2079,74 @@ details.how-it-works[open] > summary h2::before {
     flex-shrink: 0;
     max-width: 30%;
 }
+
+details.command-entry {
+    display: block;
+    padding: 0;
+    border-bottom: 1px solid var(--border-color);
+    white-space: normal;
+    overflow: visible;
+}
+
+details.command-entry summary {
+    list-style: none;
+    display: flex;
+    gap: 12px;
+    padding: 6px 8px;
+    align-items: center;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+details.command-entry summary::-webkit-details-marker {
+    display: none;
+}
+
+details.command-entry summary::before {
+    content: "\25B6";
+    font-size: 9px;
+    color: var(--text-muted);
+    min-width: 10px;
+    flex-shrink: 0;
+}
+
+details.command-entry[open] summary::before {
+    content: "\25BC";
+}
+
+.cmd-expanded {
+    padding: 8px 16px 12px 32px;
+    background: var(--bg-secondary, var(--bg-primary));
+    border-top: 1px solid var(--border-color);
+}
+
+.cmd-full,
+.cmd-result {
+    margin: 4px 0;
+    font-size: 0.75rem;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.cmd-label {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    min-width: 72px;
+    flex-shrink: 0;
+    padding-top: 2px;
+}
+
+.cmd-expanded code {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--redis-red, #FF4438);
+    word-break: break-all;
+    white-space: pre-wrap;
+    background: transparent;
+    padding: 0;
+}
