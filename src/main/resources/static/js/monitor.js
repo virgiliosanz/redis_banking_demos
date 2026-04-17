@@ -111,8 +111,62 @@
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
+    var lastCommandTimestamp = null;
+    var MAX_COMMANDS = 30;
+
+    function buildSummaryHtml(cmd, time, detail) {
+        return '<span class="cmd-time">' + escapeHtml(time) + '</span>'
+            + '<span class="cmd-uc">' + escapeHtml(cmd.useCase) + '</span>'
+            + '<span class="cmd-name">' + escapeHtml(cmd.command) + '</span>'
+            + '<span class="cmd-key">' + escapeHtml(cmd.key) + '</span>'
+            + (detail ? '<span class="cmd-detail">' + escapeHtml(detail) + '</span>' : '');
+    }
+
+    function renderCommandEntry(cmd) {
+        var time = cmd.timestamp ? new Date(cmd.timestamp).toLocaleTimeString() : '';
+        var detail = cmd.detail || '';
+        var hasExpanded = cmd.fullCommand || cmd.result;
+
+        if (!hasExpanded) {
+            var div = document.createElement('div');
+            div.className = 'command-entry';
+            div.innerHTML = buildSummaryHtml(cmd, time, detail);
+            return div;
+        }
+
+        var details = document.createElement('details');
+        details.className = 'command-entry';
+
+        var summary = document.createElement('summary');
+        summary.innerHTML = buildSummaryHtml(cmd, time, detail);
+
+        var expanded = document.createElement('div');
+        expanded.className = 'cmd-expanded';
+        if (cmd.fullCommand) {
+            expanded.innerHTML += '<div class="cmd-full">'
+                + '<span class="cmd-label">Command:</span>'
+                + '<code>' + escapeHtml(cmd.fullCommand) + '</code>'
+                + '</div>';
+        }
+        if (cmd.result) {
+            expanded.innerHTML += '<div class="cmd-result">'
+                + '<span class="cmd-label">Result:</span>'
+                + '<code>' + escapeHtml(cmd.result) + '</code>'
+                + '</div>';
+        }
+
+        details.appendChild(summary);
+        details.appendChild(expanded);
+        return details;
+    }
+
     function pollCommands() {
-        fetch('/api/monitor/commands?limit=20', { headers: { 'Accept': 'application/json' } })
+        var url = '/api/monitor/commands?limit=20';
+        if (lastCommandTimestamp) {
+            url += '&since=' + encodeURIComponent(lastCommandTimestamp);
+        }
+
+        fetch(url, { headers: { 'Accept': 'application/json' } })
             .then(function (res) {
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 return res.json();
@@ -120,48 +174,28 @@
             .then(function (commands) {
                 var logEl = document.getElementById('commandLog');
                 if (!logEl) return;
-                if (!commands || commands.length === 0) {
+
+                if ((!commands || commands.length === 0) && !lastCommandTimestamp) {
                     logEl.innerHTML = '<p class="command-log-empty">No commands yet. Run a demo!</p>';
                     return;
                 }
-                logEl.innerHTML = commands.map(function (cmd) {
-                    var time = cmd.timestamp ? new Date(cmd.timestamp).toLocaleTimeString() : '';
-                    var detail = cmd.detail
-                        ? '<span class="cmd-detail">' + escapeHtml(cmd.detail) + '</span>'
-                        : '';
 
-                    var hasExpanded = cmd.fullCommand || cmd.result;
+                if (!commands || commands.length === 0) return;
 
-                    var summaryHtml = '<span class="cmd-time">' + escapeHtml(time) + '</span>'
-                        + '<span class="cmd-uc">' + escapeHtml(cmd.useCase) + '</span>'
-                        + '<span class="cmd-name">' + escapeHtml(cmd.command) + '</span>'
-                        + '<span class="cmd-key">' + escapeHtml(cmd.key) + '</span>'
-                        + detail;
+                var placeholder = logEl.querySelector('.command-log-empty');
+                if (placeholder) placeholder.remove();
 
-                    if (!hasExpanded) {
-                        return '<div class="command-entry">' + summaryHtml + '</div>';
-                    }
+                // Server returns newest-first; update timestamp to the newest entry.
+                lastCommandTimestamp = commands[0].timestamp;
 
-                    var expandedHtml = '<div class="cmd-expanded">';
-                    if (cmd.fullCommand) {
-                        expandedHtml += '<div class="cmd-full">'
-                            + '<span class="cmd-label">Command:</span>'
-                            + '<code>' + escapeHtml(cmd.fullCommand) + '</code>'
-                            + '</div>';
-                    }
-                    if (cmd.result) {
-                        expandedHtml += '<div class="cmd-result">'
-                            + '<span class="cmd-label">Result:</span>'
-                            + '<code>' + escapeHtml(cmd.result) + '</code>'
-                            + '</div>';
-                    }
-                    expandedHtml += '</div>';
+                // Insert oldest-first so newest ends up on top after successive prepends.
+                for (var i = commands.length - 1; i >= 0; i--) {
+                    logEl.insertBefore(renderCommandEntry(commands[i]), logEl.firstChild);
+                }
 
-                    return '<details class="command-entry">'
-                        + '<summary>' + summaryHtml + '</summary>'
-                        + expandedHtml
-                        + '</details>';
-                }).join('');
+                while (logEl.children.length > MAX_COMMANDS) {
+                    logEl.removeChild(logEl.lastChild);
+                }
             })
             .catch(function (err) {
                 console.error('[monitor] commands poll failed:', err);

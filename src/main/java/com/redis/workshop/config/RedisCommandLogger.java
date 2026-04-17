@@ -67,4 +67,24 @@ public class RedisCommandLogger {
         }
         return result;
     }
+
+    /**
+     * Return only entries newer than {@code sinceTimestamp} (exclusive).
+     * The log is sorted newest-first and timestamps are ISO-8601 (UTC, lexicographically comparable),
+     * so we iterate from the head and stop on the first entry that is not newer.
+     */
+    public List<Map<String, Object>> getCommandsSince(String sinceTimestamp, int limit) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (sinceTimestamp == null) return getRecentCommands(limit);
+        for (Map<String, Object> entry : log) {
+            String ts = (String) entry.get("timestamp");
+            if (ts != null && ts.compareTo(sinceTimestamp) > 0) {
+                result.add(entry);
+                if (result.size() >= limit) break;
+            } else {
+                break;
+            }
+        }
+        return result;
+    }
 }

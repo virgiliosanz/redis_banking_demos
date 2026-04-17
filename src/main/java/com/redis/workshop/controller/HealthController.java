@@ -114,7 +114,11 @@ public class HealthController {
 
     @GetMapping("/monitor/commands")
     public ResponseEntity<List<Map<String, Object>>> recentCommands(
-            @RequestParam(defaultValue = "50") int limit) {
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(required = false) String since) {
+        if (since != null && !since.isEmpty()) {
+            return ResponseEntity.ok(commandLogger.getCommandsSince(since, limit));
+        }
         return ResponseEntity.ok(commandLogger.getRecentCommands(limit));
     }
 
