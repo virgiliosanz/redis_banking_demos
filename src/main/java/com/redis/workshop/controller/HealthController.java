@@ -1,16 +1,13 @@
 package com.redis.workshop.controller;
 
-import com.redis.workshop.config.RedisCommandLogger;
 import com.redis.workshop.service.OpenAiService;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -20,13 +17,10 @@ public class HealthController {
 
     private final StringRedisTemplate redis;
     private final OpenAiService openAiService;
-    private final RedisCommandLogger commandLogger;
 
-    public HealthController(StringRedisTemplate redis, OpenAiService openAiService,
-                            RedisCommandLogger commandLogger) {
+    public HealthController(StringRedisTemplate redis, OpenAiService openAiService) {
         this.redis = redis;
         this.openAiService = openAiService;
-        this.commandLogger = commandLogger;
     }
 
     @GetMapping("/health")
@@ -110,16 +104,6 @@ public class HealthController {
             metrics.put("error", e.getMessage());
             return ResponseEntity.status(503).body(metrics);
         }
-    }
-
-    @GetMapping("/monitor/commands")
-    public ResponseEntity<List<Map<String, Object>>> recentCommands(
-            @RequestParam(defaultValue = "50") int limit,
-            @RequestParam(required = false) String since) {
-        if (since != null && !since.isEmpty()) {
-            return ResponseEntity.ok(commandLogger.getCommandsSince(since, limit));
-        }
-        return ResponseEntity.ok(commandLogger.getRecentCommands(limit));
     }
 
     private static void putString(Map<String, Object> out, String key, Properties info, String prop) {

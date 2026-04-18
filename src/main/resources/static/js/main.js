@@ -78,18 +78,35 @@
         updateMode(localStorage.getItem(PM_KEY) === 'true');
     }
 
+    // --- Utility: auto-render redisCommands when present on a response ---
+    // Looks up the standard container (#redis-commands-list). Returns the
+    // same data unchanged so it can be chained in .then(...) handlers.
+    window.maybeRenderRedisCommands = function (data) {
+        try {
+            if (data && data.redisCommands && window.renderRedisCommands) {
+                var container = document.getElementById('redis-commands-list');
+                if (container) {
+                    window.renderRedisCommands(container, data.redisCommands);
+                }
+            }
+        } catch (e) { /* non-fatal */ }
+        return data;
+    };
+
     // --- Utility: POST JSON ---
     window.workshopFetch = function (url, data) {
         return fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: data ? JSON.stringify(data) : undefined
-        }).then(function (res) { return res.json(); });
+        }).then(function (res) { return res.json(); })
+          .then(window.maybeRenderRedisCommands);
     };
 
     // --- Utility: GET JSON ---
     window.workshopGet = function (url) {
-        return fetch(url).then(function (res) { return res.json(); });
+        return fetch(url).then(function (res) { return res.json(); })
+          .then(window.maybeRenderRedisCommands);
     };
 
     // --- Utility: Format JSON for display ---
@@ -109,5 +126,54 @@
                 if (window.Prism) Prism.highlightAll();
             });
         });
+    };
+
+    // --- Shared: Redis Commands panel renderer ---
+    // Renders an array of commands into a container. Each entry may be either:
+    //   "COMMAND args → result summary"  (collapsible: summary = command, expanded = result)
+    //   "COMMAND args"                   (non-collapsible single line)
+    // Shows the parent .redis-commands-card; keeps it visible if already shown.
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    window.renderRedisCommands = function (container, commands) {
+        if (!container) return;
+        var card = container.closest('.redis-commands-card') || container.parentElement;
+        if (!commands || !commands.length) {
+            container.innerHTML = '<div class="commands-empty">No Redis commands recorded for this request.</div>';
+            if (card) card.style.display = '';
+            return;
+        }
+        var html = '';
+        commands.forEach(function (entry) {
+            if (!entry) return;
+            var str = String(entry);
+            var idx = str.indexOf(' → ');
+            if (idx > -1) {
+                var cmdPart = str.substring(0, idx);
+                var resultPart = str.substring(idx + 3);
+                html += '<details class="command-entry">' +
+                          '<summary><code>' + escapeHtml(cmdPart) + '</code></summary>' +
+                          '<div class="cmd-expanded">' +
+                            '<div class="cmd-result">' +
+                              '<span class="cmd-label">Result</span>' +
+                              '<code>' + escapeHtml(resultPart) + '</code>' +
+                            '</div>' +
+                          '</div>' +
+                        '</details>';
+            } else {
+                html += '<div class="command-entry command-entry-simple">' +
+                          '<code>' + escapeHtml(str) + '</code>' +
+                        '</div>';
+            }
+        });
+        container.innerHTML = html;
+        if (card) card.style.display = '';
     };
 })();

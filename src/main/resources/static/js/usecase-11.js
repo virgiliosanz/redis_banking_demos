@@ -213,7 +213,8 @@
     btnAnomaly.addEventListener('click', function () {
         fetch('/api/transactions/simulate/anomaly', { method: 'POST' })
             .then(function (r) { return r.json(); })
-            .then(function () {
+            .then(function (data) {
+                window.maybeRenderRedisCommands(data);
                 // Ensure polling is active to see the spike
                 if (!pollInterval) startPolling();
             });

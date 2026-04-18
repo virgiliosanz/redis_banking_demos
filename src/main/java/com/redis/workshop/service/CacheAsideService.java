@@ -92,6 +92,7 @@ public class CacheAsideService {
     }
 
     public Map<String, Object> getProduct(String productId) {
+        commandLogger.startCapture();
         long start = System.nanoTime();
         String cacheKey = CACHE_PREFIX + productId;
 
@@ -108,7 +109,13 @@ public class CacheAsideService {
             hits.incrementAndGet();
             totalHitLatencyMs.addAndGet(latencyMs);
             Map<String, Object> product = deserialize(cached);
-            return Map.of("product", product, "cacheHit", true, "latencyMs", latencyMs, "source", "CACHE");
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("product", product);
+            result.put("cacheHit", true);
+            result.put("latencyMs", latencyMs);
+            result.put("source", "CACHE");
+            result.put("redisCommands", commandLogger.getCaptured());
+            return result;
         }
 
         // 2. CACHE MISS — fetch from "database"
@@ -120,7 +127,12 @@ public class CacheAsideService {
         Map<String, Object> product = mockDatabase.get(productId);
         if (product == null) {
             long latencyMs = (System.nanoTime() - start) / 1_000_000;
-            return Map.of("error", "Product not found", "productId", productId, "latencyMs", latencyMs);
+            Map<String, Object> err = new LinkedHashMap<>();
+            err.put("error", "Product not found");
+            err.put("productId", productId);
+            err.put("latencyMs", latencyMs);
+            err.put("redisCommands", commandLogger.getCaptured());
+            return err;
         }
 
         // 3. Store in cache with TTL (SET with EX)
@@ -133,26 +145,48 @@ public class CacheAsideService {
         long latencyMs = (System.nanoTime() - start) / 1_000_000;
         totalMissLatencyMs.addAndGet(latencyMs);
 
-        return Map.of("product", product, "cacheHit", false, "latencyMs", latencyMs, "source", "DATABASE");
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("product", product);
+        result.put("cacheHit", false);
+        result.put("latencyMs", latencyMs);
+        result.put("source", "DATABASE");
+        result.put("redisCommands", commandLogger.getCaptured());
+        return result;
     }
 
     public Map<String, Object> evictProduct(String productId) {
+        commandLogger.startCapture();
         String cacheKey = CACHE_PREFIX + productId;
         Boolean deleted = redis.delete(cacheKey);
         commandLogger.log("UC10", "DEL", cacheKey, null,
                 "DEL " + cacheKey,
                 "(integer) " + (Boolean.TRUE.equals(deleted) ? "1 (evicted)" : "0 (not cached)"));
-        return Map.of("evicted", Boolean.TRUE.equals(deleted), "productId", productId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("evicted", Boolean.TRUE.equals(deleted));
+        result.put("productId", productId);
+        result.put("redisCommands", commandLogger.getCaptured());
+        return result;
     }
 
     public Map<String, Object> evictAll() {
+        commandLogger.startCapture();
         Set<String> keys = redis.keys(CACHE_PREFIX + "*");
+        commandLogger.log("UC10", "KEYS", CACHE_PREFIX + "*", null,
+                "KEYS " + CACHE_PREFIX + "*",
+                (keys != null ? keys.size() : 0) + " matching keys");
         int count = 0;
         if (keys != null && !keys.isEmpty()) {
             count = keys.size();
             redis.delete(keys);
+            commandLogger.log("UC10", "DEL", "(batch)", count + " keys",
+                    "DEL " + String.join(" ", keys),
+                    "(integer) " + count + " (all cache keys evicted)");
         }
-        return Map.of("evicted", true, "count", count);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("evicted", true);
+        result.put("count", count);
+        result.put("redisCommands", commandLogger.getCaptured());
+        return result;
     }
 
     public Map<String, Object> getStats() {

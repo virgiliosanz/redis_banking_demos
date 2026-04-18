@@ -157,7 +157,10 @@
 
         fetch(url)
             .then(function (r) { return r.json(); })
-            .then(function (data) { renderResults(data); })
+            .then(function (data) {
+                window.maybeRenderRedisCommands(data);
+                renderResults(data);
+            })
             .catch(function (err) { console.error(err); })
             .finally(function () {
                 btnSearch.disabled = false;

@@ -38,6 +38,7 @@ public class RateLimitService {
      * @return map with allowed (boolean), remaining, limit, retryAfter, currentCount
      */
     public Map<String, Object> checkRateLimit(String clientId) {
+        commandLogger.startCapture();
         String key = KEY_PREFIX + clientId;
 
         // INCR atomically increments and returns new value (creates key with value 1 if absent)
@@ -62,6 +63,9 @@ public class RateLimitService {
 
         // Get TTL to show when the window resets
         Long ttl = redis.getExpire(key, TimeUnit.SECONDS);
+        commandLogger.log("UC4", "TTL", key, null,
+                "TTL " + key,
+                "(integer) " + (ttl != null ? ttl : -1) + " (seconds remaining in window)");
         if (ttl == null || ttl < 0) {
             ttl = (long) WINDOW_SECONDS;
         }
@@ -75,6 +79,7 @@ public class RateLimitService {
         result.put("retryAfter", allowed ? 0 : ttl);
         result.put("ttl", ttl);
         result.put("clientId", clientId);
+        result.put("redisCommands", commandLogger.getCaptured());
 
         return result;
     }
@@ -83,13 +88,20 @@ public class RateLimitService {
      * Get current rate limit status without consuming a request.
      */
     public Map<String, Object> getStatus(String clientId) {
+        commandLogger.startCapture();
         String key = KEY_PREFIX + clientId;
 
         String val = redis.opsForValue().get(key);
+        commandLogger.log("UC4", "GET", key, null,
+                "GET " + key,
+                val != null ? "\"" + val + "\" (current count)" : "(nil) — no active window");
         long currentCount = val != null ? Long.parseLong(val) : 0;
         long remaining = Math.max(0, MAX_REQUESTS - currentCount);
 
         Long ttl = redis.getExpire(key, TimeUnit.SECONDS);
+        commandLogger.log("UC4", "TTL", key, null,
+                "TTL " + key,
+                "(integer) " + (ttl != null ? ttl : -1));
         if (ttl == null || ttl < 0) {
             ttl = 0L;
         }
@@ -102,6 +114,7 @@ public class RateLimitService {
         result.put("ttl", ttl);
         result.put("clientId", clientId);
         result.put("active", val != null);
+        result.put("redisCommands", commandLogger.getCaptured());
 
         return result;
     }
@@ -109,7 +122,17 @@ public class RateLimitService {
     /**
      * Reset the rate limit for a client (for demo purposes).
      */
-    public void reset(String clientId) {
-        redis.delete(KEY_PREFIX + clientId);
+    public Map<String, Object> reset(String clientId) {
+        commandLogger.startCapture();
+        String key = KEY_PREFIX + clientId;
+        Boolean deleted = redis.delete(key);
+        commandLogger.log("UC4", "DEL", key, null,
+                "DEL " + key,
+                "(integer) " + (Boolean.TRUE.equals(deleted) ? "1 (window reset)" : "0 (no active window)"));
+        Map<String, Object> result = new HashMap<>();
+        result.put("clientId", clientId);
+        result.put("reset", Boolean.TRUE.equals(deleted));
+        result.put("redisCommands", commandLogger.getCaptured());
+        return result;
     }
 }

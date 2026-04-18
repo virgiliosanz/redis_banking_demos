@@ -38,12 +38,14 @@ public class DocumentSearchService {
 
         List<Map<String, Object>> results = executeFtSearch(ftQuery, null);
 
+        String cmd = "FT.SEARCH " + INDEX_NAME + " \"" + ftQuery + "\" WITHSCORES RETURN 6 title category summary content tags LIMIT 0 10";
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("mode", "full-text");
         response.put("query", query);
         response.put("resultCount", results.size());
         response.put("results", results);
-        response.put("redisCommand", "FT.SEARCH " + INDEX_NAME + " \"" + ftQuery + "\" WITHSCORES RETURN 6 title category summary content tags LIMIT 0 10");
+        response.put("redisCommand", cmd);
+        response.put("redisCommands", List.of(cmd + " → " + results.size() + " documents matched"));
         return response;
     }
 
@@ -58,13 +60,21 @@ public class DocumentSearchService {
         List<Map<String, Object>> results = executeVectorSearch(vectorBytes, "*", 10);
 
         boolean mockVectors = !openAiService.isConfigured();
+        String embedLine = mockVectors
+                ? "(mock vector generated — OpenAI not configured)"
+                : "OpenAI text-embedding-3-small → 1536-dim query vector";
+        String cmd = "FT.SEARCH " + INDEX_NAME + " \"*=>[KNN 10 @vector $BLOB AS score]\" RETURN 7 title category summary content tags score SORTBY score PARAMS 2 BLOB <vector_bytes> DIALECT 2";
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("mode", "vector");
         response.put("query", query);
         response.put("mockVectors", mockVectors);
         response.put("resultCount", results.size());
         response.put("results", results);
-        response.put("redisCommand", "FT.SEARCH " + INDEX_NAME + " \"*=>[KNN 10 @vector $BLOB AS score]\" RETURN 7 title category summary content tags score SORTBY score PARAMS 2 BLOB <vector_bytes> DIALECT 2");
+        response.put("redisCommand", cmd);
+        response.put("redisCommands", List.of(
+                "EMBEDDING " + embedLine,
+                cmd + " → " + results.size() + " nearest neighbors returned"
+        ));
         return response;
     }
 
@@ -87,13 +97,21 @@ public class DocumentSearchService {
         }
 
         boolean mockVectors = !openAiService.isConfigured();
+        String embedLine = mockVectors
+                ? "(mock vector generated — OpenAI not configured)"
+                : "OpenAI text-embedding-3-small → 1536-dim query vector";
+        String cmd = "FT.SEARCH " + INDEX_NAME + " \"" + preFilter + "=>[KNN 10 @vector $BLOB AS score]\" RETURN 7 title category summary content tags score SORTBY score PARAMS 2 BLOB <vector_bytes> DIALECT 2";
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("mode", "hybrid");
         response.put("query", query);
         response.put("mockVectors", mockVectors);
         response.put("resultCount", results.size());
         response.put("results", results);
-        response.put("redisCommand", "FT.SEARCH " + INDEX_NAME + " \"" + preFilter + "=>[KNN 10 @vector $BLOB AS score]\" RETURN 7 title category summary content tags score SORTBY score PARAMS 2 BLOB <vector_bytes> DIALECT 2");
+        response.put("redisCommand", cmd);
+        response.put("redisCommands", List.of(
+                "EMBEDDING " + embedLine,
+                cmd + " → " + results.size() + " hybrid results (pre-filter + KNN)"
+        ));
         return response;
     }
 
@@ -137,6 +155,7 @@ public class DocumentSearchService {
         if (result == null) {
             response.put("status", "NOT_FOUND");
             response.put("message", "No document found with id: " + id);
+            response.put("redisCommands", List.of(redisCmd + " → (nil) document not found"));
             return response;
         }
 
@@ -145,6 +164,7 @@ public class DocumentSearchService {
         response.put("id", id);
         response.put("key", key);
         response.put("document", json);
+        response.put("redisCommands", List.of(redisCmd + " → JSON document returned (" + (json != null ? json.length() : 0) + " chars)"));
         return response;
     }
 
@@ -168,6 +188,7 @@ public class DocumentSearchService {
         if (result == null) {
             response.put("status", "NOT_FOUND");
             response.put("message", "No document or field found for key: " + key + " path: " + jsonPath);
+            response.put("redisCommands", List.of(redisCmd + " → (nil) path not found"));
             return response;
         }
 
@@ -177,6 +198,7 @@ public class DocumentSearchService {
         response.put("key", key);
         response.put("path", jsonPath);
         response.put("value", json);
+        response.put("redisCommands", List.of(redisCmd + " → \"" + (json != null ? json : "") + "\""));
         return response;
     }
 
@@ -215,6 +237,7 @@ public class DocumentSearchService {
         response.put("key", key);
         response.put("document", fullDoc);
         response.put("redisCommand", redisCmd);
+        response.put("redisCommands", List.of(redisCmd + " → OK (document created, auto-indexed)"));
         return response;
     }
 
@@ -246,6 +269,7 @@ public class DocumentSearchService {
         response.put("resultCount", results.size());
         response.put("results", results);
         response.put("redisCommand", redisCmd);
+        response.put("redisCommands", List.of(redisCmd + " → " + results.size() + " documents matched"));
         return response;
     }
 

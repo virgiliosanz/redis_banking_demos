@@ -140,6 +140,7 @@ public class GeoFinderService {
 
     /** Approach 1: Native GEOSEARCH */
     public Map<String, Object> searchNative(double lng, double lat, double radiusKm) {
+        commandLogger.startCapture();
         long start = System.nanoTime();
 
         GeoResults<RedisGeoCommands.GeoLocation<String>> geoResults = redis.opsForGeo()
@@ -187,6 +188,7 @@ public class GeoFinderService {
         response.put("latencyMs", latencyMs);
         response.put("approach", "Native Geospatial");
         response.put("command", command);
+        response.put("redisCommands", commandLogger.getCaptured());
         return response;
     }
 
@@ -194,6 +196,7 @@ public class GeoFinderService {
     @SuppressWarnings("unchecked")
     public Map<String, Object> searchRQE(double lng, double lat, double radiusKm,
                                           String type, String service) {
+        commandLogger.startCapture();
         long start = System.nanoTime();
 
         StringBuilder query = new StringBuilder();
@@ -237,6 +240,7 @@ public class GeoFinderService {
         response.put("latencyMs", latencyMs);
         response.put("approach", "JSON + Query Engine");
         response.put("command", command);
+        response.put("redisCommands", commandLogger.getCaptured());
         return response;
     }
 

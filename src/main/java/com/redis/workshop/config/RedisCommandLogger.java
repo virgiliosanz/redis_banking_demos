@@ -22,6 +22,24 @@ public class RedisCommandLogger {
     private static final int MAX_ENTRIES = 50;
     private final Deque<Map<String, Object>> log = new ConcurrentLinkedDeque<>();
 
+    /**
+     * Per-request capture of commands as "fullCommand → result" strings.
+     * Services call {@link #startCapture()} at the start of a request-scoped
+     * method and {@link #getCaptured()} at the end to attach the list to the
+     * API response (so each use case can render its own Redis Commands panel).
+     */
+    private final ThreadLocal<List<String>> requestCapture = new ThreadLocal<>();
+
+    public void startCapture() {
+        requestCapture.set(new ArrayList<>());
+    }
+
+    public List<String> getCaptured() {
+        List<String> captured = requestCapture.get();
+        requestCapture.remove();
+        return captured != null ? captured : new ArrayList<>();
+    }
+
     public void log(String useCase, String command, String key) {
         log(useCase, command, key, null, null, null);
     }
@@ -38,12 +56,28 @@ public class RedisCommandLogger {
         entry.put("command", command);
         entry.put("key", key);
         if (detail != null) entry.put("detail", detail);
-        if (fullCommand != null) entry.put("fullCommand", trimVectors(fullCommand));
-        if (result != null) entry.put("result", trimVectors(result));
+        String trimmedFull = fullCommand != null ? trimVectors(fullCommand) : null;
+        String trimmedResult = result != null ? trimVectors(result) : null;
+        if (trimmedFull != null) entry.put("fullCommand", trimmedFull);
+        if (trimmedResult != null) entry.put("result", trimmedResult);
 
         log.addFirst(entry);
         while (log.size() > MAX_ENTRIES) {
             log.removeLast();
+        }
+
+        // Also append to per-request capture if one is active
+        List<String> capture = requestCapture.get();
+        if (capture != null) {
+            String line;
+            if (trimmedFull != null && trimmedResult != null) {
+                line = trimmedFull + " → " + trimmedResult;
+            } else if (trimmedFull != null) {
+                line = trimmedFull;
+            } else {
+                line = command + " " + key + (detail != null ? " " + detail : "");
+            }
+            capture.add(line);
         }
     }
 

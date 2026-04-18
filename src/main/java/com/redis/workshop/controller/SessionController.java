@@ -59,11 +59,14 @@ public class SessionController {
                     .body(Map.of("error", "Username is required"));
         }
 
-        boolean deleted = sessionService.logout(username);
-        return ResponseEntity.ok(Map.of(
-                "success", deleted,
-                "message", deleted ? "Session destroyed" : "No active session"
-        ));
+        Map<String, Object> logoutResult = sessionService.logout(username);
+        boolean deleted = Boolean.TRUE.equals(logoutResult.get("deleted"));
+        Map<String, Object> response = new java.util.LinkedHashMap<>();
+        response.put("success", deleted);
+        response.put("message", deleted ? "Session destroyed" : "No active session");
+        response.put("sessionKey", logoutResult.get("sessionKey"));
+        response.put("redisCommands", logoutResult.get("redisCommands"));
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/validate")

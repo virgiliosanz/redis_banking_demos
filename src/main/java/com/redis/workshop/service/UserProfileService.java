@@ -1,5 +1,6 @@
 package com.redis.workshop.service;
 
+import com.redis.workshop.config.RedisCommandLogger;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -48,14 +49,20 @@ public class UserProfileService {
     );
 
     private final StringRedisTemplate redis;
+    private final RedisCommandLogger commandLogger;
 
-    public UserProfileService(StringRedisTemplate redis) {
+    public UserProfileService(StringRedisTemplate redis, RedisCommandLogger commandLogger) {
         this.redis = redis;
+        this.commandLogger = commandLogger;
     }
 
     /** Load profile by aggregating from 3 mock DBs into Redis Hash. */
     public Map<String, Object> loadProfile(String userId) {
-        if (!ACCOUNTS_DB.containsKey(userId)) return null;
+        commandLogger.startCapture();
+        if (!ACCOUNTS_DB.containsKey(userId)) {
+            commandLogger.getCaptured();
+            return null;
+        }
 
         String key = PROFILE_PREFIX + userId;
 
@@ -79,41 +86,73 @@ public class UserProfileService {
 
         // HSET — store all fields in one call
         redis.opsForHash().putAll(key, profileData);
+        commandLogger.log("UC3", "HSET", key, "fields=" + profileData.size(),
+                "HSET " + key + " userId " + userId + " ... (" + profileData.size() + " fields aggregated from 3 mock DBs)",
+                "(integer) " + profileData.size() + " (fields added)");
         // EXPIRE — set TTL
         redis.expire(key, PROFILE_TTL_SECONDS, TimeUnit.SECONDS);
+        commandLogger.log("UC3", "EXPIRE", key, PROFILE_TTL_SECONDS + "s",
+                "EXPIRE " + key + " " + PROFILE_TTL_SECONDS,
+                "(integer) 1");
 
         Map<String, Object> result = new HashMap<>(profileData);
         result.put("redisKey", key);
         result.put("ttl", PROFILE_TTL_SECONDS);
         result.put("fieldCount", profileData.size());
         result.put("sources", List.of("Accounts DB", "Activity DB", "Preferences DB"));
+        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
     /** Get profile from Redis. */
     public Map<String, Object> getProfile(String userId) {
+        commandLogger.startCapture();
         String key = PROFILE_PREFIX + userId;
         Map<Object, Object> entries = redis.opsForHash().entries(key);
-        if (entries.isEmpty()) return null;
+        commandLogger.log("UC3", "HGETALL", key, null,
+                "HGETALL " + key,
+                entries.isEmpty() ? "(empty list — profile not cached)"
+                        : entries.size() + " fields returned");
+        if (entries.isEmpty()) {
+            commandLogger.getCaptured();
+            return null;
+        }
 
         Long ttl = redis.getExpire(key, TimeUnit.SECONDS);
         Map<String, Object> result = new HashMap<>();
         entries.forEach((k, v) -> result.put(k.toString(), v));
         result.put("redisKey", key);
         result.put("ttl", ttl != null ? ttl : -1);
+        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
     /** Update specific profile fields. */
     public Map<String, Object> updateProfile(String userId, Map<String, String> updates) {
+        commandLogger.startCapture();
         String key = PROFILE_PREFIX + userId;
-        if (Boolean.FALSE.equals(redis.hasKey(key))) return null;
+        if (Boolean.FALSE.equals(redis.hasKey(key))) {
+            commandLogger.getCaptured();
+            return null;
+        }
 
         // HSET — update specific fields
-        updates.forEach((field, value) ->
-                redis.opsForHash().put(key, field, value));
+        updates.forEach((field, value) -> {
+            redis.opsForHash().put(key, field, value);
+            commandLogger.log("UC3", "HSET", key, field + "=" + value,
+                    "HSET " + key + " " + field + " \"" + value + "\"",
+                    "(integer) 0 (field updated)");
+        });
 
-        return getProfile(userId);
+        // Build result directly so we keep the commands captured by this call.
+        Map<Object, Object> entries = redis.opsForHash().entries(key);
+        Long ttl = redis.getExpire(key, TimeUnit.SECONDS);
+        Map<String, Object> result = new HashMap<>();
+        entries.forEach((k, v) -> result.put(k.toString(), v));
+        result.put("redisKey", key);
+        result.put("ttl", ttl != null ? ttl : -1);
+        result.put("redisCommands", commandLogger.getCaptured());
+        return result;
     }
 
     /** Simulate syncing back to mock DBs. */

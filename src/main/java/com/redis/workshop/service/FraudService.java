@@ -58,6 +58,7 @@ public class FraudService {
      */
     public Map<String, Object> evaluateTransaction(String cardNumber, double amount,
                                                     String merchant, String country) {
+        commandLogger.startCapture();
         String txId = "tx-" + UUID.randomUUID().toString().substring(0, 8);
         long now = Instant.now().toEpochMilli();
 
@@ -76,7 +77,11 @@ public class FraudService {
                 velocityCount + " txs in last " + (VELOCITY_WINDOW_SECONDS / 60) + " min");
 
         // Clean old entries outside window
-        redis.opsForZSet().removeRangeByScore(velocityKey, 0, windowStart - 1);
+        Long removed = redis.opsForZSet().removeRangeByScore(velocityKey, 0, windowStart - 1);
+        commandLogger.log("UC6", "ZREMRANGEBYSCORE", velocityKey,
+                "cleaned=" + (removed != null ? removed : 0),
+                "ZREMRANGEBYSCORE " + velocityKey + " 0 " + (windowStart - 1),
+                "(integer) " + (removed != null ? removed : 0) + " (old entries pruned)");
 
         // 2. Amount check
         boolean highAmount = amount >= AMOUNT_THRESHOLD_HIGH;
@@ -134,6 +139,9 @@ public class FraudService {
 
         // Trim stream to last 50 entries
         redis.opsForStream().trim(STREAM_KEY, 50);
+        commandLogger.log("UC6", "XTRIM", STREAM_KEY, "MAXLEN=50",
+                "XTRIM " + STREAM_KEY + " MAXLEN 50",
+                "stream bounded to last 50 entries");
 
         // Build response
         Map<String, Object> result = new LinkedHashMap<>();
@@ -148,6 +156,7 @@ public class FraudService {
         result.put("geoAnomaly", geoAnomaly);
         result.put("factors", factors);
         result.put("timestamp", Instant.now().toString());
+        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 

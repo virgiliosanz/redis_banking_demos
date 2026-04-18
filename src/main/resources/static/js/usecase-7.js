@@ -15,8 +15,7 @@
     var simulateBtn = document.getElementById('simulateBtn');
     var txAmount = document.getElementById('txAmount');
     var txCountry = document.getElementById('txCountry');
-    var commandsCard = document.getElementById('commands-card');
-    var commandsOutput = document.getElementById('commands-output');
+    var commandsCard = document.getElementById('redis-commands-card');
 
     // Feature labels for display
     var FEATURE_LABELS = {
@@ -103,7 +102,7 @@
     // --- Client selector change ---
     clientSelect.addEventListener('change', function () {
         loadFeatures(clientSelect.value);
-        commandsCard.style.display = 'none';
+        if (commandsCard) commandsCard.style.display = 'none';
     });
 
     // --- Simulate transaction ---
@@ -126,13 +125,7 @@
         }).then(function (data) {
             simulateBtn.disabled = false;
             simulateBtn.textContent = 'Simulate Transaction';
-
-            // Show executed Redis commands
-            if (data.redisCommands) {
-                commandsCard.style.display = '';
-                commandsOutput.textContent = data.redisCommands.join('\n');
-            }
-
+            // Redis commands are auto-rendered by main.js via workshopFetch
             // Refresh feature dashboard
             loadFeatures(clientId);
         }).catch(function () {

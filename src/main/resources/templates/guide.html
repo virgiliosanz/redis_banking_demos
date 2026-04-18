@@ -471,23 +471,22 @@
             <!-- Workshop Tools -->
             <h2>Workshop Tools</h2>
             <h3>What to say</h3>
-            <div class="guide-quote">"Before we start the demos, let me show you the tools we have. This QR code on the landing page links to the GitHub repo — scan it now if you want to follow along. I also have a Redis Monitor running in a second tab that shows live metrics. And if I want to focus on the demo without the code panel, I can toggle Presentation Mode."</div>
+            <div class="guide-quote">"Before we start the demos, let me show you the tools we have. This QR code on the landing page links to the GitHub repo — scan it now if you want to follow along. Each use case has a 'Redis Commands Executed' panel so you can see exactly which commands run against Redis. And if I want to focus on the demo without the code panel, I can toggle Presentation Mode."</div>
 
             <h3>Health Check</h3>
             <p>Before starting the workshop, verify everything is working:</p>
             <ul>
                 <li>Open <code>/api/health</code> — check Redis status is UP and whether OpenAI is configured</li>
-                <li>Open <code>/api/monitor</code> — verify Redis metrics are updating</li>
+                <li>Open <code>/api/monitor</code> — verify Redis metrics are updating (JSON endpoint)</li>
             </ul>
 
-            <h3>Redis Monitor (/monitor)</h3>
-            <p>Open <code>/monitor</code> in a second browser tab or on a secondary screen during the workshop.</p>
+            <h3>Redis Commands Panel (inline)</h3>
+            <p>Every use case page has a collapsible "Redis Commands Executed" panel on the demo side.</p>
             <ul>
-                <li>Shows live metrics: memory usage, key count, ops/sec, cache hit rate, uptime, connected clients</li>
-                <li>Auto-refreshes every 2 seconds — no manual interaction needed</li>
-                <li>Use it to show how Redis metrics change as you run each demo</li>
-                <li>Point out the ops/sec counter increasing during high-throughput demos (Rate Limiting, Fraud Detection)</li>
-                <li>Point out memory usage growing as you create sessions, profiles, documents</li>
+                <li>Shows the exact Redis commands triggered by each user interaction</li>
+                <li>Click any command to expand and see its full arguments and result summary</li>
+                <li>Use it live to connect UI actions with underlying Redis operations</li>
+                <li>Pairs with Redis Insight (nav link) for deeper key inspection</li>
             </ul>
 
             <h3>Presentation Mode</h3>

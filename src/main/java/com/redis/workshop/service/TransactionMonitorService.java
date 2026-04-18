@@ -144,7 +144,8 @@ public class TransactionMonitorService {
         }
     }
 
-    public void injectAnomaly() {
+    public Map<String, Object> injectAnomaly() {
+        commandLogger.startCapture();
         for (int i = 0; i < 20; i++) {
             double amount = 5000 + random.nextDouble() * 15000;
             double riskScore = 70 + random.nextDouble() * 30;
@@ -153,11 +154,19 @@ public class TransactionMonitorService {
         commandLogger.log("UC11", "XADD (x20)", STREAM_KEY, "anomaly burst",
                 "XADD " + STREAM_KEY + " * amount <5000-20000> riskScore <70-100> (repeated 20x)",
                 "20 stream IDs generated (anomaly burst: high amounts + high risk scores)");
+        commandLogger.log("UC11", "XTRIM", STREAM_KEY, "MAXLEN=" + MAX_STREAM_LEN,
+                "XTRIM " + STREAM_KEY + " MAXLEN " + MAX_STREAM_LEN,
+                "stream bounded");
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("injected", 20);
+        result.put("redisCommands", commandLogger.getCaptured());
+        return result;
     }
 
     // ── Metrics endpoint ────────────────────────────────────────────────
 
     public Map<String, Object> getMetrics() {
+        commandLogger.startCapture();
         long now = System.currentTimeMillis();
         long from60 = now - 60_000;
         long from10 = now - 10_000;
@@ -165,6 +174,9 @@ public class TransactionMonitorService {
 
         // Read all entries from last 60 seconds
         var records = readRange(from60, now);
+        commandLogger.log("UC11", "XRANGE", STREAM_KEY, "last 60s",
+                "XRANGE " + STREAM_KEY + " " + from60 + "-0 " + now + "-99999 COUNT 10000",
+                (records != null ? records.size() : 0) + " entries returned (aggregated into 1s buckets)");
         if (records == null) records = Collections.emptyList();
 
         // Aggregate into 1-second buckets
@@ -216,6 +228,7 @@ public class TransactionMonitorService {
         result.put("amountSeries", amountSeries);
         result.put("riskSeries", riskSeries);
         result.put("simulating", simulating);
+        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 

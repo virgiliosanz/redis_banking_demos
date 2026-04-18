@@ -77,11 +77,14 @@ public class AuthTokenController {
                     .body(Map.of("error", "Token is required"));
         }
 
-        boolean deleted = authTokenService.logout(token);
-        return ResponseEntity.ok(Map.of(
-                "success", deleted,
-                "message", deleted ? "Token destroyed" : "Token not found or already expired"
-        ));
+        Map<String, Object> logoutResult = authTokenService.logout(token);
+        boolean deleted = Boolean.TRUE.equals(logoutResult.get("deleted"));
+        Map<String, Object> response = new java.util.LinkedHashMap<>();
+        response.put("success", deleted);
+        response.put("message", deleted ? "Token destroyed" : "Token not found or already expired");
+        response.put("redisKey", logoutResult.get("redisKey"));
+        response.put("redisCommands", logoutResult.get("redisCommands"));
+        return ResponseEntity.ok(response);
     }
 
     /**

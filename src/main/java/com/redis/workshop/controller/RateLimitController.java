@@ -53,10 +53,11 @@ public class RateLimitController {
      * Reset rate limit for demo purposes.
      */
     @PostMapping("/reset")
-    public ResponseEntity<Map<String, String>> reset(
+    public ResponseEntity<Map<String, Object>> reset(
             @RequestParam(defaultValue = DEFAULT_CLIENT) String clientId) {
 
-        rateLimitService.reset(clientId);
-        return ResponseEntity.ok(Map.of("status", "reset", "clientId", clientId));
+        Map<String, Object> result = rateLimitService.reset(clientId);
+        result.put("status", "reset");
+        return ResponseEntity.ok(result);
     }
 }

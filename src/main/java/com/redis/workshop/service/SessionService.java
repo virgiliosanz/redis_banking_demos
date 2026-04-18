@@ -43,9 +43,11 @@ public class SessionService {
      * Returns session info on success, null on failure.
      */
     public Map<String, Object> login(String username, String password) {
+        commandLogger.startCapture();
         // Validate credentials
         String expected = MOCK_USERS.get(username);
         if (expected == null || !expected.equals(password)) {
+            commandLogger.getCaptured();
             return null;
         }
 
@@ -89,6 +91,7 @@ public class SessionService {
         result.put("sessionKey", sessionKey);
         result.put("tokenKey", tokenKey);
         result.put("ttl", SESSION_TTL_SECONDS);
+        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
@@ -96,6 +99,7 @@ public class SessionService {
      * Get session info for a user.
      */
     public Map<String, Object> getSession(String username) {
+        commandLogger.startCapture();
         String sessionKey = SESSION_PREFIX + username;
         Map<Object, Object> entries = redis.opsForHash().entries(sessionKey);
         commandLogger.log("UC2", "HGETALL", sessionKey, null,
@@ -103,6 +107,7 @@ public class SessionService {
                 entries.isEmpty() ? "(empty list — session expired or missing)"
                         : entries.size() + " fields returned");
         if (entries.isEmpty()) {
+            commandLogger.getCaptured();
             return null;
         }
 
@@ -112,6 +117,7 @@ public class SessionService {
         entries.forEach((k, v) -> result.put(k.toString(), v));
         result.put("sessionKey", sessionKey);
         result.put("ttl", ttl != null ? ttl : -1);
+        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
@@ -127,7 +133,8 @@ public class SessionService {
     /**
      * Logout — delete session and token from Redis.
      */
-    public boolean logout(String username) {
+    public Map<String, Object> logout(String username) {
+        commandLogger.startCapture();
         String sessionKey = SESSION_PREFIX + username;
 
         // Get token before deleting session
@@ -148,7 +155,11 @@ public class SessionService {
                     "(integer) " + (Boolean.TRUE.equals(tokDel) ? "1 (deleted)" : "0 (not found)"));
         }
 
-        return Boolean.TRUE.equals(deleted);
+        Map<String, Object> result = new HashMap<>();
+        result.put("deleted", Boolean.TRUE.equals(deleted));
+        result.put("sessionKey", sessionKey);
+        result.put("redisCommands", commandLogger.getCaptured());
+        return result;
     }
 
     /**

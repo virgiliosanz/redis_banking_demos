@@ -33,6 +33,7 @@ public class DeduplicationService {
      * Uses SET with NX + EX flags (SETNX pattern) for atomic check-and-set.
      */
     public Map<String, Object> submitTransaction(String sender, String receiver, String amount) {
+        commandLogger.startCapture();
         String txHash = generateTxHash(sender, receiver, amount);
         String key = KEY_PREFIX + txHash;
 
@@ -54,9 +55,12 @@ public class DeduplicationService {
         result.put("timestamp", Instant.now().toString());
         result.put("redisKey", key);
         result.put("ttlSeconds", TTL_SECONDS);
+        result.put("redisCommands", commandLogger.getCaptured());
 
-        // Add to in-memory log for demo display
-        transactionLog.add(0, result);
+        // Add to in-memory log for demo display (without the commands list, not needed historically)
+        Map<String, Object> logEntry = new LinkedHashMap<>(result);
+        logEntry.remove("redisCommands");
+        transactionLog.add(0, logEntry);
         if (transactionLog.size() > 50) {
             transactionLog.remove(transactionLog.size() - 1);
         }

@@ -95,6 +95,7 @@
         fetch('/api/ratelimit/check', { method: 'POST' })
             .then(function (res) { return res.json(); })
             .then(function (data) {
+                window.maybeRenderRedisCommands(data);
                 limit = data.limit;
                 updateGauge(data.remaining, data.limit);
                 showStatus(data.allowed, data);
@@ -123,6 +124,8 @@
                 addLogEntry(data);
                 if (data.ttl > 0) startTtlCountdown(data.ttl);
             });
+            // Show the commands from the last call of the burst
+            if (results.length) window.maybeRenderRedisCommands(results[results.length - 1]);
         }).finally(function () { btnBurst.disabled = false; });
     }
 
@@ -145,6 +148,7 @@
         fetch('/api/ratelimit/status')
             .then(function (res) { return res.json(); })
             .then(function (data) {
+                window.maybeRenderRedisCommands(data);
                 limit = data.limit;
                 updateGauge(data.remaining, data.limit);
                 if (!data.active) {

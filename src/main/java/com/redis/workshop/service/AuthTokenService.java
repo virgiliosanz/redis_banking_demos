@@ -46,8 +46,10 @@ public class AuthTokenService {
      * Authenticate user and create auth token stored as Redis Hash.
      */
     public Map<String, Object> login(String username, String password) {
+        commandLogger.startCapture();
         String expected = MOCK_USERS.get(username);
         if (expected == null || !expected.equals(password)) {
+            commandLogger.getCaptured();
             return null;
         }
 
@@ -81,6 +83,7 @@ public class AuthTokenService {
         Map<String, Object> result = new HashMap<>(tokenData);
         result.put("redisKey", tokenKey);
         result.put("ttl", TOKEN_TTL_SECONDS);
+        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
@@ -88,6 +91,7 @@ public class AuthTokenService {
      * Validate token — returns token info if valid, null if expired/invalid.
      */
     public Map<String, Object> validateToken(String tokenId) {
+        commandLogger.startCapture();
         String tokenKey = TOKEN_PREFIX + tokenId;
         Map<Object, Object> entries = redis.opsForHash().entries(tokenKey);
         commandLogger.log("UC1", "HGETALL", tokenKey, null,
@@ -95,6 +99,7 @@ public class AuthTokenService {
                 entries.isEmpty() ? "(empty list — token expired or invalid)"
                         : entries.size() + " fields returned");
         if (entries.isEmpty()) {
+            commandLogger.getCaptured();
             return null;
         }
 
@@ -105,19 +110,25 @@ public class AuthTokenService {
         result.put("valid", true);
         result.put("redisKey", tokenKey);
         result.put("ttl", ttl != null ? ttl : -1);
+        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
     /**
-     * Logout — delete token from Redis.
+     * Logout — delete token from Redis. Returns a result map with commands.
      */
-    public boolean logout(String tokenId) {
+    public Map<String, Object> logout(String tokenId) {
+        commandLogger.startCapture();
         String tokenKey = TOKEN_PREFIX + tokenId;
         Boolean deleted = redis.delete(tokenKey);
         commandLogger.log("UC1", "DEL", tokenKey, null,
                 "DEL " + tokenKey,
                 "(integer) " + (Boolean.TRUE.equals(deleted) ? "1 (deleted)" : "0 (not found)"));
-        return Boolean.TRUE.equals(deleted);
+        Map<String, Object> result = new HashMap<>();
+        result.put("deleted", Boolean.TRUE.equals(deleted));
+        result.put("redisKey", tokenKey);
+        result.put("redisCommands", commandLogger.getCaptured());
+        return result;
     }
 
 
