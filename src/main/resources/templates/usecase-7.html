@@ -143,11 +143,12 @@
                         </button>
                     </div>
 
-                    <!-- Redis Commands Executed -->
-                    <div id="commands-card" class="data-card" style="margin-top:16px; display:none;">
-                        <h3>Redis Commands Executed</h3>
-                        <pre id="commands-output" style="font-size:0.75rem; margin:0; white-space:pre-wrap; color:var(--text-secondary);"></pre>
-                    </div>
+                </div>
+
+                <!-- Redis Commands Executed (auto-populated after each request) -->
+                <div class="data-card redis-commands-card" id="redis-commands-card" style="display:none;">
+                    <h3>Redis Commands Executed</h3>
+                    <div class="commands-list" id="commands-output"></div>
                 </div>
             </section>
 

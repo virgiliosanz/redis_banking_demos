@@ -4,6 +4,7 @@
  */
 (function () {
     'use strict';
+    window.WORKSHOP_UC = 'UC8';
 
     // --- Shared helpers ---
     function escapeHtml(str) {

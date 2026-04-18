@@ -4,6 +4,7 @@
  */
 (function () {
     'use strict';
+    window.WORKSHOP_UC = 'UC3';
 
     var MAX_TTL = 600;
     var ttlInterval = null;

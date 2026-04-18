@@ -4,6 +4,7 @@
  */
 (function () {
     'use strict';
+    window.WORKSHOP_UC = 'UC13';
 
     var resourceSelect = document.getElementById('resourceSelect');
     var clientIdInput = document.getElementById('clientIdInput');

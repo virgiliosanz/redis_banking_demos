@@ -4,6 +4,7 @@
  */
 (function () {
     'use strict';
+    window.WORKSHOP_UC = 'UC7';
 
     // --- DOM refs ---
     var clientSelect = document.getElementById('clientSelect');

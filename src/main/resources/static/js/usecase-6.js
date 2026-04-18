@@ -1,6 +1,7 @@
 /** UC6: Real-time Fraud Detection */
 (function () {
     'use strict';
+    window.WORKSHOP_UC = 'UC6';
 
     var RISK_COLORS = {
         LOW: '#0a7e3e',

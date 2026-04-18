@@ -1,6 +1,7 @@
 /** UC5: Transaction Deduplication */
 (function () {
     'use strict';
+    window.WORKSHOP_UC = 'UC5';
 
     document.addEventListener('DOMContentLoaded', function () {
         var form = document.getElementById('paymentForm');
