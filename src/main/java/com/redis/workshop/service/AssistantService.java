@@ -305,8 +305,21 @@ public class AssistantService {
                 responseText = cached.get("response");
                 int savedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
                 tokensSaved.addAndGet(savedTokens);
-                relevantMemories = List.of();
-                relevantDocs = List.of();
+                // Even on cache hit, retrieve sources so UI can show the RAG context
+                List<Map<String, Object>> memResults = vectorSearch(MEMORY_INDEX, userMessage, 3);
+                relevantMemories = new ArrayList<>();
+                for (var m : memResults) {
+                    Map<String, String> flat = new LinkedHashMap<>();
+                    m.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
+                    relevantMemories.add(flat);
+                }
+                List<Map<String, Object>> kbResults = vectorSearch(KB_INDEX, userMessage, 3);
+                relevantDocs = new ArrayList<>();
+                for (var d : kbResults) {
+                    Map<String, String> flat = new LinkedHashMap<>();
+                    d.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
+                    relevantDocs.add(flat);
+                }
                 log.info("UC9: Semantic cache HIT for question: {} (~{} tokens saved)", userMessage, savedTokens);
             } else {
                 // Cache MISS — do full vector search + generate response
@@ -516,11 +529,15 @@ public class AssistantService {
             tokensSaved.addAndGet(savedTokens);
             log.info("UC9 Stream: Semantic cache HIT for: {} (~{} tokens saved)", userMessage, savedTokens);
 
+            // Even on cache hit, retrieve sources so UI can show the RAG context
+            List<Map<String, Object>> relevantMemories = vectorSearch(MEMORY_INDEX, userMessage, 3);
+            List<Map<String, Object>> relevantDocs = vectorSearch(KB_INDEX, userMessage, 3);
+
             // Send cache-hit event with sources
             try {
                 Map<String, Object> sourcesData = new LinkedHashMap<>();
-                sourcesData.put("memories", List.of());
-                sourcesData.put("kbDocs", List.of());
+                sourcesData.put("memories", relevantMemories);
+                sourcesData.put("kbDocs", relevantDocs);
                 sourcesData.put("semanticCacheHit", true);
                 emitter.send(SseEmitter.event().name("sources").data(objectMapper.writeValueAsString(sourcesData)));
             } catch (Exception e) {

@@ -341,7 +341,6 @@
                         <h3>Redis Context</h3>
                         <p class="uc9-ctx-subtitle">
                             Data fetched from Redis and sent to the LLM as context for this response.
-                            Use the <a href="/monitor" target="_blank">Redis Monitor</a> to see the commands executed.
                         </p>
 
                         <!-- 1. Conversation (Short-term Memory) -->
@@ -376,6 +375,12 @@
                         <button id="resetBtn" class="btn btn-outline btn-sm">Reset Demo</button>
                     </div>
                 </div>
+
+                <!-- Redis Commands Executed (auto-populated after each request) -->
+                <div class="data-card redis-commands-card" id="redis-commands-card" style="display:none;">
+                    <h3>Redis Commands Executed</h3>
+                    <div class="commands-list" id="commands-output"></div>
+                </div>
             </section>
 
             <!-- RIGHT: Code Showcase Panel -->
@@ -390,7 +395,7 @@
                     <div class="code-block" id="tab-java">
                         <pre><code class="language-java">// 1. Short-term Memory — HSET + EXPIRE
 // Store conversation context as a Hash
-String convKey = "workshop:assistant:conversation:"
+String convKey = "uc9:conversation:"
     + sessionId;
 
 Map&lt;String, String&gt; convData = Map.of(
@@ -406,7 +411,7 @@ redis.expire(convKey, 600, TimeUnit.SECONDS);
 
 // 2. Long-term Memory — Hash + Vector
 // Store past interaction with embedding vector
-String memKey = "workshop:assistant:memory:mem-001";
+String memKey = "uc9:memory:mem-001";
 redis.opsForHash().putAll(memKey, Map.of(
     "summary", "Asked about wire transfer fees",
     "detail", "Customer inquired about SWIFT...",
@@ -421,8 +426,8 @@ conn.hashCommands().hSet(
 );
 
 // 3. FT.CREATE — Vector index for memories
-// FT.CREATE idx:assistant_memory
-//   ON HASH PREFIX 1 workshop:assistant:memory:
+// FT.CREATE idx:uc9:memory
+//   ON HASH PREFIX 1 uc9:memory:
 //   SCHEMA
 //     summary TEXT
 //     tags TAG SEPARATOR ","
@@ -431,14 +436,14 @@ conn.hashCommands().hSet(
 //       DISTANCE_METRIC COSINE
 
 // 4. FT.SEARCH KNN — Retrieve memories
-// FT.SEARCH idx:assistant_memory
+// FT.SEARCH idx:uc9:memory
 //   "*=&gt;[KNN 3 @vector $BLOB]"
 //   PARAMS 2 BLOB &lt;query_vector_bytes&gt;
 //   RETURN 3 summary detail date
 //   DIALECT 2
 
 // 5. RAG — Same pattern for knowledge base
-// FT.SEARCH idx:assistant_kb
+// FT.SEARCH idx:uc9:kb
 //   "*=&gt;[KNN 3 @vector $BLOB]"
 //   PARAMS 2 BLOB &lt;query_vector_bytes&gt;
 //   RETURN 3 title content tags
@@ -446,22 +451,22 @@ conn.hashCommands().hSet(
 
 // 6. Semantic Cache — avoid redundant LLM calls
 // Create cache index
-// FT.CREATE idx:assistant_cache
-//   ON HASH PREFIX 1 workshop:assistant:cache:
+// FT.CREATE idx:uc9:cache
+//   ON HASH PREFIX 1 uc9:cache:
 //   SCHEMA question TEXT
 //     vector VECTOR HNSW 6
 //       TYPE FLOAT32 DIM 1536
 //       DISTANCE_METRIC COSINE
 
 // Check cache before calling LLM
-// FT.SEARCH idx:assistant_cache
+// FT.SEARCH idx:uc9:cache
 //   "*=&gt;[KNN 1 @vector $BLOB]"
 //   PARAMS 2 BLOB &lt;question_embedding&gt;
 //   DIALECT 2
 // If distance &lt; 0.15 → CACHE HIT (instant!)
 
 // Store in cache after LLM response
-String cacheKey = "workshop:assistant:cache:" + id;
+String cacheKey = "uc9:cache:" + id;
 redis.opsForHash().putAll(cacheKey, Map.of(
     "question", userMessage,
     "response", llmResponse
@@ -478,23 +483,23 @@ redis.expire(cacheKey, 600, TimeUnit.SECONDS);
 
                     <div class="code-block active" id="tab-cli">
                         <pre><code class="language-bash"># 1. Short-term Memory — conversation context
-HSET workshop:assistant:conversation:sess-001 \
+HSET uc9:conversation:sess-001 \
   messages '[{"role":"user","content":"..."}]' \
   created_at "2024-03-15T10:00:00Z" \
   last_active "2024-03-15T10:05:00Z" \
   user_name "Demo User"
 
 # Auto-expire after 10 minutes
-EXPIRE workshop:assistant:conversation:sess-001 600
+EXPIRE uc9:conversation:sess-001 600
 
 # Read conversation
-HGETALL workshop:assistant:conversation:sess-001
+HGETALL uc9:conversation:sess-001
 
 # Check remaining TTL
-TTL workshop:assistant:conversation:sess-001
+TTL uc9:conversation:sess-001
 
 # 2. Long-term Memory — store with vector
-HSET workshop:assistant:memory:mem-001 \
+HSET uc9:memory:mem-001 \
   summary "Asked about wire transfer fees" \
   detail "Customer inquired about SWIFT..." \
   date "2024-03-15" \
@@ -502,8 +507,8 @@ HSET workshop:assistant:memory:mem-001 \
   vector "&lt;768-dim FLOAT32 binary blob&gt;"
 
 # 3. Create vector index for memories
-FT.CREATE idx:assistant_memory \
-  ON HASH PREFIX 1 workshop:assistant:memory: \
+FT.CREATE idx:uc9:memory \
+  ON HASH PREFIX 1 uc9:memory: \
   SCHEMA \
     summary TEXT \
     tags TAG SEPARATOR "," \
@@ -513,15 +518,15 @@ FT.CREATE idx:assistant_memory \
       DISTANCE_METRIC COSINE
 
 # 4. KNN search — find similar memories
-FT.SEARCH idx:assistant_memory \
+FT.SEARCH idx:uc9:memory \
   "*=&gt;[KNN 3 @vector $BLOB]" \
   PARAMS 2 BLOB "&lt;query_vector&gt;" \
   RETURN 3 summary detail date \
   DIALECT 2
 
 # 5. RAG knowledge base index
-FT.CREATE idx:assistant_kb \
-  ON HASH PREFIX 1 workshop:assistant:kb: \
+FT.CREATE idx:uc9:kb \
+  ON HASH PREFIX 1 uc9:kb: \
   SCHEMA \
     title TEXT \
     content TEXT \
@@ -531,15 +536,15 @@ FT.CREATE idx:assistant_kb \
       DISTANCE_METRIC COSINE
 
 # 6. KNN search — retrieve KB articles
-FT.SEARCH idx:assistant_kb \
+FT.SEARCH idx:uc9:kb \
   "*=&gt;[KNN 3 @vector $BLOB]" \
   PARAMS 2 BLOB "&lt;query_vector&gt;" \
   RETURN 3 title content tags \
   DIALECT 2
 
 # 7. Semantic Cache — skip LLM for similar questions
-FT.CREATE idx:assistant_cache \
-  ON HASH PREFIX 1 workshop:assistant:cache: \
+FT.CREATE idx:uc9:cache \
+  ON HASH PREFIX 1 uc9:cache: \
   SCHEMA \
     question TEXT \
     vector VECTOR HNSW 6 \
@@ -547,18 +552,18 @@ FT.CREATE idx:assistant_cache \
       DISTANCE_METRIC COSINE
 
 # Check cache before calling LLM (KNN k=1)
-FT.SEARCH idx:assistant_cache \
+FT.SEARCH idx:uc9:cache \
   "*=&gt;[KNN 1 @vector $BLOB]" \
   PARAMS 2 BLOB "&lt;question_embedding&gt;" \
   DIALECT 2
 # If distance &lt; 0.15 → return cached response!
 
 # Store in cache after LLM response
-HSET workshop:assistant:cache:cache-abc123 \
+HSET uc9:cache:cache-abc123 \
   question "What is PSD2?" \
   response "PSD2 is the Payment Services Directive..." \
   vector "&lt;1536-dim FLOAT32 blob&gt;"
-EXPIRE workshop:assistant:cache:cache-abc123 600
+EXPIRE uc9:cache:cache-abc123 600
 
 # Memory patterns summary:
 # SHORT-TERM: Hash + TTL (10 min window)
