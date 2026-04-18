@@ -1,6 +1,7 @@
 /** UC12: ATM & Branch Finder — Redis Geospatial */
 (function () {
     'use strict';
+    window.WORKSHOP_UC = 'UC12';
 
     // --- State ---
     var currentApproach = 'native';
@@ -158,7 +159,6 @@
         fetch(url)
             .then(function (r) { return r.json(); })
             .then(function (data) {
-                window.maybeRenderRedisCommands(data);
                 renderResults(data);
             })
             .catch(function (err) { console.error(err); })

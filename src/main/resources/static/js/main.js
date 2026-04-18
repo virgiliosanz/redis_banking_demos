@@ -78,35 +78,18 @@
         updateMode(localStorage.getItem(PM_KEY) === 'true');
     }
 
-    // --- Utility: auto-render redisCommands when present on a response ---
-    // Looks up the standard container (#redis-commands-list). Returns the
-    // same data unchanged so it can be chained in .then(...) handlers.
-    window.maybeRenderRedisCommands = function (data) {
-        try {
-            if (data && data.redisCommands && window.renderRedisCommands) {
-                var container = document.getElementById('redis-commands-list');
-                if (container) {
-                    window.renderRedisCommands(container, data.redisCommands);
-                }
-            }
-        } catch (e) { /* non-fatal */ }
-        return data;
-    };
-
     // --- Utility: POST JSON ---
     window.workshopFetch = function (url, data) {
         return fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: data ? JSON.stringify(data) : undefined
-        }).then(function (res) { return res.json(); })
-          .then(window.maybeRenderRedisCommands);
+        }).then(function (res) { return res.json(); });
     };
 
     // --- Utility: GET JSON ---
     window.workshopGet = function (url) {
-        return fetch(url).then(function (res) { return res.json(); })
-          .then(window.maybeRenderRedisCommands);
+        return fetch(url).then(function (res) { return res.json(); });
     };
 
     // --- Utility: Format JSON for display ---
@@ -128,11 +111,7 @@
         });
     };
 
-    // --- Shared: Redis Commands panel renderer ---
-    // Renders an array of commands into a container. Each entry may be either:
-    //   "COMMAND args → result summary"  (collapsible: summary = command, expanded = result)
-    //   "COMMAND args"                   (non-collapsible single line)
-    // Shows the parent .redis-commands-card; keeps it visible if already shown.
+    // --- Shared: HTML escape ---
     function escapeHtml(s) {
         return String(s)
             .replace(/&/g, '&amp;')
@@ -142,38 +121,132 @@
             .replace(/'/g, '&#39;');
     }
 
-    window.renderRedisCommands = function (container, commands) {
-        if (!container) return;
-        var card = container.closest('.redis-commands-card') || container.parentElement;
-        if (!commands || !commands.length) {
-            container.innerHTML = '<div class="commands-empty">No Redis commands recorded for this request.</div>';
-            if (card) card.style.display = '';
+    // --- Redis Commands Panel ---
+    // Each UC page sets window.WORKSHOP_UC = 'UCn'. We poll /api/redis/commands
+    // for that UC, newest-first, and render entries in #commands-output inside
+    // the #redis-commands-card block.
+    var _lastCmdTsMicros = null;
+
+    function pollRedisCommands() {
+        var uc = window.WORKSHOP_UC;
+        if (!uc) return;
+
+        var card = document.getElementById('redis-commands-card');
+        var output = document.getElementById('commands-output');
+        if (!card || !output) return;
+
+        var url = '/api/redis/commands?uc=' + encodeURIComponent(uc) + '&limit=15';
+        if (_lastCmdTsMicros !== null) {
+            url += '&since=' + encodeURIComponent(_lastCmdTsMicros);
+        }
+
+        fetch(url, { headers: { 'Accept': 'application/json' } })
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (data) {
+                if (!data) return;
+                var commands = Array.isArray(data) ? data : (data.commands || []);
+                if (commands.length === 0 && _lastCmdTsMicros === null) {
+                    card.style.display = 'none';
+                    return;
+                }
+                if (commands.length === 0) return;
+
+                card.style.display = '';
+                var newest = commands[0];
+                if (newest && typeof newest.tsMicros === 'number') {
+                    _lastCmdTsMicros = newest.tsMicros;
+                }
+
+                var placeholder = output.querySelector('.command-log-empty, .commands-empty');
+                if (placeholder) placeholder.remove();
+
+                // commands are newest-first; insert in reverse so newest ends on top
+                for (var i = commands.length - 1; i >= 0; i--) {
+                    var el = createCommandEntry(commands[i]);
+                    output.insertBefore(el, output.firstChild);
+                }
+
+                while (output.children.length > 20) {
+                    output.removeChild(output.lastChild);
+                }
+            })
+            .catch(function () { /* silent */ });
+    }
+
+    function createCommandEntry(cmd) {
+        var fullCmd = cmd.fullCommand || ((cmd.command || '') + (cmd.key ? ' ' + cmd.key : ''));
+        var commandName = cmd.command || '';
+        var keyText = cmd.key || '';
+
+        var details = document.createElement('details');
+        details.className = 'redis-cmd-entry command-entry';
+
+        var summary = document.createElement('summary');
+        var summaryCode = document.createElement('code');
+        summaryCode.className = 'cmd-summary';
+        summaryCode.innerHTML = escapeHtml(commandName)
+            + (keyText ? ' <span class="cmd-key-text">' + escapeHtml(keyText) + '</span>' : '');
+
+        var copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'cmd-copy-btn';
+        copyBtn.title = 'Copy command to clipboard';
+        copyBtn.setAttribute('aria-label', 'Copy command to clipboard');
+        copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"'
+            + ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            + '<rect x="9" y="9" width="13" height="13" rx="2"/>'
+            + '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'
+            + '</svg>';
+        copyBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            copyRedisCommand(copyBtn, fullCmd);
+        });
+
+        summary.appendChild(summaryCode);
+        summary.appendChild(copyBtn);
+
+        var expanded = document.createElement('div');
+        expanded.className = 'cmd-expanded';
+        expanded.innerHTML = '<div class="cmd-full"><span class="cmd-label">Full command</span>'
+            + '<code>' + escapeHtml(fullCmd) + '</code></div>';
+
+        details.appendChild(summary);
+        details.appendChild(expanded);
+        return details;
+    }
+
+    function copyRedisCommand(btn, command) {
+        function flash() {
+            btn.classList.add('cmd-copied');
+            btn.title = 'Copied!';
+            setTimeout(function () {
+                btn.classList.remove('cmd-copied');
+                btn.title = 'Copy command to clipboard';
+            }, 1500);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(command).then(flash).catch(function () {});
             return;
         }
-        var html = '';
-        commands.forEach(function (entry) {
-            if (!entry) return;
-            var str = String(entry);
-            var idx = str.indexOf(' → ');
-            if (idx > -1) {
-                var cmdPart = str.substring(0, idx);
-                var resultPart = str.substring(idx + 3);
-                html += '<details class="command-entry">' +
-                          '<summary><code>' + escapeHtml(cmdPart) + '</code></summary>' +
-                          '<div class="cmd-expanded">' +
-                            '<div class="cmd-result">' +
-                              '<span class="cmd-label">Result</span>' +
-                              '<code>' + escapeHtml(resultPart) + '</code>' +
-                            '</div>' +
-                          '</div>' +
-                        '</details>';
-            } else {
-                html += '<div class="command-entry command-entry-simple">' +
-                          '<code>' + escapeHtml(str) + '</code>' +
-                        '</div>';
-            }
-        });
-        container.innerHTML = html;
-        if (card) card.style.display = '';
-    };
+        // Fallback for older/non-secure contexts
+        try {
+            var ta = document.createElement('textarea');
+            ta.value = command;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'absolute';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            flash();
+        } catch (e) { /* non-fatal */ }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!window.WORKSHOP_UC) return;
+        setTimeout(pollRedisCommands, 500);
+        setInterval(pollRedisCommands, 2000);
+    });
 })();

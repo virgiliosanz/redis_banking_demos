@@ -1,6 +1,7 @@
 /** UC11: Real-time Transaction Monitoring — Redis Streams */
 (function () {
     'use strict';
+    window.WORKSHOP_UC = 'UC11';
 
     // --- DOM refs ---
     var btnStart   = document.getElementById('btnStart');
@@ -213,8 +214,7 @@
     btnAnomaly.addEventListener('click', function () {
         fetch('/api/transactions/simulate/anomaly', { method: 'POST' })
             .then(function (r) { return r.json(); })
-            .then(function (data) {
-                window.maybeRenderRedisCommands(data);
+            .then(function () {
                 // Ensure polling is active to see the spike
                 if (!pollInterval) startPolling();
             });

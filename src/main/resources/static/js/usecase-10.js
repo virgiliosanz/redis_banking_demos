@@ -1,6 +1,7 @@
 /** UC10: Cache-Aside Pattern — Banking Product Catalog Caching */
 (function () {
     'use strict';
+    window.WORKSHOP_UC = 'UC10';
 
     // --- DOM refs ---
     var productCards = document.getElementById('productCards');
@@ -62,7 +63,6 @@
         fetch('/api/cache/product/' + selectedProductId)
             .then(function (r) { return r.json(); })
             .then(function (data) {
-                window.maybeRenderRedisCommands(data);
                 if (data.error) {
                     cacheStatus.className = 'cache-status-badge cache-miss';
                     cacheStatus.textContent = data.error;
@@ -100,7 +100,6 @@
         fetch('/api/cache/product/' + selectedProductId, { method: 'DELETE' })
             .then(function (r) { return r.json(); })
             .then(function (data) {
-                window.maybeRenderRedisCommands(data);
                 addLogEntry({ cacheHit: null, latencyMs: 0, source: 'EVICT', product: { id: data.productId } });
                 refreshStats();
             });
@@ -110,7 +109,6 @@
         fetch('/api/cache/products', { method: 'DELETE' })
             .then(function (r) { return r.json(); })
             .then(function (data) {
-                window.maybeRenderRedisCommands(data);
                 addLogEntry({ cacheHit: null, latencyMs: 0, source: 'EVICT_ALL', product: { id: data.count + ' keys' } });
                 refreshStats();
             });
