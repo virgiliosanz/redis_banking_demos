@@ -26,7 +26,7 @@ docker compose --profile workshop up -d --build
 5. Try to validate again — show it fails
 
 ### Key Redis commands to highlight
-- `HSET workshop:auth:token:{id} ...` — store token
+- `HSET uc1:token:{id} ...` — store token
 - `EXPIRE` — auto-cleanup
 - `HGET` / `EXISTS` — validate token
 
@@ -252,8 +252,8 @@ docker compose --profile workshop up -d --build
 7. Show the hit ratio climbing as you make more requests
 
 ### Key Redis commands to highlight
-- `GET workshop:cache:product:{id}` — check cache
-- `SET workshop:cache:product:{id} ... EX 300` — store with TTL
+- `GET uc10:product:{id}` — check cache
+- `SET uc10:product:{id} ... EX 300` — store with TTL
 - `DEL` — cache eviction on data change
 
 ### Talking points
@@ -335,7 +335,7 @@ docker compose --profile workshop up -d --build
 6. Show the Lua script for safe release in the code showcase
 
 ### Key Redis commands to highlight
-- `SET workshop:lock:{resourceId} {clientId} NX EX 30` — atomic lock acquisition
+- `SET uc13:lock:{accountId} {clientId} NX EX 30` — atomic lock acquisition
 - `EVAL "if GET == expected then DEL" 1 key value` — Lua safe release
 - `GET` + `TTL` — lock inspection
 

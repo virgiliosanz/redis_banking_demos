@@ -48,7 +48,7 @@
             </ol>
             <h3>Key Redis commands</h3>
             <ul>
-                <li><code>HSET workshop:auth:token:{id} ...</code> — store token</li>
+                <li><code>HSET uc1:token:{id} ...</code> — store token</li>
                 <li><code>EXPIRE</code> — auto-cleanup</li>
                 <li><code>HGET</code> / <code>EXISTS</code> — validate token</li>
             </ul>
@@ -338,8 +338,8 @@
             </ol>
             <h3>Key Redis commands</h3>
             <ul>
-                <li><code>GET workshop:cache:product:{id}</code> — check cache</li>
-                <li><code>SET workshop:cache:product:{id} ... EX 300</code> — store with TTL</li>
+                <li><code>GET uc10:product:{id}</code> — check cache</li>
+                <li><code>SET uc10:product:{id} ... EX 300</code> — store with TTL</li>
                 <li><code>DEL</code> — cache eviction on data change</li>
             </ul>
             <h3>Why these data structures?</h3>
@@ -447,7 +447,7 @@
             </ol>
             <h3>Key Redis commands</h3>
             <ul>
-                <li><code>SET workshop:lock:{accountId} {clientId} NX EX 30</code> — atomic lock acquire</li>
+                <li><code>SET uc13:lock:{accountId} {clientId} NX EX 30</code> — atomic lock acquire</li>
                 <li><code>EVAL</code> with Lua script — safe release (check owner, then DEL)</li>
                 <li><code>TTL</code> — inspect remaining lock time</li>
                 <li><code>GET</code> — check current lock holder</li>
@@ -477,7 +477,7 @@
             <p>Before starting the workshop, verify everything is working:</p>
             <ul>
                 <li>Open <code>/api/health</code> — check Redis status is UP and whether OpenAI is configured</li>
-                <li>Open <code>/api/monitor</code> — verify Redis metrics are updating (JSON endpoint)</li>
+                <li>Optional: <code>curl /api/monitor</code> — returns a JSON snapshot of Redis metrics used for sanity checks (there is no standalone monitor page)</li>
             </ul>
 
             <h3>Redis Commands Panel (inline)</h3>
@@ -511,7 +511,7 @@
                 <li>Add a connection: host <code>redis</code> (or <code>localhost</code>), port <code>6379</code></li>
                 <li>Use Redis Insight to show the actual key structure after each demo</li>
                 <li>Great for showing Hash fields, Sorted Set scores, Stream entries, JSON documents</li>
-                <li>The browser view complements the Monitor — Monitor shows metrics, Insight shows data</li>
+                <li>Redis Insight complements the inline "Redis Commands Executed" panel — the panel shows each command as it runs, Insight lets you inspect the resulting keys and data</li>
             </ul>
 
             <hr class="guide-hr"/>
@@ -525,7 +525,7 @@
                 <li>Sub-millisecond latency for all operations</li>
                 <li>Built-in search engine (full-text + vector) since Redis 8</li>
                 <li>Active-Active for multi-geo banking requirements</li>
-                <li>Workshop tools: live monitoring, presentation mode, and QR sharing — all built with Redis data</li>
+                <li>Workshop tools: inline Redis command logging, presentation mode, and QR sharing — all built with Redis data</li>
             </ol>
             <h3>Questions?</h3>
             <p>Open any demo and let the audience try it themselves.</p>
