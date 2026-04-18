@@ -43,8 +43,6 @@ public class RedisMonitorService {
     // +<timestamp> [<db> <addr>] "<cmd>" "<arg1>" "<arg2>" ...
     private static final Pattern MONITOR_LINE = Pattern.compile(
             "^\\+?(\\d+\\.\\d+)\\s+\\[(\\d+)\\s+([^\\]]+)\\]\\s+(.*)$");
-    private static final Pattern QUOTED_ARG = Pattern.compile(
-            "\"((?:\\\\.|[^\"\\\\])*)\"");
 
     private final RedisConnectionFactory connectionFactory;
     private final Deque<Map<String, Object>> buffer = new ConcurrentLinkedDeque<>();
@@ -151,11 +149,7 @@ public class RedisMonitorService {
         String client = m.group(3);
         String cmdPart = m.group(4);
 
-        List<String> args = new ArrayList<>();
-        Matcher am = QUOTED_ARG.matcher(cmdPart);
-        while (am.find()) {
-            args.add(unescape(am.group(1)));
-        }
+        List<String> args = parseQuotedArgs(cmdPart);
         if (args.isEmpty()) return;
 
         String command = args.get(0).toUpperCase();
@@ -188,8 +182,41 @@ public class RedisMonitorService {
         }
     }
 
-    private static String unescape(String s) {
-        return s.replace("\\\"", "\"").replace("\\\\", "\\").replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t");
+    /**
+     * Parse quoted arguments from a MONITOR line fragment.
+     * Manual parser — avoids regex backtracking on long binary blobs.
+     */
+    private static List<String> parseQuotedArgs(String input) {
+        List<String> args = new ArrayList<>();
+        int i = 0;
+        int len = input.length();
+
+        while (i < len) {
+            // Find next opening quote
+            int start = input.indexOf('"', i);
+            if (start < 0) break;
+
+            // Find matching closing quote (handle escaped quotes)
+            StringBuilder sb = new StringBuilder();
+            int j = start + 1;
+            while (j < len) {
+                char c = input.charAt(j);
+                if (c == '\\' && j + 1 < len) {
+                    sb.append(input.charAt(j + 1));
+                    j += 2;
+                } else if (c == '"') {
+                    break;
+                } else {
+                    sb.append(c);
+                    j++;
+                }
+            }
+
+            args.add(sb.toString());
+            i = j + 1;
+        }
+
+        return args;
     }
 
     private static String renderArgs(List<String> args) {
