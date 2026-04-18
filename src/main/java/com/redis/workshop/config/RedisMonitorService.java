@@ -19,7 +19,9 @@ import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -48,6 +50,7 @@ public class RedisMonitorService {
 
     private final RedisConnectionFactory connectionFactory;
     private final Deque<Map<String, Object>> buffer = new ConcurrentLinkedDeque<>();
+    private final Map<String, Consumer<Map<String, Object>>> listeners = new ConcurrentHashMap<>();
 
     private volatile Thread worker;
     private volatile Socket socket;
@@ -177,6 +180,14 @@ public class RedisMonitorService {
         while (buffer.size() > MAX_ENTRIES) {
             buffer.removeLast();
         }
+
+        for (Consumer<Map<String, Object>> listener : listeners.values()) {
+            try {
+                listener.accept(entry);
+            } catch (Exception ignored) {
+                // listener will be cleaned up by SSE error handling
+            }
+        }
     }
 
     private static String unescape(String s) {
@@ -246,5 +257,13 @@ public class RedisMonitorService {
 
     public boolean isRunning() {
         return running;
+    }
+
+    public void addListener(String id, Consumer<Map<String, Object>> listener) {
+        listeners.put(id, listener);
+    }
+
+    public void removeListener(String id) {
+        listeners.remove(id);
     }
 }

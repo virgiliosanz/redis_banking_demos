@@ -3,16 +3,20 @@ package com.redis.workshop.controller;
 import com.redis.workshop.config.RedisMonitorService;
 import com.redis.workshop.service.OpenAiService;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
@@ -37,13 +41,53 @@ public class HealthController {
     @GetMapping("/redis/commands")
     public ResponseEntity<Map<String, Object>> redisCommands(
             @RequestParam(defaultValue = "100") int limit,
-            @RequestParam(required = false) Long since) {
+            @RequestParam(required = false) Long since,
+            @RequestParam(required = false) String uc) {
         List<Map<String, Object>> commands = redisMonitor.getCommandsSince(since, limit);
+
+        if (uc != null && !uc.isEmpty()) {
+            String ucFilter = uc.toUpperCase();
+            commands = commands.stream()
+                    .filter(c -> ucFilter.equals(c.get("useCase")))
+                    .collect(Collectors.toList());
+        }
+
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("running", redisMonitor.isRunning());
         body.put("count", commands.size());
         body.put("commands", commands);
         return ResponseEntity.ok(body);
+    }
+
+    /**
+     * Server-Sent Events stream of Redis commands in real-time. Frontend
+     * subscribes per UC so the commands panel updates the instant a command
+     * hits the MONITOR feed, avoiding polling races.
+     */
+    @GetMapping(value = "/redis/commands/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamCommands(@RequestParam(required = false) String uc) {
+        SseEmitter emitter = new SseEmitter(0L);
+
+        String listenerId = UUID.randomUUID().toString();
+        String ucFilter = (uc != null && !uc.isEmpty()) ? uc.toUpperCase() : null;
+
+        redisMonitor.addListener(listenerId, command -> {
+            try {
+                if (ucFilter != null && !ucFilter.equals(command.get("useCase"))) return;
+                emitter.send(SseEmitter.event()
+                        .name("command")
+                        .data(command));
+            } catch (Exception e) {
+                redisMonitor.removeListener(listenerId);
+                try { emitter.completeWithError(e); } catch (Exception ignored) {}
+            }
+        });
+
+        emitter.onCompletion(() -> redisMonitor.removeListener(listenerId));
+        emitter.onTimeout(() -> redisMonitor.removeListener(listenerId));
+        emitter.onError(e -> redisMonitor.removeListener(listenerId));
+
+        return emitter;
     }
 
     @GetMapping("/health")

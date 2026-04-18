@@ -121,13 +121,15 @@
             .replace(/'/g, '&#39;');
     }
 
-    // --- Redis Commands Panel ---
-    // Each UC page sets window.WORKSHOP_UC = 'UCn'. We poll /api/redis/commands
-    // for that UC, newest-first, and render entries in #commands-output inside
-    // the #redis-commands-card block.
-    var _lastCmdTsMicros = null;
+    // --- Redis Commands Panel (SSE) ---
+    // Each UC page sets window.WORKSHOP_UC = 'UCn'. We open an SSE stream
+    // filtered by UC and push entries into #commands-output inside the
+    // #redis-commands-card block. A one-shot REST call backfills any
+    // commands that happened before the page loaded.
+    var MAX_COMMANDS = 25;
+    var _eventSource = null;
 
-    function pollRedisCommands() {
+    function initRedisCommands() {
         var uc = window.WORKSHOP_UC;
         if (!uc) return;
 
@@ -135,43 +137,61 @@
         var output = document.getElementById('commands-output');
         if (!card || !output) return;
 
-        var url = '/api/redis/commands?uc=' + encodeURIComponent(uc) + '&limit=15';
-        if (_lastCmdTsMicros !== null) {
-            url += '&since=' + encodeURIComponent(_lastCmdTsMicros);
-        }
-
-        fetch(url, { headers: { 'Accept': 'application/json' } })
+        // Backfill recent commands captured before page load
+        fetch('/api/redis/commands?uc=' + encodeURIComponent(uc) + '&limit=10',
+                { headers: { 'Accept': 'application/json' } })
             .then(function (res) { return res.ok ? res.json() : null; })
             .then(function (data) {
                 if (!data) return;
                 var commands = Array.isArray(data) ? data : (data.commands || []);
-                if (commands.length === 0 && _lastCmdTsMicros === null) {
-                    card.style.display = 'none';
-                    return;
-                }
                 if (commands.length === 0) return;
 
                 card.style.display = '';
-                var newest = commands[0];
-                if (newest && typeof newest.tsMicros === 'number') {
-                    _lastCmdTsMicros = newest.tsMicros;
-                }
-
                 var placeholder = output.querySelector('.command-log-empty, .commands-empty');
                 if (placeholder) placeholder.remove();
 
-                // commands are newest-first; insert in reverse so newest ends on top
+                // Backend returns newest-first; insert in reverse so newest ends on top
                 for (var i = commands.length - 1; i >= 0; i--) {
                     var el = createCommandEntry(commands[i]);
                     output.insertBefore(el, output.firstChild);
                 }
-
-                while (output.children.length > 20) {
+                while (output.children.length > MAX_COMMANDS) {
                     output.removeChild(output.lastChild);
                 }
             })
             .catch(function () { /* silent */ });
+
+        // Open SSE stream for real-time push
+        var streamUrl = '/api/redis/commands/stream?uc=' + encodeURIComponent(uc);
+        _eventSource = new EventSource(streamUrl);
+
+        _eventSource.addEventListener('command', function (event) {
+            var cmd;
+            try { cmd = JSON.parse(event.data); } catch (e) { return; }
+
+            card.style.display = '';
+            var placeholder = output.querySelector('.command-log-empty, .commands-empty');
+            if (placeholder) placeholder.remove();
+
+            var el = createCommandEntry(cmd);
+            output.insertBefore(el, output.firstChild);
+
+            while (output.children.length > MAX_COMMANDS) {
+                output.removeChild(output.lastChild);
+            }
+        });
+
+        _eventSource.onerror = function () {
+            // EventSource auto-reconnects by default
+        };
     }
+
+    window.addEventListener('beforeunload', function () {
+        if (_eventSource) {
+            _eventSource.close();
+            _eventSource = null;
+        }
+    });
 
     function createCommandEntry(cmd) {
         var fullCmd = cmd.fullCommand || ((cmd.command || '') + (cmd.key ? ' ' + cmd.key : ''));
@@ -246,7 +266,6 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         if (!window.WORKSHOP_UC) return;
-        setTimeout(pollRedisCommands, 500);
-        setInterval(pollRedisCommands, 2000);
+        initRedisCommands();
     });
 })();
