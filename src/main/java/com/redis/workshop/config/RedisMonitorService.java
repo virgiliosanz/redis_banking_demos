@@ -8,6 +8,8 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.stereotype.Component;
 
+import javax.net.ssl.SSLSocketFactory;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -66,8 +68,10 @@ public class RedisMonitorService {
         String host = lettuce.getHostName();
         int port = lettuce.getPort();
         String password = lettuce.getPassword();
+        boolean useSsl = lettuce.isUseSsl();
+        log.info("RedisMonitorService: connecting to {}:{} ({})", host, port, useSsl ? "TLS" : "plain");
         running = true;
-        worker = new Thread(() -> runLoop(host, port, password), "redis-monitor");
+        worker = new Thread(() -> runLoop(host, port, password, useSsl), "redis-monitor");
         worker.setDaemon(true);
         worker.start();
     }
@@ -79,9 +83,11 @@ public class RedisMonitorService {
         if (worker != null) worker.interrupt();
     }
 
-    private void runLoop(String host, int port, String password) {
+    private void runLoop(String host, int port, String password, boolean useSsl) {
         while (running) {
-            try (Socket s = new Socket(host, port)) {
+            try (Socket s = useSsl
+                    ? SSLSocketFactory.getDefault().createSocket(host, port)
+                    : new Socket(host, port)) {
                 this.socket = s;
                 s.setSoTimeout(0);
                 OutputStream out = s.getOutputStream();
