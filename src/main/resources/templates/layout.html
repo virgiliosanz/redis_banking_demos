@@ -45,6 +45,13 @@
                 <option th:value="@{/usecase/13}">13. Distributed Locking</option>
             </select>
             <a href="http://localhost:5540" target="_blank" class="nav-link">Redis Insight</a>
+            <button class="nav-reset-btn" id="resetAllBtn" type="button" aria-label="Reset all demo data">
+                <svg class="reset-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="1 4 1 10 7 10"/>
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                </svg>
+                <span class="reset-label">Reset All</span>
+            </button>
             <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
                 <svg class="theme-icon-light" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="5"/>

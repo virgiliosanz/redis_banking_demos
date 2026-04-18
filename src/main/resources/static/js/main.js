@@ -49,7 +49,53 @@
         }
 
         initPresentationMode();
+        initResetAll();
     });
+
+    // --- Reset All (navbar) ---
+    function initResetAll() {
+        var btn = document.getElementById('resetAllBtn');
+        if (!btn) return;
+        var label = btn.querySelector('.reset-label');
+        var originalLabel = label ? label.textContent : 'Reset All';
+
+        btn.addEventListener('click', function () {
+            if (btn.disabled) return;
+            if (!window.confirm('This will reset all demo data. Continue?')) return;
+
+            btn.disabled = true;
+            btn.classList.add('is-loading');
+            if (label) label.textContent = 'Resetting…';
+
+            fetch('/api/reset-all', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' }
+            })
+                .then(function (res) {
+                    return res.json().then(function (body) { return { ok: res.ok, body: body }; });
+                })
+                .then(function (result) {
+                    var totalMs = (result.body && result.body.totalMs) || 0;
+                    if (result.ok) {
+                        if (label) label.textContent = 'Reset ✓ ' + totalMs + 'ms';
+                    } else {
+                        if (label) label.textContent = 'Reset failed';
+                        console.error('Reset-all partial/failed', result.body);
+                    }
+                })
+                .catch(function (err) {
+                    if (label) label.textContent = 'Reset failed';
+                    console.error('Reset-all error', err);
+                })
+                .finally(function () {
+                    btn.classList.remove('is-loading');
+                    setTimeout(function () {
+                        btn.disabled = false;
+                        if (label) label.textContent = originalLabel;
+                    }, 2500);
+                });
+        });
+    }
 
     // --- Presentation Mode ---
     function initPresentationMode() {
