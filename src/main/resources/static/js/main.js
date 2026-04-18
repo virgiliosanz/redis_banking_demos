@@ -124,6 +124,50 @@
         updateMode(localStorage.getItem(PM_KEY) === 'true');
     }
 
+    // --- Redis latency badge ---
+    // Renders a pill in the demo panel header. Green <1ms, yellow 1-10ms, red >10ms.
+    window.renderRedisLatency = function (latencyMs) {
+        if (latencyMs === null || latencyMs === undefined) return;
+        var n = Number(latencyMs);
+        if (!isFinite(n) || n < 0) return;
+
+        var panel = document.querySelector('.usecase-panels .demo-panel');
+        if (!panel) return;
+
+        var badge = document.getElementById('redis-latency-badge');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.id = 'redis-latency-badge';
+            badge.className = 'redis-latency-badge';
+            badge.title = 'Server-side Redis operation latency';
+            var h2 = panel.querySelector(':scope > h2');
+            if (h2) h2.appendChild(badge);
+            else panel.insertBefore(badge, panel.firstChild);
+        }
+
+        var state = n < 1 ? 'ok' : (n <= 10 ? 'warn' : 'slow');
+        badge.className = 'redis-latency-badge ' + state;
+        var display = n < 10 ? n.toFixed(2) : n.toFixed(1);
+        badge.textContent = 'Redis: ' + display + ' ms';
+    };
+
+    // Auto-tap every /api/** response: the X-Redis-Latency-Ms header is set by
+    // RedisLatencyAdvice on the server, so we can render the pill for any fetch
+    // (raw fetch, workshopFetch, workshopGet) without per-UC changes.
+    var _origFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+        return _origFetch(input, init).then(function (res) {
+            try {
+                var url = typeof input === 'string' ? input : (input && input.url) || '';
+                if (url.indexOf('/api/') !== -1) {
+                    var header = res.headers.get('X-Redis-Latency-Ms');
+                    if (header != null) window.renderRedisLatency(parseFloat(header));
+                }
+            } catch (e) { /* non-fatal */ }
+            return res;
+        });
+    };
+
     // --- Utility: POST JSON ---
     window.workshopFetch = function (url, data) {
         return fetch(url, {
