@@ -3,442 +3,208 @@ package com.redis.workshop.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
+import com.redis.workshop.config.RedisScanHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.redis.workshop.config.RedisScanHelper;
-import com.redis.workshop.config.RedisSearchHelper;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.context.annotation.DependsOn;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import com.redis.workshop.config.DocumentDataLoader;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+/** UC9 orchestrator: coordinates conversation state + MemoryService / KnowledgeBaseService / SemanticCacheService. */
 @Service
 @DependsOn("startupCleanup")
 public class AssistantService {
 
     private static final Logger log = LoggerFactory.getLogger(AssistantService.class);
-
     private static final String CONV_PREFIX = "uc9:conversation:";
-    private static final String MEMORY_PREFIX = "uc9:memory:";
-    private static final String KB_PREFIX = "uc9:kb:";
-    private static final String CACHE_PREFIX = "uc9:cache:";
-    private static final String MEMORY_INDEX = "idx:uc9:memory";
-    private static final String KB_INDEX = "idx:uc9:kb";
-    private static final String CACHE_INDEX = "idx:uc9:cache";
-    // UC8 regulation documents (PDF chunks) — reused for RAG
-    private static final String DOC_INDEX = "idx:uc8:documents";
-    private static final String DOC_PREFIX = "uc8:doc:";
-    private static final int VECTOR_DIM = 1536;
     private static final long CONV_TTL_SECONDS = 600;
-    private static final long CACHE_TTL_SECONDS = 600;
-    private static final double CACHE_DISTANCE_THRESHOLD = 0.15;
     private static final int MAX_MESSAGES = 20;
-
-    // Semantic cache stats
-    private final java.util.concurrent.atomic.AtomicLong cacheHits = new java.util.concurrent.atomic.AtomicLong(0);
-    private final java.util.concurrent.atomic.AtomicLong cacheMisses = new java.util.concurrent.atomic.AtomicLong(0);
-    private final java.util.concurrent.atomic.AtomicLong tokensUsed = new java.util.concurrent.atomic.AtomicLong(0);
-    private final java.util.concurrent.atomic.AtomicLong tokensSaved = new java.util.concurrent.atomic.AtomicLong(0);
 
     private final StringRedisTemplate redis;
     private final OpenAiService openAiService;
-    private final RedisSearchHelper redisSearchHelper;
     private final ObjectMapper objectMapper;
+    private final MemoryService memoryService;
+    private final KnowledgeBaseService knowledgeBaseService;
+    private final SemanticCacheService semanticCacheService;
 
-    // Pre-loaded data for keyword matching (fallback)
-    private final List<Map<String, String>> memories = new ArrayList<>();
-    private final List<Map<String, String>> kbArticles = new ArrayList<>();
-
-    public AssistantService(StringRedisTemplate redis, OpenAiService openAiService,
-                            RedisSearchHelper redisSearchHelper, ObjectMapper objectMapper) {
+    public AssistantService(StringRedisTemplate redis, OpenAiService openAiService, ObjectMapper objectMapper,
+                            MemoryService memoryService, KnowledgeBaseService knowledgeBaseService,
+                            SemanticCacheService semanticCacheService) {
         this.redis = redis;
         this.openAiService = openAiService;
-        this.redisSearchHelper = redisSearchHelper;
         this.objectMapper = objectMapper;
+        this.memoryService = memoryService;
+        this.knowledgeBaseService = knowledgeBaseService;
+        this.semanticCacheService = semanticCacheService;
+    }
+
+    /** Re-run init on all UC9 sub-services (used by AdminController cleanup/reset flow). */
+    public void init() {
+        memoryService.init();
+        knowledgeBaseService.init();
+        semanticCacheService.init();
     }
 
     private int estimateTokens(String text) {
-        if (text == null || text.isEmpty()) return 0;
-        return Math.max(1, text.length() / 4);
+        return (text == null || text.isEmpty()) ? 0 : Math.max(1, text.length() / 4);
     }
 
-    @PostConstruct
-    public void init() {
-        loadLongTermMemories();
-        loadKnowledgeBase();
-        createIndexes();
-    }
-
-    // ── Long-Term Memories ──────────────────────────────────────────────
-    private void loadLongTermMemories() {
-        memories.clear();
-        var items = List.of(
-            Map.of("id", "mem-001", "summary", "Asked about international wire transfer fees",
-                    "detail", "Customer inquired about SWIFT transfer costs to the UK. Quoted €15 flat fee for SEPA, €35 for SWIFT. Recommended SEPA for EU destinations.",
-                    "date", "2024-03-15", "tags", "transfer,international,fees,swift,sepa"),
-            Map.of("id", "mem-002", "summary", "Inquired about mortgage refinancing options",
-                    "detail", "Customer explored refinancing a 25-year fixed mortgage at 3.2%. Discussed variable rate options at Euribor+0.9%. Sent comparison PDF.",
-                    "date", "2024-02-28", "tags", "mortgage,refinancing,rates,euribor"),
-            Map.of("id", "mem-003", "summary", "Requested information on investment portfolio diversification",
-                    "detail", "Customer asked about diversifying beyond equities. Suggested bond ETFs, real estate REITs, and commodity exposure. Risk profile: moderate.",
-                    "date", "2024-03-01", "tags", "investment,portfolio,diversification,etf,bonds"),
-            Map.of("id", "mem-004", "summary", "Asked about SEPA payment regulations post-Brexit",
-                    "detail", "Customer concerned about SEPA transfers to UK after Brexit. Explained UK left SEPA but GBP transfers still possible via SWIFT. SEPA only for EUR in EEA.",
-                    "date", "2024-03-10", "tags", "sepa,brexit,uk,regulations,payment"),
-            Map.of("id", "mem-005", "summary", "Discussed credit card fraud protection measures",
-                    "detail", "Customer reported suspicious activity. Enabled 3D Secure, set transaction alerts, reviewed chargeback process. Card temporarily blocked and reissued.",
-                    "date", "2024-03-12", "tags", "credit,card,fraud,security,3dsecure"),
-            Map.of("id", "mem-006", "summary", "Asked about opening a business account for startup",
-                    "detail", "Customer starting a fintech company, needed business current account with API access. Recommended Business Pro plan with Open Banking APIs.",
-                    "date", "2024-01-20", "tags", "business,account,startup,api,openbanking")
-        );
-        memories.addAll(items);
-
-        // Generate embeddings — batch real or individual mock
-        List<float[]> vectors;
-        if (openAiService.isConfigured()) {
-            log.info("UC9: Generating real embeddings for {} memories via OpenAI...", items.size());
-            List<String> texts = items.stream()
-                    .map(m -> m.get("summary") + " " + m.get("tags") + " " + m.get("detail"))
-                    .toList();
-            try {
-                vectors = openAiService.getEmbeddings(texts);
-            } catch (OpenAiException e) {
-                log.warn("UC9: OpenAI embeddings failed for memories ({}), falling back to mock vectors", e.getMessage());
-                vectors = items.stream()
-                        .map(m -> DocumentDataLoader.generateVector(m.get("summary") + " " + m.get("tags")))
-                        .toList();
-            }
-        } else {
-            vectors = items.stream()
-                    .map(m -> DocumentDataLoader.generateVector(m.get("summary") + " " + m.get("tags")))
-                    .toList();
-        }
-
-        for (int i = 0; i < items.size(); i++) {
-            var mem = items.get(i);
-            String key = MEMORY_PREFIX + mem.get("id");
-            Map<String, String> hash = new LinkedHashMap<>();
-            hash.put("id", mem.get("id"));
-            hash.put("summary", mem.get("summary"));
-            hash.put("detail", mem.get("detail"));
-            hash.put("date", mem.get("date"));
-            hash.put("tags", mem.get("tags"));
-            redis.opsForHash().putAll(key, hash);
-            storeVectorField(key, vectors.get(i));
-        }
-    }
-
-    // ── Knowledge Base ──────────────────────────────────────────────────
-    private void loadKnowledgeBase() {
-        kbArticles.clear();
-        var articles = List.of(
-            Map.of("id", "kb-001", "title", "Account Types & Features",
-                    "content", "We offer Personal Current, Savings, Business Current, and Premium accounts. Personal Current has no monthly fee, free debit card, and mobile banking. Savings offers 2.1% AER on balances over €1,000. Business Current includes invoicing tools and multi-user access. Premium includes concierge service, travel insurance, and priority support.",
-                    "tags", "account,types,savings,business,premium,current",
-                    "source", "Product Catalogue 2024"),
-            Map.of("id", "kb-002", "title", "International Transfer Limits & Fees",
-                    "content", "SEPA transfers: free for amounts under €50,000, €0.50 fee above. Processing time: 1 business day. SWIFT transfers: €35 flat fee, 2-4 business days. Daily limit: €100,000 (Personal), €500,000 (Business). Instant SEPA (SCT Inst): €1 fee, limit €100,000, processed in under 10 seconds.",
-                    "tags", "transfer,international,sepa,swift,fees,limits",
-                    "source", "SEPA Regulation Guide v3.2"),
-            Map.of("id", "kb-003", "title", "Card Security & Fraud Prevention",
-                    "content", "All cards support 3D Secure 2.0 for online purchases. Real-time transaction monitoring flags unusual patterns. Instant card freeze via mobile app. Contactless limit: €50 per transaction, €150 cumulative before PIN required. Virtual cards available for online shopping. Zero liability for unauthorized transactions reported within 48 hours.",
-                    "tags", "card,security,fraud,3dsecure,contactless,virtual",
-                    "source", "Security Policy Handbook"),
-            Map.of("id", "kb-004", "title", "Investment Products Overview",
-                    "content", "Managed portfolios: Conservative (bonds 70%, equities 30%), Balanced (50/50), Growth (equities 80%, bonds 20%). Minimum investment: €5,000. Robo-advisor available for automated rebalancing. ETF marketplace with 500+ funds. No commission on EU-listed ETFs. Custody fee: 0.15% annually.",
-                    "tags", "investment,portfolio,etf,managed,robo,bonds,equities",
-                    "source", "MiFID II Product Sheet"),
-            Map.of("id", "kb-005", "title", "Loan & Mortgage Rates",
-                    "content", "Personal loans: 5.9% APR (€1,000-€50,000), terms 1-7 years. Mortgage: fixed 2.8% (10yr), 3.1% (20yr), 3.4% (30yr). Variable: Euribor 12M + 0.85%. Green mortgage discount: -0.2% for energy-efficient homes (EPC A/B). Early repayment fee: 0.5% of outstanding balance.",
-                    "tags", "loan,mortgage,rates,personal,euribor,green",
-                    "source", "Lending Terms Q1 2025"),
-            Map.of("id", "kb-006", "title", "Insurance Products",
-                    "content", "Home insurance from €15/month covering fire, theft, water damage. Travel insurance: €4.99/trip or €49/year for unlimited trips. Life insurance: term life from €12/month (€100,000 coverage). Payment protection insurance for loans: covers unemployment and illness. All policies managed via the mobile app.",
-                    "tags", "insurance,home,travel,life,payment,protection",
-                    "source", "Insurance Partner Brochure"),
-            Map.of("id", "kb-007", "title", "Open Banking & PSD2 Compliance",
-                    "content", "Fully PSD2 compliant with strong customer authentication (SCA). Account Information Service (AIS) API for aggregating accounts from other banks. Payment Initiation Service (PIS) API for third-party payment initiation. Developer portal with sandbox environment. OAuth 2.0 + OpenID Connect for authorization. Rate limit: 4 requests/second per TPP.",
-                    "tags", "openbanking,psd2,api,sca,ais,pis,oauth",
-                    "source", "PSD2 Technical Standards"),
-            Map.of("id", "kb-008", "title", "SEPA & Cross-Border Payments",
-                    "content", "SEPA Credit Transfer (SCT): 1 business day across 36 countries. SEPA Instant (SCT Inst): under 10 seconds, available 24/7/365. SEPA Direct Debit (SDD): for recurring payments, 14-day refund period. Non-EUR transfers via SWIFT: GBP, USD, CHF, JPY supported. FX markup: 0.3% above mid-market rate.",
-                    "tags", "sepa,cross-border,payments,instant,direct-debit,swift,fx",
-                    "source", "EPC SEPA Rulebook 2024"),
-            Map.of("id", "kb-009", "title", "Digital Banking Features",
-                    "content", "Mobile app: biometric login, instant notifications, spending analytics, budget categories. Online banking: full account management, batch payments, statement download (PDF/CSV/MT940). API access for Business accounts. Multi-currency wallets for EUR, GBP, USD. Scheduled transfers and standing orders.",
-                    "tags", "digital,mobile,app,online,banking,api,notifications",
-                    "source", "Digital Strategy Roadmap"),
-            Map.of("id", "kb-010", "title", "Regulatory Compliance (MiFID II, GDPR)",
-                    "content", "MiFID II: suitability assessments for investment products, cost transparency reports, best execution policy. GDPR: data minimization, right to erasure, data portability, consent management. AML/KYC: identity verification via video call or in-branch, ongoing transaction monitoring, PEP and sanctions screening.",
-                    "tags", "compliance,mifid,gdpr,aml,kyc,regulation",
-                    "source", "Compliance Manual v5.1")
-        );
-        kbArticles.addAll(articles);
-
-        // Generate embeddings — batch real or individual mock
-        List<float[]> vectors;
-        if (openAiService.isConfigured()) {
-            log.info("UC9: Generating real embeddings for {} KB articles via OpenAI...", articles.size());
-            List<String> texts = articles.stream()
-                    .map(a -> a.get("title") + " " + a.get("tags") + " " + a.get("content"))
-                    .toList();
-            try {
-                vectors = openAiService.getEmbeddings(texts);
-            } catch (OpenAiException e) {
-                log.warn("UC9: OpenAI embeddings failed for KB articles ({}), falling back to mock vectors", e.getMessage());
-                vectors = articles.stream()
-                        .map(a -> DocumentDataLoader.generateVector(a.get("title") + " " + a.get("tags")))
-                        .toList();
-            }
-        } else {
-            vectors = articles.stream()
-                    .map(a -> DocumentDataLoader.generateVector(a.get("title") + " " + a.get("tags")))
-                    .toList();
-        }
-
-        for (int i = 0; i < articles.size(); i++) {
-            var art = articles.get(i);
-            String key = KB_PREFIX + art.get("id");
-            Map<String, String> hash = new LinkedHashMap<>();
-            hash.put("id", art.get("id"));
-            hash.put("title", art.get("title"));
-            hash.put("content", art.get("content"));
-            hash.put("tags", art.get("tags"));
-            hash.put("source", art.get("source"));
-            redis.opsForHash().putAll(key, hash);
-            storeVectorField(key, vectors.get(i));
-        }
-    }
-
-    // ── RediSearch Indexes ──────────────────────────────────────────────
-    private void createIndexes() {
-        // Drop + recreate indexes via RedisCallback
-        dropIndex(MEMORY_INDEX);
-        dropIndex(KB_INDEX);
-        dropIndex(CACHE_INDEX);
-
-        createVectorIndex(MEMORY_INDEX, MEMORY_PREFIX,
-                "summary TEXT tags TAG SEPARATOR , date TEXT");
-        createVectorIndex(KB_INDEX, KB_PREFIX,
-                "title TEXT content TEXT tags TAG SEPARATOR ,");
-        createVectorIndex(CACHE_INDEX, CACHE_PREFIX,
-                "question TEXT");
-    }
-
-    private void dropIndex(String indexName) {
-        try {
-            redis.execute((org.springframework.data.redis.core.RedisCallback<Object>) conn ->
-                    conn.execute("FT.DROPINDEX", indexName.getBytes()));
-        } catch (Exception ignored) {}
-    }
-
-    private void createVectorIndex(String indexName, String prefix, String extraSchemaFields) {
-        try {
-            // Build the FT.CREATE args list
-            // FT.CREATE <idx> ON HASH PREFIX 1 <prefix> SCHEMA <fields...> vector VECTOR HNSW 6 TYPE FLOAT32 DIM 768 DISTANCE_METRIC COSINE
-            List<byte[]> argList = new ArrayList<>();
-            argList.add(indexName.getBytes());
-            argList.add("ON".getBytes());
-            argList.add("HASH".getBytes());
-            argList.add("PREFIX".getBytes());
-            argList.add("1".getBytes());
-            argList.add(prefix.getBytes());
-            argList.add("SCHEMA".getBytes());
-            // Split extra schema field definitions
-            for (String part : extraSchemaFields.split("\\s+")) {
-                argList.add(part.getBytes());
-            }
-            // Vector field
-            argList.add("vector".getBytes());
-            argList.add("VECTOR".getBytes());
-            argList.add("HNSW".getBytes());
-            argList.add("6".getBytes());
-            argList.add("TYPE".getBytes());
-            argList.add("FLOAT32".getBytes());
-            argList.add("DIM".getBytes());
-            argList.add(String.valueOf(VECTOR_DIM).getBytes());
-            argList.add("DISTANCE_METRIC".getBytes());
-            argList.add("COSINE".getBytes());
-
-            byte[][] args = argList.toArray(new byte[0][]);
-            redis.execute((org.springframework.data.redis.core.RedisCallback<Object>) conn ->
-                    conn.execute("FT.CREATE", args));
-        } catch (Exception e) {
-            log.info("Index creation note ({}): {}", indexName, e.getMessage());
-        }
-    }
-
-    // ── Chat Endpoint ───────────────────────────────────────────────────
     public Map<String, Object> chat(String sessionId, String userName, String userMessage) {
         long startTime = System.currentTimeMillis();
         String convKey = CONV_PREFIX + sessionId;
+        List<Map<String, String>> messageHistory = loadConversation(convKey, userName);
+        appendMessage(messageHistory, "user", userMessage);
 
-        // 1. Load or create conversation (short-term memory)
-        Map<Object, Object> convData = redis.opsForHash().entries(convKey);
-        List<Map<String, String>> messageHistory;
-        if (convData.isEmpty()) {
-            messageHistory = new ArrayList<>();
-            redis.opsForHash().put(convKey, "created_at", Instant.now().toString());
-            redis.opsForHash().put(convKey, "user_name", userName);
-        } else {
-            messageHistory = parseMessages(convData.getOrDefault("messages", "[]").toString());
-        }
-
-        // 2. Append user message
-        Map<String, String> userMsg = new LinkedHashMap<>();
-        userMsg.put("role", "user");
-        userMsg.put("content", userMessage);
-        userMsg.put("timestamp", Instant.now().toString());
-        messageHistory.add(userMsg);
-
-        // Trim to last N messages
-        if (messageHistory.size() > MAX_MESSAGES) {
-            messageHistory = new ArrayList<>(messageHistory.subList(
-                    messageHistory.size() - MAX_MESSAGES, messageHistory.size()));
-        }
-
-        // 3-5. Check semantic cache first, then retrieve context and generate response
-        List<Map<String, String>> relevantMemories;
-        List<Map<String, String>> relevantKB;
-        List<Map<String, String>> relevantRegDocs;
+        List<Map<String, String>> memoriesOut, kbOut, regDocsOut;
         String responseText;
         boolean semanticCacheHit = false;
-        long cacheCheckStart = System.currentTimeMillis();
 
         if (openAiService.isConfigured()) {
-            // Check semantic cache
-            Map<String, String> cached = checkSemanticCache(userMessage);
-            long cacheLatencyMs = System.currentTimeMillis() - cacheCheckStart;
-
+            Map<String, String> cached = semanticCacheService.checkSemanticCache(userMessage);
+            memoriesOut = flatten(memoryService.vectorSearchMemories(userMessage, 3));
+            kbOut = flatten(knowledgeBaseService.vectorSearchKB(userMessage, 3));
+            regDocsOut = flatten(knowledgeBaseService.vectorSearchRegulationDocs(userMessage, 3));
             if (cached != null) {
-                // Cache HIT
                 semanticCacheHit = true;
-                cacheHits.incrementAndGet();
+                semanticCacheService.recordHit();
                 responseText = cached.get("response");
                 int savedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
-                tokensSaved.addAndGet(savedTokens);
-                // Even on cache hit, retrieve sources so UI can show the RAG context
-                List<Map<String, Object>> memResults = vectorSearch(MEMORY_INDEX, userMessage, 3);
-                relevantMemories = new ArrayList<>();
-                for (var m : memResults) {
-                    Map<String, String> flat = new LinkedHashMap<>();
-                    m.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
-                    relevantMemories.add(flat);
-                }
-                List<Map<String, Object>> kbResults = vectorSearch(KB_INDEX, userMessage, 3);
-                relevantKB = new ArrayList<>();
-                for (var d : kbResults) {
-                    Map<String, String> flat = new LinkedHashMap<>();
-                    d.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
-                    relevantKB.add(flat);
-                }
-                List<Map<String, Object>> regResults = vectorSearchRegulationDocs(userMessage, 3);
-                relevantRegDocs = new ArrayList<>();
-                for (var d : regResults) {
-                    Map<String, String> flat = new LinkedHashMap<>();
-                    d.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
-                    relevantRegDocs.add(flat);
-                }
+                semanticCacheService.addTokensSaved(savedTokens);
                 log.info("UC9: Semantic cache HIT for question: {} (~{} tokens saved)", userMessage, savedTokens);
             } else {
-                // Cache MISS — do full vector search + generate response
-                cacheMisses.incrementAndGet();
-                List<Map<String, Object>> memResults = vectorSearch(MEMORY_INDEX, userMessage, 3);
-                relevantMemories = new ArrayList<>();
-                for (var m : memResults) {
-                    Map<String, String> flat = new LinkedHashMap<>();
-                    m.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
-                    relevantMemories.add(flat);
-                }
-                List<Map<String, Object>> kbResults = vectorSearch(KB_INDEX, userMessage, 3);
-                relevantKB = new ArrayList<>();
-                for (var d : kbResults) {
-                    Map<String, String> flat = new LinkedHashMap<>();
-                    d.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
-                    relevantKB.add(flat);
-                }
-                List<Map<String, Object>> regResults = vectorSearchRegulationDocs(userMessage, 3);
-                relevantRegDocs = new ArrayList<>();
-                for (var d : regResults) {
-                    Map<String, String> flat = new LinkedHashMap<>();
-                    d.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
-                    relevantRegDocs.add(flat);
-                }
-                List<Map<String, String>> combinedDocs = new ArrayList<>(relevantKB);
-                combinedDocs.addAll(relevantRegDocs);
-                responseText = generateResponse(userMessage, relevantMemories, combinedDocs);
-
+                semanticCacheService.recordMiss();
+                List<Map<String, String>> combined = new ArrayList<>(kbOut);
+                combined.addAll(regDocsOut);
+                responseText = generateResponse(userMessage, memoriesOut, combined);
                 int usedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
-                tokensUsed.addAndGet(usedTokens);
-
-                // Store in cache
-                storeInSemanticCache(userMessage, responseText);
+                semanticCacheService.addTokensUsed(usedTokens);
+                semanticCacheService.storeInSemanticCache(userMessage, responseText);
                 log.info("UC9: Semantic cache MISS — stored response for: {} (~{} tokens used)", userMessage, usedTokens);
             }
         } else {
-            // Mock mode — skip semantic caching
-            relevantMemories = findRelevantMemories(userMessage);
-            relevantKB = findRelevantKBDocs(userMessage);
-            relevantRegDocs = new ArrayList<>();
-            responseText = generateResponse(userMessage, relevantMemories, relevantKB);
+            memoriesOut = memoryService.findRelevantMemories(userMessage);
+            kbOut = knowledgeBaseService.findRelevantKBDocs(userMessage);
+            regDocsOut = new ArrayList<>();
+            responseText = generateResponse(userMessage, memoriesOut, kbOut);
         }
 
-        // 6. Append assistant message
-        Map<String, String> assistantMsg = new LinkedHashMap<>();
-        assistantMsg.put("role", "assistant");
-        assistantMsg.put("content", responseText);
-        assistantMsg.put("timestamp", Instant.now().toString());
-        messageHistory.add(assistantMsg);
-
-        // Trim again after adding response
-        if (messageHistory.size() > MAX_MESSAGES) {
-            messageHistory = new ArrayList<>(messageHistory.subList(
-                    messageHistory.size() - MAX_MESSAGES, messageHistory.size()));
-        }
-
-        // 7. Store updated conversation — HSET with TTL
-        try {
-            String messagesJson = objectMapper.writeValueAsString(messageHistory);
-            redis.opsForHash().put(convKey, "messages", messagesJson);
-            redis.opsForHash().put(convKey, "last_active", Instant.now().toString());
-            redis.opsForHash().put(convKey, "user_name", userName);
-            redis.expire(convKey, CONV_TTL_SECONDS, TimeUnit.SECONDS);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to serialize messages", e);
-        }
+        appendMessage(messageHistory, "assistant", responseText);
+        saveConversation(convKey, userName, messageHistory);
 
         long latencyMs = System.currentTimeMillis() - startTime;
-
-        // Build response
+        int tokens = estimateTokens(userMessage) + estimateTokens(responseText);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("sessionId", sessionId);
-        result.put("response", responseText);
-        result.put("memoriesRetrieved", relevantMemories);
-        result.put("kbDocsRetrieved", relevantKB);
-        result.put("regDocsRetrieved", relevantRegDocs);
-        result.put("conversationLength", messageHistory.size());
-        result.put("latencyMs", latencyMs);
-        result.put("semanticCacheHit", semanticCacheHit);
-        result.put("semanticCacheEnabled", openAiService.isConfigured());
-        result.put("cacheLatencyMs", System.currentTimeMillis() - cacheCheckStart);
-        int chatTokens = estimateTokens(userMessage) + estimateTokens(responseText);
-        if (semanticCacheHit) {
-            result.put("tokensSaved", chatTokens);
-        } else {
-            result.put("tokensUsed", chatTokens);
-        }
-
+        result.put("sessionId", sessionId); result.put("response", responseText);
+        result.put("memoriesRetrieved", memoriesOut); result.put("kbDocsRetrieved", kbOut);
+        result.put("regDocsRetrieved", regDocsOut); result.put("conversationLength", messageHistory.size());
+        result.put("latencyMs", latencyMs); result.put("semanticCacheHit", semanticCacheHit);
+        result.put("semanticCacheEnabled", openAiService.isConfigured()); result.put("cacheLatencyMs", latencyMs);
+        result.put(semanticCacheHit ? "tokensSaved" : "tokensUsed", tokens);
         return result;
     }
 
-    // ── Conversation Inspection ─────────────────────────────────────────
+    public void chatStream(String sessionId, String userName, String userMessage, SseEmitter emitter) {
+        long startTime = System.currentTimeMillis();
+        String convKey = CONV_PREFIX + sessionId;
+        List<Map<String, String>> messageHistory = loadConversation(convKey, userName);
+        appendMessage(messageHistory, "user", userMessage);
+
+        Map<String, String> cached = semanticCacheService.checkSemanticCache(userMessage);
+        boolean semanticCacheHit = cached != null;
+        List<Map<String, Object>> memories = memoryService.vectorSearchMemories(userMessage, 3);
+        List<Map<String, Object>> kb = knowledgeBaseService.vectorSearchKB(userMessage, 3);
+        List<Map<String, Object>> regDocs = knowledgeBaseService.vectorSearchRegulationDocs(userMessage, 3);
+        sendSources(emitter, memories, kb, regDocs, semanticCacheHit);
+
+        String responseText;
+        if (semanticCacheHit) {
+            semanticCacheService.recordHit();
+            responseText = cached.get("response");
+            int savedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
+            semanticCacheService.addTokensSaved(savedTokens);
+            log.info("UC9 Stream: Semantic cache HIT for: {} (~{} tokens saved)", userMessage, savedTokens);
+            try {
+                emitter.send(SseEmitter.event().name("token").data(
+                        objectMapper.writeValueAsString(Map.of("content", responseText))));
+            } catch (Exception e) { log.error("Failed to send cached response", e); }
+        } else {
+            semanticCacheService.recordMiss();
+            List<Map<String, Object>> combined = new ArrayList<>(kb);
+            combined.addAll(regDocs);
+            List<Map<String, String>> openAiMessages = new ArrayList<>();
+            openAiMessages.add(Map.of("role", "system", "content", buildSystemPrompt(memories, combined)));
+            for (var msg : messageHistory) {
+                openAiMessages.add(Map.of("role", msg.get("role"), "content", msg.get("content")));
+            }
+            responseText = openAiService.streamChatCompletion(openAiMessages, emitter);
+            int usedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
+            semanticCacheService.addTokensUsed(usedTokens);
+            semanticCacheService.storeInSemanticCache(userMessage, responseText);
+            log.info("UC9 Stream: Semantic cache MISS — stored response for: {} (~{} tokens used)", userMessage, usedTokens);
+        }
+
+        appendMessage(messageHistory, "assistant", responseText);
+        saveConversation(convKey, userName, messageHistory);
+        sendDone(emitter, sessionId, messageHistory.size(),
+                System.currentTimeMillis() - startTime, semanticCacheHit,
+                estimateTokens(userMessage) + estimateTokens(responseText));
+    }
+
+    private void sendSources(SseEmitter emitter, List<Map<String, Object>> memories,
+                             List<Map<String, Object>> kb, List<Map<String, Object>> regDocs, boolean cacheHit) {
+        try {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("memories", memories); data.put("kbDocs", kb);
+            data.put("regDocs", regDocs); data.put("semanticCacheHit", cacheHit);
+            emitter.send(SseEmitter.event().name("sources").data(objectMapper.writeValueAsString(data)));
+        } catch (Exception e) { log.error("Failed to send sources event", e); }
+    }
+
+    private void sendDone(SseEmitter emitter, String sessionId, int convLen, long latencyMs, boolean cacheHit, int tokens) {
+        try {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("conversationLength", convLen); data.put("latencyMs", latencyMs); data.put("sessionId", sessionId);
+            data.put("semanticCacheHit", cacheHit); data.put("semanticCacheEnabled", true);
+            data.put(cacheHit ? "tokensSaved" : "tokensUsed", tokens);
+            emitter.send(SseEmitter.event().name("done").data(objectMapper.writeValueAsString(data)));
+            emitter.complete();
+        } catch (Exception e) { log.error("Failed to send done event", e); }
+    }
+
+    private List<Map<String, String>> loadConversation(String convKey, String userName) {
+        Map<Object, Object> convData = redis.opsForHash().entries(convKey);
+        if (convData.isEmpty()) {
+            redis.opsForHash().put(convKey, "created_at", Instant.now().toString());
+            redis.opsForHash().put(convKey, "user_name", userName);
+            return new ArrayList<>();
+        }
+        return parseMessages(convData.getOrDefault("messages", "[]").toString());
+    }
+
+    private void appendMessage(List<Map<String, String>> history, String role, String content) {
+        Map<String, String> msg = new LinkedHashMap<>();
+        msg.put("role", role); msg.put("content", content); msg.put("timestamp", Instant.now().toString());
+        history.add(msg);
+        if (history.size() > MAX_MESSAGES) {
+            var trimmed = new ArrayList<>(history.subList(history.size() - MAX_MESSAGES, history.size()));
+            history.clear(); history.addAll(trimmed);
+        }
+    }
+
+    private void saveConversation(String convKey, String userName, List<Map<String, String>> history) {
+        try {
+            redis.opsForHash().put(convKey, "messages", objectMapper.writeValueAsString(history));
+            redis.opsForHash().put(convKey, "last_active", Instant.now().toString());
+            redis.opsForHash().put(convKey, "user_name", userName);
+            redis.expire(convKey, CONV_TTL_SECONDS, TimeUnit.SECONDS);
+        } catch (JsonProcessingException e) { throw new RuntimeException("Failed to serialize messages", e); }
+    }
+
     public Map<String, Object> getConversation(String sessionId) {
         String convKey = CONV_PREFIX + sessionId;
         Map<Object, Object> data = redis.opsForHash().entries(convKey);
@@ -446,9 +212,7 @@ public class AssistantService {
 
         Long ttl = redis.getExpire(convKey, TimeUnit.SECONDS);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("exists", true);
-        result.put("sessionId", sessionId);
-        result.put("redisKey", convKey);
+        result.put("exists", true); result.put("sessionId", sessionId); result.put("redisKey", convKey);
         result.put("userName", data.getOrDefault("user_name", ""));
         result.put("createdAt", data.getOrDefault("created_at", ""));
         result.put("lastActive", data.getOrDefault("last_active", ""));
@@ -457,538 +221,74 @@ public class AssistantService {
         return result;
     }
 
-    // ── Memory & KB listing for inspection panel ────────────────────────
-    public List<Map<String, String>> listMemories() {
-        return memories;
+    private List<Map<String, String>> parseMessages(String json) {
+        try { return objectMapper.readValue(json, new TypeReference<>() {}); }
+        catch (JsonProcessingException e) { return new ArrayList<>(); }
     }
 
-    public List<Map<String, String>> listKBArticles() {
-        List<Map<String, String>> result = new ArrayList<>();
-        for (var art : kbArticles) {
-            Map<String, String> item = new LinkedHashMap<>();
-            item.put("id", art.get("id"));
-            item.put("title", art.get("title"));
-            item.put("tags", art.get("tags"));
-            result.add(item);
-        }
-        return result;
-    }
-
-    /** Get a single KB article by ID with full content. */
-    public Map<String, String> getKBArticle(String id) {
-        for (var art : kbArticles) {
-            if (art.get("id").equals(id)) {
-                Map<String, String> result = new LinkedHashMap<>();
-                result.put("id", art.get("id"));
-                result.put("title", art.get("title"));
-                result.put("content", art.get("content"));
-                result.put("tags", art.get("tags"));
-                result.put("source", art.get("source"));
-                return result;
-            }
-        }
-        return null;
-    }
-
-    // ── Vector Search (real KNN via FT.SEARCH) ────────────────────────
-    private List<Map<String, Object>> vectorSearch(String indexName, String query, int k) {
-        float[] queryVector;
-        try {
-            queryVector = openAiService.getEmbedding(query);
-        } catch (OpenAiException e) {
-            log.warn("UC9: OpenAI embedding failed ({}), falling back to mock vector for KNN on {}", e.getMessage(), indexName);
-            queryVector = DocumentDataLoader.generateVector(query);
-        }
-        byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
-
-        // FT.SEARCH <idx> "*=>[KNN <k> @vector $BLOB]" PARAMS 2 BLOB <bytes> DIALECT 2
-        String knnQuery = "*=>[KNN " + k + " @vector $BLOB]";
-        byte[][] binaryArgs = new byte[][] {
-                knnQuery.getBytes(),
-                "PARAMS".getBytes(),
-                "2".getBytes(),
-                "BLOB".getBytes(),
-                vectorBytes,
-                "DIALECT".getBytes(),
-                "2".getBytes()
-        };
-
-        List<Object> rawResult = redisSearchHelper.ftSearchWithBinaryArgs(indexName, binaryArgs);
-        List<Map<String, String>> parsed = redisSearchHelper.parseSearchResults(rawResult);
-
-        List<Map<String, Object>> results = new ArrayList<>();
-        for (var doc : parsed) {
-            Map<String, Object> entry = new LinkedHashMap<>();
-            entry.put("redisKey", doc.get("_key"));
-            entry.put("score", doc.getOrDefault("__vector_score", "0"));
-            for (var e : doc.entrySet()) {
-                if (!e.getKey().equals("_key") && !e.getKey().equals("vector") && !e.getKey().equals("__vector_score")) {
-                    entry.put(e.getKey(), e.getValue());
-                }
-            }
-            results.add(entry);
-        }
-        return results;
-    }
-
-    /**
-     * KNN search against UC8's regulation document index (idx:uc8:documents).
-     * Documents are JSON-backed PDF chunks with fields: title, category, summary, content, tags.
-     * Returns entries shaped like {@link #vectorSearch} so results merge cleanly with KB docs.
-     */
-    private List<Map<String, Object>> vectorSearchRegulationDocs(String query, int k) {
-        if (!openAiService.isConfigured()) return List.of();
-        try {
-            float[] queryVector = openAiService.getEmbedding(query);
-            byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
-
-            String knnQuery = "*=>[KNN " + k + " @vector $BLOB]";
-            byte[][] binaryArgs = new byte[][] {
-                    knnQuery.getBytes(),
-                    "RETURN".getBytes(),
-                    "4".getBytes(),
-                    "title".getBytes(),
-                    "category".getBytes(),
-                    "summary".getBytes(),
-                    "content".getBytes(),
-                    "PARAMS".getBytes(),
-                    "2".getBytes(),
-                    "BLOB".getBytes(),
-                    vectorBytes,
-                    "DIALECT".getBytes(),
-                    "2".getBytes()
-            };
-
-            List<Object> rawResult = redisSearchHelper.ftSearchWithBinaryArgs(DOC_INDEX, binaryArgs);
-            List<Map<String, String>> parsed = redisSearchHelper.parseSearchResults(rawResult);
-
-            List<Map<String, Object>> results = new ArrayList<>();
-            for (var doc : parsed) {
-                Map<String, Object> entry = new LinkedHashMap<>();
-                String key = doc.get("_key");
-                entry.put("redisKey", key);
-                // Derive a stable id from the key (e.g. "uc8:doc:psd2:chunk:5" -> "psd2:chunk:5")
-                if (key != null && key.startsWith(DOC_PREFIX)) {
-                    entry.put("id", key.substring(DOC_PREFIX.length()));
-                } else {
-                    entry.put("id", key != null ? key : "");
-                }
-                entry.put("score", doc.getOrDefault("__vector_score", "0"));
-                entry.put("title", doc.getOrDefault("title", ""));
-                entry.put("content", doc.getOrDefault("content", ""));
-                if (doc.containsKey("summary")) entry.put("summary", doc.get("summary"));
-                if (doc.containsKey("category")) {
-                    entry.put("category", doc.get("category"));
-                    // Expose category as tags too so the UI's tag row renders something useful
-                    entry.put("tags", doc.get("category"));
-                }
-                entry.put("docType", "regulation");
-                results.add(entry);
-            }
-            return results;
-        } catch (Exception e) {
-            log.warn("UC9: Regulation doc search failed: {}", e.getMessage());
-            return List.of();
-        }
-    }
-
-    // ── Streaming Chat (OpenAI) ─────────────────────────────────────────
-    public void chatStream(String sessionId, String userName, String userMessage, SseEmitter emitter) {
-        long startTime = System.currentTimeMillis();
-        String convKey = CONV_PREFIX + sessionId;
-
-        // 1. Load or create conversation
-        Map<Object, Object> convData = redis.opsForHash().entries(convKey);
-        List<Map<String, String>> messageHistory;
-        if (convData.isEmpty()) {
-            messageHistory = new ArrayList<>();
-            redis.opsForHash().put(convKey, "created_at", Instant.now().toString());
-            redis.opsForHash().put(convKey, "user_name", userName);
-        } else {
-            messageHistory = parseMessages(convData.getOrDefault("messages", "[]").toString());
-        }
-
-        // 2. Append user message
-        Map<String, String> userMsg = new LinkedHashMap<>();
-        userMsg.put("role", "user");
-        userMsg.put("content", userMessage);
-        userMsg.put("timestamp", Instant.now().toString());
-        messageHistory.add(userMsg);
-        if (messageHistory.size() > MAX_MESSAGES) {
-            messageHistory = new ArrayList<>(messageHistory.subList(
-                    messageHistory.size() - MAX_MESSAGES, messageHistory.size()));
-        }
-
-        // 3. Check semantic cache first
-        boolean semanticCacheHit = false;
-        Map<String, String> cached = checkSemanticCache(userMessage);
-        String responseText;
-
-        if (cached != null) {
-            // Cache HIT — return cached response directly (no streaming needed)
-            semanticCacheHit = true;
-            cacheHits.incrementAndGet();
-            responseText = cached.get("response");
-            int savedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
-            tokensSaved.addAndGet(savedTokens);
-            log.info("UC9 Stream: Semantic cache HIT for: {} (~{} tokens saved)", userMessage, savedTokens);
-
-            // Even on cache hit, retrieve sources so UI can show the RAG context
-            List<Map<String, Object>> relevantMemories = vectorSearch(MEMORY_INDEX, userMessage, 3);
-            List<Map<String, Object>> relevantKB = vectorSearch(KB_INDEX, userMessage, 3);
-            List<Map<String, Object>> relevantRegDocs = vectorSearchRegulationDocs(userMessage, 3);
-
-            // Send cache-hit event with sources
-            try {
-                Map<String, Object> sourcesData = new LinkedHashMap<>();
-                sourcesData.put("memories", relevantMemories);
-                sourcesData.put("kbDocs", relevantKB);
-                sourcesData.put("regDocs", relevantRegDocs);
-                sourcesData.put("semanticCacheHit", true);
-                emitter.send(SseEmitter.event().name("sources").data(objectMapper.writeValueAsString(sourcesData)));
-            } catch (Exception e) {
-                log.error("Failed to send sources event", e);
-            }
-
-            // Send cached response as a single token
-            try {
-                String tokenJson = objectMapper.writeValueAsString(Map.of("content", responseText));
-                emitter.send(SseEmitter.event().name("token").data(tokenJson));
-            } catch (Exception e) {
-                log.error("Failed to send cached response", e);
-            }
-        } else {
-            // Cache MISS — do full vector search + streaming
-            cacheMisses.incrementAndGet();
-
-            List<Map<String, Object>> relevantMemories = vectorSearch(MEMORY_INDEX, userMessage, 3);
-            List<Map<String, Object>> relevantKB = vectorSearch(KB_INDEX, userMessage, 3);
-            List<Map<String, Object>> relevantRegDocs = vectorSearchRegulationDocs(userMessage, 3);
-
-            // Send "sources" event before streaming starts
-            try {
-                Map<String, Object> sourcesData = new LinkedHashMap<>();
-                sourcesData.put("memories", relevantMemories);
-                sourcesData.put("kbDocs", relevantKB);
-                sourcesData.put("regDocs", relevantRegDocs);
-                sourcesData.put("semanticCacheHit", false);
-                emitter.send(SseEmitter.event().name("sources").data(objectMapper.writeValueAsString(sourcesData)));
-            } catch (Exception e) {
-                log.error("Failed to send sources event", e);
-            }
-
-            // Build OpenAI messages — combine KB + regulation docs for the LLM prompt
-            List<Map<String, Object>> combinedDocs = new ArrayList<>(relevantKB);
-            combinedDocs.addAll(relevantRegDocs);
-            String systemPrompt = buildSystemPrompt(relevantMemories, combinedDocs);
-            List<Map<String, String>> openAiMessages = new ArrayList<>();
-            openAiMessages.add(Map.of("role", "system", "content", systemPrompt));
-            for (var msg : messageHistory) {
-                openAiMessages.add(Map.of("role", msg.get("role"), "content", msg.get("content")));
-            }
-
-            // Stream OpenAI response
-            responseText = openAiService.streamChatCompletion(openAiMessages, emitter);
-
-            int usedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
-            tokensUsed.addAndGet(usedTokens);
-
-            // Store in cache
-            storeInSemanticCache(userMessage, responseText);
-            log.info("UC9 Stream: Semantic cache MISS — stored response for: {} (~{} tokens used)", userMessage, usedTokens);
-        }
-
-        // 7. Save assistant message to conversation
-        Map<String, String> assistantMsg = new LinkedHashMap<>();
-        assistantMsg.put("role", "assistant");
-        assistantMsg.put("content", responseText);
-        assistantMsg.put("timestamp", Instant.now().toString());
-        messageHistory.add(assistantMsg);
-        if (messageHistory.size() > MAX_MESSAGES) {
-            messageHistory = new ArrayList<>(messageHistory.subList(
-                    messageHistory.size() - MAX_MESSAGES, messageHistory.size()));
-        }
-
-        try {
-            String messagesJson = objectMapper.writeValueAsString(messageHistory);
-            redis.opsForHash().put(convKey, "messages", messagesJson);
-            redis.opsForHash().put(convKey, "last_active", Instant.now().toString());
-            redis.opsForHash().put(convKey, "user_name", userName);
-            redis.expire(convKey, CONV_TTL_SECONDS, TimeUnit.SECONDS);
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize messages", e);
-        }
-
-        // 8. Send "done" event
-        long latencyMs = System.currentTimeMillis() - startTime;
-        try {
-            Map<String, Object> doneData = new LinkedHashMap<>();
-            doneData.put("conversationLength", messageHistory.size());
-            doneData.put("latencyMs", latencyMs);
-            doneData.put("sessionId", sessionId);
-            doneData.put("semanticCacheHit", semanticCacheHit);
-            doneData.put("semanticCacheEnabled", true);
-            int doneTokens = estimateTokens(userMessage) + estimateTokens(responseText);
-            if (semanticCacheHit) {
-                doneData.put("tokensSaved", doneTokens);
-            } else {
-                doneData.put("tokensUsed", doneTokens);
-            }
-            emitter.send(SseEmitter.event().name("done").data(objectMapper.writeValueAsString(doneData)));
-            emitter.complete();
-        } catch (Exception e) {
-            log.error("Failed to send done event", e);
-        }
-    }
+    public List<Map<String, String>> listMemories() { return memoryService.listMemories(); }
+    public List<Map<String, String>> listKBArticles() { return knowledgeBaseService.listKBArticles(); }
+    public Map<String, String> getKBArticle(String id) { return knowledgeBaseService.getKBArticle(id); }
+    public Map<String, Object> getSemanticCacheStats() { return semanticCacheService.getSemanticCacheStats(); }
 
     private String buildSystemPrompt(List<Map<String, Object>> memories, List<Map<String, Object>> kbDocs) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("You are a helpful AI banking assistant. Answer questions based on the provided context.\n\n");
-
+        StringBuilder sb = new StringBuilder("You are a helpful AI banking assistant. Answer questions based on the provided context.\n\n");
         if (!kbDocs.isEmpty()) {
             sb.append("## Relevant Knowledge Base Articles:\n");
-            for (var doc : kbDocs) {
-                sb.append("- [").append(doc.get("id")).append("] ").append(doc.get("title")).append(": ");
-                sb.append(doc.get("content")).append("\n");
-            }
+            for (var doc : kbDocs) sb.append("- [").append(doc.get("id")).append("] ").append(doc.get("title"))
+                    .append(": ").append(doc.get("content")).append("\n");
             sb.append("\n");
         }
-
         if (!memories.isEmpty()) {
             sb.append("## Relevant Past Interactions:\n");
-            for (var mem : memories) {
-                sb.append("- [").append(mem.get("id")).append("] ").append(mem.get("summary")).append(": ");
-                sb.append(mem.get("detail")).append("\n");
-            }
+            for (var mem : memories) sb.append("- [").append(mem.get("id")).append("] ").append(mem.get("summary"))
+                    .append(": ").append(mem.get("detail")).append("\n");
             sb.append("\n");
         }
-
-        sb.append("Use the above context to provide accurate, helpful responses. ");
-        sb.append("If referencing specific documents or memories, mention their IDs. ");
-        sb.append("Be concise and professional.");
-
+        sb.append("Use the above context to provide accurate, helpful responses. ")
+          .append("If referencing specific documents or memories, mention their IDs. Be concise and professional.");
         return sb.toString();
     }
 
-    // ── Keyword-based retrieval (mock for vector search) ────────────────
-    private List<Map<String, String>> findRelevantMemories(String query) {
-        String lower = query.toLowerCase();
-        List<Map<String, String>> results = new ArrayList<>();
-        for (var mem : memories) {
-            String searchable = (mem.get("summary") + " " + mem.get("tags") + " " + mem.get("detail")).toLowerCase();
-            int score = calculateKeywordScore(lower, searchable, mem.get("tags").toLowerCase());
-            if (score > 0) {
-                Map<String, String> match = new LinkedHashMap<>(mem);
-                match.put("score", String.valueOf(score));
-                results.add(match);
-            }
-        }
-        results.sort((a, b) -> Integer.compare(Integer.parseInt(b.get("score")), Integer.parseInt(a.get("score"))));
-        return results.size() > 3 ? results.subList(0, 3) : results;
-    }
-
-    private List<Map<String, String>> findRelevantKBDocs(String query) {
-        String lower = query.toLowerCase();
-        List<Map<String, String>> results = new ArrayList<>();
-        for (var art : kbArticles) {
-            String searchable = (art.get("title") + " " + art.get("tags") + " " + art.get("content")).toLowerCase();
-            int score = calculateKeywordScore(lower, searchable, art.get("tags").toLowerCase());
-            if (score > 0) {
-                Map<String, String> match = new LinkedHashMap<>();
-                match.put("id", art.get("id"));
-                match.put("title", art.get("title"));
-                match.put("content", art.get("content").length() > 150 ?
-                        art.get("content").substring(0, 150) + "..." : art.get("content"));
-                match.put("tags", art.get("tags"));
-                match.put("score", String.valueOf(score));
-                results.add(match);
-            }
-        }
-        results.sort((a, b) -> Integer.compare(Integer.parseInt(b.get("score")), Integer.parseInt(a.get("score"))));
-        return results.size() > 3 ? results.subList(0, 3) : results;
-    }
-
-    private int calculateKeywordScore(String query, String document, String tags) {
-        int score = 0;
-        String[] keywords = query.split("\\s+");
-        for (String kw : keywords) {
-            if (kw.length() < 3) continue; // skip short words
-            if (tags.contains(kw)) score += 3;
-            if (document.contains(kw)) score += 1;
-        }
-        return score;
-    }
-
-    // ── Mock Response Generation ────────────────────────────────────────
-    private String generateResponse(String query, List<Map<String, String>> memories,
-                                     List<Map<String, String>> kbDocs) {
+    private String generateResponse(String query, List<Map<String, String>> memories, List<Map<String, String>> kbDocs) {
         StringBuilder sb = new StringBuilder();
-
-        // If we have relevant KB docs, use their content
         if (!kbDocs.isEmpty()) {
             sb.append("Based on our banking knowledge base, here's what I found:\n\n");
-            for (var doc : kbDocs) {
-                sb.append("**").append(doc.get("title")).append("**: ");
-                sb.append(doc.get("content")).append("\n\n");
-            }
+            for (var doc : kbDocs) sb.append("**").append(doc.get("title")).append("**: ").append(doc.get("content")).append("\n\n");
         }
-
-        // If we have relevant memories, reference them
         if (!memories.isEmpty()) {
             sb.append("I also found relevant context from your previous interactions:\n\n");
-            for (var mem : memories) {
-                sb.append("*").append(mem.get("summary")).append("* (").append(mem.get("date")).append("): ");
-                sb.append(mem.get("detail")).append("\n\n");
-            }
+            for (var mem : memories) sb.append("*").append(mem.get("summary")).append("* (").append(mem.get("date"))
+                    .append("): ").append(mem.get("detail")).append("\n\n");
         }
-
-        // Fallback if nothing was found
-        if (sb.length() == 0) {
-            sb.append(getDefaultResponse(query));
-        }
-
+        if (sb.length() == 0) sb.append(getDefaultResponse(query));
         return sb.toString().trim();
     }
 
     private String getDefaultResponse(String query) {
         String lower = query.toLowerCase();
-        if (lower.contains("hello") || lower.contains("hi") || lower.contains("hey")) {
+        if (lower.contains("hello") || lower.contains("hi") || lower.contains("hey"))
             return "Hello! I'm your AI Banking Assistant. I can help you with account information, transfers, loans, investments, and more. What would you like to know?";
-        }
-        if (lower.contains("help")) {
+        if (lower.contains("help"))
             return "I can assist you with:\n• Account types and features\n• Transfer limits and fees (SEPA, SWIFT)\n• Card security and fraud prevention\n• Investment products\n• Loan and mortgage rates\n• Insurance products\n• Open Banking and PSD2\n\nWhat topic interests you?";
-        }
-        if (lower.contains("thank")) {
-            return "You're welcome! Is there anything else I can help you with today?";
-        }
+        if (lower.contains("thank")) return "You're welcome! Is there anything else I can help you with today?";
         return "I understand you're asking about \"" + query + "\". Let me look into that for you. Could you provide more details? You can ask about transfers, accounts, investments, loans, cards, insurance, or regulations.";
     }
 
-    // ── Semantic Cache ────────────────────────────────────────────────
-    /**
-     * Check semantic cache: KNN search for similar question.
-     * Returns cached response map if distance < threshold, null otherwise.
-     */
-    private Map<String, String> checkSemanticCache(String question) {
-        if (!openAiService.isConfigured()) return null;
-        try {
-            float[] queryVector = openAiService.getEmbedding(question);
-            byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
-
-            String knnQuery = "*=>[KNN 1 @vector $BLOB]";
-            byte[][] binaryArgs = new byte[][] {
-                    knnQuery.getBytes(),
-                    "PARAMS".getBytes(),
-                    "2".getBytes(),
-                    "BLOB".getBytes(),
-                    vectorBytes,
-                    "DIALECT".getBytes(),
-                    "2".getBytes()
-            };
-
-            List<Object> rawResult = redisSearchHelper.ftSearchWithBinaryArgs(CACHE_INDEX, binaryArgs);
-            List<Map<String, String>> parsed = redisSearchHelper.parseSearchResults(rawResult);
-
-            if (!parsed.isEmpty()) {
-                Map<String, String> topResult = parsed.get(0);
-                String scoreStr = topResult.getOrDefault("__vector_score", "1.0");
-                double distance = Double.parseDouble(scoreStr);
-                log.debug("UC9 Cache: top result distance={} threshold={}", distance, CACHE_DISTANCE_THRESHOLD);
-                if (distance < CACHE_DISTANCE_THRESHOLD) {
-                    return topResult;
-                }
-            }
-        } catch (Exception e) {
-            log.warn("UC9: Semantic cache lookup failed: {}", e.getMessage());
-        }
-        return null;
+    private static List<Map<String, String>> flatten(List<Map<String, Object>> rows) {
+        List<Map<String, String>> out = new ArrayList<>();
+        for (var row : rows) {
+            Map<String, String> flat = new LinkedHashMap<>();
+            row.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
+            out.add(flat);
+        } return out;
     }
 
-    /**
-     * Store question + response in semantic cache with vector and TTL.
-     */
-    private void storeInSemanticCache(String question, String response) {
-        if (!openAiService.isConfigured()) return;
-        try {
-            String cacheId = "cache-" + UUID.randomUUID().toString().substring(0, 8);
-            String key = CACHE_PREFIX + cacheId;
-
-            float[] embedding = openAiService.getEmbedding(question);
-
-            Map<String, String> hash = new LinkedHashMap<>();
-            hash.put("question", question);
-            hash.put("response", response);
-            redis.opsForHash().putAll(key, hash);
-            storeVectorField(key, embedding);
-            redis.expire(key, CACHE_TTL_SECONDS, TimeUnit.SECONDS);
-        } catch (Exception e) {
-            log.warn("UC9: Failed to store in semantic cache: {}", e.getMessage());
-        }
-    }
-
-    /**
-     * Get semantic cache statistics.
-     */
-    public Map<String, Object> getSemanticCacheStats() {
-        Map<String, Object> stats = new LinkedHashMap<>();
-        stats.put("enabled", openAiService.isConfigured());
-        stats.put("hits", cacheHits.get());
-        stats.put("misses", cacheMisses.get());
-        stats.put("distanceThreshold", CACHE_DISTANCE_THRESHOLD);
-        stats.put("ttlSeconds", CACHE_TTL_SECONDS);
-
-        // Count cached entries
-        Set<String> cacheKeys = RedisScanHelper.scanKeys(redis, CACHE_PREFIX + "*");
-        stats.put("cachedEntries", cacheKeys.size());
-
-        long total = cacheHits.get() + cacheMisses.get();
-        stats.put("hitRate", total > 0 ? String.format("%.1f%%", (cacheHits.get() * 100.0) / total) : "N/A");
-        stats.put("tokensUsed", tokensUsed.get());
-        stats.put("tokensSaved", tokensSaved.get());
-        // Estimated cost savings (GPT-4o pricing: ~$5/1M input, ~$15/1M output — simplified to ~$10/1M average)
-        double costSavedUsd = (tokensSaved.get() / 1_000_000.0) * 10.0;
-        stats.put("estimatedCostSavedUsd", String.format("$%.4f", costSavedUsd));
-        return stats;
-    }
-
-    // ── Reset ───────────────────────────────────────────────────────────
     public void reset() {
-        // Clean up all keys
         Set<String> convKeys = RedisScanHelper.scanKeys(redis, CONV_PREFIX + "*");
         if (!convKeys.isEmpty()) redis.delete(convKeys);
-        Set<String> memKeys = RedisScanHelper.scanKeys(redis, MEMORY_PREFIX + "*");
-        if (!memKeys.isEmpty()) redis.delete(memKeys);
-        Set<String> kbKeys = RedisScanHelper.scanKeys(redis, KB_PREFIX + "*");
-        if (!kbKeys.isEmpty()) redis.delete(kbKeys);
-        Set<String> cacheKeys = RedisScanHelper.scanKeys(redis, CACHE_PREFIX + "*");
-        if (!cacheKeys.isEmpty()) redis.delete(cacheKeys);
-        // Reset cache stats
-        cacheHits.set(0);
-        cacheMisses.set(0);
-        tokensUsed.set(0);
-        tokensSaved.set(0);
-        // Reload data
-        init();
-    }
-
-    // ── Utility Methods ─────────────────────────────────────────────────
-    private List<Map<String, String>> parseMessages(String json) {
-        try {
-            return objectMapper.readValue(json, new TypeReference<>() {});
-        } catch (JsonProcessingException e) {
-            return new ArrayList<>();
-        }
-    }
-
-    /**
-     * Store vector field as raw bytes using RedisCallback (required for HNSW indexing).
-     */
-    private void storeVectorField(String key, float[] vector) {
-        byte[] keyBytes = key.getBytes();
-        byte[] vectorBytes = RedisSearchHelper.vectorToBytes(vector);
-        redis.execute((org.springframework.data.redis.core.RedisCallback<Object>) conn -> {
-            conn.hashCommands().hSet(keyBytes, "vector".getBytes(), vectorBytes);
-            return null;
-        });
+        memoryService.reset();
+        knowledgeBaseService.reset();
+        semanticCacheService.reset();
     }
 }
