@@ -75,7 +75,8 @@ public class OpenAiService {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
-                throw new RuntimeException("OpenAI embeddings API error " + response.statusCode() + ": " + response.body());
+                throw new OpenAiException(response.statusCode(), response.body(),
+                        "OpenAI embeddings API error " + response.statusCode());
             }
 
             JsonNode root = objectMapper.readTree(response.body());
@@ -90,8 +91,10 @@ public class OpenAiService {
                 results.add(vec);
             }
             return results;
+        } catch (OpenAiException e) {
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to get embeddings from OpenAI", e);
+            throw new OpenAiException("Failed to get embeddings from OpenAI", e);
         }
     }
 
@@ -118,7 +121,8 @@ public class OpenAiService {
 
             if (response.statusCode() != 200) {
                 String errorBody = new String(response.body().readAllBytes(), StandardCharsets.UTF_8);
-                throw new RuntimeException("OpenAI chat API error " + response.statusCode() + ": " + errorBody);
+                throw new OpenAiException(response.statusCode(), errorBody,
+                        "OpenAI chat API error " + response.statusCode());
             }
 
             StringBuilder fullResponse = new StringBuilder();
@@ -143,9 +147,12 @@ public class OpenAiService {
                 }
             }
             return fullResponse.toString();
+        } catch (OpenAiException e) {
+            log.error("OpenAI API error during streaming chat completion: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("Error during streaming chat completion", e);
-            throw new RuntimeException("Failed to stream chat completion", e);
+            throw new OpenAiException("Failed to stream chat completion", e);
         }
     }
 }
