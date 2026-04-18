@@ -1,5 +1,6 @@
 package com.redis.workshop.config;
 
+import com.redis.workshop.service.OpenAiException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +35,26 @@ public class GlobalExceptionHandler {
             NoHandlerFoundException ex, HttpServletRequest request) {
         log.warn("No handler for {} {}", request.getMethod(), request.getRequestURI());
         return build(HttpStatus.NOT_FOUND, "No handler for " + request.getRequestURI(), request);
+    }
+
+    @ExceptionHandler(OpenAiException.class)
+    public ResponseEntity<Map<String, Object>> handleOpenAi(
+            OpenAiException ex, HttpServletRequest request) {
+        log.error("OpenAI API failure on {}: status={} message={}",
+                request.getRequestURI(), ex.getStatusCode(), ex.getMessage());
+        HttpStatus status = HttpStatus.BAD_GATEWAY;
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", ex.getMessage() != null ? ex.getMessage() : "OpenAI API error");
+        body.put("status", status.value());
+        body.put("path", request.getRequestURI());
+        body.put("source", "openai");
+        if (ex.getStatusCode() > 0) {
+            body.put("openaiStatus", ex.getStatusCode());
+        }
+        if (ex.getResponseBody() != null && !ex.getResponseBody().isBlank()) {
+            body.put("openaiResponse", ex.getResponseBody());
+        }
+        return ResponseEntity.status(status).body(body);
     }
 
     @ExceptionHandler(RuntimeException.class)
