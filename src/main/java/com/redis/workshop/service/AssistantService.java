@@ -54,6 +54,34 @@ public class AssistantService {
         return (text == null || text.isEmpty()) ? 0 : Math.max(1, text.length() / 4);
     }
 
+    /** Shared pre-generation context for chat/chatStream: cache status + vector search results. */
+    private record ChatContext(
+            List<Map<String, Object>> relevantMemories,
+            List<Map<String, Object>> relevantKB,
+            List<Map<String, Object>> relevantRegDocs,
+            String responseText,
+            boolean semanticCacheHit,
+            int tokensSaved,
+            int tokensUsed) {}
+
+    /** Checks semantic cache and runs vector search over memories / KB / regulation docs. */
+    private ChatContext resolveContext(String userMessage) {
+        Map<String, String> cached = semanticCacheService.checkSemanticCache(userMessage);
+        List<Map<String, Object>> memories = memoryService.vectorSearchMemories(userMessage, 3);
+        List<Map<String, Object>> kb = knowledgeBaseService.vectorSearchKB(userMessage, 3);
+        List<Map<String, Object>> regDocs = knowledgeBaseService.vectorSearchRegulationDocs(userMessage, 3);
+        if (cached != null) {
+            semanticCacheService.recordHit();
+            String responseText = cached.get("response");
+            int savedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
+            semanticCacheService.addTokensSaved(savedTokens);
+            log.info("UC9: Semantic cache HIT for question: {} (~{} tokens saved)", userMessage, savedTokens);
+            return new ChatContext(memories, kb, regDocs, responseText, true, savedTokens, 0);
+        }
+        semanticCacheService.recordMiss();
+        return new ChatContext(memories, kb, regDocs, null, false, 0, 0);
+    }
+
     public Map<String, Object> chat(String sessionId, String userName, String userMessage) {
         long startTime = System.currentTimeMillis();
         String convKey = CONV_PREFIX + sessionId;
@@ -65,19 +93,14 @@ public class AssistantService {
         boolean semanticCacheHit = false;
 
         if (openAiService.isConfigured()) {
-            Map<String, String> cached = semanticCacheService.checkSemanticCache(userMessage);
-            memoriesOut = flatten(memoryService.vectorSearchMemories(userMessage, 3));
-            kbOut = flatten(knowledgeBaseService.vectorSearchKB(userMessage, 3));
-            regDocsOut = flatten(knowledgeBaseService.vectorSearchRegulationDocs(userMessage, 3));
-            if (cached != null) {
-                semanticCacheHit = true;
-                semanticCacheService.recordHit();
-                responseText = cached.get("response");
-                int savedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
-                semanticCacheService.addTokensSaved(savedTokens);
-                log.info("UC9: Semantic cache HIT for question: {} (~{} tokens saved)", userMessage, savedTokens);
+            ChatContext ctx = resolveContext(userMessage);
+            memoriesOut = flatten(ctx.relevantMemories());
+            kbOut = flatten(ctx.relevantKB());
+            regDocsOut = flatten(ctx.relevantRegDocs());
+            semanticCacheHit = ctx.semanticCacheHit();
+            if (semanticCacheHit) {
+                responseText = ctx.responseText();
             } else {
-                semanticCacheService.recordMiss();
                 List<Map<String, String>> combined = new ArrayList<>(kbOut);
                 combined.addAll(regDocsOut);
                 responseText = generateResponse(userMessage, memoriesOut, combined);
@@ -114,30 +137,22 @@ public class AssistantService {
         List<Map<String, String>> messageHistory = loadConversation(convKey, userName);
         appendMessage(messageHistory, "user", userMessage);
 
-        Map<String, String> cached = semanticCacheService.checkSemanticCache(userMessage);
-        boolean semanticCacheHit = cached != null;
-        List<Map<String, Object>> memories = memoryService.vectorSearchMemories(userMessage, 3);
-        List<Map<String, Object>> kb = knowledgeBaseService.vectorSearchKB(userMessage, 3);
-        List<Map<String, Object>> regDocs = knowledgeBaseService.vectorSearchRegulationDocs(userMessage, 3);
-        sendSources(emitter, memories, kb, regDocs, semanticCacheHit);
+        ChatContext ctx = resolveContext(userMessage);
+        sendSources(emitter, ctx.relevantMemories(), ctx.relevantKB(), ctx.relevantRegDocs(), ctx.semanticCacheHit());
 
         String responseText;
-        if (semanticCacheHit) {
-            semanticCacheService.recordHit();
-            responseText = cached.get("response");
-            int savedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
-            semanticCacheService.addTokensSaved(savedTokens);
-            log.info("UC9 Stream: Semantic cache HIT for: {} (~{} tokens saved)", userMessage, savedTokens);
+        if (ctx.semanticCacheHit()) {
+            responseText = ctx.responseText();
+            log.info("UC9 Stream: Semantic cache HIT for: {} (~{} tokens saved)", userMessage, ctx.tokensSaved());
             try {
                 emitter.send(SseEmitter.event().name("token").data(
                         objectMapper.writeValueAsString(Map.of("content", responseText))));
             } catch (Exception e) { log.error("Failed to send cached response", e); }
         } else {
-            semanticCacheService.recordMiss();
-            List<Map<String, Object>> combined = new ArrayList<>(kb);
-            combined.addAll(regDocs);
+            List<Map<String, Object>> combined = new ArrayList<>(ctx.relevantKB());
+            combined.addAll(ctx.relevantRegDocs());
             List<Map<String, String>> openAiMessages = new ArrayList<>();
-            openAiMessages.add(Map.of("role", "system", "content", buildSystemPrompt(memories, combined)));
+            openAiMessages.add(Map.of("role", "system", "content", buildSystemPrompt(ctx.relevantMemories(), combined)));
             for (var msg : messageHistory) {
                 openAiMessages.add(Map.of("role", msg.get("role"), "content", msg.get("content")));
             }
@@ -151,7 +166,7 @@ public class AssistantService {
         appendMessage(messageHistory, "assistant", responseText);
         saveConversation(convKey, userName, messageHistory);
         sendDone(emitter, sessionId, messageHistory.size(),
-                System.currentTimeMillis() - startTime, semanticCacheHit,
+                System.currentTimeMillis() - startTime, ctx.semanticCacheHit(),
                 estimateTokens(userMessage) + estimateTokens(responseText));
     }
 
