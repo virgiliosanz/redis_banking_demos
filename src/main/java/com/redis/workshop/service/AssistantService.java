@@ -291,7 +291,8 @@ public class AssistantService {
 
         // 3-5. Check semantic cache first, then retrieve context and generate response
         List<Map<String, String>> relevantMemories;
-        List<Map<String, String>> relevantDocs;
+        List<Map<String, String>> relevantKB;
+        List<Map<String, String>> relevantRegDocs;
         String responseText;
         boolean semanticCacheHit = false;
         long cacheCheckStart = System.currentTimeMillis();
@@ -317,12 +318,18 @@ public class AssistantService {
                     relevantMemories.add(flat);
                 }
                 List<Map<String, Object>> kbResults = vectorSearch(KB_INDEX, userMessage, 3);
-                kbResults.addAll(vectorSearchRegulationDocs(userMessage, 3));
-                relevantDocs = new ArrayList<>();
+                relevantKB = new ArrayList<>();
                 for (var d : kbResults) {
                     Map<String, String> flat = new LinkedHashMap<>();
                     d.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
-                    relevantDocs.add(flat);
+                    relevantKB.add(flat);
+                }
+                List<Map<String, Object>> regResults = vectorSearchRegulationDocs(userMessage, 3);
+                relevantRegDocs = new ArrayList<>();
+                for (var d : regResults) {
+                    Map<String, String> flat = new LinkedHashMap<>();
+                    d.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
+                    relevantRegDocs.add(flat);
                 }
                 log.info("UC9: Semantic cache HIT for question: {} (~{} tokens saved)", userMessage, savedTokens);
             } else {
@@ -336,14 +343,22 @@ public class AssistantService {
                     relevantMemories.add(flat);
                 }
                 List<Map<String, Object>> kbResults = vectorSearch(KB_INDEX, userMessage, 3);
-                kbResults.addAll(vectorSearchRegulationDocs(userMessage, 3));
-                relevantDocs = new ArrayList<>();
+                relevantKB = new ArrayList<>();
                 for (var d : kbResults) {
                     Map<String, String> flat = new LinkedHashMap<>();
                     d.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
-                    relevantDocs.add(flat);
+                    relevantKB.add(flat);
                 }
-                responseText = generateResponse(userMessage, relevantMemories, relevantDocs);
+                List<Map<String, Object>> regResults = vectorSearchRegulationDocs(userMessage, 3);
+                relevantRegDocs = new ArrayList<>();
+                for (var d : regResults) {
+                    Map<String, String> flat = new LinkedHashMap<>();
+                    d.forEach((k, v) -> flat.put(k, v != null ? v.toString() : ""));
+                    relevantRegDocs.add(flat);
+                }
+                List<Map<String, String>> combinedDocs = new ArrayList<>(relevantKB);
+                combinedDocs.addAll(relevantRegDocs);
+                responseText = generateResponse(userMessage, relevantMemories, combinedDocs);
 
                 int usedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
                 tokensUsed.addAndGet(usedTokens);
@@ -355,8 +370,9 @@ public class AssistantService {
         } else {
             // Mock mode — skip semantic caching
             relevantMemories = findRelevantMemories(userMessage);
-            relevantDocs = findRelevantKBDocs(userMessage);
-            responseText = generateResponse(userMessage, relevantMemories, relevantDocs);
+            relevantKB = findRelevantKBDocs(userMessage);
+            relevantRegDocs = new ArrayList<>();
+            responseText = generateResponse(userMessage, relevantMemories, relevantKB);
         }
 
         // 6. Append assistant message
@@ -390,7 +406,8 @@ public class AssistantService {
         result.put("sessionId", sessionId);
         result.put("response", responseText);
         result.put("memoriesRetrieved", relevantMemories);
-        result.put("kbDocsRetrieved", relevantDocs);
+        result.put("kbDocsRetrieved", relevantKB);
+        result.put("regDocsRetrieved", relevantRegDocs);
         result.put("conversationLength", messageHistory.size());
         result.put("latencyMs", latencyMs);
         result.put("semanticCacheHit", semanticCacheHit);
@@ -597,14 +614,15 @@ public class AssistantService {
 
             // Even on cache hit, retrieve sources so UI can show the RAG context
             List<Map<String, Object>> relevantMemories = vectorSearch(MEMORY_INDEX, userMessage, 3);
-            List<Map<String, Object>> relevantDocs = vectorSearch(KB_INDEX, userMessage, 3);
-            relevantDocs.addAll(vectorSearchRegulationDocs(userMessage, 3));
+            List<Map<String, Object>> relevantKB = vectorSearch(KB_INDEX, userMessage, 3);
+            List<Map<String, Object>> relevantRegDocs = vectorSearchRegulationDocs(userMessage, 3);
 
             // Send cache-hit event with sources
             try {
                 Map<String, Object> sourcesData = new LinkedHashMap<>();
                 sourcesData.put("memories", relevantMemories);
-                sourcesData.put("kbDocs", relevantDocs);
+                sourcesData.put("kbDocs", relevantKB);
+                sourcesData.put("regDocs", relevantRegDocs);
                 sourcesData.put("semanticCacheHit", true);
                 emitter.send(SseEmitter.event().name("sources").data(objectMapper.writeValueAsString(sourcesData)));
             } catch (Exception e) {
@@ -623,22 +641,25 @@ public class AssistantService {
             cacheMisses.incrementAndGet();
 
             List<Map<String, Object>> relevantMemories = vectorSearch(MEMORY_INDEX, userMessage, 3);
-            List<Map<String, Object>> relevantDocs = vectorSearch(KB_INDEX, userMessage, 3);
-            relevantDocs.addAll(vectorSearchRegulationDocs(userMessage, 3));
+            List<Map<String, Object>> relevantKB = vectorSearch(KB_INDEX, userMessage, 3);
+            List<Map<String, Object>> relevantRegDocs = vectorSearchRegulationDocs(userMessage, 3);
 
             // Send "sources" event before streaming starts
             try {
                 Map<String, Object> sourcesData = new LinkedHashMap<>();
                 sourcesData.put("memories", relevantMemories);
-                sourcesData.put("kbDocs", relevantDocs);
+                sourcesData.put("kbDocs", relevantKB);
+                sourcesData.put("regDocs", relevantRegDocs);
                 sourcesData.put("semanticCacheHit", false);
                 emitter.send(SseEmitter.event().name("sources").data(objectMapper.writeValueAsString(sourcesData)));
             } catch (Exception e) {
                 log.error("Failed to send sources event", e);
             }
 
-            // Build OpenAI messages
-            String systemPrompt = buildSystemPrompt(relevantMemories, relevantDocs);
+            // Build OpenAI messages — combine KB + regulation docs for the LLM prompt
+            List<Map<String, Object>> combinedDocs = new ArrayList<>(relevantKB);
+            combinedDocs.addAll(relevantRegDocs);
+            String systemPrompt = buildSystemPrompt(relevantMemories, combinedDocs);
             List<Map<String, String>> openAiMessages = new ArrayList<>();
             openAiMessages.add(Map.of("role", "system", "content", systemPrompt));
             for (var msg : messageHistory) {

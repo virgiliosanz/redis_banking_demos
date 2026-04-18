@@ -5,6 +5,7 @@
  */
 (function () {
     'use strict';
+    window.WORKSHOP_UC = 'UC9';
 
     // --- State ---
     var sessionId = 'sess-' + Math.random().toString(36).substring(2, 10);
@@ -18,6 +19,7 @@
     var shortTermInfo = document.getElementById('short-term-info');
     var memoryResults = document.getElementById('memory-results');
     var ragResults = document.getElementById('rag-results');
+    var regResults = document.getElementById('reg-results');
     var latencyDisplay = document.getElementById('latency-display');
     var resetBtn = document.getElementById('resetBtn');
     var apiStatusText = document.getElementById('api-status-text');
@@ -156,6 +158,26 @@
         ragResults.innerHTML = html;
     }
 
+    function updateRegResults(docs) {
+        if (!docs || docs.length === 0) {
+            regResults.innerHTML = '<span>No regulation documents retrieved for this query.</span>';
+            return;
+        }
+        var html = '';
+        docs.forEach(function (doc) {
+            html += '<div class="uc9-source-item">';
+            if (doc.redisKey) html += '<span class="uc9-source-key">' + escapeHtml(doc.redisKey) + '</span>';
+            html += '<span class="uc9-source-title">' + escapeHtml(doc.title || doc.id || '') + '</span>';
+            html += scoreBadge(doc.score);
+            var meta = [];
+            if (doc.category) meta.push('Category: ' + escapeHtml(doc.category));
+            if (doc.tags && doc.tags !== doc.category) meta.push('Tags: ' + escapeHtml(doc.tags));
+            if (meta.length) html += '<div class="uc9-source-meta">' + meta.join(' — ') + '</div>';
+            html += '</div>';
+        });
+        regResults.innerHTML = html;
+    }
+
     // --- Cache display ---
     function showCacheBadge(isHit, latencyMs, tokensSaved) {
         if (!cacheIndicator || !cacheBadge) return;
@@ -249,6 +271,7 @@
                 // Update unified Redis Context panel
                 updateMemoryResults(sources.memories);
                 updateRagResults(sources.kbDocs);
+                updateRegResults(sources.regDocs);
                 updateShortTermMemory();
             } catch (err) { console.error('UC9 sources handler error:', err); }
         });
@@ -318,6 +341,7 @@
             updateShortTermMemory();
             updateMemoryResults(data.memoriesRetrieved);
             updateRagResults(data.kbDocsRetrieved);
+            updateRegResults(data.regDocsRetrieved);
 
             // Semantic cache indicator
             if (data.semanticCacheEnabled) {
@@ -364,6 +388,7 @@
             shortTermInfo.innerHTML = 'No active conversation yet.';
             memoryResults.innerHTML = 'No memories retrieved yet.';
             ragResults.innerHTML = 'No documents retrieved yet.';
+            regResults.innerHTML = 'No regulation documents retrieved yet.';
             if (cacheIndicator) cacheIndicator.style.display = 'none';
             latencyDisplay.textContent = '';
             resetBtn.disabled = false;
