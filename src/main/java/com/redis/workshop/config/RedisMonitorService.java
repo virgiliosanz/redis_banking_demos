@@ -45,8 +45,6 @@ public class RedisMonitorService {
             "^\\+?(\\d+\\.\\d+)\\s+\\[(\\d+)\\s+([^\\]]+)\\]\\s+(.*)$");
     private static final Pattern QUOTED_ARG = Pattern.compile(
             "\"((?:\\\\.|[^\"\\\\])*)\"");
-    // Trim base64/hex vector blobs and long float arrays that would flood the UI
-    private static final Pattern LONG_BLOB = Pattern.compile("\"[^\"]{200,}\"");
 
     private final RedisConnectionFactory connectionFactory;
     private final Deque<Map<String, Object>> buffer = new ConcurrentLinkedDeque<>();
@@ -205,8 +203,7 @@ public class RedisMonitorService {
                 sb.append(a);
             }
         }
-        String out = sb.toString();
-        return LONG_BLOB.matcher(out).replaceAll("\"<blob>\"");
+        return sb.toString();
     }
 
     private static String inferUseCase(String key, String command) {
