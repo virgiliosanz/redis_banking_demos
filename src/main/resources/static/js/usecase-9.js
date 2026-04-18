@@ -406,8 +406,23 @@
     });
 
     // --- Check API status on load ---
+    var aiBadge = document.getElementById('ai-badge');
+    function setAiBadge(configured) {
+        if (!aiBadge) return;
+        aiBadge.classList.remove('on', 'mock');
+        if (configured) {
+            aiBadge.classList.add('on');
+            aiBadge.textContent = 'AI: ON';
+            aiBadge.title = 'OpenAI is configured — real LLM responses';
+        } else {
+            aiBadge.classList.add('mock');
+            aiBadge.textContent = 'AI: Mock';
+            aiBadge.title = 'No OPENAI_API_KEY — using mock responses';
+        }
+    }
     window.workshopGet('/api/assistant/status').then(function (data) {
         openaiConfigured = !!(data && data.openaiConfigured);
+        setAiBadge(openaiConfigured);
         if (openaiConfigured) {
             apiStatusText.innerHTML = 'OpenAI Connected';
             apiStatusText.style.color = '#059669';
@@ -417,6 +432,7 @@
         }
     }).catch(function () {
         openaiConfigured = false;
+        setAiBadge(false);
         apiStatusText.innerHTML = 'Mock Mode';
         apiStatusText.style.color = '#d97706';
     });

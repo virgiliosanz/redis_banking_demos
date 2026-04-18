@@ -189,6 +189,47 @@ a:hover {
     background: var(--bg-tertiary);
 }
 
+/* --- Reset All button (navbar) --- */
+.nav-reset-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing-unit) * 0.5);
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
+    cursor: pointer;
+    transition: color var(--transition), background var(--transition), border-color var(--transition);
+}
+
+.nav-reset-btn:hover:not(:disabled) {
+    color: var(--redis-primary);
+    border-color: var(--redis-primary);
+    background: rgba(255, 68, 56, 0.08);
+}
+
+.nav-reset-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.nav-reset-btn .reset-icon {
+    flex-shrink: 0;
+}
+
+.nav-reset-btn.is-loading .reset-icon {
+    animation: nav-reset-spin 1s linear infinite;
+}
+
+@keyframes nav-reset-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
 /* --- Main Content --- */
 .main-content {
     max-width: 1280px;
@@ -590,6 +631,49 @@ a:hover {
 [data-theme="dark"] .status-badge.active {
     color: #4ade80;
     background: rgba(74, 222, 128, 0.15);
+}
+
+/* --- AI Status Badge (UC8, UC9) --- */
+.ai-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-code);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+    border-radius: 999px;
+    line-height: 1;
+    letter-spacing: 0.02em;
+}
+
+.ai-badge::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.ai-badge.on {
+    color: #0a7e3e;
+    background: rgba(10, 126, 62, 0.1);
+}
+
+.ai-badge.mock {
+    color: #D97706;
+    background: rgba(245, 158, 11, 0.1);
+}
+
+[data-theme="dark"] .ai-badge.on {
+    color: #4ade80;
+    background: rgba(74, 222, 128, 0.15);
+}
+
+[data-theme="dark"] .ai-badge.mock {
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.15);
 }
 
 /* --- Code Showcase Tabs --- */

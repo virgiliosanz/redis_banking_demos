@@ -16,6 +16,29 @@
     // --- Code Tabs ---
     window.initCodeTabs();
 
+    // --- AI status badge (reflects OpenAI configuration) ---
+    (function updateAiBadge() {
+        var badge = document.getElementById('ai-badge');
+        if (!badge) return;
+        window.workshopGet('/api/health').then(function (data) {
+            var configured = !!(data && data.openai && data.openai.configured);
+            badge.classList.remove('on', 'mock');
+            if (configured) {
+                badge.classList.add('on');
+                badge.textContent = 'AI: ON';
+                badge.title = 'OpenAI is configured — real embeddings in use';
+            } else {
+                badge.classList.add('mock');
+                badge.textContent = 'AI: Mock';
+                badge.title = 'No OPENAI_API_KEY — using mock embeddings';
+            }
+        }).catch(function () {
+            badge.classList.remove('on');
+            badge.classList.add('mock');
+            badge.textContent = 'AI: Mock';
+        });
+    })();
+
     // --- Main Tab Toggle (CRUD / Search) ---
     var crudTab = document.getElementById('crud-tab');
     var searchTab = document.getElementById('search-tab');
