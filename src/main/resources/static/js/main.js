@@ -225,6 +225,8 @@
             while (output.children.length > MAX_COMMANDS) {
                 output.removeChild(output.lastChild);
             }
+
+            flashCodeShowcase(cmd.command);
         });
 
         _eventSource.onerror = function () {
@@ -280,6 +282,40 @@
         details.appendChild(summary);
         details.appendChild(expanded);
         return details;
+    }
+
+    // Briefly flash the code-showcase snippet that contains the executed command.
+    // Matches the command token within the currently visible (active) code block,
+    // ignoring substrings of longer commands (e.g. HGET inside HGETALL).
+    function flashCodeShowcase(commandName) {
+        if (!commandName) return;
+        var panel = document.querySelector('.code-panel');
+        if (!panel) return;
+
+        var blocks = panel.querySelectorAll('.code-block.active');
+        if (!blocks.length) blocks = panel.querySelectorAll('.code-block');
+
+        var escaped = commandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        var re = new RegExp('(^|[^A-Z0-9.])' + escaped + '(?![A-Z0-9.])');
+
+        for (var i = 0; i < blocks.length; i++) {
+            var pres = blocks[i].querySelectorAll('pre');
+            for (var j = 0; j < pres.length; j++) {
+                var code = pres[j].querySelector('code');
+                var text = code ? code.textContent : pres[j].textContent;
+                if (re.test(text)) {
+                    var target = pres[j];
+                    target.classList.remove('code-highlight-flash');
+                    // Force reflow so animation restarts on repeated matches
+                    void target.offsetWidth;
+                    target.classList.add('code-highlight-flash');
+                    setTimeout(function (el) {
+                        return function () { el.classList.remove('code-highlight-flash'); };
+                    }(target), 1700);
+                    return;
+                }
+            }
+        }
     }
 
     function copyRedisCommand(btn, command) {
