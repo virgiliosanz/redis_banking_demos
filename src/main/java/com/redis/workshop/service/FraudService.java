@@ -168,7 +168,7 @@ public class FraudService {
         loadBaselineData();
     }
 
-    private int calculateRiskScore(int velocityCount, double amount, boolean geoAnomaly) {
+    int calculateRiskScore(int velocityCount, double amount, boolean geoAnomaly) {
         int score = 0;
         // Velocity component (0-40)
         if (velocityCount >= VELOCITY_THRESHOLD_HIGH) score += 40;
@@ -186,7 +186,7 @@ public class FraudService {
         return Math.min(score, 100);
     }
 
-    private String getRiskLevel(int score) {
+    String getRiskLevel(int score) {
         if (score >= 70) return "CRITICAL";
         if (score >= 45) return "HIGH";
         if (score >= 25) return "MEDIUM";

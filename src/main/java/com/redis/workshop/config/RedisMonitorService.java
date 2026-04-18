@@ -192,7 +192,7 @@ public class RedisMonitorService {
      * Parse quoted arguments from a MONITOR line fragment.
      * Manual parser — avoids regex backtracking on long binary blobs.
      */
-    private static List<String> parseQuotedArgs(String input) {
+    static List<String> parseQuotedArgs(String input) {
         List<String> args = new ArrayList<>();
         int i = 0;
         int len = input.length();
@@ -239,7 +239,7 @@ public class RedisMonitorService {
         return sb.toString();
     }
 
-    private static String inferUseCase(String key, String command) {
+    static String inferUseCase(String key, String command) {
         if (key == null || key.isEmpty()) return "";
 
         // Keys follow uc{N}:... pattern
