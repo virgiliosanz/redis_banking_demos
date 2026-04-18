@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 public class UserProfileService {
 
     private static final long PROFILE_TTL_SECONDS = 600; // 10 minutes
-    private static final String PROFILE_PREFIX = "workshop:profile:user:";
+    private static final String PROFILE_PREFIX = "uc3:user:";
 
     // Mock "Accounts DB"
     private static final Map<String, Map<String, String>> ACCOUNTS_DB = Map.of(

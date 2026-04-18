@@ -14,8 +14,8 @@ import java.util.*;
 public class DocumentSearchService {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentSearchService.class);
-    private static final String INDEX_NAME = "idx:regulations";
-    private static final String DOC_PREFIX = "workshop:docs:regulation:";
+    private static final String INDEX_NAME = "idx:uc8:documents";
+    private static final String DOC_PREFIX = "uc8:doc:";
     private static final int VECTOR_DIM = 1536;
 
     private final StringRedisTemplate redis;

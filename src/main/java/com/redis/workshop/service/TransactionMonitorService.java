@@ -31,7 +31,7 @@ public class TransactionMonitorService {
     private volatile boolean simulating = false;
     private final Random random = new Random();
 
-    private static final String STREAM_KEY = "workshop:txmonitor:stream";
+    private static final String STREAM_KEY = "uc11:stream:transactions";
     private static final long MAX_STREAM_LEN = 10_000; // MAXLEN for trimming
 
     public TransactionMonitorService(StringRedisTemplate redis, RedisCommandLogger commandLogger) {

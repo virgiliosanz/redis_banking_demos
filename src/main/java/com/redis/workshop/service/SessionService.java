@@ -13,8 +13,8 @@ import java.util.concurrent.TimeUnit;
 public class SessionService {
 
     private static final long SESSION_TTL_SECONDS = 300; // 5 minutes for demo
-    private static final String SESSION_PREFIX = "workshop:session:user:";
-    private static final String TOKEN_PREFIX = "workshop:session:token:";
+    private static final String SESSION_PREFIX = "uc2:user:";
+    private static final String TOKEN_PREFIX = "uc2:token:";
 
     // Mock users: username -> password
     private static final Map<String, String> MOCK_USERS = Map.of(

@@ -29,10 +29,10 @@ public class GeoFinderService {
     private final RedisSearchHelper redisSearchHelper;
     private final RedisCommandLogger commandLogger;
 
-    private static final String GEO_KEY = "workshop:geo:atms";
-    private static final String META_PREFIX = "workshop:geo:meta:";
-    private static final String BRANCH_PREFIX = "workshop:geo:branch:";
-    private static final String INDEX_NAME = "idx:branches";
+    private static final String GEO_KEY = "uc12:geo:atms";
+    private static final String META_PREFIX = "uc12:meta:";
+    private static final String BRANCH_PREFIX = "uc12:branch:";
+    private static final String INDEX_NAME = "idx:uc12:branches";
 
     public GeoFinderService(StringRedisTemplate redis, ObjectMapper objectMapper,
                              RedisSearchHelper redisSearchHelper, RedisCommandLogger commandLogger) {

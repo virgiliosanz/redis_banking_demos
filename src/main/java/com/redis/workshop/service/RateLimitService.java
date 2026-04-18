@@ -12,13 +12,13 @@ import java.util.concurrent.TimeUnit;
  * Rate Limiting Service — Fixed-window pattern using Redis INCR + EXPIRE.
  * Banking context: Open Banking API protection (PSD2 compliance).
  *
- * Key pattern: workshop:ratelimit:{clientId}
+ * Key pattern: uc4:{clientId}
  * Window: 60 seconds, max 10 requests per window (demo-friendly values).
  */
 @Service
 public class RateLimitService {
 
-    private static final String KEY_PREFIX = "workshop:ratelimit:";
+    private static final String KEY_PREFIX = "uc4:";
     private static final int MAX_REQUESTS = 10;
     private static final int WINDOW_SECONDS = 60;
 

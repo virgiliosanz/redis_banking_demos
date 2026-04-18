@@ -15,7 +15,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Service
 public class DeduplicationService {
 
-    private static final String KEY_PREFIX = "workshop:dedup:";
+    private static final String KEY_PREFIX = "uc5:";
     private static final long TTL_SECONDS = 300; // 5-minute dedup window
     private static final long WINDOW_SECONDS = 300; // floor to 5-min windows
 

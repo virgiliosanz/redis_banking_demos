@@ -21,8 +21,8 @@ import java.util.*;
 public class DocumentDataLoader {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentDataLoader.class);
-    private static final String DOC_PREFIX = "workshop:docs:regulation:";
-    private static final String INDEX_NAME = "idx:regulations";
+    private static final String DOC_PREFIX = "uc8:doc:";
+    private static final String INDEX_NAME = "idx:uc8:documents";
     private static final int VECTOR_DIM = 1536;
     private static final String EMBEDDINGS_RESOURCE = "/data/kb-embeddings.json";
     private static final String EMBEDDINGS_WRITE_PATH = "src/main/resources/data/kb-embeddings.json";

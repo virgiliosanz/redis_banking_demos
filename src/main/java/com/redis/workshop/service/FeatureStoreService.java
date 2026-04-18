@@ -12,7 +12,7 @@ import java.util.*;
 @DependsOn("startupCleanup")
 public class FeatureStoreService {
 
-    private static final String FEATURE_PREFIX = "workshop:features:client:";
+    private static final String FEATURE_PREFIX = "uc7:client:";
 
     private final StringRedisTemplate redis;
 

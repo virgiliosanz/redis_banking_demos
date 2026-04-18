@@ -15,8 +15,8 @@ import java.util.*;
 @DependsOn("startupCleanup")
 public class FraudService {
 
-    private static final String VELOCITY_KEY_PREFIX = "workshop:fraud:velocity:";
-    private static final String STREAM_KEY = "workshop:fraud:stream";
+    private static final String VELOCITY_KEY_PREFIX = "uc6:velocity:";
+    private static final String STREAM_KEY = "uc6:stream:transactions";
     private static final long VELOCITY_WINDOW_SECONDS = 300; // 5-minute window
     private static final int VELOCITY_THRESHOLD_MEDIUM = 3;
     private static final int VELOCITY_THRESHOLD_HIGH = 5;

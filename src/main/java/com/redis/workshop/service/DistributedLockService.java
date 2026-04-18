@@ -16,7 +16,7 @@ import java.util.concurrent.*;
 @Service
 public class DistributedLockService {
 
-    private static final String LOCK_PREFIX = "workshop:lock:";
+    private static final String LOCK_PREFIX = "uc13:lock:";
 
     /**
      * Lua script for safe lock release.

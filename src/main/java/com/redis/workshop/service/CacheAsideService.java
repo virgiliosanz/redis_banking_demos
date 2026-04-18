@@ -16,13 +16,13 @@ import java.util.concurrent.atomic.AtomicLong;
  * Cache-Aside Service — demonstrates the cache-aside (lazy-loading) pattern.
  * Banking context: caching banking product catalog data.
  *
- * Key pattern: workshop:cache:product:{productId}
+ * Key pattern: uc10:product:{productId}
  * TTL: 300 seconds (5 minutes)
  */
 @Service
 public class CacheAsideService {
 
-    private static final String CACHE_PREFIX = "workshop:cache:product:";
+    private static final String CACHE_PREFIX = "uc10:product:";
     private static final long CACHE_TTL_SECONDS = 300;
     private static final long DB_SIMULATED_DELAY_MS = 200;
 

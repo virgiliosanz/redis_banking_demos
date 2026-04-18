@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 public class AuthTokenService {
 
     private static final long TOKEN_TTL_SECONDS = 300; // 5 minutes for demo
-    private static final String TOKEN_PREFIX = "workshop:auth:token:";
+    private static final String TOKEN_PREFIX = "uc1:token:";
 
     // Mock users: username -> password
     private static final Map<String, String> MOCK_USERS = Map.of(

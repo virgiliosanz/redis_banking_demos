@@ -24,13 +24,13 @@ public class AssistantService {
 
     private static final Logger log = LoggerFactory.getLogger(AssistantService.class);
 
-    private static final String CONV_PREFIX = "workshop:assistant:conversation:";
-    private static final String MEMORY_PREFIX = "workshop:assistant:memory:";
-    private static final String KB_PREFIX = "workshop:assistant:kb:";
-    private static final String CACHE_PREFIX = "workshop:assistant:cache:";
-    private static final String MEMORY_INDEX = "idx:assistant_memory";
-    private static final String KB_INDEX = "idx:assistant_kb";
-    private static final String CACHE_INDEX = "idx:assistant_cache";
+    private static final String CONV_PREFIX = "uc9:conversation:";
+    private static final String MEMORY_PREFIX = "uc9:memory:";
+    private static final String KB_PREFIX = "uc9:kb:";
+    private static final String CACHE_PREFIX = "uc9:cache:";
+    private static final String MEMORY_INDEX = "idx:uc9:memory";
+    private static final String KB_INDEX = "idx:uc9:kb";
+    private static final String CACHE_INDEX = "idx:uc9:cache";
     private static final int VECTOR_DIM = 1536;
     private static final long CONV_TTL_SECONDS = 600;
     private static final long CACHE_TTL_SECONDS = 600;
