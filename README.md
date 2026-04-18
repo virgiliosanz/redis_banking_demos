@@ -246,7 +246,7 @@ Both tools read PDFs from `src/main/resources/docs/` and write to `src/main/reso
 
 ## Monitor endpoint
 
-`GET /api/monitor` returns detailed Redis metrics for the live dashboard:
+`GET /api/monitor` is a JSON metrics endpoint that returns detailed Redis metrics:
 
 ```json
 {
@@ -262,8 +262,6 @@ Both tools read PDFs from `src/main/resources/docs/` and write to `src/main/reso
   "db_size": 342
 }
 ```
-
-Open `/monitor` in a second browser tab during presentations for a live Redis metrics view.
 
 ## Project Structure
 
@@ -296,13 +294,11 @@ src/main/resources/
 │   ├── layout.html                 # Shared layout with nav
 │   ├── index.html                  # Landing page (13 cards)
 │   ├── guide.html                  # Workshop Presenter Guide
-│   ├── monitor.html                # Live Redis metrics dashboard
 │   └── usecase-{1..13}.html        # Use case pages
 └── static/
     ├── css/redis-brand.css         # Redis brand design tokens
     ├── img/icons/{light,dark}/     # Redis brand icons per theme
     ├── js/main.js                  # Dark mode toggle + utils
-    ├── js/monitor.js               # Live monitor dashboard logic
     ├── js/qr-landing.js            # Landing page QR code renderer
     ├── js/usecase-{1..13}.js       # Per-use-case JS
     ├── vendor/prism/               # Syntax highlighting
@@ -324,6 +320,6 @@ src/main/resources/
 - **Code showcase** — Each use case includes curated Java + Redis CLI snippets with Prism.js syntax highlighting
 - **Responsive layout** — Two-panel grid (demo + code) that adapts to mobile
 - **Presenter guide** — Built-in guide at `/guide` with talking points and demo steps for each use case
-- **Redis Monitor** — Live dashboard at `/monitor` showing memory usage, key count, ops/sec, hit rate, uptime, and connected clients. Auto-refreshes every 2 seconds.
+- **Redis Monitor** — JSON API endpoint at `/api/monitor` exposing memory usage, key count, ops/sec, hit rate, uptime, and connected clients. Live Redis commands executed by each use case are shown inline via the collapsible "Redis Commands Executed" panel on each UC page.
 - **Presentation mode** — Toggle button on all use case pages that hides the code panel and expands the demo to full width. State persists across page navigation via localStorage.
 - **QR code** — Landing page displays a scannable QR code linking to the GitHub repository, generated client-side via vendored qrcode-generator library.
