@@ -211,19 +211,23 @@ public class RedisMonitorService {
 
     private static String inferUseCase(String key, String command) {
         if (key == null || key.isEmpty()) return "";
-        if (key.startsWith("workshop:auth:")) return "UC1";
-        if (key.startsWith("workshop:session:")) return "UC2";
-        if (key.startsWith("workshop:profile:")) return "UC3";
-        if (key.startsWith("workshop:ratelimit:")) return "UC4";
-        if (key.startsWith("workshop:dedup:")) return "UC5";
-        if (key.startsWith("workshop:fraud:")) return "UC6";
-        if (key.startsWith("workshop:feature:")) return "UC7";
-        if (key.startsWith("workshop:doc:") || key.startsWith("idx:docs")) return "UC8";
-        if (key.startsWith("uc9:") || key.startsWith("idx:uc9:")) return "UC9";
-        if (key.startsWith("workshop:cache:")) return "UC10";
-        if (key.startsWith("workshop:txmonitor:")) return "UC11";
-        if (key.startsWith("workshop:geo:") || key.startsWith("idx:branches")) return "UC12";
-        if (key.startsWith("workshop:lock:")) return "UC13";
+
+        // Keys follow uc{N}:... pattern
+        if (key.startsWith("uc")) {
+            int colonIdx = key.indexOf(':');
+            if (colonIdx > 0) {
+                return key.substring(0, colonIdx).toUpperCase(); // "UC1", "UC2", etc.
+            }
+        }
+
+        // Index names follow idx:uc{N}:... pattern
+        if (key.startsWith("idx:uc")) {
+            int secondColon = key.indexOf(':', 4); // after "idx:"
+            if (secondColon > 0) {
+                return key.substring(4, secondColon).toUpperCase(); // "UC3", "UC8", etc.
+            }
+        }
+
         return "";
     }
 
