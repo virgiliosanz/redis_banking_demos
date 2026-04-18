@@ -139,7 +139,7 @@
                 <div class="code-container code-tab-content" id="tab-java">
 <pre><code class="language-java">// ═══ Cache-Aside Pattern ═══
 // 1. Check cache first (GET)
-String cacheKey = "workshop:cache:product:" + productId;
+String cacheKey = "uc10:product:" + productId;
 String cached = redis.opsForValue().get(cacheKey);
 
 if (cached != null) {
@@ -175,32 +175,32 @@ public Product getProduct(String productId) {
 <pre><code class="language-bash"># ═══ Cache-Aside with Redis CLI ═══
 
 # 1. Check cache (returns nil on miss)
-GET workshop:cache:product:mortgage-fixed
+GET uc10:product:mortgage-fixed
 # → (nil)  ← CACHE MISS
 
 # 2. After fetching from DB, store in cache
-SET workshop:cache:product:mortgage-fixed \
+SET uc10:product:mortgage-fixed \
   '{"id":"mortgage-fixed","name":"Fixed Rate Mortgage"...}' \
   EX 300
 # → OK  (TTL = 300 seconds = 5 minutes)
 
 # 3. Next request — CACHE HIT!
-GET workshop:cache:product:mortgage-fixed
+GET uc10:product:mortgage-fixed
 # → '{"id":"mortgage-fixed","name":"Fixed Rate..."}'
 
 # 4. Check remaining TTL
-TTL workshop:cache:product:mortgage-fixed
+TTL uc10:product:mortgage-fixed
 # → (integer) 287
 
 # 5. Evict on data change
-DEL workshop:cache:product:mortgage-fixed
+DEL uc10:product:mortgage-fixed
 # → (integer) 1
 
 # 6. Evict all cached products
 # (use SCAN in production, KEYS for demo)
-KEYS workshop:cache:product:*
-DEL workshop:cache:product:mortgage-fixed \
-    workshop:cache:product:savings-premium</code></pre>
+KEYS uc10:product:*
+DEL uc10:product:mortgage-fixed \
+    uc10:product:savings-premium</code></pre>
                 </div>
             </section>
         </div>

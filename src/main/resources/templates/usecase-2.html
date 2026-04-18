@@ -132,7 +132,7 @@
 
                     <div class="code-block" id="tab-java">
                         <pre><code class="language-java">// 1. Create session — HSET + EXPIRE
-String sessionKey = "workshop:session:user:" + username;
+String sessionKey = "uc2:user:" + username;
 
 // Store session data as a Redis Hash
 Map&lt;String, String&gt; session = Map.of(
@@ -151,7 +151,7 @@ redis.opsForHash().putAll(sessionKey, session);
 redis.expire(sessionKey, 300, TimeUnit.SECONDS);
 
 // 2. Store auth token — SET with EX
-String tokenKey = "workshop:session:token:" + token;
+String tokenKey = "uc2:token:" + token;
 redis.opsForValue()
      .set(tokenKey, username, 300, TimeUnit.SECONDS);
 
@@ -173,7 +173,7 @@ redis.delete(tokenKey);</code></pre>
 
                     <div class="code-block active" id="tab-cli">
                         <pre><code class="language-bash"># 1. Create session Hash
-HSET workshop:session:user:user1 \
+HSET uc2:user:user1 \
   username "user1" \
   fullName "Ana García López" \
   role "Premium Client" \
@@ -182,27 +182,27 @@ HSET workshop:session:user:user1 \
   createdAt "1713045600000"
 
 # 2. Set TTL (300 seconds = 5 min)
-EXPIRE workshop:session:user:user1 300
+EXPIRE uc2:user:user1 300
 
 # 3. Store auth token → username mapping
-SET workshop:session:token:a1b2c3d4-... \
+SET uc2:token:a1b2c3d4-... \
   "user1" EX 300
 
 # 4. Read full session
-HGETALL workshop:session:user:user1
+HGETALL uc2:user:user1
 
 # 5. Read single field
-HGET workshop:session:user:user1 role
+HGET uc2:user:user1 role
 
 # 6. Check remaining TTL
-TTL workshop:session:user:user1
+TTL uc2:user:user1
 
 # 7. Validate token
-GET workshop:session:token:a1b2c3d4-...
+GET uc2:token:a1b2c3d4-...
 
 # 8. Logout — delete both keys
-DEL workshop:session:user:user1
-DEL workshop:session:token:a1b2c3d4-...</code></pre>
+DEL uc2:user:user1
+DEL uc2:token:a1b2c3d4-...</code></pre>
                     </div>
                 </div>
             </section>

@@ -119,10 +119,10 @@
                 <div class="code-container">
                     <h3 class="code-section-title">1. SETNX Pattern (SET NX EX)</h3>
                     <pre><code class="language-java">// Atomic check-and-set: only succeeds if key doesn't exist
-// SET workshop:dedup:{txHash} "1" NX EX 300
+// SET uc5:dedup:{txHash} "1" NX EX 300
 
 String txHash = sha256(sender + receiver + amount + timeWindow);
-String key = "workshop:dedup:" + txHash;
+String key = "uc5:dedup:" + txHash;
 
 // SET with NX (Not eXists) + EX (Expire) — atomic dedup!
 Boolean wasSet = redis.opsForValue()
@@ -138,19 +138,19 @@ if (Boolean.TRUE.equals(wasSet)) {
 
                     <h3 class="code-section-title">2. Redis CLI Equivalent</h3>
                     <pre><code class="language-bash"># First attempt — key created, payment processed
-SET workshop:dedup:a1b2c3d4 "1" NX EX 300
+SET uc5:dedup:a1b2c3d4 "1" NX EX 300
 # → OK
 
 # Second attempt (within 5 min) — blocked!
-SET workshop:dedup:a1b2c3d4 "1" NX EX 300
+SET uc5:dedup:a1b2c3d4 "1" NX EX 300
 # → (nil)   ← duplicate detected
 
 # Check remaining TTL
-TTL workshop:dedup:a1b2c3d4
+TTL uc5:dedup:a1b2c3d4
 # → (integer) 287
 
 # After TTL expires, same tx is accepted again
-SET workshop:dedup:a1b2c3d4 "1" NX EX 300
+SET uc5:dedup:a1b2c3d4 "1" NX EX 300
 # → OK</code></pre>
 
                     <h3 class="code-section-title">3. Bloom Filter Alternative (High Volume)</h3>
@@ -159,28 +159,28 @@ SET workshop:dedup:a1b2c3d4 "1" NX EX 300
 # Much less memory than storing every key
 
 # Create filter (1M capacity, 0.01% error rate)
-BF.RESERVE workshop:dedup:bloom 0.0001 1000000
+BF.RESERVE uc5:dedup:bloom 0.0001 1000000
 
 # Check + add in one step
-BF.ADD workshop:dedup:bloom "a1b2c3d4e5f6"
+BF.ADD uc5:dedup:bloom "a1b2c3d4e5f6"
 # → (integer) 1  ← new item, not seen before
 
-BF.ADD workshop:dedup:bloom "a1b2c3d4e5f6"
+BF.ADD uc5:dedup:bloom "a1b2c3d4e5f6"
 # → (integer) 0  ← already exists = DUPLICATE
 
 # Check without adding
-BF.EXISTS workshop:dedup:bloom "a1b2c3d4e5f6"
+BF.EXISTS uc5:dedup:bloom "a1b2c3d4e5f6"
 # → (integer) 1  ← exists</code></pre>
 
                     <pre><code class="language-java">// Java equivalent with Lettuce + RedisBloom
 // Note: Bloom filters don't support per-item TTL
 // Combine with time-bucketed filter names:
-//   "workshop:dedup:bloom:2024-01-15-14"  (hourly bucket)
+//   "uc5:dedup:bloom:2024-01-15-14"  (hourly bucket)
 
 // BF.ADD via Lettuce custom command
 Long added = redis.execute((RedisCallback&lt;Long&gt;) conn ->
     conn.commands().execute("BF.ADD",
-        "workshop:dedup:bloom".getBytes(),
+        "uc5:dedup:bloom".getBytes(),
         txHash.getBytes())
 );
 

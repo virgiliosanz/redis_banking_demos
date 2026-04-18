@@ -260,7 +260,7 @@
                         <pre><code class="language-java">// === CRUD Operations ===
 
 // 1. CREATE — JSON.SET (store document)
-String key = "workshop:docs:regulation:psd2:chunk:0";
+String key = "uc8:doc:psd2:chunk:0";
 String json = """
   { "id": "psd2:chunk:0",
     "title": "PSD2 - Payment Services Directive 2",
@@ -286,7 +286,7 @@ redis.execute(conn -&gt; conn.execute(
 
 // 5. QUERY by field — FT.SEARCH + filter
 redis.execute(conn -&gt; conn.execute(
-  "FT.SEARCH", "idx:regulations",
+  "FT.SEARCH", "idx:uc8:documents",
   "@category:{PSD2}",
   "RETURN", "4",
     "title", "category", "summary", "tags",
@@ -296,7 +296,7 @@ redis.execute(conn -&gt; conn.execute(
 
 // 6. Full-text search — FT.SEARCH
 redis.execute(conn -&gt; conn.execute(
-  "FT.SEARCH", "idx:regulations",
+  "FT.SEARCH", "idx:uc8:documents",
   "payment services",
   "RETURN", "4",
     "title", "category", "summary", "tags",
@@ -305,7 +305,7 @@ redis.execute(conn -&gt; conn.execute(
 // 7. Vector similarity (KNN)
 byte[] queryVec = embedQuery("data protection");
 redis.execute(conn -&gt; conn.execute(
-  "FT.SEARCH", "idx:regulations",
+  "FT.SEARCH", "idx:uc8:documents",
   "*=&gt;[KNN 10 @vector $BLOB AS score]",
   "RETURN", "5",
     "title", "category", "summary", "score",
@@ -315,7 +315,7 @@ redis.execute(conn -&gt; conn.execute(
 
 // 8. Hybrid: text filter + KNN
 redis.execute(conn -&gt; conn.execute(
-  "FT.SEARCH", "idx:regulations",
+  "FT.SEARCH", "idx:uc8:documents",
   "(payment)=&gt;[KNN 5 @vector $BLOB AS score]",
   "RETURN", "5",
     "title", "category", "summary", "score",
@@ -328,7 +328,7 @@ redis.execute(conn -&gt; conn.execute(
                         <pre><code class="language-bash"># === CRUD Operations ===
 
 # 1. CREATE — store document as JSON
-JSON.SET workshop:docs:regulation:psd2:chunk:0 $ '{
+JSON.SET uc8:doc:psd2:chunk:0 $ '{
   "id": "psd2:chunk:0",
   "title": "PSD2 - Payment Services Directive 2",
   "category": "PSD2",
@@ -337,30 +337,30 @@ JSON.SET workshop:docs:regulation:psd2:chunk:0 $ '{
 }'
 
 # 2. READ full document
-JSON.GET workshop:docs:regulation:psd2:chunk:0 $
+JSON.GET uc8:doc:psd2:chunk:0 $
 
 # 3. READ specific field (JSONPath)
-JSON.GET workshop:docs:regulation:psd2:chunk:0 $.title
-JSON.GET workshop:docs:regulation:psd2:chunk:0 $.summary
+JSON.GET uc8:doc:psd2:chunk:0 $.title
+JSON.GET uc8:doc:psd2:chunk:0 $.summary
 
 # 4. READ multiple documents at once
-JSON.MGET workshop:docs:regulation:psd2:chunk:0 \
-  workshop:docs:regulation:gdpr:chunk:0 $
+JSON.MGET uc8:doc:psd2:chunk:0 \
+  uc8:doc:gdpr:chunk:0 $
 
 # 5. QUERY by field — TAG filter
-FT.SEARCH idx:regulations "@category:{PSD2}" \
+FT.SEARCH idx:uc8:documents "@category:{PSD2}" \
   RETURN 4 title category summary tags \
   LIMIT 0 10
 
 # === Search Operations ===
 
 # 6. Full-text search
-FT.SEARCH idx:regulations "payment services" \
+FT.SEARCH idx:uc8:documents "payment services" \
   RETURN 4 title category summary tags \
   LIMIT 0 10
 
 # 7. Vector similarity (KNN)
-FT.SEARCH idx:regulations \
+FT.SEARCH idx:uc8:documents \
   "*=>[KNN 10 @vector $BLOB AS score]" \
   RETURN 5 title category summary tags score \
   SORTBY score \
@@ -368,7 +368,7 @@ FT.SEARCH idx:regulations \
   DIALECT 2
 
 # 8. Hybrid: text pre-filter + KNN
-FT.SEARCH idx:regulations \
+FT.SEARCH idx:uc8:documents \
   "(payment)=>[KNN 5 @vector $BLOB AS score]" \
   RETURN 5 title category summary tags score \
   SORTBY score \

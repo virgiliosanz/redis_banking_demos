@@ -140,25 +140,25 @@
 <pre><code class="language-bash"># ═══ Redis Streams — Transaction Monitoring ═══
 
 # Add a transaction event to the stream
-XADD workshop:txmonitor:stream * \
+XADD uc11:stream:transactions * \
   amount 150.75 riskScore 25.3 \
   type purchase merchant "Store ABC"
 
 # Read last 10 transactions
-XRANGE workshop:txmonitor:stream - + COUNT 10
+XRANGE uc11:stream:transactions - + COUNT 10
 
 # Read transactions from last 60 seconds
 # (replace &lt;timestamp_ms&gt; with epoch ms)
-XRANGE workshop:txmonitor:stream &lt;timestamp_ms&gt;-0 + COUNT 100
+XRANGE uc11:stream:transactions &lt;timestamp_ms&gt;-0 + COUNT 100
 
 # Count total transactions in the stream
-XLEN workshop:txmonitor:stream
+XLEN uc11:stream:transactions
 
 # Trim stream to last 10000 entries (retention)
-XTRIM workshop:txmonitor:stream MAXLEN ~ 10000
+XTRIM uc11:stream:transactions MAXLEN ~ 10000
 
 # Read transactions in reverse (most recent first)
-XREVRANGE workshop:txmonitor:stream + - COUNT 5</code></pre>
+XREVRANGE uc11:stream:transactions + - COUNT 5</code></pre>
                 </div>
 
                 <!-- Java -->
@@ -174,20 +174,20 @@ Map&lt;String, String&gt; txData = Map.of(
 );
 redisTemplate.opsForStream().add(
     StreamRecords.string(txData)
-        .withStreamKey("workshop:txmonitor:stream")
+        .withStreamKey("uc11:stream:transactions")
 );
 
 // Read transactions from last 60 seconds
 long fromTs = System.currentTimeMillis() - 60000;
 List&lt;MapRecord&lt;String, Object, Object&gt;&gt; records =
     redisTemplate.opsForStream().range(
-        "workshop:txmonitor:stream",
+        "uc11:stream:transactions",
         Range.closed(fromTs + "-0", "+")
     );
 
 // Calculate metrics from stream data
 long totalCount = redisTemplate.opsForStream()
-    .size("workshop:txmonitor:stream");
+    .size("uc11:stream:transactions");
 
 // Aggregate: compute TPS, avg amount per second
 Map&lt;Long, List&lt;Double&gt;&gt; buckets = new TreeMap&lt;&gt;();

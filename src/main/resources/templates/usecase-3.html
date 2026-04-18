@@ -147,7 +147,7 @@
 
                     <div class="code-block" id="tab-java">
                         <pre><code class="language-java">// 1. Aggregate from multiple DBs — HSET
-String key = "workshop:profile:user:" + userId;
+String key = "uc3:user:" + userId;
 
 Map&lt;String, String&gt; profile = new HashMap&lt;&gt;();
 
@@ -185,7 +185,7 @@ redis.opsForHash()
 
                     <div class="code-block active" id="tab-cli">
                         <pre><code class="language-bash"># 1. Store aggregated profile
-HSET workshop:profile:user:U1001 \
+HSET uc3:user:U1001 \
   account_number "ES76-0128-0001..." \
   account_balance "12450.75" \
   account_type "Premium Savings" \
@@ -196,21 +196,21 @@ HSET workshop:profile:user:U1001 \
   pref_theme "light"
 
 # 2. Set TTL
-EXPIRE workshop:profile:user:U1001 600
+EXPIRE uc3:user:U1001 600
 
 # 3. Read full profile
-HGETALL workshop:profile:user:U1001
+HGETALL uc3:user:U1001
 
 # 4. Update single field
-HSET workshop:profile:user:U1001 \
+HSET uc3:user:U1001 \
   pref_language "en"
 
 # 5. Atomic increment
-HINCRBY workshop:profile:user:U1001 \
+HINCRBY uc3:user:U1001 \
   activity_loginCount 1
 
 # 6. Read single field
-HGET workshop:profile:user:U1001 \
+HGET uc3:user:U1001 \
   account_balance</code></pre>
                     </div>
                 </div>

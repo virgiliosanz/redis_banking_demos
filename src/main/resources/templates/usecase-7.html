@@ -163,7 +163,7 @@
 
                     <div class="code-block" id="tab-java">
                         <pre><code class="language-java">// 1. Store client features — HSET (bulk)
-String key = "workshop:features:client:C1001";
+String key = "uc7:client:C1001";
 
 Map&lt;String, String&gt; features = Map.of(
     "tx_count_1h",         "2",
@@ -218,7 +218,7 @@ String riskScore = (String) redis.opsForHash()
 
                     <div class="code-block active" id="tab-cli">
                         <pre><code class="language-bash"># 1. Store feature vector (bulk HSET)
-HSET workshop:features:client:C1001 \
+HSET uc7:client:C1001 \
   tx_count_1h 2 \
   tx_count_24h 5 \
   tx_amount_avg_24h "120.50" \
@@ -228,21 +228,21 @@ HSET workshop:features:client:C1001 \
   risk_score 12
 
 # 2. Read full feature vector (~0.1ms)
-HGETALL workshop:features:client:C1001
+HGETALL uc7:client:C1001
 
 # 3. Atomic counter increment
-HINCRBY workshop:features:client:C1001 \
+HINCRBY uc7:client:C1001 \
   tx_count_1h 1
-HINCRBY workshop:features:client:C1001 \
+HINCRBY uc7:client:C1001 \
   tx_count_24h 1
 
 # 4. Update computed features
-HSET workshop:features:client:C1001 \
+HSET uc7:client:C1001 \
   tx_amount_avg_24h "135.25" \
   risk_score 15
 
 # 5. Read single feature
-HGET workshop:features:client:C1001 risk_score
+HGET uc7:client:C1001 risk_score
 
 # 6. Feature store vs data warehouse
 # Redis Hash: HGETALL → ~0.1ms latency

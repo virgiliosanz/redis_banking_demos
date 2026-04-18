@@ -134,7 +134,7 @@
 // Pattern: INCR + EXPIRE
 // Simple, efficient, atomic counter per time window
 
-String key = "workshop:ratelimit:" + clientId;
+String key = "uc4:ratelimit:" + clientId;
 
 // INCR atomically increments (creates key=1 if absent)
 Long count = redis.opsForValue().increment(key);
@@ -162,7 +162,7 @@ if (!allowed) {
 // Pattern: Sorted Set (ZADD + ZRANGEBYSCORE + ZCARD)
 // More precise than fixed-window, no boundary burst
 
-String key = "workshop:ratelimit:sliding:" + clientId;
+String key = "uc4:ratelimit:sliding:" + clientId;
 long now = System.currentTimeMillis();
 long windowStart = now - (WINDOW_SECONDS * 1000);
 
@@ -193,31 +193,31 @@ if (count != null &amp;&amp; count &lt; MAX_REQUESTS) {
 <pre><code class="language-bash"># ═══ Fixed-Window with Redis CLI ═══
 
 # Increment counter (creates if not exists)
-INCR workshop:ratelimit:fintech-app-001
+INCR uc4:ratelimit:fintech-app-001
 # → (integer) 1
 
 # Set expiry on first request
-EXPIRE workshop:ratelimit:fintech-app-001 60
+EXPIRE uc4:ratelimit:fintech-app-001 60
 # → (integer) 1
 
 # Check current count
-GET workshop:ratelimit:fintech-app-001
+GET uc4:ratelimit:fintech-app-001
 # → "5"
 
 # Check TTL (time until window resets)
-TTL workshop:ratelimit:fintech-app-001
+TTL uc4:ratelimit:fintech-app-001
 # → (integer) 42
 
 # ═══ Sliding-Window with Redis CLI ═══
 
 # Add request with timestamp as score
-ZADD workshop:ratelimit:sliding:fintech-app-001 1713045600000 "req-uuid-1"
+ZADD uc4:ratelimit:sliding:fintech-app-001 1713045600000 "req-uuid-1"
 
 # Remove expired entries
-ZREMRANGEBYSCORE workshop:ratelimit:sliding:fintech-app-001 0 1713045540000
+ZREMRANGEBYSCORE uc4:ratelimit:sliding:fintech-app-001 0 1713045540000
 
 # Count requests in current window
-ZCARD workshop:ratelimit:sliding:fintech-app-001
+ZCARD uc4:ratelimit:sliding:fintech-app-001
 # → (integer) 3</code></pre>
                 </div>
             </section>

@@ -156,7 +156,7 @@
                 <div class="code-container">
                     <h3 class="code-section-title">1. Velocity Tracking (Sorted Set)</h3>
                     <pre><code class="language-java">// ZADD — record each transaction with timestamp as score
-String velocityKey = "workshop:fraud:velocity:" + cardNumber;
+String velocityKey = "uc6:velocity:" + cardNumber;
 long now = Instant.now().toEpochMilli();
 
 redis.opsForZSet().add(velocityKey, txId, now);
@@ -175,18 +175,18 @@ redis.opsForZSet()
 
                     <h3 class="code-section-title">2. Redis CLI — Velocity Check</h3>
                     <pre><code class="language-bash"># Add transaction with timestamp as score
-ZADD workshop:fraud:velocity:4000-1234 1713045600000 "tx-abc123"
+ZADD uc6:velocity:4000-1234 1713045600000 "tx-abc123"
 # → (integer) 1
 
 # Count transactions in last 5 minutes
-ZRANGEBYSCORE workshop:fraud:velocity:4000-1234 1713045300000 1713045600000
+ZRANGEBYSCORE uc6:velocity:4000-1234 1713045300000 1713045600000
 # → 1) "tx-prev001"
 # → 2) "tx-prev002"
 # → 3) "tx-abc123"
 # 3 transactions → elevated velocity
 
 # Clean old entries
-ZREMRANGEBYSCORE workshop:fraud:velocity:4000-1234 0 1713045299999</code></pre>
+ZREMRANGEBYSCORE uc6:velocity:4000-1234 0 1713045299999</code></pre>
 
                     <h3 class="code-section-title">3. Event Stream (Redis Streams)</h3>
                     <pre><code class="language-java">// XADD — log every fraud evaluation to a stream
@@ -200,27 +200,27 @@ Map&lt;String, String&gt; entry = Map.of(
 
 redis.opsForStream().add(
     StreamRecords.string(entry)
-        .withStreamKey("workshop:fraud:stream"));
+        .withStreamKey("uc6:stream:transactions"));
 
 // XREVRANGE — read most recent evaluations
 redis.opsForStream().reverseRange(
-    "workshop:fraud:stream",
+    "uc6:stream:transactions",
     Range.unbounded(),
     Limit.limit().count(20));</code></pre>
 
                     <h3 class="code-section-title">4. Redis CLI — Stream Commands</h3>
                     <pre><code class="language-bash"># Log a fraud evaluation event
-XADD workshop:fraud:stream * txId "tx-abc123" card "4000-1234" amount "15000.00" riskScore "75" riskLevel "CRITICAL"
+XADD uc6:stream:transactions * txId "tx-abc123" card "4000-1234" amount "15000.00" riskScore "75" riskLevel "CRITICAL"
 # → "1713045600000-0"
 
 # Read last 5 evaluations
-XREVRANGE workshop:fraud:stream + - COUNT 5
+XREVRANGE uc6:stream:transactions + - COUNT 5
 
 # Stream length
-XLEN workshop:fraud:stream
+XLEN uc6:stream:transactions
 
 # Trim to last 50 entries
-XTRIM workshop:fraud:stream MAXLEN ~ 50</code></pre>
+XTRIM uc6:stream:transactions MAXLEN ~ 50</code></pre>
                 </div>
             </section>
         </div>

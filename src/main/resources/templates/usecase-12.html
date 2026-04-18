@@ -152,30 +152,30 @@
 <pre><code class="language-bash"># ═══ Approach 1: Native Geospatial ═══
 
 # Add ATM locations — GEOADD key lng lat member
-GEOADD workshop:geo:atms -3.7038 40.4168 "atm-001"
-GEOADD workshop:geo:atms -3.7056 40.4200 "atm-002"
-GEOADD workshop:geo:atms -3.6931 40.4194 "branch-001"
+GEOADD uc12:geo:atms -3.7038 40.4168 "atm-001"
+GEOADD uc12:geo:atms -3.7056 40.4200 "atm-002"
+GEOADD uc12:geo:atms -3.6931 40.4194 "branch-001"
 
 # Store metadata in separate Hash
-HSET workshop:geo:meta:atm-001 name "Cajero Sol" \
+HSET uc12:meta:atm-001 name "Cajero Sol" \
   type atm address "Puerta del Sol 1" hours 24h \
   services "withdrawal,deposit,balance"
 
 # Find ATMs within 2km of Puerta del Sol
-GEOSEARCH workshop:geo:atms FROMLONLAT -3.7038 40.4168 \
+GEOSEARCH uc12:geo:atms FROMLONLAT -3.7038 40.4168 \
   BYRADIUS 2 km ASC COUNT 10 WITHDIST
 # → 1) "atm-001" "0.0000"
 # → 2) "atm-009" "0.3150"
 # → 3) "branch-007" "0.4820"
 
 # Distance between two points
-GEODIST workshop:geo:atms atm-001 branch-001 km
+GEODIST uc12:geo:atms atm-001 branch-001 km
 # → "0.9510"
 
 # ═══ Approach 2: JSON + Redis Query Engine ═══
 
 # Store rich documents with JSON.SET
-JSON.SET workshop:geo:branch:atm-001 $ '{
+JSON.SET uc12:branch:atm-001 $ '{
   "name": "Cajero Sol", "type": "atm",
   "address": "Puerta del Sol 1, Madrid",
   "services": ["withdrawal","deposit","balance"],
@@ -184,8 +184,8 @@ JSON.SET workshop:geo:branch:atm-001 $ '{
 }'
 
 # Create index with GEO + TAG fields
-FT.CREATE idx:branches ON JSON
-  PREFIX 1 workshop:geo:branch:
+FT.CREATE idx:uc12:branches ON JSON
+  PREFIX 1 uc12:branch:
   SCHEMA
     $.location AS location GEO
     $.type AS type TAG
@@ -194,15 +194,15 @@ FT.CREATE idx:branches ON JSON
     $.hours AS hours TAG
 
 # Geo search — all within 2km
-FT.SEARCH idx:branches
+FT.SEARCH idx:uc12:branches
   "@location:[-3.7038 40.4168 2 km]"
 
 # Geo + type filter — only ATMs within 2km
-FT.SEARCH idx:branches
+FT.SEARCH idx:uc12:branches
   "@location:[-3.7038 40.4168 2 km] @type:{atm}"
 
 # Geo + type + service filter
-FT.SEARCH idx:branches
+FT.SEARCH idx:uc12:branches
   "@location:[-3.7038 40.4168 2 km] @type:{branch} @services:{advisor}"</code></pre>
                 </div>
 
@@ -211,12 +211,12 @@ FT.SEARCH idx:branches
 <pre><code class="language-java">// ═══ Approach 1: Native Geospatial ═══
 
 // GEOADD — add locations with coordinates
-redis.opsForGeo().add("workshop:geo:atms",
+redis.opsForGeo().add("uc12:geo:atms",
     new Point(-3.7038, 40.4168), "atm-001");
 
 // GEOSEARCH — find within radius, sorted by distance
 GeoResults&lt;GeoLocation&lt;String&gt;&gt; results =
-    redis.opsForGeo().search("workshop:geo:atms",
+    redis.opsForGeo().search("uc12:geo:atms",
         GeoReference.fromCoordinate(-3.7038, 40.4168),
         new Distance(2, Metrics.KILOMETERS),
         GeoSearchCommandArgs.newGeoSearchArgs()
@@ -228,7 +228,7 @@ GeoResults&lt;GeoLocation&lt;String&gt;&gt; results =
 for (var r : results) {
     String id = r.getContent().getName();
     Map meta = redis.opsForHash()
-        .entries("workshop:geo:meta:" + id);
+        .entries("uc12:meta:" + id);
     // meta has: name, type, address, services
 }
 
@@ -236,14 +236,14 @@ for (var r : results) {
 
 // JSON.SET — store rich document
 redis.execute(conn -&gt; conn.execute(
-    "JSON.SET", "workshop:geo:branch:atm-001",
+    "JSON.SET", "uc12:branch:atm-001",
     "$", jsonString));
 
 // FT.CREATE — index with GEO field
 redis.execute(conn -&gt; conn.execute(
-    "FT.CREATE", "idx:branches",
+    "FT.CREATE", "idx:uc12:branches",
     "ON", "JSON",
-    "PREFIX", "1", "workshop:geo:branch:",
+    "PREFIX", "1", "uc12:branch:",
     "SCHEMA",
     "$.location", "AS", "location", "GEO",
     "$.type", "AS", "type", "TAG",
@@ -255,7 +255,7 @@ String query = "@location:[-3.7038 40.4168 2 km]"
     + " @type:{atm}"
     + " @services:{deposit}";
 redis.execute(conn -&gt; conn.execute(
-    "FT.SEARCH", "idx:branches", query));</code></pre>
+    "FT.SEARCH", "idx:uc12:branches", query));</code></pre>
                 </div>
             </section>
         </div>

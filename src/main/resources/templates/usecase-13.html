@@ -16,7 +16,7 @@
             <summary><h2>How it works</h2></summary>
             <div class="how-it-works-steps">
                 <ol>
-                    <li><strong>Lock request:</strong> Client sends <code>SET workshop:lock:{accountId} {clientId} NX EX 30</code> — atomic acquire with TTL.</li>
+                    <li><strong>Lock request:</strong> Client sends <code>SET uc13:lock:{accountId} {clientId} NX EX 30</code> — atomic acquire with TTL.</li>
                     <li><strong>NX guarantee:</strong> Only the first client succeeds. Others get a denial — mutual exclusion enforced by Redis.</li>
                     <li><strong>Safe release:</strong> A Lua script checks that the caller owns the lock before deleting — prevents accidental release.</li>
                     <li><strong>Auto-expiry:</strong> EX ensures locks are released even if the holder crashes — no deadlocks.</li>
@@ -126,7 +126,7 @@
 
                     <div class="code-block" id="tab-java">
                         <pre><code class="language-java">// 1. Acquire lock — SET NX EX (atomic)
-String key = "workshop:lock:" + accountId;
+String key = "uc13:lock:" + accountId;
 Boolean acquired = redis.opsForValue()
     .setIfAbsent(key, clientId,
         Duration.ofSeconds(30));  // NX + EX
@@ -160,33 +160,33 @@ Long ttl = redis.getExpire(key, TimeUnit.SECONDS);</code></pre>
 
                     <div class="code-block active" id="tab-cli">
                         <pre><code class="language-bash"># 1. Acquire lock (atomic SET NX EX)
-SET workshop:lock:acc-1001 transfer-svc-1 NX EX 30
+SET uc13:lock:acc-1001 transfer-svc-1 NX EX 30
 # → OK if acquired, (nil) if already held
 
 # 2. Check who holds the lock
-GET workshop:lock:acc-1001
+GET uc13:lock:acc-1001
 # → "transfer-svc-1"
 
 # 3. Check remaining TTL
-TTL workshop:lock:acc-1001
+TTL uc13:lock:acc-1001
 # → 28 (seconds remaining)
 
 # 4. Try to acquire from another client (DENIED)
-SET workshop:lock:acc-1001 transfer-svc-2 NX EX 30
+SET uc13:lock:acc-1001 transfer-svc-2 NX EX 30
 # → (nil)  ← NX prevents overwrite
 
 # 5. Safe release with Lua script
 EVAL "if redis.call('GET', KEYS[1]) == ARGV[1] \
   then return redis.call('DEL', KEYS[1]) \
   else return 0 end" \
-  1 workshop:lock:acc-1001 transfer-svc-1
+  1 uc13:lock:acc-1001 transfer-svc-1
 # → 1 (released)
 
 # 6. Wrong client tries to release (DENIED)
 EVAL "if redis.call('GET', KEYS[1]) == ARGV[1] \
   then return redis.call('DEL', KEYS[1]) \
   else return 0 end" \
-  1 workshop:lock:acc-1001 transfer-svc-2
+  1 uc13:lock:acc-1001 transfer-svc-2
 # → 0 (not your lock!)</code></pre>
                     </div>
                 </div>

@@ -143,7 +143,7 @@
                     <div class="code-block" id="tab-java">
                         <pre><code class="language-java">// 1. Generate token &amp; store as Hash — HSET
 String tokenId = UUID.randomUUID().toString();
-String key = "workshop:auth:token:" + tokenId;
+String key = "uc1:token:" + tokenId;
 
 Map&lt;String, String&gt; tokenData = Map.of(
     "tokenId",  tokenId,
@@ -174,7 +174,7 @@ redis.delete(key);</code></pre>
 
                     <div class="code-block active" id="tab-cli">
                         <pre><code class="language-bash"># 1. Store auth token as Hash
-HSET workshop:auth:token:a1b2c3d4-uuid \
+HSET uc1:token:a1b2c3d4-uuid \
   tokenId "a1b2c3d4-uuid" \
   username "user1" \
   fullName "Ana García López" \
@@ -182,19 +182,19 @@ HSET workshop:auth:token:a1b2c3d4-uuid \
   issuedAt "1713045600000"
 
 # 2. Set TTL (300 seconds = 5 min)
-EXPIRE workshop:auth:token:a1b2c3d4-uuid 300
+EXPIRE uc1:token:a1b2c3d4-uuid 300
 
 # 3. Validate — read all token fields
-HGETALL workshop:auth:token:a1b2c3d4-uuid
+HGETALL uc1:token:a1b2c3d4-uuid
 
 # 4. Read single field
-HGET workshop:auth:token:a1b2c3d4-uuid username
+HGET uc1:token:a1b2c3d4-uuid username
 
 # 5. Check remaining TTL
-TTL workshop:auth:token:a1b2c3d4-uuid
+TTL uc1:token:a1b2c3d4-uuid
 
 # 6. Logout — delete token
-DEL workshop:auth:token:a1b2c3d4-uuid</code></pre>
+DEL uc1:token:a1b2c3d4-uuid</code></pre>
                     </div>
                 </div>
             </section>
