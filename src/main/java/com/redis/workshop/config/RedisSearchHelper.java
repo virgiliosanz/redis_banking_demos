@@ -20,6 +20,16 @@ import java.util.*;
  * Spring Data Redis's connection.execute() uses ByteArrayOutput which cannot
  * handle the integer count that FT.SEARCH returns as its first element.
  * This helper uses NestedMultiOutput to properly handle mixed return types.
+ *
+ * <p>Redis 8 defaults to RESP3 which returns FT.SEARCH results as a map
+ * ({@code total_results}, {@code results}, {@code attributes}, {@code format},
+ * {@code warning}) rather than the RESP2 flat array. Callers across this
+ * codebase were written against the RESP2 layout
+ * {@code [count, key1, [fields1], key2, [fields2], ...]}, so {@code ftSearchRaw}
+ * and {@code ftSearchWithBinaryArgs} detect RESP3 responses and normalize them
+ * back to that flat layout. When the caller requested {@code WITHSCORES}, the
+ * score is inlined between the key and its fields list, matching RESP2
+ * {@code [count, key1, score1, [fields1], ...]}.
  */
 @Component
 public class RedisSearchHelper {
@@ -56,7 +66,9 @@ public class RedisSearchHelper {
 
     /**
      * Execute FT.SEARCH using Lettuce's native dispatch with NestedMultiOutput.
-     * Returns raw List&lt;Object&gt; result for callers that need custom parsing.
+     * Returns a RESP2-flat layout regardless of protocol version:
+     * <pre>[count, key1, (score1)?, [f1,v1,...], key2, (score2)?, [...], ...]</pre>
+     * (score elements are only present when {@code WITHSCORES} was requested).
      */
     @SuppressWarnings("unchecked")
     public List<Object> ftSearchRaw(String indexName, String query, String... extraArgs) {
@@ -73,7 +85,7 @@ public class RedisSearchHelper {
 
             NestedMultiOutput<byte[], byte[]> output = new NestedMultiOutput<>(codec);
             List<Object> result = statefulConn.sync().dispatch(FT_SEARCH, output, args);
-            return result;
+            return normalizeToResp2Flat(result);
         });
     }
 
@@ -87,6 +99,7 @@ public class RedisSearchHelper {
 
     /**
      * Execute FT.SEARCH with binary args (for vector KNN queries with raw byte[] params).
+     * Returns the same RESP2-flat layout as {@link #ftSearchRaw(String, String, String...)}.
      */
     @SuppressWarnings("unchecked")
     public List<Object> ftSearchWithBinaryArgs(String indexName, byte[][] allArgs) {
@@ -102,13 +115,20 @@ public class RedisSearchHelper {
 
             NestedMultiOutput<byte[], byte[]> output = new NestedMultiOutput<>(codec);
             List<Object> result = statefulConn.sync().dispatch(FT_SEARCH, output, args);
-            return result;
+            return normalizeToResp2Flat(result);
         });
     }
 
     /**
-     * Parse FT.SEARCH raw results into a list of maps.
-     * FT.SEARCH returns: [count, key1, [field1, val1, ...], key2, [...], ...]
+     * Parse a RESP2-flat FT.SEARCH response into a list of maps, one per document.
+     * Each map includes the document key under {@code _key} plus every returned field.
+     *
+     * <p>Assumes the input already uses the flat layout
+     * {@code [count, key1, [fields1], key2, [fields2], ...]} produced by
+     * {@link #ftSearchRaw(String, String, String...)} and
+     * {@link #ftSearchWithBinaryArgs(String, byte[][])}, which normalize RESP3
+     * responses upstream so all callers observe the same structure regardless
+     * of the negotiated Redis protocol.
      */
     public List<Map<String, String>> parseSearchResults(List<Object> rawResult) {
         List<Map<String, String>> results = new ArrayList<>();
@@ -122,13 +142,80 @@ public class RedisSearchHelper {
 
             Object fieldsObj = rawResult.get(i + 1);
             if (fieldsObj instanceof List<?> fields) {
-                for (int j = 0; j < fields.size() - 1; j += 2) {
+                for (int j = 0; j + 1 < fields.size(); j += 2) {
                     doc.put(toStr(fields.get(j)), toStr(fields.get(j + 1)));
                 }
             }
             results.add(doc);
         }
         return results;
+    }
+
+    /**
+     * Normalize an FT.SEARCH response to the RESP2-flat layout:
+     * <pre>[count, key1, (score1)?, [f1,v1,...], key2, (score2)?, [...], ...]</pre>
+     *
+     * <p>RESP2 responses are returned unchanged. RESP3 responses — which Lettuce's
+     * {@link NestedMultiOutput} delivers as a flat list of alternating key/value
+     * pairs for each map level (top-level document and each per-result document) —
+     * are converted by locating {@code total_results} and {@code results}, then
+     * rewriting each result's {@code id}, optional {@code score} (present only
+     * when {@code WITHSCORES} was requested), and fields from
+     * {@code extra_attributes} (falling back to {@code values} if missing).
+     */
+    @SuppressWarnings("unchecked")
+    private List<Object> normalizeToResp2Flat(List<Object> raw) {
+        if (raw == null || raw.isEmpty()) return raw;
+        Object first = raw.get(0);
+        // RESP2 already starts with the integer count — nothing to do.
+        if (first instanceof Number) return raw;
+
+        long total = 0L;
+        List<Object> resultsList = null;
+        for (int i = 0; i + 1 < raw.size(); i += 2) {
+            String key = toStr(raw.get(i));
+            Object val = raw.get(i + 1);
+            if ("total_results".equals(key) && val instanceof Number n) {
+                total = n.longValue();
+            } else if ("results".equals(key) && val instanceof List<?> l) {
+                resultsList = (List<Object>) l;
+            }
+        }
+
+        List<Object> flat = new ArrayList<>();
+        flat.add(total);
+        if (resultsList == null) return flat;
+
+        for (Object docObj : resultsList) {
+            if (!(docObj instanceof List<?> docFlat)) continue;
+            String docKey = null;
+            String scoreStr = null;
+            List<Object> attrs = null;
+            List<Object> values = null;
+            for (int i = 0; i + 1 < docFlat.size(); i += 2) {
+                String fn = toStr(docFlat.get(i));
+                Object fv = docFlat.get(i + 1);
+                switch (fn) {
+                    case "id" -> docKey = toStr(fv);
+                    case "score" -> scoreStr = toStr(fv);
+                    case "extra_attributes" -> {
+                        if (fv instanceof List<?> l) attrs = (List<Object>) l;
+                    }
+                    case "values" -> {
+                        if (fv instanceof List<?> l) values = (List<Object>) l;
+                    }
+                    default -> { /* ignore payload, sortkey, format, etc. */ }
+                }
+            }
+            if (docKey == null) continue;
+            flat.add(docKey);
+            if (scoreStr != null) flat.add(scoreStr);
+            List<Object> fields = (attrs != null && !attrs.isEmpty())
+                    ? attrs
+                    : (values != null ? values : new ArrayList<>());
+            flat.add(fields);
+        }
+        return flat;
     }
 
     public static String toStr(Object obj) {
