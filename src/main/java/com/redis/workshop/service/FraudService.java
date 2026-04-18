@@ -1,5 +1,6 @@
 package com.redis.workshop.service;
 
+import com.redis.workshop.config.RedisScanHelper;
 import jakarta.annotation.PostConstruct;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.StreamRecords;
@@ -160,8 +161,8 @@ public class FraudService {
      */
     public void reset() {
         redis.delete(STREAM_KEY);
-        Set<String> velocityKeys = redis.keys(VELOCITY_KEY_PREFIX + "*");
-        if (velocityKeys != null && !velocityKeys.isEmpty()) {
+        Set<String> velocityKeys = RedisScanHelper.scanKeys(redis, VELOCITY_KEY_PREFIX + "*");
+        if (!velocityKeys.isEmpty()) {
             redis.delete(velocityKeys);
         }
         loadBaselineData();

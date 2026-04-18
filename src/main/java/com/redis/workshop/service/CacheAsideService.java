@@ -3,6 +3,7 @@ package com.redis.workshop.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.redis.workshop.config.RedisScanHelper;
 import jakarta.annotation.PostConstruct;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -149,9 +150,9 @@ public class CacheAsideService {
     }
 
     public Map<String, Object> evictAll() {
-        Set<String> keys = redis.keys(CACHE_PREFIX + "*");
+        Set<String> keys = RedisScanHelper.scanKeys(redis, CACHE_PREFIX + "*");
         int count = 0;
-        if (keys != null && !keys.isEmpty()) {
+        if (!keys.isEmpty()) {
             count = keys.size();
             redis.delete(keys);
         }

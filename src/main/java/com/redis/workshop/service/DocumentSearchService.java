@@ -1,6 +1,7 @@
 package com.redis.workshop.service;
 
 import com.redis.workshop.config.DocumentDataLoader;
+import com.redis.workshop.config.RedisScanHelper;
 import com.redis.workshop.config.RedisSearchHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,8 +110,7 @@ public class DocumentSearchService {
     /** List all loaded regulation documents. */
     public List<Map<String, Object>> listDocuments() {
         List<Map<String, Object>> docs = new ArrayList<>();
-        Set<String> keys = redis.keys(DOC_PREFIX + "*");
-        if (keys == null) return docs;
+        Set<String> keys = RedisScanHelper.scanKeys(redis, DOC_PREFIX + "*");
 
         for (String key : keys) {
             Map<String, Object> doc = readJsonDoc(key);

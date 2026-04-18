@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.redis.workshop.config.RedisScanHelper;
 import com.redis.workshop.config.RedisSearchHelper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.context.annotation.DependsOn;
@@ -106,7 +107,14 @@ public class AssistantService {
             List<String> texts = items.stream()
                     .map(m -> m.get("summary") + " " + m.get("tags") + " " + m.get("detail"))
                     .toList();
-            vectors = openAiService.getEmbeddings(texts);
+            try {
+                vectors = openAiService.getEmbeddings(texts);
+            } catch (OpenAiException e) {
+                log.warn("UC9: OpenAI embeddings failed for memories ({}), falling back to mock vectors", e.getMessage());
+                vectors = items.stream()
+                        .map(m -> DocumentDataLoader.generateVector(m.get("summary") + " " + m.get("tags")))
+                        .toList();
+            }
         } else {
             vectors = items.stream()
                     .map(m -> DocumentDataLoader.generateVector(m.get("summary") + " " + m.get("tags")))
@@ -181,7 +189,14 @@ public class AssistantService {
             List<String> texts = articles.stream()
                     .map(a -> a.get("title") + " " + a.get("tags") + " " + a.get("content"))
                     .toList();
-            vectors = openAiService.getEmbeddings(texts);
+            try {
+                vectors = openAiService.getEmbeddings(texts);
+            } catch (OpenAiException e) {
+                log.warn("UC9: OpenAI embeddings failed for KB articles ({}), falling back to mock vectors", e.getMessage());
+                vectors = articles.stream()
+                        .map(a -> DocumentDataLoader.generateVector(a.get("title") + " " + a.get("tags")))
+                        .toList();
+            }
         } else {
             vectors = articles.stream()
                     .map(a -> DocumentDataLoader.generateVector(a.get("title") + " " + a.get("tags")))
@@ -477,7 +492,13 @@ public class AssistantService {
 
     // ── Vector Search (real KNN via FT.SEARCH) ────────────────────────
     private List<Map<String, Object>> vectorSearch(String indexName, String query, int k) {
-        float[] queryVector = openAiService.getEmbedding(query);
+        float[] queryVector;
+        try {
+            queryVector = openAiService.getEmbedding(query);
+        } catch (OpenAiException e) {
+            log.warn("UC9: OpenAI embedding failed ({}), falling back to mock vector for KNN on {}", e.getMessage(), indexName);
+            queryVector = DocumentDataLoader.generateVector(query);
+        }
         byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
 
         // FT.SEARCH <idx> "*=>[KNN <k> @vector $BLOB]" PARAMS 2 BLOB <bytes> DIALECT 2
@@ -917,8 +938,8 @@ public class AssistantService {
         stats.put("ttlSeconds", CACHE_TTL_SECONDS);
 
         // Count cached entries
-        Set<String> cacheKeys = redis.keys(CACHE_PREFIX + "*");
-        stats.put("cachedEntries", cacheKeys != null ? cacheKeys.size() : 0);
+        Set<String> cacheKeys = RedisScanHelper.scanKeys(redis, CACHE_PREFIX + "*");
+        stats.put("cachedEntries", cacheKeys.size());
 
         long total = cacheHits.get() + cacheMisses.get();
         stats.put("hitRate", total > 0 ? String.format("%.1f%%", (cacheHits.get() * 100.0) / total) : "N/A");
@@ -933,14 +954,14 @@ public class AssistantService {
     // ── Reset ───────────────────────────────────────────────────────────
     public void reset() {
         // Clean up all keys
-        Set<String> convKeys = redis.keys(CONV_PREFIX + "*");
-        if (convKeys != null && !convKeys.isEmpty()) redis.delete(convKeys);
-        Set<String> memKeys = redis.keys(MEMORY_PREFIX + "*");
-        if (memKeys != null && !memKeys.isEmpty()) redis.delete(memKeys);
-        Set<String> kbKeys = redis.keys(KB_PREFIX + "*");
-        if (kbKeys != null && !kbKeys.isEmpty()) redis.delete(kbKeys);
-        Set<String> cacheKeys = redis.keys(CACHE_PREFIX + "*");
-        if (cacheKeys != null && !cacheKeys.isEmpty()) redis.delete(cacheKeys);
+        Set<String> convKeys = RedisScanHelper.scanKeys(redis, CONV_PREFIX + "*");
+        if (!convKeys.isEmpty()) redis.delete(convKeys);
+        Set<String> memKeys = RedisScanHelper.scanKeys(redis, MEMORY_PREFIX + "*");
+        if (!memKeys.isEmpty()) redis.delete(memKeys);
+        Set<String> kbKeys = RedisScanHelper.scanKeys(redis, KB_PREFIX + "*");
+        if (!kbKeys.isEmpty()) redis.delete(kbKeys);
+        Set<String> cacheKeys = RedisScanHelper.scanKeys(redis, CACHE_PREFIX + "*");
+        if (!cacheKeys.isEmpty()) redis.delete(cacheKeys);
         // Reset cache stats
         cacheHits.set(0);
         cacheMisses.set(0);
