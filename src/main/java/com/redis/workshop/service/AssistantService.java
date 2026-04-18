@@ -30,6 +30,9 @@ public class AssistantService {
     private static final String MEMORY_INDEX = "idx:uc9:memory";
     private static final String KB_INDEX = "idx:uc9:kb";
     private static final String CACHE_INDEX = "idx:uc9:cache";
+    // UC8 regulation documents (PDF chunks) — reused for RAG
+    private static final String DOC_INDEX = "idx:uc8:documents";
+    private static final String DOC_PREFIX = "uc8:doc:";
     private static final int VECTOR_DIM = 1536;
     private static final long CONV_TTL_SECONDS = 600;
     private static final long CACHE_TTL_SECONDS = 600;
@@ -314,6 +317,7 @@ public class AssistantService {
                     relevantMemories.add(flat);
                 }
                 List<Map<String, Object>> kbResults = vectorSearch(KB_INDEX, userMessage, 3);
+                kbResults.addAll(vectorSearchRegulationDocs(userMessage, 3));
                 relevantDocs = new ArrayList<>();
                 for (var d : kbResults) {
                     Map<String, String> flat = new LinkedHashMap<>();
@@ -332,6 +336,7 @@ public class AssistantService {
                     relevantMemories.add(flat);
                 }
                 List<Map<String, Object>> kbResults = vectorSearch(KB_INDEX, userMessage, 3);
+                kbResults.addAll(vectorSearchRegulationDocs(userMessage, 3));
                 relevantDocs = new ArrayList<>();
                 for (var d : kbResults) {
                     Map<String, String> flat = new LinkedHashMap<>();
@@ -488,6 +493,67 @@ public class AssistantService {
         return results;
     }
 
+    /**
+     * KNN search against UC8's regulation document index (idx:uc8:documents).
+     * Documents are JSON-backed PDF chunks with fields: title, category, summary, content, tags.
+     * Returns entries shaped like {@link #vectorSearch} so results merge cleanly with KB docs.
+     */
+    private List<Map<String, Object>> vectorSearchRegulationDocs(String query, int k) {
+        if (!openAiService.isConfigured()) return List.of();
+        try {
+            float[] queryVector = openAiService.getEmbedding(query);
+            byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
+
+            String knnQuery = "*=>[KNN " + k + " @vector $BLOB]";
+            byte[][] binaryArgs = new byte[][] {
+                    knnQuery.getBytes(),
+                    "RETURN".getBytes(),
+                    "4".getBytes(),
+                    "title".getBytes(),
+                    "category".getBytes(),
+                    "summary".getBytes(),
+                    "content".getBytes(),
+                    "PARAMS".getBytes(),
+                    "2".getBytes(),
+                    "BLOB".getBytes(),
+                    vectorBytes,
+                    "DIALECT".getBytes(),
+                    "2".getBytes()
+            };
+
+            List<Object> rawResult = redisSearchHelper.ftSearchWithBinaryArgs(DOC_INDEX, binaryArgs);
+            List<Map<String, String>> parsed = redisSearchHelper.parseSearchResults(rawResult);
+
+            List<Map<String, Object>> results = new ArrayList<>();
+            for (var doc : parsed) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                String key = doc.get("_key");
+                entry.put("redisKey", key);
+                // Derive a stable id from the key (e.g. "uc8:doc:psd2:chunk:5" -> "psd2:chunk:5")
+                if (key != null && key.startsWith(DOC_PREFIX)) {
+                    entry.put("id", key.substring(DOC_PREFIX.length()));
+                } else {
+                    entry.put("id", key != null ? key : "");
+                }
+                entry.put("score", doc.getOrDefault("__vector_score", "0"));
+                entry.put("title", doc.getOrDefault("title", ""));
+                entry.put("content", doc.getOrDefault("content", ""));
+                if (doc.containsKey("summary")) entry.put("summary", doc.get("summary"));
+                if (doc.containsKey("category")) {
+                    entry.put("category", doc.get("category"));
+                    // Expose category as tags too so the UI's tag row renders something useful
+                    entry.put("tags", doc.get("category"));
+                }
+                entry.put("docType", "regulation");
+                results.add(entry);
+            }
+            return results;
+        } catch (Exception e) {
+            log.warn("UC9: Regulation doc search failed: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
     // ── Streaming Chat (OpenAI) ─────────────────────────────────────────
     public void chatStream(String sessionId, String userName, String userMessage, SseEmitter emitter) {
         long startTime = System.currentTimeMillis();
@@ -532,6 +598,7 @@ public class AssistantService {
             // Even on cache hit, retrieve sources so UI can show the RAG context
             List<Map<String, Object>> relevantMemories = vectorSearch(MEMORY_INDEX, userMessage, 3);
             List<Map<String, Object>> relevantDocs = vectorSearch(KB_INDEX, userMessage, 3);
+            relevantDocs.addAll(vectorSearchRegulationDocs(userMessage, 3));
 
             // Send cache-hit event with sources
             try {
@@ -557,6 +624,7 @@ public class AssistantService {
 
             List<Map<String, Object>> relevantMemories = vectorSearch(MEMORY_INDEX, userMessage, 3);
             List<Map<String, Object>> relevantDocs = vectorSearch(KB_INDEX, userMessage, 3);
+            relevantDocs.addAll(vectorSearchRegulationDocs(userMessage, 3));
 
             // Send "sources" event before streaming starts
             try {
