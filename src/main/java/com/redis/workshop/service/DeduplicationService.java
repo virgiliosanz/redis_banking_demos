@@ -1,6 +1,5 @@
 package com.redis.workshop.service;
 
-import com.redis.workshop.config.RedisCommandLogger;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -20,12 +19,10 @@ public class DeduplicationService {
     private static final long WINDOW_SECONDS = 300; // floor to 5-min windows
 
     private final StringRedisTemplate redis;
-    private final RedisCommandLogger commandLogger;
     private final List<Map<String, Object>> transactionLog = new CopyOnWriteArrayList<>();
 
-    public DeduplicationService(StringRedisTemplate redis, RedisCommandLogger commandLogger) {
+    public DeduplicationService(StringRedisTemplate redis) {
         this.redis = redis;
-        this.commandLogger = commandLogger;
     }
 
     /**
@@ -33,7 +30,6 @@ public class DeduplicationService {
      * Uses SET with NX + EX flags (SETNX pattern) for atomic check-and-set.
      */
     public Map<String, Object> submitTransaction(String sender, String receiver, String amount) {
-        commandLogger.startCapture();
         String txHash = generateTxHash(sender, receiver, amount);
         String key = KEY_PREFIX + txHash;
 
@@ -42,9 +38,6 @@ public class DeduplicationService {
 
         boolean accepted = Boolean.TRUE.equals(wasSet);
         String status = accepted ? "ACCEPTED" : "DUPLICATE";
-        commandLogger.log("UC5", "SET NX EX", key, status,
-                "SET " + key + " 1 NX EX " + TTL_SECONDS,
-                accepted ? "OK (new key created)" : "nil (duplicate — key already exists)");
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("status", status);
@@ -55,12 +48,9 @@ public class DeduplicationService {
         result.put("timestamp", Instant.now().toString());
         result.put("redisKey", key);
         result.put("ttlSeconds", TTL_SECONDS);
-        result.put("redisCommands", commandLogger.getCaptured());
 
-        // Add to in-memory log for demo display (without the commands list, not needed historically)
-        Map<String, Object> logEntry = new LinkedHashMap<>(result);
-        logEntry.remove("redisCommands");
-        transactionLog.add(0, logEntry);
+        // Add to in-memory log for demo display
+        transactionLog.add(0, new LinkedHashMap<>(result));
         if (transactionLog.size() > 50) {
             transactionLog.remove(transactionLog.size() - 1);
         }

@@ -3,7 +3,6 @@ package com.redis.workshop.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.redis.workshop.config.RedisCommandLogger;
 import jakarta.annotation.PostConstruct;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -28,7 +27,6 @@ public class CacheAsideService {
 
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
-    private final RedisCommandLogger commandLogger;
 
     // Mock "database" — simulates a slow relational DB
     private final Map<String, Map<String, Object>> mockDatabase = new LinkedHashMap<>();
@@ -39,11 +37,9 @@ public class CacheAsideService {
     private final AtomicLong totalHitLatencyMs = new AtomicLong();
     private final AtomicLong totalMissLatencyMs = new AtomicLong();
 
-    public CacheAsideService(StringRedisTemplate redis, ObjectMapper objectMapper,
-                              RedisCommandLogger commandLogger) {
+    public CacheAsideService(StringRedisTemplate redis, ObjectMapper objectMapper) {
         this.redis = redis;
         this.objectMapper = objectMapper;
-        this.commandLogger = commandLogger;
     }
 
     @PostConstruct
@@ -92,16 +88,11 @@ public class CacheAsideService {
     }
 
     public Map<String, Object> getProduct(String productId) {
-        commandLogger.startCapture();
         long start = System.nanoTime();
         String cacheKey = CACHE_PREFIX + productId;
 
         // 1. Check cache (Redis GET)
         String cached = redis.opsForValue().get(cacheKey);
-        commandLogger.log("UC10", "GET", cacheKey, cached != null ? "HIT" : "MISS",
-                "GET " + cacheKey,
-                cached != null ? "\"<cached JSON, " + cached.length() + " chars>\" (HIT)"
-                        : "(nil) — cache MISS");
 
         if (cached != null) {
             // CACHE HIT
@@ -114,7 +105,6 @@ public class CacheAsideService {
             result.put("cacheHit", true);
             result.put("latencyMs", latencyMs);
             result.put("source", "CACHE");
-            result.put("redisCommands", commandLogger.getCaptured());
             return result;
         }
 
@@ -131,16 +121,12 @@ public class CacheAsideService {
             err.put("error", "Product not found");
             err.put("productId", productId);
             err.put("latencyMs", latencyMs);
-            err.put("redisCommands", commandLogger.getCaptured());
             return err;
         }
 
         // 3. Store in cache with TTL (SET with EX)
         String productJson = serialize(product);
         redis.opsForValue().set(cacheKey, productJson, Duration.ofSeconds(CACHE_TTL_SECONDS));
-        commandLogger.log("UC10", "SET EX", cacheKey, CACHE_TTL_SECONDS + "s",
-                "SET " + cacheKey + " <json, " + productJson.length() + " chars> EX " + CACHE_TTL_SECONDS,
-                "OK");
 
         long latencyMs = (System.nanoTime() - start) / 1_000_000;
         totalMissLatencyMs.addAndGet(latencyMs);
@@ -150,42 +136,28 @@ public class CacheAsideService {
         result.put("cacheHit", false);
         result.put("latencyMs", latencyMs);
         result.put("source", "DATABASE");
-        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
     public Map<String, Object> evictProduct(String productId) {
-        commandLogger.startCapture();
         String cacheKey = CACHE_PREFIX + productId;
         Boolean deleted = redis.delete(cacheKey);
-        commandLogger.log("UC10", "DEL", cacheKey, null,
-                "DEL " + cacheKey,
-                "(integer) " + (Boolean.TRUE.equals(deleted) ? "1 (evicted)" : "0 (not cached)"));
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("evicted", Boolean.TRUE.equals(deleted));
         result.put("productId", productId);
-        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
     public Map<String, Object> evictAll() {
-        commandLogger.startCapture();
         Set<String> keys = redis.keys(CACHE_PREFIX + "*");
-        commandLogger.log("UC10", "KEYS", CACHE_PREFIX + "*", null,
-                "KEYS " + CACHE_PREFIX + "*",
-                (keys != null ? keys.size() : 0) + " matching keys");
         int count = 0;
         if (keys != null && !keys.isEmpty()) {
             count = keys.size();
             redis.delete(keys);
-            commandLogger.log("UC10", "DEL", "(batch)", count + " keys",
-                    "DEL " + String.join(" ", keys),
-                    "(integer) " + count + " (all cache keys evicted)");
         }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("evicted", true);
         result.put("count", count);
-        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 

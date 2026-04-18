@@ -1,6 +1,5 @@
 package com.redis.workshop.service;
 
-import com.redis.workshop.config.RedisCommandLogger;
 import jakarta.annotation.PostConstruct;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.StreamRecords;
@@ -32,11 +31,9 @@ public class FraudService {
     );
 
     private final StringRedisTemplate redis;
-    private final RedisCommandLogger commandLogger;
 
-    public FraudService(StringRedisTemplate redis, RedisCommandLogger commandLogger) {
+    public FraudService(StringRedisTemplate redis) {
         this.redis = redis;
-        this.commandLogger = commandLogger;
     }
 
     /**
@@ -58,30 +55,19 @@ public class FraudService {
      */
     public Map<String, Object> evaluateTransaction(String cardNumber, double amount,
                                                     String merchant, String country) {
-        commandLogger.startCapture();
         String txId = "tx-" + UUID.randomUUID().toString().substring(0, 8);
         long now = Instant.now().toEpochMilli();
 
         // 1. Velocity check — ZADD + ZRANGEBYSCORE
         String velocityKey = VELOCITY_KEY_PREFIX + cardNumber;
         redis.opsForZSet().add(velocityKey, txId, now);
-        commandLogger.log("UC6", "ZADD", velocityKey, txId,
-                "ZADD " + velocityKey + " " + now + " " + txId,
-                "(integer) 1 (new member added)");
         // Count transactions in the last N minutes
         long windowStart = now - (VELOCITY_WINDOW_SECONDS * 1000);
         Set<String> recentTxs = redis.opsForZSet().rangeByScore(velocityKey, windowStart, now);
         int velocityCount = recentTxs != null ? recentTxs.size() : 0;
-        commandLogger.log("UC6", "ZRANGEBYSCORE", velocityKey, "count=" + velocityCount,
-                "ZRANGEBYSCORE " + velocityKey + " " + windowStart + " " + now,
-                velocityCount + " txs in last " + (VELOCITY_WINDOW_SECONDS / 60) + " min");
 
         // Clean old entries outside window
-        Long removed = redis.opsForZSet().removeRangeByScore(velocityKey, 0, windowStart - 1);
-        commandLogger.log("UC6", "ZREMRANGEBYSCORE", velocityKey,
-                "cleaned=" + (removed != null ? removed : 0),
-                "ZREMRANGEBYSCORE " + velocityKey + " 0 " + (windowStart - 1),
-                "(integer) " + (removed != null ? removed : 0) + " (old entries pruned)");
+        redis.opsForZSet().removeRangeByScore(velocityKey, 0, windowStart - 1);
 
         // 2. Amount check
         boolean highAmount = amount >= AMOUNT_THRESHOLD_HIGH;
@@ -129,19 +115,10 @@ public class FraudService {
 
         MapRecord<String, String, String> record = StreamRecords.string(streamEntry)
                 .withStreamKey(STREAM_KEY);
-        var recordId = redis.opsForStream().add(record);
-        commandLogger.log("UC6", "XADD", STREAM_KEY, "risk=" + riskLevel,
-                "XADD " + STREAM_KEY + " * txId " + txId + " card " + cardNumber
-                        + " amount " + String.format("%.2f", amount) + " riskScore " + riskScore
-                        + " riskLevel " + riskLevel + " ... (" + streamEntry.size() + " fields)",
-                recordId != null ? "\"" + recordId.getValue() + "\" (stream ID)"
-                        : "stream entry added");
+        redis.opsForStream().add(record);
 
         // Trim stream to last 50 entries
         redis.opsForStream().trim(STREAM_KEY, 50);
-        commandLogger.log("UC6", "XTRIM", STREAM_KEY, "MAXLEN=50",
-                "XTRIM " + STREAM_KEY + " MAXLEN 50",
-                "stream bounded to last 50 entries");
 
         // Build response
         Map<String, Object> result = new LinkedHashMap<>();
@@ -156,7 +133,6 @@ public class FraudService {
         result.put("geoAnomaly", geoAnomaly);
         result.put("factors", factors);
         result.put("timestamp", Instant.now().toString());
-        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 

@@ -1,6 +1,5 @@
 package com.redis.workshop.service;
 
-import com.redis.workshop.config.RedisCommandLogger;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -23,11 +22,9 @@ public class RateLimitService {
     private static final int WINDOW_SECONDS = 60;
 
     private final StringRedisTemplate redis;
-    private final RedisCommandLogger commandLogger;
 
-    public RateLimitService(StringRedisTemplate redis, RedisCommandLogger commandLogger) {
+    public RateLimitService(StringRedisTemplate redis) {
         this.redis = redis;
-        this.commandLogger = commandLogger;
     }
 
     /**
@@ -38,7 +35,6 @@ public class RateLimitService {
      * @return map with allowed (boolean), remaining, limit, retryAfter, currentCount
      */
     public Map<String, Object> checkRateLimit(String clientId) {
-        commandLogger.startCapture();
         String key = KEY_PREFIX + clientId;
 
         // INCR atomically increments and returns new value (creates key with value 1 if absent)
@@ -46,16 +42,10 @@ public class RateLimitService {
         if (currentCount == null) {
             currentCount = 1L;
         }
-        commandLogger.log("UC4", "INCR", key, "count=" + currentCount,
-                "INCR " + key,
-                "(integer) " + currentCount + (currentCount == 1 ? " (key created)" : ""));
 
         // Set TTL only on the first request of a new window
         if (currentCount == 1) {
             redis.expire(key, WINDOW_SECONDS, TimeUnit.SECONDS);
-            commandLogger.log("UC4", "EXPIRE", key, WINDOW_SECONDS + "s",
-                    "EXPIRE " + key + " " + WINDOW_SECONDS,
-                    "(integer) 1");
         }
 
         boolean allowed = currentCount <= MAX_REQUESTS;
@@ -63,9 +53,6 @@ public class RateLimitService {
 
         // Get TTL to show when the window resets
         Long ttl = redis.getExpire(key, TimeUnit.SECONDS);
-        commandLogger.log("UC4", "TTL", key, null,
-                "TTL " + key,
-                "(integer) " + (ttl != null ? ttl : -1) + " (seconds remaining in window)");
         if (ttl == null || ttl < 0) {
             ttl = (long) WINDOW_SECONDS;
         }
@@ -79,7 +66,6 @@ public class RateLimitService {
         result.put("retryAfter", allowed ? 0 : ttl);
         result.put("ttl", ttl);
         result.put("clientId", clientId);
-        result.put("redisCommands", commandLogger.getCaptured());
 
         return result;
     }
@@ -88,20 +74,13 @@ public class RateLimitService {
      * Get current rate limit status without consuming a request.
      */
     public Map<String, Object> getStatus(String clientId) {
-        commandLogger.startCapture();
         String key = KEY_PREFIX + clientId;
 
         String val = redis.opsForValue().get(key);
-        commandLogger.log("UC4", "GET", key, null,
-                "GET " + key,
-                val != null ? "\"" + val + "\" (current count)" : "(nil) — no active window");
         long currentCount = val != null ? Long.parseLong(val) : 0;
         long remaining = Math.max(0, MAX_REQUESTS - currentCount);
 
         Long ttl = redis.getExpire(key, TimeUnit.SECONDS);
-        commandLogger.log("UC4", "TTL", key, null,
-                "TTL " + key,
-                "(integer) " + (ttl != null ? ttl : -1));
         if (ttl == null || ttl < 0) {
             ttl = 0L;
         }
@@ -114,7 +93,6 @@ public class RateLimitService {
         result.put("ttl", ttl);
         result.put("clientId", clientId);
         result.put("active", val != null);
-        result.put("redisCommands", commandLogger.getCaptured());
 
         return result;
     }
@@ -123,16 +101,11 @@ public class RateLimitService {
      * Reset the rate limit for a client (for demo purposes).
      */
     public Map<String, Object> reset(String clientId) {
-        commandLogger.startCapture();
         String key = KEY_PREFIX + clientId;
         Boolean deleted = redis.delete(key);
-        commandLogger.log("UC4", "DEL", key, null,
-                "DEL " + key,
-                "(integer) " + (Boolean.TRUE.equals(deleted) ? "1 (window reset)" : "0 (no active window)"));
         Map<String, Object> result = new HashMap<>();
         result.put("clientId", clientId);
         result.put("reset", Boolean.TRUE.equals(deleted));
-        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 }

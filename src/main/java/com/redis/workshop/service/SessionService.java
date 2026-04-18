@@ -1,6 +1,5 @@
 package com.redis.workshop.service;
 
-import com.redis.workshop.config.RedisCommandLogger;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -31,11 +30,9 @@ public class SessionService {
     );
 
     private final StringRedisTemplate redis;
-    private final RedisCommandLogger commandLogger;
 
-    public SessionService(StringRedisTemplate redis, RedisCommandLogger commandLogger) {
+    public SessionService(StringRedisTemplate redis) {
         this.redis = redis;
-        this.commandLogger = commandLogger;
     }
 
     /**
@@ -43,11 +40,9 @@ public class SessionService {
      * Returns session info on success, null on failure.
      */
     public Map<String, Object> login(String username, String password) {
-        commandLogger.startCapture();
         // Validate credentials
         String expected = MOCK_USERS.get(username);
         if (expected == null || !expected.equals(password)) {
-            commandLogger.getCaptured();
             return null;
         }
 
@@ -70,28 +65,15 @@ public class SessionService {
 
         // HSET — store session as Redis Hash
         redis.opsForHash().putAll(sessionKey, sessionData);
-        commandLogger.log("UC2", "HSET", sessionKey, "fields=" + sessionData.size(),
-                "HSET " + sessionKey + " username " + username + " fullName \""
-                        + profile.get("fullName") + "\" token " + token + " ... ("
-                        + sessionData.size() + " fields)",
-                "(integer) " + sessionData.size() + " (fields added)");
         // EXPIRE — set TTL on session key
         redis.expire(sessionKey, SESSION_TTL_SECONDS, TimeUnit.SECONDS);
-        commandLogger.log("UC2", "EXPIRE", sessionKey, SESSION_TTL_SECONDS + "s",
-                "EXPIRE " + sessionKey + " " + SESSION_TTL_SECONDS,
-                "(integer) 1");
-
         // SET — store token pointing back to username
         redis.opsForValue().set(tokenKey, username, SESSION_TTL_SECONDS, TimeUnit.SECONDS);
-        commandLogger.log("UC2", "SET EX", tokenKey, "user=" + username,
-                "SET " + tokenKey + " " + username + " EX " + SESSION_TTL_SECONDS,
-                "OK");
 
         Map<String, Object> result = new HashMap<>(sessionData);
         result.put("sessionKey", sessionKey);
         result.put("tokenKey", tokenKey);
         result.put("ttl", SESSION_TTL_SECONDS);
-        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
@@ -99,15 +81,9 @@ public class SessionService {
      * Get session info for a user.
      */
     public Map<String, Object> getSession(String username) {
-        commandLogger.startCapture();
         String sessionKey = SESSION_PREFIX + username;
         Map<Object, Object> entries = redis.opsForHash().entries(sessionKey);
-        commandLogger.log("UC2", "HGETALL", sessionKey, null,
-                "HGETALL " + sessionKey,
-                entries.isEmpty() ? "(empty list — session expired or missing)"
-                        : entries.size() + " fields returned");
         if (entries.isEmpty()) {
-            commandLogger.getCaptured();
             return null;
         }
 
@@ -117,7 +93,6 @@ public class SessionService {
         entries.forEach((k, v) -> result.put(k.toString(), v));
         result.put("sessionKey", sessionKey);
         result.put("ttl", ttl != null ? ttl : -1);
-        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
@@ -134,7 +109,6 @@ public class SessionService {
      * Logout — delete session and token from Redis.
      */
     public Map<String, Object> logout(String username) {
-        commandLogger.startCapture();
         String sessionKey = SESSION_PREFIX + username;
 
         // Get token before deleting session
@@ -142,23 +116,16 @@ public class SessionService {
 
         // DEL — remove session hash
         Boolean deleted = redis.delete(sessionKey);
-        commandLogger.log("UC2", "DEL", sessionKey, null,
-                "DEL " + sessionKey,
-                "(integer) " + (Boolean.TRUE.equals(deleted) ? "1 (deleted)" : "0 (not found)"));
 
         // DEL — remove auth token
         if (token != null) {
             String tokenKey = TOKEN_PREFIX + token.toString();
-            Boolean tokDel = redis.delete(tokenKey);
-            commandLogger.log("UC2", "DEL", tokenKey, null,
-                    "DEL " + tokenKey,
-                    "(integer) " + (Boolean.TRUE.equals(tokDel) ? "1 (deleted)" : "0 (not found)"));
+            redis.delete(tokenKey);
         }
 
         Map<String, Object> result = new HashMap<>();
         result.put("deleted", Boolean.TRUE.equals(deleted));
         result.put("sessionKey", sessionKey);
-        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 

@@ -2,7 +2,6 @@ package com.redis.workshop.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.redis.workshop.config.RedisCommandLogger;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +26,6 @@ public class GeoFinderService {
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
     private final RedisSearchHelper redisSearchHelper;
-    private final RedisCommandLogger commandLogger;
 
     private static final String GEO_KEY = "uc12:geo:atms";
     private static final String META_PREFIX = "uc12:meta:";
@@ -35,11 +33,10 @@ public class GeoFinderService {
     private static final String INDEX_NAME = "idx:uc12:branches";
 
     public GeoFinderService(StringRedisTemplate redis, ObjectMapper objectMapper,
-                             RedisSearchHelper redisSearchHelper, RedisCommandLogger commandLogger) {
+                             RedisSearchHelper redisSearchHelper) {
         this.redis = redis;
         this.objectMapper = objectMapper;
         this.redisSearchHelper = redisSearchHelper;
-        this.commandLogger = commandLogger;
     }
 
     @PostConstruct
@@ -140,7 +137,6 @@ public class GeoFinderService {
 
     /** Approach 1: Native GEOSEARCH */
     public Map<String, Object> searchNative(double lng, double lat, double radiusKm) {
-        commandLogger.startCapture();
         long start = System.nanoTime();
 
         GeoResults<RedisGeoCommands.GeoLocation<String>> geoResults = redis.opsForGeo()
@@ -151,11 +147,6 @@ public class GeoFinderService {
                                 .includeDistance()
                                 .sortAscending()
                                 .limit(20));
-        int geoHitCount = geoResults != null ? geoResults.getContent().size() : 0;
-        commandLogger.log("UC12", "GEOSEARCH", GEO_KEY, "radius=" + radiusKm + "km",
-                "GEOSEARCH " + GEO_KEY + " FROMLONLAT " + lng + " " + lat
-                        + " BYRADIUS " + radiusKm + " km ASC COUNT 20 WITHCOORD WITHDIST",
-                geoHitCount + " locations within " + radiusKm + " km (sorted by distance)");
 
         List<Map<String, Object>> locations = new ArrayList<>();
         if (geoResults != null) {
@@ -188,7 +179,6 @@ public class GeoFinderService {
         response.put("latencyMs", latencyMs);
         response.put("approach", "Native Geospatial");
         response.put("command", command);
-        response.put("redisCommands", commandLogger.getCaptured());
         return response;
     }
 
@@ -196,7 +186,6 @@ public class GeoFinderService {
     @SuppressWarnings("unchecked")
     public Map<String, Object> searchRQE(double lng, double lat, double radiusKm,
                                           String type, String service) {
-        commandLogger.startCapture();
         long start = System.nanoTime();
 
         StringBuilder query = new StringBuilder();
@@ -212,13 +201,6 @@ public class GeoFinderService {
         String ftQuery = query.toString();
 
         List<Object> rawResults = executeFtSearch(INDEX_NAME, ftQuery, "LIMIT", "0", "20");
-        int rqeHitCount = 0;
-        if (rawResults != null && !rawResults.isEmpty() && rawResults.get(0) instanceof Number n) {
-            rqeHitCount = n.intValue();
-        }
-        commandLogger.log("UC12", "FT.SEARCH", INDEX_NAME, ftQuery,
-                "FT.SEARCH " + INDEX_NAME + " \"" + ftQuery + "\" LIMIT 0 20",
-                rqeHitCount + " documents matched (JSON docs from " + BRANCH_PREFIX + "*)");
 
         List<Map<String, Object>> results = parseRqeResults(rawResults);
 
@@ -240,7 +222,6 @@ public class GeoFinderService {
         response.put("latencyMs", latencyMs);
         response.put("approach", "JSON + Query Engine");
         response.put("command", command);
-        response.put("redisCommands", commandLogger.getCaptured());
         return response;
     }
 

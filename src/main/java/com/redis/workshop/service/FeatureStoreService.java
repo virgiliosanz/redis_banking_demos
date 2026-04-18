@@ -148,14 +148,6 @@ public class FeatureStoreService {
         result.put("country", country);
         result.put("timestamp", now);
         result.put("riskScore", riskScore);
-        result.put("redisCommands", List.of(
-                "HINCRBY " + key + " tx_count_1h 1",
-                "HINCRBY " + key + " tx_count_24h 1",
-                "HSET " + key + " last_tx_timestamp " + now,
-                "HSET " + key + " tx_amount_avg_24h " + String.format("%.2f", newAvg),
-                "HSET " + key + " tx_amount_max_24h " + String.format("%.2f", newMax),
-                "HSET " + key + " risk_score " + riskScore
-        ));
         return result;
     }
 

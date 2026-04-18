@@ -1,13 +1,16 @@
 package com.redis.workshop.controller;
 
+import com.redis.workshop.config.RedisMonitorService;
 import com.redis.workshop.service.OpenAiService;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -17,10 +20,30 @@ public class HealthController {
 
     private final StringRedisTemplate redis;
     private final OpenAiService openAiService;
+    private final RedisMonitorService redisMonitor;
 
-    public HealthController(StringRedisTemplate redis, OpenAiService openAiService) {
+    public HealthController(StringRedisTemplate redis, OpenAiService openAiService,
+                            RedisMonitorService redisMonitor) {
         this.redis = redis;
         this.openAiService = openAiService;
+        this.redisMonitor = redisMonitor;
+    }
+
+    /**
+     * Expose the last N commands captured by {@link RedisMonitorService} via
+     * the Redis MONITOR stream. Used by the workshop UI to show a live feed
+     * of commands without embedding them into every endpoint response.
+     */
+    @GetMapping("/redis/commands")
+    public ResponseEntity<Map<String, Object>> redisCommands(
+            @RequestParam(defaultValue = "100") int limit,
+            @RequestParam(required = false) Long since) {
+        List<Map<String, Object>> commands = redisMonitor.getCommandsSince(since, limit);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("running", redisMonitor.isRunning());
+        body.put("count", commands.size());
+        body.put("commands", commands);
+        return ResponseEntity.ok(body);
     }
 
     @GetMapping("/health")

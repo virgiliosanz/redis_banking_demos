@@ -45,7 +45,6 @@ public class DocumentSearchService {
         response.put("resultCount", results.size());
         response.put("results", results);
         response.put("redisCommand", cmd);
-        response.put("redisCommands", List.of(cmd + " → " + results.size() + " documents matched"));
         return response;
     }
 
@@ -71,10 +70,6 @@ public class DocumentSearchService {
         response.put("resultCount", results.size());
         response.put("results", results);
         response.put("redisCommand", cmd);
-        response.put("redisCommands", List.of(
-                "EMBEDDING " + embedLine,
-                cmd + " → " + results.size() + " nearest neighbors returned"
-        ));
         return response;
     }
 
@@ -108,10 +103,6 @@ public class DocumentSearchService {
         response.put("resultCount", results.size());
         response.put("results", results);
         response.put("redisCommand", cmd);
-        response.put("redisCommands", List.of(
-                "EMBEDDING " + embedLine,
-                cmd + " → " + results.size() + " hybrid results (pre-filter + KNN)"
-        ));
         return response;
     }
 
@@ -155,7 +146,6 @@ public class DocumentSearchService {
         if (result == null) {
             response.put("status", "NOT_FOUND");
             response.put("message", "No document found with id: " + id);
-            response.put("redisCommands", List.of(redisCmd + " → (nil) document not found"));
             return response;
         }
 
@@ -164,7 +154,6 @@ public class DocumentSearchService {
         response.put("id", id);
         response.put("key", key);
         response.put("document", json);
-        response.put("redisCommands", List.of(redisCmd + " → JSON document returned (" + (json != null ? json.length() : 0) + " chars)"));
         return response;
     }
 
@@ -188,7 +177,6 @@ public class DocumentSearchService {
         if (result == null) {
             response.put("status", "NOT_FOUND");
             response.put("message", "No document or field found for key: " + key + " path: " + jsonPath);
-            response.put("redisCommands", List.of(redisCmd + " → (nil) path not found"));
             return response;
         }
 
@@ -198,7 +186,6 @@ public class DocumentSearchService {
         response.put("key", key);
         response.put("path", jsonPath);
         response.put("value", json);
-        response.put("redisCommands", List.of(redisCmd + " → \"" + (json != null ? json : "") + "\""));
         return response;
     }
 
@@ -237,7 +224,6 @@ public class DocumentSearchService {
         response.put("key", key);
         response.put("document", fullDoc);
         response.put("redisCommand", redisCmd);
-        response.put("redisCommands", List.of(redisCmd + " → OK (document created, auto-indexed)"));
         return response;
     }
 
@@ -269,7 +255,6 @@ public class DocumentSearchService {
         response.put("resultCount", results.size());
         response.put("results", results);
         response.put("redisCommand", redisCmd);
-        response.put("redisCommands", List.of(redisCmd + " → " + results.size() + " documents matched"));
         return response;
     }
 

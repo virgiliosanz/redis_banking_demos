@@ -83,7 +83,6 @@ public class AuthTokenController {
         response.put("success", deleted);
         response.put("message", deleted ? "Token destroyed" : "Token not found or already expired");
         response.put("redisKey", logoutResult.get("redisKey"));
-        response.put("redisCommands", logoutResult.get("redisCommands"));
         return ResponseEntity.ok(response);
     }
 

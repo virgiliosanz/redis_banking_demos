@@ -39,11 +39,10 @@ public class TransactionMonitorController {
      */
     @PostMapping("/simulate/anomaly")
     public ResponseEntity<Map<String, Object>> injectAnomaly() {
-        Map<String, Object> anomalyResult = monitorService.injectAnomaly();
+        monitorService.injectAnomaly();
         Map<String, Object> response = new java.util.LinkedHashMap<>();
         response.put("status", "OK");
         response.put("message", "Anomaly injected: 20 high-risk transactions");
-        response.put("redisCommands", anomalyResult.get("redisCommands"));
         return ResponseEntity.ok(response);
     }
 

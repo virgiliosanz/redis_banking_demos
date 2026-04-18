@@ -1,6 +1,5 @@
 package com.redis.workshop.service;
 
-import com.redis.workshop.config.RedisCommandLogger;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -35,21 +34,17 @@ public class AuthTokenService {
     );
 
     private final StringRedisTemplate redis;
-    private final RedisCommandLogger commandLogger;
 
-    public AuthTokenService(StringRedisTemplate redis, RedisCommandLogger commandLogger) {
+    public AuthTokenService(StringRedisTemplate redis) {
         this.redis = redis;
-        this.commandLogger = commandLogger;
     }
 
     /**
      * Authenticate user and create auth token stored as Redis Hash.
      */
     public Map<String, Object> login(String username, String password) {
-        commandLogger.startCapture();
         String expected = MOCK_USERS.get(username);
         if (expected == null || !expected.equals(password)) {
-            commandLogger.getCaptured();
             return null;
         }
 
@@ -70,20 +65,12 @@ public class AuthTokenService {
 
         // HSET — store token as Redis Hash
         redis.opsForHash().putAll(tokenKey, tokenData);
-        commandLogger.log("UC1", "HSET", tokenKey, "fields=" + tokenData.size(),
-                "HSET " + tokenKey + " tokenId " + tokenId + " username " + username
-                        + " role \"" + info.get("role") + "\" ... (" + tokenData.size() + " fields)",
-                "(integer) " + tokenData.size() + " (fields added)");
         // EXPIRE — set TTL
         redis.expire(tokenKey, TOKEN_TTL_SECONDS, TimeUnit.SECONDS);
-        commandLogger.log("UC1", "EXPIRE", tokenKey, TOKEN_TTL_SECONDS + "s",
-                "EXPIRE " + tokenKey + " " + TOKEN_TTL_SECONDS,
-                "(integer) 1");
 
         Map<String, Object> result = new HashMap<>(tokenData);
         result.put("redisKey", tokenKey);
         result.put("ttl", TOKEN_TTL_SECONDS);
-        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
@@ -91,15 +78,9 @@ public class AuthTokenService {
      * Validate token — returns token info if valid, null if expired/invalid.
      */
     public Map<String, Object> validateToken(String tokenId) {
-        commandLogger.startCapture();
         String tokenKey = TOKEN_PREFIX + tokenId;
         Map<Object, Object> entries = redis.opsForHash().entries(tokenKey);
-        commandLogger.log("UC1", "HGETALL", tokenKey, null,
-                "HGETALL " + tokenKey,
-                entries.isEmpty() ? "(empty list — token expired or invalid)"
-                        : entries.size() + " fields returned");
         if (entries.isEmpty()) {
-            commandLogger.getCaptured();
             return null;
         }
 
@@ -110,24 +91,18 @@ public class AuthTokenService {
         result.put("valid", true);
         result.put("redisKey", tokenKey);
         result.put("ttl", ttl != null ? ttl : -1);
-        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
     /**
-     * Logout — delete token from Redis. Returns a result map with commands.
+     * Logout — delete token from Redis.
      */
     public Map<String, Object> logout(String tokenId) {
-        commandLogger.startCapture();
         String tokenKey = TOKEN_PREFIX + tokenId;
         Boolean deleted = redis.delete(tokenKey);
-        commandLogger.log("UC1", "DEL", tokenKey, null,
-                "DEL " + tokenKey,
-                "(integer) " + (Boolean.TRUE.equals(deleted) ? "1 (deleted)" : "0 (not found)"));
         Map<String, Object> result = new HashMap<>();
         result.put("deleted", Boolean.TRUE.equals(deleted));
         result.put("redisKey", tokenKey);
-        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 

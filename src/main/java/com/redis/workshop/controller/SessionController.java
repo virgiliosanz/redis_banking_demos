@@ -65,7 +65,6 @@ public class SessionController {
         response.put("success", deleted);
         response.put("message", deleted ? "Session destroyed" : "No active session");
         response.put("sessionKey", logoutResult.get("sessionKey"));
-        response.put("redisCommands", logoutResult.get("redisCommands"));
         return ResponseEntity.ok(response);
     }
 

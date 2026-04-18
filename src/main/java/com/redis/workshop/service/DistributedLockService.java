@@ -1,6 +1,5 @@
 package com.redis.workshop.service;
 
-import com.redis.workshop.config.RedisCommandLogger;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
@@ -34,11 +33,9 @@ public class DistributedLockService {
             new DefaultRedisScript<>(RELEASE_LOCK_LUA, Long.class);
 
     private final StringRedisTemplate redis;
-    private final RedisCommandLogger commandLogger;
 
-    public DistributedLockService(StringRedisTemplate redis, RedisCommandLogger commandLogger) {
+    public DistributedLockService(StringRedisTemplate redis) {
         this.redis = redis;
-        this.commandLogger = commandLogger;
     }
 
     /**
@@ -46,17 +43,11 @@ public class DistributedLockService {
      * Returns lock info if acquired, or contention info if already held.
      */
     public Map<String, Object> acquireLock(String resourceId, String clientId, int ttlSeconds) {
-        commandLogger.startCapture();
         String key = LOCK_PREFIX + resourceId;
 
         // SET key clientId NX EX ttl
         Boolean acquired = redis.opsForValue().setIfAbsent(key, clientId,
                 java.time.Duration.ofSeconds(ttlSeconds));
-        commandLogger.log("UC13", "SET NX EX", key,
-                "clientId=" + clientId + " " + (Boolean.TRUE.equals(acquired) ? "ACQUIRED" : "DENIED"),
-                "SET " + key + " " + clientId + " NX EX " + ttlSeconds,
-                Boolean.TRUE.equals(acquired) ? "OK (lock acquired)"
-                        : "nil (lock already held by other client)");
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("resourceId", resourceId);
@@ -71,19 +62,12 @@ public class DistributedLockService {
         } else {
             // Lock already held — get current holder info
             String currentHolder = redis.opsForValue().get(key);
-            commandLogger.log("UC13", "GET", key, null,
-                    "GET " + key,
-                    currentHolder != null ? "\"" + currentHolder + "\" (current holder)" : "(nil)");
             Long remainingTtl = redis.getExpire(key, TimeUnit.SECONDS);
-            commandLogger.log("UC13", "TTL", key, null,
-                    "TTL " + key,
-                    "(integer) " + (remainingTtl != null ? remainingTtl : -1));
             result.put("acquired", false);
             result.put("currentHolder", currentHolder);
             result.put("remainingTtl", remainingTtl != null ? remainingTtl : -1);
             result.put("message", "Lock already held by " + currentHolder);
         }
-        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
@@ -92,18 +76,10 @@ public class DistributedLockService {
      * Only releases if the caller is the current lock holder.
      */
     public Map<String, Object> releaseLock(String resourceId, String clientId) {
-        commandLogger.startCapture();
         String key = LOCK_PREFIX + resourceId;
 
         Long released = redis.execute(RELEASE_SCRIPT,
                 Collections.singletonList(key), clientId);
-        boolean ok = released != null && released == 1L;
-        commandLogger.log("UC13", "EVAL (Lua release)", key,
-                "clientId=" + clientId + " " + (ok ? "RELEASED" : "DENIED"),
-                "EVAL \"if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) else return 0 end\" 1 "
-                        + key + " " + clientId,
-                ok ? "(integer) 1 (lock released)"
-                        : "(integer) 0 (caller is not the lock holder — denied)");
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("resourceId", resourceId);
@@ -118,7 +94,6 @@ public class DistributedLockService {
             result.put("released", false);
             result.put("message", "Lock not held by " + clientId + " — release denied");
         }
-        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
@@ -126,16 +101,9 @@ public class DistributedLockService {
      * Get lock info: current holder and remaining TTL.
      */
     public Map<String, Object> getLockInfo(String resourceId) {
-        commandLogger.startCapture();
         String key = LOCK_PREFIX + resourceId;
         String holder = redis.opsForValue().get(key);
-        commandLogger.log("UC13", "GET", key, null,
-                "GET " + key,
-                holder != null ? "\"" + holder + "\"" : "(nil)");
         Long ttl = redis.getExpire(key, TimeUnit.SECONDS);
-        commandLogger.log("UC13", "TTL", key, null,
-                "TTL " + key,
-                "(integer) " + (ttl != null ? ttl : -2));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("resourceId", resourceId);
@@ -150,7 +118,6 @@ public class DistributedLockService {
             result.put("holder", null);
             result.put("ttl", -2);
         }
-        result.put("redisCommands", commandLogger.getCaptured());
         return result;
     }
 
@@ -159,13 +126,9 @@ public class DistributedLockService {
      * Demonstrates the mutual exclusion guarantee of SET NX.
      */
     public Map<String, Object> simulateContention(String resourceId) {
-        commandLogger.startCapture();
         String key = LOCK_PREFIX + resourceId;
         // First, ensure the lock is free for the demo
         redis.delete(key);
-        commandLogger.log("UC13", "DEL", key, "reset contention demo",
-                "DEL " + key,
-                "OK (lock reset before demo)");
 
         String[] clients = {"transfer-svc-A", "transfer-svc-B", "transfer-svc-C"};
         int ttl = 30;
@@ -193,24 +156,12 @@ public class DistributedLockService {
         }
         executor.shutdown();
 
-        // Aggregate per-attempt redisCommands into a single flat list for the card
-        List<String> aggregated = new ArrayList<>(commandLogger.getCaptured());
-        for (Map<String, Object> r : results) {
-            Object cmds = r.get("redisCommands");
-            if (cmds instanceof List<?> list) {
-                for (Object s : list) {
-                    if (s instanceof String str) aggregated.add(str);
-                }
-            }
-        }
-
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("resourceId", resourceId);
         result.put("redisKey", key);
         result.put("winner", winner);
         result.put("attempts", results);
         result.put("message", winner + " won the lock — others were denied (NX guarantee)");
-        result.put("redisCommands", aggregated);
         return result;
     }
 }
