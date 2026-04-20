@@ -52,7 +52,7 @@ public class TransactionMonitorService {
                 .withStreamKey(STREAM_KEY);
         redis.opsForStream().add(record);
 
-        // Trim to keep stream bounded — XTRIM MAXLEN ~
+        // Trim to keep stream bounded — XTRIM MAXLEN (exact, no '~' flag)
         redis.opsForStream().trim(STREAM_KEY, MAX_STREAM_LEN);
     }
 

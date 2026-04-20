@@ -11,7 +11,7 @@
             <span class="usecase-badge">UC11</span>
             <h1 th:text="${useCaseTitle}">Real-time Transaction Monitoring</h1>
         </div>
-        <p class="usecase-subtitle">Live transaction metrics with Redis Streams &mdash; XADD, XRANGE, XLEN with manual aggregation.</p>
+        <p class="usecase-subtitle">Live transaction metrics with Redis Streams &mdash; XADD, XTRIM, XRANGE with manual aggregation.</p>
 
         <details class="how-it-works" open>
             <summary><h2>How it works</h2></summary>
@@ -139,27 +139,27 @@
                 <div class="code-container code-tab-content active" id="tab-cli">
 <pre><code class="language-bash"># ═══ Redis Streams — Transaction Monitoring ═══
 
-# Add a transaction event to the stream
-# The service emits only two fields: amount and riskScore
+# ── Used by the service ─────────────────────────────
+
+# Add a transaction event (amount + riskScore only)
 XADD uc11:stream:transactions * \
   amount 150.75 riskScore 25.3
 
-# Trim stream right after XADD to keep it bounded
+# Trim right after XADD to keep the stream bounded
 # (exact MAXLEN — no '~' flag in this service)
 XTRIM uc11:stream:transactions MAXLEN 10000
 
-# Read last 10 transactions
-XRANGE uc11:stream:transactions - + COUNT 10
-
-# Read transactions in a bounded time window
-# (service uses &lt;fromMs&gt;-0 .. &lt;toMs&gt;-99999)
+# Read the last 60s window — service uses
+# &lt;fromMs&gt;-0 .. &lt;toMs&gt;-99999 as range IDs
 XRANGE uc11:stream:transactions \
   &lt;fromMs&gt;-0 &lt;toMs&gt;-99999 COUNT 10000
 
-# Count total transactions in the stream
+# ── Handy for inspection (not used at runtime) ──────
+
+# Count entries in the stream
 XLEN uc11:stream:transactions
 
-# Read transactions in reverse (most recent first)
+# Peek the last N entries (reverse chronological)
 XREVRANGE uc11:stream:transactions + - COUNT 5</code></pre>
                 </div>
 
