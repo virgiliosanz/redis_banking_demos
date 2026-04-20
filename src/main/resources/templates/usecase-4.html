@@ -123,29 +123,30 @@
                 <h2>Code Showcase</h2>
 
                 <div class="code-tabs">
-                    <button class="code-tab" data-tab="fixed">Fixed Window</button>
-                    <button class="code-tab" data-tab="sliding">Sliding Window</button>
+                    <button class="code-tab" data-tab="fixed">Fixed Window (demo)</button>
+                    <button class="code-tab" data-tab="sliding">Sliding Window (alternative)</button>
                     <button class="code-tab active" data-tab="cli">Redis CLI</button>
                 </div>
 
-                <!-- Fixed Window -->
+                <!-- Fixed Window — real implementation used by RateLimitService -->
                 <div class="code-container code-tab-content" id="tab-fixed">
-<pre><code class="language-java">// ═══ Fixed-Window Rate Limiting ═══
+<pre><code class="language-java">// ═══ Fixed-Window Rate Limiting (this demo) ═══
 // Pattern: INCR + EXPIRE
-// Simple, efficient, atomic counter per time window
+// Simple, efficient, atomic counter per time window.
+// Matches RateLimitService.checkRateLimit(clientId).
 
-String key = "uc4:ratelimit:" + clientId;
+String key = "uc4:" + clientId;   // e.g. "uc4:fintech-app-001"
 
 // INCR atomically increments (creates key=1 if absent)
 Long count = redis.opsForValue().increment(key);
 
 // Set TTL only on the FIRST request of a new window
 if (count == 1) {
-    redis.expire(key, 60, TimeUnit.SECONDS);
+    redis.expire(key, 60, TimeUnit.SECONDS);  // WINDOW_SECONDS
 }
 
 // Check if client exceeded the limit
-boolean allowed = count &lt;= MAX_REQUESTS;  // e.g. 10
+boolean allowed = count &lt;= MAX_REQUESTS;           // 10 in this demo
 long remaining = Math.max(0, MAX_REQUESTS - count);
 
 if (!allowed) {
@@ -156,13 +157,17 @@ if (!allowed) {
 }</code></pre>
                 </div>
 
-                <!-- Sliding Window -->
+                <!-- Sliding Window — conceptual alternative, NOT implemented in this demo -->
                 <div class="code-container code-tab-content" id="tab-sliding">
 <pre><code class="language-java">// ═══ Sliding-Window Rate Limiting ═══
-// Pattern: Sorted Set (ZADD + ZRANGEBYSCORE + ZCARD)
-// More precise than fixed-window, no boundary burst
+// ⚠ Conceptual alternative — NOT implemented in this demo.
+//   The live demo uses the fixed-window pattern above
+//   (RateLimitService + INCR/EXPIRE). This snippet is shown for
+//   comparison only: more precise, no boundary-burst problem,
+//   at the cost of extra memory and per-request sorted-set ops.
+// Pattern: Sorted Set (ZADD + ZREMRANGEBYSCORE + ZCARD)
 
-String key = "uc4:ratelimit:sliding:" + clientId;
+String key = "uc4:sliding:" + clientId;   // illustrative key
 long now = System.currentTimeMillis();
 long windowStart = now - (WINDOW_SECONDS * 1000);
 
@@ -190,34 +195,37 @@ if (count != null &amp;&amp; count &lt; MAX_REQUESTS) {
 
                 <!-- Redis CLI -->
                 <div class="code-container code-tab-content active" id="tab-cli">
-<pre><code class="language-bash"># ═══ Fixed-Window with Redis CLI ═══
+<pre><code class="language-bash"># ═══ Fixed-Window with Redis CLI (this demo) ═══
+# Key pattern used by RateLimitService: uc4:{clientId}
 
 # Increment counter (creates if not exists)
-INCR uc4:ratelimit:fintech-app-001
+INCR uc4:fintech-app-001
 # → (integer) 1
 
-# Set expiry on first request
-EXPIRE uc4:ratelimit:fintech-app-001 60
+# Set expiry on first request of the window
+EXPIRE uc4:fintech-app-001 60
 # → (integer) 1
 
 # Check current count
-GET uc4:ratelimit:fintech-app-001
+GET uc4:fintech-app-001
 # → "5"
 
 # Check TTL (time until window resets)
-TTL uc4:ratelimit:fintech-app-001
+TTL uc4:fintech-app-001
 # → (integer) 42
 
 # ═══ Sliding-Window with Redis CLI ═══
+# ⚠ Conceptual alternative — NOT implemented in this demo.
+#   Shown for comparison with the fixed-window approach above.
 
 # Add request with timestamp as score
-ZADD uc4:ratelimit:sliding:fintech-app-001 1713045600000 "req-uuid-1"
+ZADD uc4:sliding:fintech-app-001 1713045600000 "req-uuid-1"
 
-# Remove expired entries
-ZREMRANGEBYSCORE uc4:ratelimit:sliding:fintech-app-001 0 1713045540000
+# Remove expired entries (older than window start)
+ZREMRANGEBYSCORE uc4:sliding:fintech-app-001 0 1713045540000
 
 # Count requests in current window
-ZCARD uc4:ratelimit:sliding:fintech-app-001
+ZCARD uc4:sliding:fintech-app-001
 # → (integer) 3</code></pre>
                 </div>
             </section>
