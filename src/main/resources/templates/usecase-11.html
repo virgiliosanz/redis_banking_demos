@@ -140,22 +140,24 @@
 <pre><code class="language-bash"># ═══ Redis Streams — Transaction Monitoring ═══
 
 # Add a transaction event to the stream
+# The service emits only two fields: amount and riskScore
 XADD uc11:stream:transactions * \
-  amount 150.75 riskScore 25.3 \
-  type purchase merchant "Store ABC"
+  amount 150.75 riskScore 25.3
+
+# Trim stream right after XADD to keep it bounded
+# (exact MAXLEN — no '~' flag in this service)
+XTRIM uc11:stream:transactions MAXLEN 10000
 
 # Read last 10 transactions
 XRANGE uc11:stream:transactions - + COUNT 10
 
-# Read transactions from last 60 seconds
-# (replace &lt;timestamp_ms&gt; with epoch ms)
-XRANGE uc11:stream:transactions &lt;timestamp_ms&gt;-0 + COUNT 100
+# Read transactions in a bounded time window
+# (service uses &lt;fromMs&gt;-0 .. &lt;toMs&gt;-99999)
+XRANGE uc11:stream:transactions \
+  &lt;fromMs&gt;-0 &lt;toMs&gt;-99999 COUNT 10000
 
 # Count total transactions in the stream
 XLEN uc11:stream:transactions
-
-# Trim stream to last 10000 entries (retention)
-XTRIM uc11:stream:transactions MAXLEN ~ 10000
 
 # Read transactions in reverse (most recent first)
 XREVRANGE uc11:stream:transactions + - COUNT 5</code></pre>
@@ -165,39 +167,36 @@ XREVRANGE uc11:stream:transactions + - COUNT 5</code></pre>
                 <div class="code-container code-tab-content" id="tab-java">
 <pre><code class="language-java">// ═══ Redis Streams with Spring Data Redis ═══
 
-// Add a transaction to the stream
-Map&lt;String, String&gt; txData = Map.of(
-    "amount", String.valueOf(amount),
-    "riskScore", String.valueOf(riskScore),
-    "type", type,
-    "merchant", merchant
-);
-redisTemplate.opsForStream().add(
-    StreamRecords.string(txData)
-        .withStreamKey("uc11:stream:transactions")
-);
+// Add a transaction — the service emits only amount + riskScore
+Map&lt;String, String&gt; fields = new LinkedHashMap&lt;&gt;();
+fields.put("amount",    String.format("%.2f", amount));
+fields.put("riskScore", String.format("%.1f", riskScore));
 
-// Read transactions from last 60 seconds
-long fromTs = System.currentTimeMillis() - 60000;
+MapRecord&lt;String, String, String&gt; record = StreamRecords
+    .string(fields)
+    .withStreamKey("uc11:stream:transactions");
+redis.opsForStream().add(record);
+
+// Keep the stream bounded — XTRIM MAXLEN (exact, no approximate flag)
+redis.opsForStream().trim("uc11:stream:transactions", 10_000);
+
+// Read a bounded time window — XRANGE key fromId toId COUNT N
+long now = System.currentTimeMillis();
+long fromMs = now - 60_000;
 List&lt;MapRecord&lt;String, Object, Object&gt;&gt; records =
-    redisTemplate.opsForStream().range(
+    redis.opsForStream().range(
         "uc11:stream:transactions",
-        Range.closed(fromTs + "-0", "+")
+        Range.closed(fromMs + "-0", now + "-99999"),
+        Limit.limit().count(10_000)
     );
 
-// Calculate metrics from stream data
-long totalCount = redisTemplate.opsForStream()
-    .size("uc11:stream:transactions");
-
-// Aggregate: compute TPS, avg amount per second
-Map&lt;Long, List&lt;Double&gt;&gt; buckets = new TreeMap&lt;&gt;();
-for (var record : records) {
+// Aggregate in Java into 1-second buckets (count, sum, max)
+Map&lt;Long, int[]&gt; buckets = new TreeMap&lt;&gt;();
+for (var r : records) {
     long ts = Long.parseLong(
-        record.getId().toString().split("-")[0]);
-    long bucket = ts / 1000 * 1000; // 1-second buckets
-    buckets.computeIfAbsent(bucket, k -&gt; new ArrayList&lt;&gt;())
-        .add(Double.parseDouble(
-            record.getValue().get("amount").toString()));
+        r.getId().getValue().split("-")[0]);
+    long bucket = (ts / 1000) * 1000; // 1s buckets
+    buckets.computeIfAbsent(bucket, k -&gt; new int[]{0})[0]++;
 }</code></pre>
                 </div>
             </section>
