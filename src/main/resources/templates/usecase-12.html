@@ -248,7 +248,8 @@ redis.execute(conn -&gt; conn.execute(
     "$.location", "AS", "location", "GEO",
     "$.type", "AS", "type", "TAG",
     "$.services[*]", "AS", "services", "TAG",
-    "$.name", "AS", "name", "TEXT"));
+    "$.name", "AS", "name", "TEXT",
+    "$.hours", "AS", "hours", "TAG"));
 
 // FT.SEARCH — geo + filters
 String query = "@location:[-3.7038 40.4168 2 km]"
