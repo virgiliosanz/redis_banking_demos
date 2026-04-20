@@ -4,6 +4,9 @@
     window.WORKSHOP_UC = 'UC5';
 
     document.addEventListener('DOMContentLoaded', function () {
+        // --- Code Tabs ---
+        window.initCodeTabs();
+
         var form = document.getElementById('paymentForm');
         var payBtn = document.getElementById('payBtn');
         var doubleClickBtn = document.getElementById('doubleClickBtn');

@@ -117,78 +117,89 @@
             <section class="panel code-panel">
                 <h2>Code Showcase</h2>
                 <div class="code-container">
-                    <h3 class="code-section-title">1. SETNX Pattern (SET NX EX)</h3>
-                    <pre><code class="language-java">// Atomic check-and-set: only succeeds if key doesn't exist
-// SET uc5:dedup:{txHash} "1" NX EX 300
+                    <div class="code-tabs">
+                        <button class="code-tab active" data-tab="java">Java</button>
+                        <button class="code-tab" data-tab="cli">Redis CLI</button>
+                        <button class="code-tab" data-tab="bloom">Bloom Alternative</button>
+                    </div>
 
-String txHash = sha256(sender + receiver + amount + timeWindow);
-String key = "uc5:dedup:" + txHash;
+                    <div class="code-block active" id="tab-java">
+                        <pre><code class="language-java">// SETNX pattern — atomic check-and-set with TTL
+// Key convention used by DeduplicationService: "uc5:{txHash}"
 
-// SET with NX (Not eXists) + EX (Expire) — atomic dedup!
+String txHash = sha256Short(sender + receiver + amount + windowId);
+String key = "uc5:" + txHash;
+
+// SET key value NX EX 300 — atomic "set if not exists" with 5-min TTL
 Boolean wasSet = redis.opsForValue()
     .setIfAbsent(key, "1", Duration.ofSeconds(300));
 
 if (Boolean.TRUE.equals(wasSet)) {
-    // First time — process the payment
+    // First time within the window — process the payment
     return "ACCEPTED";
 } else {
-    // Key already exists — duplicate detected!
+    // Key already exists — duplicate detected
     return "DUPLICATE";
 }</code></pre>
+                    </div>
 
-                    <h3 class="code-section-title">2. Redis CLI Equivalent</h3>
-                    <pre><code class="language-bash"># First attempt — key created, payment processed
-SET uc5:dedup:a1b2c3d4 "1" NX EX 300
+                    <div class="code-block" id="tab-cli">
+                        <pre><code class="language-bash"># First attempt — key created, payment accepted
+SET uc5:a1b2c3d4 "1" NX EX 300
 # → OK
 
-# Second attempt (within 5 min) — blocked!
-SET uc5:dedup:a1b2c3d4 "1" NX EX 300
+# Second attempt (within 5 min) — blocked
+SET uc5:a1b2c3d4 "1" NX EX 300
 # → (nil)   ← duplicate detected
 
 # Check remaining TTL
-TTL uc5:dedup:a1b2c3d4
+TTL uc5:a1b2c3d4
 # → (integer) 287
 
-# After TTL expires, same tx is accepted again
-SET uc5:dedup:a1b2c3d4 "1" NX EX 300
+# After TTL expires, the same tx is accepted again
+SET uc5:a1b2c3d4 "1" NX EX 300
 # → OK</code></pre>
+                    </div>
 
-                    <h3 class="code-section-title">3. Bloom Filter Alternative (High Volume)</h3>
-                    <pre><code class="language-bash"># For millions of tx/day, use a Bloom filter
-# Probabilistic — tiny false-positive rate, zero false-negatives
-# Much less memory than storing every key
+                    <div class="code-block" id="tab-bloom">
+                        <pre><code class="language-bash"># ═══ Bloom filter alternative ═══
+# ⚠ Conceptual alternative — NOT implemented in this demo.
+#   The live demo uses the SET NX EX pattern above. A Bloom filter
+#   (RedisBloom module) trades a tiny false-positive rate for a
+#   large memory saving at very high volumes (millions of tx/day).
 
 # Create filter (1M capacity, 0.01% error rate)
-BF.RESERVE uc5:dedup:bloom 0.0001 1000000
+BF.RESERVE uc5:bloom:2024-01-15-14 0.0001 1000000
 
 # Check + add in one step
-BF.ADD uc5:dedup:bloom "a1b2c3d4e5f6"
+BF.ADD uc5:bloom:2024-01-15-14 "a1b2c3d4e5f6"
 # → (integer) 1  ← new item, not seen before
 
-BF.ADD uc5:dedup:bloom "a1b2c3d4e5f6"
+BF.ADD uc5:bloom:2024-01-15-14 "a1b2c3d4e5f6"
 # → (integer) 0  ← already exists = DUPLICATE
 
 # Check without adding
-BF.EXISTS uc5:dedup:bloom "a1b2c3d4e5f6"
+BF.EXISTS uc5:bloom:2024-01-15-14 "a1b2c3d4e5f6"
 # → (integer) 1  ← exists</code></pre>
+                        <pre><code class="language-java">// Java equivalent with Spring Data Redis (Lettuce)
+// Bloom filters don't support per-item TTL — use a
+// time-bucketed filter name, e.g. "uc5:bloom:2024-01-15-14".
 
-                    <pre><code class="language-java">// Java equivalent with Lettuce + RedisBloom
-// Note: Bloom filters don't support per-item TTL
-// Combine with time-bucketed filter names:
-//   "uc5:dedup:bloom:2024-01-15-14"  (hourly bucket)
+String filter = "uc5:bloom:" + hourBucket;
 
-// BF.ADD via Lettuce custom command
-Long added = redis.execute((RedisCallback&lt;Long&gt;) conn ->
-    conn.commands().execute("BF.ADD",
-        "uc5:dedup:bloom".getBytes(),
-        txHash.getBytes())
+// BF.ADD via RedisCallback — conn.execute runs any Redis command
+Long added = (Long) redis.execute((RedisCallback&lt;Object&gt;) conn ->
+    conn.execute("BF.ADD",
+        filter.getBytes(StandardCharsets.UTF_8),
+        txHash.getBytes(StandardCharsets.UTF_8))
 );
 
-if (added == 1L) {
+if (added != null &amp;&amp; added == 1L) {
     return "ACCEPTED";   // new transaction
 } else {
     return "DUPLICATE";  // already seen
 }</code></pre>
+                    </div>
                 </div>
             </section>
         </div>
