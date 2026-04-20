@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,7 +78,15 @@ public class HealthController {
                 emitter.send(SseEmitter.event()
                         .name("command")
                         .data(command));
+            } catch (IOException e) {
+                // Expected client disconnect (broken pipe, connection reset,
+                // or AsyncRequestNotUsableException — subclass of IOException —
+                // when the async response is already closed). Detach the listener
+                // and complete the emitter quietly; don't surface as a server error.
+                redisMonitor.removeListener(listenerId);
+                try { emitter.complete(); } catch (Exception ignored) {}
             } catch (Exception e) {
+                // Unexpected failure: propagate so real bugs stay visible.
                 redisMonitor.removeListener(listenerId);
                 try { emitter.completeWithError(e); } catch (Exception ignored) {}
             }

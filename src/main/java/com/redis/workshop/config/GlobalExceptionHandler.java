@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.util.LinkedHashMap;
@@ -35,6 +36,20 @@ public class GlobalExceptionHandler {
             NoHandlerFoundException ex, HttpServletRequest request) {
         log.warn("No handler for {} {}", request.getMethod(), request.getRequestURI());
         return build(HttpStatus.NOT_FOUND, "No handler for " + request.getRequestURI(), request);
+    }
+
+    /**
+     * Raised by Spring's async dispatcher when a client has already closed
+     * an SSE/async response (e.g. the commands stream on page reload). The
+     * response is not writable anymore, so we cannot produce a body — just
+     * log at debug and let the request unwind silently instead of surfacing
+     * a noisy stack trace in the workshop logs.
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncRequestNotUsable(
+            AsyncRequestNotUsableException ex, HttpServletRequest request) {
+        log.debug("Async request no longer usable on {}: {}",
+                request.getRequestURI(), ex.getMessage());
     }
 
     @ExceptionHandler(OpenAiException.class)
