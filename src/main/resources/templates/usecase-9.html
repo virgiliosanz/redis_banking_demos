@@ -433,7 +433,7 @@ redis.opsForHash().putAll(memKey, Map.of(
 conn.hashCommands().hSet(
     memKey.getBytes(),
     "vector".getBytes(),
-    vectorToBytes(embedding)  // 768-dim float[]
+    vectorToBytes(embedding)  // 1536-dim float[]
 );
 
 // 3. FT.CREATE — Vector index for memories
@@ -443,7 +443,7 @@ conn.hashCommands().hSet(
 //     summary TEXT
 //     tags TAG SEPARATOR ","
 //     vector VECTOR HNSW 6
-//       TYPE FLOAT32 DIM 768
+//       TYPE FLOAT32 DIM 1536
 //       DISTANCE_METRIC COSINE
 
 // 4. FT.SEARCH KNN — Retrieve memories
@@ -515,7 +515,7 @@ HSET uc9:memory:mem-001 \
   detail "Customer inquired about SWIFT..." \
   date "2024-03-15" \
   tags "transfer,international,fees" \
-  vector "&lt;768-dim FLOAT32 binary blob&gt;"
+  vector "&lt;1536-dim FLOAT32 binary blob&gt;"
 
 # 3. Create vector index for memories
 FT.CREATE idx:uc9:memory \
@@ -525,7 +525,7 @@ FT.CREATE idx:uc9:memory \
     tags TAG SEPARATOR "," \
     date TEXT \
     vector VECTOR HNSW 6 \
-      TYPE FLOAT32 DIM 768 \
+      TYPE FLOAT32 DIM 1536 \
       DISTANCE_METRIC COSINE
 
 # 4. KNN search — find similar memories
@@ -543,7 +543,7 @@ FT.CREATE idx:uc9:kb \
     content TEXT \
     tags TAG SEPARATOR "," \
     vector VECTOR HNSW 6 \
-      TYPE FLOAT32 DIM 768 \
+      TYPE FLOAT32 DIM 1536 \
       DISTANCE_METRIC COSINE
 
 # 6. KNN search — retrieve KB articles
