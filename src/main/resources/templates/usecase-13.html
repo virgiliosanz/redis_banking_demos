@@ -120,12 +120,17 @@
                 <h2>Code Showcase</h2>
                 <div class="code-container">
                     <div class="code-tabs">
-                        <button class="code-tab" data-tab="java">Java</button>
+                        <button class="code-tab" data-tab="java">Java (demo)</button>
+                        <button class="code-tab" data-tab="watch">WATCH/MULTI/EXEC (alternative)</button>
                         <button class="code-tab active" data-tab="cli">Redis CLI</button>
                     </div>
 
                     <div class="code-block" id="tab-java">
-                        <pre><code class="language-java">// 1. Acquire lock — SET NX EX (atomic)
+                        <pre><code class="language-java">// ═══ Safe Distributed Lock (this demo) ═══
+// Pattern: SET NX EX + Lua safe-release.
+// Matches LockService.acquire() / release().
+
+// 1. Acquire lock — SET NX EX (atomic)
 String key = "uc13:lock:" + accountId;
 Boolean acquired = redis.opsForValue()
     .setIfAbsent(key, clientId,
@@ -138,7 +143,7 @@ if (acquired) {
 }
 
 // 2. Safe release — Lua script
-// Only delete if WE hold the lock
+// Only delete if WE hold the lock (atomic GET+DEL)
 String luaScript =
     "if redis.call('GET', KEYS[1]) == ARGV[1] then " +
     "  return redis.call('DEL', KEYS[1]) " +
@@ -156,6 +161,49 @@ Long result = redis.execute(
 // 3. Check lock status
 String holder = redis.opsForValue().get(key);
 Long ttl = redis.getExpire(key, TimeUnit.SECONDS);</code></pre>
+                    </div>
+
+                    <div class="code-block" id="tab-watch">
+                        <pre><code class="language-java">// ═══ Safe release with WATCH / MULTI / EXEC ═══
+// ⚠ Conceptual alternative — NOT the active backend implementation.
+//   The live demo uses the Lua safe-release above (single atomic
+//   round-trip, no retries). This snippet is shown for comparison:
+//   same correctness guarantee using optimistic locking instead of
+//   server-side scripting, at the cost of extra round-trips and
+//   client-side retry handling on EXEC aborts.
+// Pattern: WATCH the key → verify ownership → MULTI/DEL → EXEC.
+
+String key = "uc13:lock:" + accountId;
+
+redis.execute(new SessionCallback&lt;Object&gt;() {
+    @Override
+    public Object execute(RedisOperations ops) {
+        // 1. WATCH the key: EXEC will abort if it changes
+        //    (e.g. another client releases or the TTL expires)
+        ops.watch(key);
+
+        // 2. Read current holder OUTSIDE the transaction
+        String currentHolder = (String) ops.opsForValue().get(key);
+
+        // 3. Only release if WE own the lock
+        if (!clientId.equals(currentHolder)) {
+            ops.unwatch();
+            return 0L;  // not our lock
+        }
+
+        // 4. Queue the DEL inside MULTI/EXEC
+        ops.multi();
+        ops.delete(key);
+        List&lt;Object&gt; result = ops.exec();
+
+        // 5. EXEC returns null if the WATCHed key was modified
+        //    concurrently → caller should retry the whole flow.
+        return (result == null) ? null : 1L;
+    }
+});
+// Tradeoffs vs. Lua:
+//   + No server-side scripting (easier to reason about in clusters)
+//   - Multiple round-trips and explicit retry loop on conflicts</code></pre>
                     </div>
 
                     <div class="code-block active" id="tab-cli">

@@ -6,6 +6,9 @@
     'use strict';
     window.WORKSHOP_UC = 'UC13';
 
+    // --- Code tabs: wire up the shared tab behavior (Java / WATCH-MULTI-EXEC / CLI) ---
+    window.initCodeTabs();
+
     var resourceSelect = document.getElementById('resourceSelect');
     var clientIdInput = document.getElementById('clientIdInput');
     var btnAcquire = document.getElementById('btnAcquire');
