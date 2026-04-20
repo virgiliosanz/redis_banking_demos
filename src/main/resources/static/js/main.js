@@ -336,8 +336,8 @@
         var panel = document.querySelector('.code-panel');
         if (!panel) return;
 
-        var blocks = panel.querySelectorAll('.code-block.active');
-        if (!blocks.length) blocks = panel.querySelectorAll('.code-block');
+        var blocks = panel.querySelectorAll('.code-block.active, .code-tab-content.active');
+        if (!blocks.length) blocks = panel.querySelectorAll('.code-block, .code-tab-content');
 
         var escaped = commandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         var re = new RegExp('(^|[^A-Z0-9.])' + escaped + '(?![A-Z0-9.])');
