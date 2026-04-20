@@ -154,73 +154,98 @@
             <section class="panel code-panel">
                 <h2>Code Showcase</h2>
                 <div class="code-container">
-                    <h3 class="code-section-title">1. Velocity Tracking (Sorted Set)</h3>
-                    <pre><code class="language-java">// ZADD — record each transaction with timestamp as score
+                    <div class="code-tabs">
+                        <button class="code-tab active" data-tab="java">Java</button>
+                        <button class="code-tab" data-tab="cli">Redis CLI</button>
+                    </div>
+
+                    <div class="code-block active" id="tab-java">
+                        <h3 class="code-section-title">1. Velocity tracking (Sorted Set)</h3>
+                        <pre><code class="language-java">// ZADD — record each transaction with timestamp as score
+// Key convention used by FraudService: "uc6:velocity:{cardNumber}"
 String velocityKey = "uc6:velocity:" + cardNumber;
 long now = Instant.now().toEpochMilli();
 
 redis.opsForZSet().add(velocityKey, txId, now);
 
-// ZRANGEBYSCORE — count txs in last 5 minutes
+// ZRANGEBYSCORE — count txs in the last 5 minutes
 long windowStart = now - (300 * 1000); // 5 min ago
 Set&lt;String&gt; recentTxs = redis.opsForZSet()
     .rangeByScore(velocityKey, windowStart, now);
 
-int velocityCount = recentTxs.size();
-// velocityCount &gt; 5 → HIGH RISK!
+int velocityCount = recentTxs != null ? recentTxs.size() : 0;
+// velocityCount &gt;= 5 → HIGH risk component
 
-// Clean expired entries
+// Clean entries that fell outside the window
 redis.opsForZSet()
     .removeRangeByScore(velocityKey, 0, windowStart - 1);</code></pre>
 
-                    <h3 class="code-section-title">2. Redis CLI — Velocity Check</h3>
-                    <pre><code class="language-bash"># Add transaction with timestamp as score
-ZADD uc6:velocity:4000-1234 1713045600000 "tx-abc123"
-# → (integer) 1
+                        <h3 class="code-section-title">2. Event stream (Redis Streams)</h3>
+                        <pre><code class="language-java">// XADD — log every fraud evaluation to a stream.
+// Fields mirror the FraudService response, so consumers
+// can rebuild the full context from a single entry.
+Map&lt;String, String&gt; entry = new LinkedHashMap&lt;&gt;();
+entry.put("txId",          txId);
+entry.put("card",          cardNumber);
+entry.put("amount",        String.format("%.2f", amount));
+entry.put("merchant",      merchant);
+entry.put("country",       country);
+entry.put("riskScore",     String.valueOf(riskScore));
+entry.put("riskLevel",     riskLevel);
+entry.put("velocityCount", String.valueOf(velocityCount));
+entry.put("geoAnomaly",    String.valueOf(geoAnomaly));
+entry.put("timestamp",     Instant.now().toString());
 
-# Count transactions in last 5 minutes
-ZRANGEBYSCORE uc6:velocity:4000-1234 1713045300000 1713045600000
-# → 1) "tx-prev001"
-# → 2) "tx-prev002"
-# → 3) "tx-abc123"
-# 3 transactions → elevated velocity
+MapRecord&lt;String, String, String&gt; record = StreamRecords
+    .string(entry)
+    .withStreamKey("uc6:stream:transactions");
+redis.opsForStream().add(record);
 
-# Clean old entries
-ZREMRANGEBYSCORE uc6:velocity:4000-1234 0 1713045299999</code></pre>
+// Keep the stream bounded — exact MAXLEN (no '~' flag)
+redis.opsForStream().trim("uc6:stream:transactions", 50);
 
-                    <h3 class="code-section-title">3. Event Stream (Redis Streams)</h3>
-                    <pre><code class="language-java">// XADD — log every fraud evaluation to a stream
-Map&lt;String, String&gt; entry = Map.of(
-    "txId", txId,
-    "card", cardNumber,
-    "amount", String.valueOf(amount),
-    "riskScore", String.valueOf(riskScore),
-    "riskLevel", riskLevel
-);
-
-redis.opsForStream().add(
-    StreamRecords.string(entry)
-        .withStreamKey("uc6:stream:transactions"));
-
-// XREVRANGE — read most recent evaluations
+// XREVRANGE — read most recent evaluations for the UI
 redis.opsForStream().reverseRange(
     "uc6:stream:transactions",
     Range.unbounded(),
     Limit.limit().count(20));</code></pre>
+                    </div>
 
-                    <h3 class="code-section-title">4. Redis CLI — Stream Commands</h3>
-                    <pre><code class="language-bash"># Log a fraud evaluation event
-XADD uc6:stream:transactions * txId "tx-abc123" card "4000-1234" amount "15000.00" riskScore "75" riskLevel "CRITICAL"
+                    <div class="code-block" id="tab-cli">
+                        <h3 class="code-section-title">1. Velocity check</h3>
+                        <pre><code class="language-bash"># Add transaction with timestamp as score
+ZADD uc6:velocity:4000-1234-5678-9010 1713045600000 "tx-abc123"
+# → (integer) 1
+
+# Count transactions in the last 5 minutes
+ZRANGEBYSCORE uc6:velocity:4000-1234-5678-9010 1713045300000 1713045600000
+# → 1) "baseline-1-4000-1234-5678-9010"
+# → 2) "baseline-2-4000-1234-5678-9010"
+# → 3) "tx-abc123"
+# 3 transactions → elevated velocity
+
+# Drop entries older than the window
+ZREMRANGEBYSCORE uc6:velocity:4000-1234-5678-9010 0 1713045299999</code></pre>
+
+                        <h3 class="code-section-title">2. Stream commands</h3>
+                        <pre><code class="language-bash"># Log a fraud evaluation event (fields match FraudService)
+XADD uc6:stream:transactions * \
+  txId "tx-abc123" card "4000-1234-5678-9010" \
+  amount "15000.00" merchant "Luxury Watches Ltd" country "RU" \
+  riskScore "95" riskLevel "CRITICAL" \
+  velocityCount "3" geoAnomaly "true" \
+  timestamp "2025-04-20T12:00:00Z"
 # → "1713045600000-0"
 
-# Read last 5 evaluations
+# Read last 5 evaluations (most recent first)
 XREVRANGE uc6:stream:transactions + - COUNT 5
 
 # Stream length
 XLEN uc6:stream:transactions
 
-# Trim to last 50 entries
-XTRIM uc6:stream:transactions MAXLEN ~ 50</code></pre>
+# Bound the stream — exact trim to 50 entries
+XTRIM uc6:stream:transactions MAXLEN 50</code></pre>
+                    </div>
                 </div>
             </section>
         </div>

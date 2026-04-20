@@ -11,6 +11,9 @@
     };
 
     document.addEventListener('DOMContentLoaded', function () {
+        // --- Code Tabs ---
+        window.initCodeTabs();
+
         var form = document.getElementById('fraudForm');
         var evaluateBtn = document.getElementById('evaluateBtn');
         var burstBtn = document.getElementById('burstBtn');
