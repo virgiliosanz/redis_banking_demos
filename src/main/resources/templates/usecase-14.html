@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${useCaseTitle}">Agent Memory Server</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">UC14</span>
+            <h1 th:text="${useCaseTitle}">Agent Memory Server</h1>
+        </div>
+
+        <details class="how-it-works" open>
+            <summary><h2>How it works</h2></summary>
+            <div class="how-it-works-steps">
+                <ol>
+                    <li><strong>Working memory</strong> holds the active conversation per <code>session_id</code>. The app appends each user turn via <code>PUT /v1/working-memory/{session_id}</code>.</li>
+                    <li><strong>Long-term memory</strong> stores durable, semantic facts. The seed flow posts curated banking memories via <code>POST /v1/long-term-memory/</code>.</li>
+                    <li><strong>Context assembly</strong> runs on every turn: <code>POST /v1/memory/prompt</code> merges working memory + KNN-retrieved long-term memories into the final messages fed to the LLM.</li>
+                    <li><strong>Observability</strong> — the demo captures every AMS request/response (no raw Redis commands) so you can see exactly what the agent saw before replying.</li>
+                </ol>
+            </div>
+            <div class="how-it-works-diagram">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 200" width="780" height="200">
+                    <defs>
+                        <marker id="uc14-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                            <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                        </marker>
+                    </defs>
+                    <rect x="10" y="80" width="90" height="50" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="55" y="105" text-anchor="middle" font-size="12" font-weight="600">App</text>
+                    <text x="55" y="121" text-anchor="middle" font-size="10" class="svg-label">(Spring)</text>
+                    <line x1="100" y1="105" x2="175" y2="105" class="svg-arrow" stroke-width="2" marker-end="url(#uc14-arrow)"/>
+                    <rect x="180" y="60" width="200" height="90" rx="5" ry="5" class="svg-box svg-box-accent" stroke-width="1"/>
+                    <text x="280" y="85" text-anchor="middle" font-size="13" font-weight="700">Agent Memory Server</text>
+                    <text x="280" y="105" text-anchor="middle" font-size="10" class="svg-label">/v1/working-memory</text>
+                    <text x="280" y="120" text-anchor="middle" font-size="10" class="svg-label">/v1/long-term-memory</text>
+                    <text x="280" y="135" text-anchor="middle" font-size="10" class="svg-label">/v1/memory/prompt</text>
+                    <line x1="380" y1="105" x2="460" y2="105" class="svg-arrow" stroke-width="2" marker-end="url(#uc14-arrow)"/>
+                    <circle cx="510" cy="105" r="50" class="svg-redis-circle"/>
+                    <text x="510" y="100" text-anchor="middle" font-size="13" class="svg-redis-text">Redis</text>
+                    <text x="510" y="117" text-anchor="middle" font-size="10" class="svg-redis-text">Storage + KNN</text>
+                    <line x1="380" y1="80" x2="605" y2="40" class="svg-arrow" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#uc14-arrow)"/>
+                    <rect x="600" y="20" width="160" height="38" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="680" y="38" text-anchor="middle" font-size="11" font-weight="600">LLM</text>
+                    <text x="680" y="52" text-anchor="middle" font-size="10" class="svg-label">assembled messages</text>
+                    <line x1="380" y1="135" x2="605" y2="175" class="svg-arrow" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#uc14-arrow)"/>
+                    <rect x="600" y="160" width="160" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="680" y="180" text-anchor="middle" font-size="11" font-weight="600">MCP (tool-native)</text>
+                </svg>
+            </div>
+            <p class="uc14-narrative">
+                <strong>REST is the operational path for the web app.</strong> MCP is shown in the code showcase as a tool-native
+                alternative for agents — the workshop stack ships an <code>ams-mcp</code> profile for it, but the demo itself
+                drives AMS via REST for clarity and reproducibility.
+            </p>
+        </details>
+
+        <div class="usecase-panels">
+            <!-- LEFT: Live Demo Panel -->
+            <section class="panel demo-panel">
+                <div class="uc14-panel-head">
+                    <h2 style="margin:0;">Live Demo</h2>
+                    <span id="ams-status-badge" class="ai-badge mock" title="AMS reachability">AMS: …</span>
+                    <span id="ai-badge" class="ai-badge mock" title="OpenAI configuration">AI: …</span>
+                </div>
+                <div id="demo-container" class="demo-container">
+
+                    <!-- AMS status card -->
+                    <div class="data-card" id="ams-status-card">
+                        <h3>Agent Memory Server</h3>
+                        <div class="data-row"><span class="data-label">Base URL</span><span class="data-value" id="ams-base-url">—</span></div>
+                        <div class="data-row"><span class="data-label">MCP URL</span><span class="data-value" id="ams-mcp-url">—</span></div>
+                        <div class="data-row"><span class="data-label">Namespace</span><span class="data-value" id="ams-namespace">—</span></div>
+                        <div class="data-row"><span class="data-label">Session</span><span class="data-value" id="ams-session">—</span></div>
+                        <div class="data-row"><span class="data-label">User</span><span class="data-value" id="ams-user">demo-user</span></div>
+                        <div class="data-row"><span class="data-label">Seeded memories</span><span class="data-value" id="ams-seed-count">0</span></div>
+                        <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+                            <button id="btnSeed" class="btn btn-primary btn-sm">Seed demo memories</button>
+                            <button id="btnReset" class="btn btn-outline btn-sm">Reset session &amp; memories</button>
+                        </div>
+                    </div>
+
+                    <!-- Chat -->
+                    <div class="data-card" id="chat-card">
+                        <h3>Chat with the agent</h3>
+                        <div id="chat-messages" class="uc14-chat">
+                            <div class="chat-welcome">
+                                Seed the demo, then ask the agent about the customer profile — transfers,
+                                mortgage, investments, card security or Open Banking. Context is assembled
+                                by AMS on every turn.
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input type="text" id="chatInput" class="form-input" placeholder="Ask about the customer…" style="flex:1;"/>
+                            <button id="sendBtn" class="btn btn-primary">Send</button>
+                        </div>
+                        <div style="margin-top:8px;">
+                            <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px;">Try these prompts:</label>
+                            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                <button class="btn btn-sm btn-secondary uc14-prompt" data-prompt="Which payment rail should I use for a €500 transfer inside the EEA?">Transfers</button>
+                                <button class="btn btn-sm btn-secondary uc14-prompt" data-prompt="What mortgage options am I currently evaluating?">Mortgage</button>
+                                <button class="btn btn-sm btn-secondary uc14-prompt" data-prompt="What is my investment risk profile and what have I asked about diversifying into?">Investments</button>
+                                <button class="btn btn-sm btn-secondary uc14-prompt" data-prompt="Is my card secure after the recent fraud alert?">Card security</button>
+                                <button class="btn btn-sm btn-secondary uc14-prompt" data-prompt="Can my business use Open Banking APIs?">Open Banking</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Context assembly -->
+                    <div class="data-card" id="context-card">
+                        <h3>Context assembly</h3>
+                        <p class="uc14-ctx-subtitle">
+                            What <code>/v1/memory/prompt</code> returned for the last turn — working memory,
+                            long-term memory hits, and the final assembled messages fed to the LLM.
+                        </p>
+                        <div class="uc14-ctx-section">
+                            <div class="uc14-ctx-section-title">Working memory <span class="uc14-ctx-tag">Short-term · per session</span></div>
+                            <div id="wm-body" class="uc14-ctx-section-body">No chat turns yet.</div>
+                        </div>
+                        <div class="uc14-ctx-section">
+                            <div class="uc14-ctx-section-title">Long-term memories <span class="uc14-ctx-tag">Semantic · KNN</span></div>
+                            <div id="lt-body" class="uc14-ctx-section-body">No memories retrieved yet.</div>
+                        </div>
+                        <div class="uc14-ctx-section">
+                            <div class="uc14-ctx-section-title">Assembled messages <span class="uc14-ctx-tag">Final prompt to LLM</span></div>
+                            <div id="assembled-body" class="uc14-ctx-section-body">No prompt assembled yet.</div>
+                        </div>
+                        <div id="latency-display" class="uc14-ctx-latency"></div>
+                    </div>
+
+                    <!-- AMS traces -->
+                    <div class="data-card" id="traces-card">
+                        <h3>AMS request/response traces</h3>
+                        <p class="uc14-ctx-subtitle">
+                            Most recent AMS calls captured by the app. REST is the operational path; MCP
+                            would surface equivalent tool calls against the same backend.
+                        </p>
+                        <div id="traces-body" class="uc14-traces-list">No traces yet. Run Seed or send a chat message.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT: Code Showcase Panel -->
+            <section class="panel code-panel">
+                <h2>Code Showcase</h2>
+                <div class="code-container">
+                    <div class="code-tabs">
+                        <button class="code-tab active" data-tab="java">Java (demo)</button>
+                        <button class="code-tab" data-tab="rest">REST (operational)</button>
+                        <button class="code-tab" data-tab="mcp">MCP (alternative)</button>
+                    </div>
+
+                    <div class="code-block active" id="tab-java">
+                        <pre><code class="language-java">// ═══ Agent Memory Server — demo flow (REST via Spring) ═══
+// Matches AmsDemoService + AmsClient in this repo.
+
+// 1. Seed long-term memory (banking subset)
+List&lt;Map&lt;String, Object&gt;&gt; memories = AmsDemoData.LONG_TERM_MEMORIES
+    .stream().map(m -&gt; {
+        Map&lt;String, Object&gt; rec = new LinkedHashMap&lt;&gt;(m);
+        rec.put("user_id", userId);
+        rec.put("namespace", "workshop");
+        return rec;
+    }).toList();
+ams.createLongTermMemories(memories, /* deduplicate */ true);
+//   → POST /v1/long-term-memory/  { memories: [...], deduplicate: true }
+
+// 2. Initialise working memory for the session
+Map&lt;String, Object&gt; wm = Map.of(
+    "messages", List.of(),
+    "memories", List.of(),
+    "data", Map.of("demo_seeded_at", Instant.now().toString()));
+ams.putWorkingMemory(sessionId, wm, userId, "workshop");
+//   → PUT /v1/working-memory/{sessionId}
+
+// 3. Chat turn — append user msg, assemble context, call LLM
+Map&lt;String, Object&gt; current = ams.getWorkingMemory(
+    sessionId, userId, "workshop");
+List&lt;Map&lt;String, Object&gt;&gt; msgs = extractMessages(current);
+msgs.add(Map.of("role", "user", "content", userMessage));
+ams.putWorkingMemory(sessionId,
+    Map.of("messages", msgs), userId, "workshop");
+
+// 4. Context assembly — AMS merges working + long-term memory
+Map&lt;String, Object&gt; promptReq = Map.of(
+    "query", userMessage,
+    "session", Map.of(
+        "session_id", sessionId,
+        "user_id", userId,
+        "namespace", "workshop"),
+    "long_term_search", Map.of(
+        "limit", 5,
+        "user_id", Map.of("eq", userId)));
+Map&lt;String, Object&gt; promptResp = ams.memoryPrompt(promptReq);
+//   → POST /v1/memory/prompt
+//   returns { messages: [{role, content}, ...], context: {...} }
+
+// 5. Feed assembled messages straight into the LLM
+List&lt;Map&lt;String, String&gt;&gt; llmMsgs = coerceToLlmMessages(promptResp);
+String reply = openAiService.chatCompletion(llmMsgs);
+
+// 6. Append assistant reply and persist working memory
+msgs.add(Map.of("role", "assistant", "content", reply));
+ams.putWorkingMemory(sessionId,
+    Map.of("messages", msgs), userId, "workshop");
+
+// Observability: every AMS call is recorded in AmsTraceRecorder
+// and surfaced to the UI via GET /api/ams/traces — the app never
+// reads raw Redis keys for this use case.</code></pre>
+                    </div>
+
+                    <div class="code-block" id="tab-rest">
+                        <pre><code class="language-bash"># ═══ AMS REST — operational path for the web app ═══
+
+# 1. Health check
+curl -s http://localhost:8000/v1/health
+
+# 2. Seed long-term memory (banking subset)
+curl -s -X POST http://localhost:8000/v1/long-term-memory/ \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "memories": [{
+      "id": "ams-mem-001",
+      "text": "Customer prefers SEPA for EUR transfers inside the EEA...",
+      "topics": ["transfers","fees","preferences"],
+      "entities": ["SEPA","SWIFT","EEA"],
+      "memory_type": "semantic",
+      "user_id": "demo-user",
+      "namespace": "workshop"
+    }],
+    "deduplicate": true
+  }'
+
+# 3. Initialise working memory for a session
+curl -s -X PUT \
+  http://localhost:8000/v1/working-memory/demo-session \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "messages": [],
+    "memories": [],
+    "user_id": "demo-user",
+    "namespace": "workshop"
+  }'
+
+# 4. Context assembly (working + long-term, KNN)
+curl -s -X POST http://localhost:8000/v1/memory/prompt \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "Which rail should I use for a €500 EEA transfer?",
+    "session": {
+      "session_id": "demo-session",
+      "user_id": "demo-user",
+      "namespace": "workshop"
+    },
+    "long_term_search": {
+      "limit": 5,
+      "user_id": {"eq": "demo-user"}
+    }
+  }'
+# → { "messages": [ {role, content}, ... ], "context": {...} }
+
+# 5. Standalone long-term semantic search
+curl -s -X POST http://localhost:8000/v1/long-term-memory/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "text": "open banking",
+    "limit": 5,
+    "user_id": {"eq": "demo-user"},
+    "namespace": {"eq": "workshop"}
+  }'
+
+# 6. Reset — delete working memory + seeded long-term IDs
+curl -s -X DELETE \
+  'http://localhost:8000/v1/working-memory/demo-session?user_id=demo-user&namespace=workshop'
+
+curl -s -X DELETE \
+  'http://localhost:8000/v1/long-term-memory?memory_ids=ams-mem-001&memory_ids=ams-mem-002'</code></pre>
+                    </div>
+
+                    <div class="code-block" id="tab-mcp">
+                        <pre><code class="language-bash"># ═══ MCP — tool-native alternative (profile: ams-mcp) ═══
+# ⚠ Conceptual / narrative. The live demo drives AMS via REST
+#   for observability and single-tenant simplicity. The workshop
+#   stack ships the MCP server for agent-native integrations:
+#   docker compose --profile ams-mcp up -d agent-memory-server-mcp
+
+# Server exposed at: http://localhost:9000  (streamable HTTP)
+
+# Example tools exposed by AMS over MCP:
+#   create_long_term_memories(memories[])
+#   search_long_term_memory(text, filters)
+#   memory_prompt(query, session, long_term_search)
+#   get_working_memory(session_id, user_id, namespace)
+
+# Example MCP tool-call (tool arguments are identical to the REST
+# request bodies — only the transport differs):
+{
+  "name": "memory_prompt",
+  "arguments": {
+    "query": "Which rail for a €500 EEA transfer?",
+    "session": {
+      "session_id": "demo-session",
+      "user_id": "demo-user",
+      "namespace": "workshop"
+    },
+    "long_term_search": {
+      "limit": 5,
+      "user_id": {"eq": "demo-user"}
+    }
+  }
+}
+
+# Why REST for the demo, MCP for agents?
+#   REST  — trivial observability in the UI (single HTTP hop,
+#           every request/response recorded in AmsTraceRecorder)
+#   MCP   — agent-native: an IDE-hosted or autonomous agent can
+#           reach the same AMS backend without a bespoke client.</code></pre>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div layout:fragment="scripts">
+        <style>
+            .uc14-panel-head {
+                display:flex; align-items:center; gap:12px;
+                margin-bottom:16px; flex-wrap:wrap;
+            }
+            .uc14-narrative {
+                font-size:0.85rem; color:var(--text-secondary);
+                margin-top:12px; padding:10px 12px;
+                background:var(--bg-tertiary);
+                border-radius:var(--border-radius);
+                border-left:3px solid var(--redis-primary);
+            }
+            .uc14-chat {
+                max-height:280px; overflow-y:auto;
+                margin-bottom:8px; padding:8px;
+                background:var(--bg-secondary);
+                border-radius:var(--border-radius);
+                min-height:120px;
+            }
+            .uc14-chat .chat-welcome {
+                color:var(--text-muted); font-style:italic;
+                padding:16px 0; text-align:center; font-size:0.85rem;
+            }
+            .uc14-msg {
+                margin-bottom:10px; padding:10px 12px;
+                border-radius:var(--border-radius); max-width:90%;
+                font-size:0.85rem; line-height:1.5;
+            }
+            .uc14-msg-user {
+                background:var(--redis-primary); color:#fff;
+                margin-left:auto; text-align:right;
+            }
+            .uc14-msg-assistant {
+                background:var(--bg-tertiary); color:var(--text-primary);
+            }
+            .uc14-ctx-subtitle {
+                font-size:0.8rem; color:var(--text-muted);
+                margin-bottom:12px;
+            }
+            .uc14-ctx-section { margin-bottom:16px; }
+            .uc14-ctx-section:last-of-type { margin-bottom:8px; }
+            .uc14-ctx-section-title {
+                font-size:0.8rem; font-weight:600;
+                color:var(--text-primary); margin-bottom:6px;
+                display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+            }
+            .uc14-ctx-tag {
+                font-family:var(--font-code); font-size:0.65rem;
+                font-weight:500; padding:2px 8px;
+                border-radius:var(--border-radius);
+                background:rgba(255, 68, 56, 0.08);
+                color:var(--redis-primary);
+                text-transform:uppercase; letter-spacing:0.03em;
+            }
+            .uc14-ctx-section-body {
+                font-size:0.8rem; color:var(--text-muted);
+                padding:10px 12px; background:var(--bg-secondary);
+                border-radius:var(--border-radius);
+                border:1px solid var(--border-color);
+                max-height:240px; overflow-y:auto;
+            }
+            .uc14-ctx-latency {
+                font-family:var(--font-code); font-size:0.75rem;
+                color:var(--redis-primary); margin-top:12px;
+                border-top:1px solid var(--border-color);
+                padding-top:8px;
+            }
+            .uc14-lt-item, .uc14-wm-item, .uc14-assembled-item {
+                padding:6px 0; border-bottom:1px solid var(--border-color);
+            }
+            .uc14-lt-item:last-child, .uc14-wm-item:last-child,
+            .uc14-assembled-item:last-child {
+                border-bottom:none; padding-bottom:0;
+            }
+            .uc14-role-pill {
+                display:inline-block; font-family:var(--font-code);
+                font-size:0.65rem; font-weight:700;
+                padding:2px 6px; border-radius:var(--border-radius);
+                margin-right:8px; text-transform:uppercase;
+                background:var(--bg-tertiary);
+                color:var(--text-secondary);
+            }
+            .uc14-role-user { background:rgba(255, 68, 56, 0.12); color:var(--redis-primary); }
+            .uc14-role-system { background:rgba(9, 26, 35, 0.12); color:var(--text-secondary); }
+            .uc14-role-assistant { background:rgba(5, 150, 105, 0.15); color:#059669; }
+            .uc14-score {
+                font-family:var(--font-code); font-size:0.7rem;
+                padding:2px 8px; border-radius:var(--border-radius);
+                background:var(--bg-tertiary); color:var(--text-muted);
+                margin-left:6px;
+            }
+            .uc14-traces-list {
+                max-height:320px; overflow-y:auto;
+                background:var(--bg-secondary);
+                border-radius:var(--border-radius);
+                border:1px solid var(--border-color);
+                padding:4px;
+            }
+            .uc14-trace {
+                border-bottom:1px solid var(--border-color);
+                padding:6px 8px;
+            }
+            .uc14-trace:last-child { border-bottom:none; }
+            .uc14-trace > summary {
+                list-style:none; cursor:pointer;
+                display:flex; gap:8px; align-items:center;
+                font-family:var(--font-code); font-size:0.75rem;
+            }
+            .uc14-trace > summary::-webkit-details-marker { display:none; }
+            .uc14-trace-method {
+                font-weight:700; color:var(--redis-primary);
+                min-width:56px;
+            }
+            .uc14-trace-path {
+                flex:1; color:var(--text-primary); word-break:break-all;
+            }
+            .uc14-trace-status-ok { color:#059669; }
+            .uc14-trace-status-err { color:var(--color-danger); }
+            .uc14-trace-duration { color:var(--text-muted); }
+            .uc14-trace pre {
+                margin-top:6px; font-size:0.7rem; padding:8px;
+                background:var(--bg-tertiary);
+                border-radius:var(--border-radius);
+                max-height:200px; overflow:auto;
+                color:var(--text-primary);
+            }
+            .ai-badge {
+                font-family:var(--font-code); font-size:0.7rem;
+                padding:3px 10px; border-radius:var(--border-radius);
+                background:var(--bg-tertiary); color:var(--text-muted);
+                font-weight:600;
+            }
+            .ai-badge.ok {
+                background:rgba(5, 150, 105, 0.15); color:#059669;
+            }
+            .ai-badge.fail {
+                background:rgba(239, 68, 68, 0.15); color:var(--color-danger);
+            }
+        </style>
+        <script th:src="@{/js/usecase-14.js}"></script>
+    </div>
+</body>
+</html>

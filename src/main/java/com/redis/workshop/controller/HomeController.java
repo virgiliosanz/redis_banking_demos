@@ -49,7 +49,10 @@ public class HomeController {
                     "icon", "geospatial-data", "features", "Geo · JSON · RQE · GEOSEARCH"),
             Map.of("id", "13", "title", "Distributed Locking",
                     "description", "Lock accounts during wire transfers with SET NX EX + Lua",
-                    "icon", "security", "features", "SET NX EX · Lua · EVAL · TTL")
+                    "icon", "security", "features", "SET NX EX · Lua · EVAL · TTL"),
+            Map.of("id", "14", "title", "Agent Memory Server",
+                    "description", "Working memory, long-term memory and context assembly via Redis Agent Memory Server",
+                    "icon", "ai-agent-memory", "features", "AMS · REST · MCP · Context Assembly")
     );
 
     @GetMapping("/")
