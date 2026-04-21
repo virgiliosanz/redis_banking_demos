@@ -98,6 +98,43 @@ public class OpenAiService {
         }
     }
 
+    /**
+     * Non-streaming chat completion. Used by the AMS use case where the frontend
+     * renders assembled context + final response together rather than streaming
+     * tokens. Returns the full assistant message text.
+     */
+    public String chatCompletion(List<Map<String, String>> messages) {
+        try {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("model", model);
+            body.put("messages", messages);
+            body.put("temperature", 0.7);
+            body.put("max_tokens", 1024);
+            String json = objectMapper.writeValueAsString(body);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(API_BASE + "/chat/completions"))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(json))
+                    .timeout(Duration.ofSeconds(60))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw new OpenAiException(response.statusCode(), response.body(),
+                        "OpenAI chat API error " + response.statusCode());
+            }
+            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode content = root.path("choices").path(0).path("message").path("content");
+            return content.isMissingNode() || content.isNull() ? "" : content.asText();
+        } catch (OpenAiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new OpenAiException("Failed to get chat completion from OpenAI", e);
+        }
+    }
+
     public String streamChatCompletion(List<Map<String, String>> messages, SseEmitter emitter) {
         try {
             Map<String, Object> body = new LinkedHashMap<>();

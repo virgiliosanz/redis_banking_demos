@@ -136,6 +136,25 @@ class ApiEndpointTests {
         mockMvc.perform(get("/api/assistant/cache/stats")).andExpect(status().isOk());
     }
 
+    // -------- AMS (dedicated Agent Memory Server use case) --------
+    @Test
+    void ams_status() throws Exception {
+        mockMvc.perform(get("/api/ams/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.baseUrl").exists())
+                .andExpect(jsonPath("$.namespace").exists())
+                .andExpect(jsonPath("$.reachable").exists())
+                .andExpect(jsonPath("$.seededMemoryIds").isArray());
+    }
+
+    @Test
+    void ams_tracesEmptyByDefault() throws Exception {
+        mockMvc.perform(get("/api/ams/traces").param("limit", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").exists())
+                .andExpect(jsonPath("$.traces").isArray());
+    }
+
     // -------- UC10: Cache-Aside --------
     @Test
     void uc10_cacheProducts() throws Exception {

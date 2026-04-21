@@ -1,5 +1,6 @@
 package com.redis.workshop.config;
 
+import com.redis.workshop.service.AmsException;
 import com.redis.workshop.service.OpenAiException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -50,6 +51,25 @@ public class GlobalExceptionHandler {
             AsyncRequestNotUsableException ex, HttpServletRequest request) {
         log.debug("Async request no longer usable on {}: {}",
                 request.getRequestURI(), ex.getMessage());
+    }
+
+    @ExceptionHandler(AmsException.class)
+    public ResponseEntity<Map<String, Object>> handleAms(
+            AmsException ex, HttpServletRequest request) {
+        log.error("AMS failure on {}: status={} message={}",
+                request.getRequestURI(), ex.getStatusCode(), ex.getMessage());
+        HttpStatus status = ex.isUnreachable() ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.BAD_GATEWAY;
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("error", ex.getMessage() != null ? ex.getMessage() : "Agent Memory Server error");
+        body.put("status", status.value());
+        body.put("path", request.getRequestURI());
+        body.put("source", "ams");
+        body.put("unreachable", ex.isUnreachable());
+        if (ex.getStatusCode() > 0) body.put("amsStatus", ex.getStatusCode());
+        if (ex.getResponseBody() != null && !ex.getResponseBody().isBlank()) {
+            body.put("amsResponse", ex.getResponseBody());
+        }
+        return ResponseEntity.status(status).body(body);
     }
 
     @ExceptionHandler(OpenAiException.class)
