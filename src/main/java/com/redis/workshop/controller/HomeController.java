@@ -51,7 +51,7 @@ public class HomeController {
                     "description", "Lock accounts during wire transfers with SET NX EX + Lua",
                     "icon", "security", "features", "SET NX EX · Lua · EVAL · TTL"),
             Map.of("id", "14", "title", "Agent Memory Server",
-                    "description", "Working memory, long-term memory and context assembly via Redis Agent Memory Server",
+                    "description", "Memory-only agent: working memory, long-term memory and context assembly via Redis AMS (synchronous chat, no RAG/docs)",
                     "icon", "ai-agent-memory", "features", "AMS · REST · MCP · Context Assembly")
     );
 

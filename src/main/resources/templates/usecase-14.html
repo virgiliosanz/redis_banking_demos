@@ -15,10 +15,17 @@
         <details class="how-it-works" open>
             <summary><h2>How it works</h2></summary>
             <div class="how-it-works-steps">
+                <p class="uc14-scope-note">
+                    <strong>Scope.</strong> UC14 is a <strong>memory-only</strong> use case: the agent only knows
+                    what lives in AMS working memory + long-term memory. It does <strong>not</strong> query a
+                    knowledge base, regulation documents or any RAG pipeline (that is UC9). The chat endpoint
+                    <code>POST /api/ams/chat</code> is <strong>synchronous</strong> and returns one full JSON
+                    response per turn — there is no SSE / token streaming here.
+                </p>
                 <ol>
                     <li><strong>Working memory</strong> holds the active conversation per <code>session_id</code>. The app appends each user turn via <code>PUT /v1/working-memory/{session_id}</code>.</li>
                     <li><strong>Long-term memory</strong> stores durable, semantic facts. The seed flow posts curated banking memories via <code>POST /v1/long-term-memory/</code>.</li>
-                    <li><strong>Context assembly</strong> runs on every turn: <code>POST /v1/memory/prompt</code> merges working memory + KNN-retrieved long-term memories into the final messages fed to the LLM.</li>
+                    <li><strong>Context assembly</strong> runs on every turn: <code>POST /v1/memory/prompt</code> merges working memory + KNN-retrieved long-term memories into the final messages fed to the LLM. No external KB/documents are merged in.</li>
                     <li><strong>Observability</strong> — the demo captures every AMS request/response (no raw Redis commands) so you can see exactly what the agent saw before replying.</li>
                 </ol>
             </div>
@@ -52,8 +59,10 @@
                 </svg>
             </div>
             <p class="uc14-narrative">
-                <strong>REST is the operational path for the web app.</strong> MCP is shown in the code showcase as a tool-native
-                alternative for agents — the workshop stack ships an <code>ams-mcp</code> profile for it, but the demo itself
+                <strong>REST is the operational path for the web app.</strong> The browser calls a single synchronous
+                endpoint — <code>POST /api/ams/chat</code> — and gets the full turn back as JSON (working memory, retrieved
+                long-term memories, assembled messages, final reply). MCP is shown in the code showcase as a tool-native
+                alternative for agents; the workshop stack ships an <code>ams-mcp</code> profile for it, but this demo
                 drives AMS via REST for clarity and reproducibility.
             </p>
         </details>
@@ -89,8 +98,9 @@
                         <div id="chat-messages" class="uc14-chat">
                             <div class="chat-welcome">
                                 Seed the demo, then ask the agent about the customer profile — transfers,
-                                mortgage, investments, card security or Open Banking. Context is assembled
-                                by AMS on every turn.
+                                mortgage, investments, card security or Open Banking. The agent only knows
+                                what lives in AMS memory (no knowledge base, no documents). Each turn is a
+                                synchronous <code>POST /api/ams/chat</code> that returns the full JSON reply.
                             </div>
                         </div>
                         <div style="display:flex; gap:8px; align-items:center;">
@@ -113,8 +123,9 @@
                     <div class="data-card" id="context-card">
                         <h3>Context assembly</h3>
                         <p class="uc14-ctx-subtitle">
-                            What <code>/v1/memory/prompt</code> returned for the last turn — working memory,
-                            long-term memory hits, and the final assembled messages fed to the LLM.
+                            What <code>/v1/memory/prompt</code> returned for the last turn — working memory
+                            and KNN-retrieved long-term memories, merged into the final assembled messages fed
+                            to the LLM. Memory-only: no external KB or documents are injected here.
                         </p>
                         <div class="uc14-ctx-section">
                             <div class="uc14-ctx-section-title">Working memory <span class="uc14-ctx-tag">Short-term · per session</span></div>
@@ -156,6 +167,10 @@
                     <div class="code-block active" id="tab-java">
                         <pre><code class="language-java">// ═══ Agent Memory Server — demo flow (REST via Spring) ═══
 // Matches AmsDemoService + AmsClient in this repo.
+//
+// Scope: UC14 is memory-only. No KB / documents / RAG pipeline.
+// Delivery: one synchronous POST /api/ams/chat per turn returns
+//           the full JSON payload below — no SSE / token streaming.
 
 // 1. Seed long-term memory (banking subset)
 List&lt;Map&lt;String, Object&gt;&gt; memories = AmsDemoData.LONG_TERM_MEMORIES
@@ -198,7 +213,8 @@ Map&lt;String, Object&gt; promptResp = ams.memoryPrompt(promptReq);
 //   → POST /v1/memory/prompt
 //   returns { messages: [{role, content}, ...], context: {...} }
 
-// 5. Feed assembled messages straight into the LLM
+// 5. Feed assembled messages straight into the LLM (blocking call,
+//    no streaming — the full string is returned before we respond).
 List&lt;Map&lt;String, String&gt;&gt; llmMsgs = coerceToLlmMessages(promptResp);
 String reply = openAiService.chatCompletion(llmMsgs);
 
@@ -207,6 +223,10 @@ msgs.add(Map.of("role", "assistant", "content", reply));
 ams.putWorkingMemory(sessionId,
     Map.of("messages", msgs), userId, "workshop");
 
+// 7. The controller returns ONE synchronous JSON body per turn:
+//    { response, workingMemory, contextAssembly, assembledMessages,
+//      openaiUsed, latencyMs } — no SSE, no chunked tokens.
+
 // Observability: every AMS call is recorded in AmsTraceRecorder
 // and surfaced to the UI via GET /api/ams/traces — the app never
 // reads raw Redis keys for this use case.</code></pre>
@@ -214,6 +234,10 @@ ams.putWorkingMemory(sessionId,
 
                     <div class="code-block" id="tab-rest">
                         <pre><code class="language-bash"># ═══ AMS REST — operational path for the web app ═══
+# Memory-only: working memory + long-term memory (no KB / no docs).
+# The app exposes ONE synchronous chat endpoint (no SSE):
+#   POST /api/ams/chat  -> full JSON response per turn.
+# The calls below are the AMS REST hops executed by that endpoint.
 
 # 1. Health check
 curl -s http://localhost:8000/v1/health
@@ -287,7 +311,9 @@ curl -s -X DELETE \
 #   stack ships the MCP server for agent-native integrations:
 #   docker compose --profile ams-mcp up -d agent-memory-server-mcp
 
-# Server exposed at: http://localhost:9000  (streamable HTTP)
+# Server exposed at: http://localhost:9000
+# (MCP "streamable HTTP" transport — this is about the MCP channel,
+#  NOT about streaming LLM tokens back to the browser.)
 
 # Example tools exposed by AMS over MCP:
 #   create_long_term_memories(memories[])
@@ -329,6 +355,14 @@ curl -s -X DELETE \
             .uc14-panel-head {
                 display:flex; align-items:center; gap:12px;
                 margin-bottom:16px; flex-wrap:wrap;
+            }
+            .uc14-scope-note {
+                font-size:0.85rem; color:var(--text-secondary);
+                margin:0 0 12px 0; padding:10px 12px;
+                background:var(--bg-tertiary);
+                border-radius:var(--border-radius);
+                border-left:3px solid var(--redis-primary);
+                line-height:1.5;
             }
             .uc14-narrative {
                 font-size:0.85rem; color:var(--text-secondary);

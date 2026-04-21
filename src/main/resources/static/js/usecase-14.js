@@ -1,8 +1,14 @@
 /**
  * UC14: Agent Memory Server (dedicated)
  * Drives the /api/ams/** endpoints: status, seed, reset, chat and traces.
+ *
  * Separate from UC9 on purpose — this showcase focuses on AMS working memory,
  * long-term memory and context assembly (no raw Redis commands here).
+ *
+ * Scope: memory-only. No knowledge base, no documents, no RAG pipeline
+ * (that narrative lives in UC9). The chat turn is a single synchronous
+ * POST /api/ams/chat that returns one full JSON body — there is no SSE /
+ * EventSource / token streaming on this page.
  */
 (function () {
     'use strict';

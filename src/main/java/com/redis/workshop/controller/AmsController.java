@@ -57,6 +57,11 @@ public class AmsController {
     /**
      * One conversation turn via AMS: appends to working memory, assembles
      * context via {@code /v1/memory/prompt}, returns the context + LLM reply.
+     *
+     * <p>Memory-only: no external knowledge base or documents are merged in
+     * by this endpoint. Response is <strong>synchronous</strong>: the full JSON
+     * payload is returned when the turn completes — this endpoint does not
+     * stream tokens (no SSE / chunked transfer).
      */
     @PostMapping("/chat")
     public ResponseEntity<Map<String, Object>> chat(@RequestBody Map<String, String> request) {
