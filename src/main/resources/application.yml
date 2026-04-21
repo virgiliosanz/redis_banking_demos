@@ -29,3 +29,9 @@ openai:
   api-key: ${OPENAI_API_KEY:}
   model: gpt-4o-mini
   embedding-model: text-embedding-3-small
+
+workshop:
+  ams:
+    base-url: ${WORKSHOP_AMS_BASE_URL:http://localhost:8000}
+    mcp-url: ${WORKSHOP_AMS_MCP_URL:http://localhost:9000}
+    default-namespace: workshop

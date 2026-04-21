@@ -79,8 +79,41 @@ docker compose --profile workshop down
 | Service | Image | Port | Description |
 |---------|-------|------|-------------|
 | `redis` | `redis:8.0-M02` | 6379 | Redis 8 with RQE, JSON, Search, Vector support |
+| `agent-memory-server` | `redislabs/agent-memory-server:0.15.2` | 8000 | Redis Agent Memory Server — REST API, single-process (`asyncio` backend), auth disabled for local workshop |
+| `agent-memory-server-mcp` | `redislabs/agent-memory-server:0.15.2` | 9000 | Agent Memory Server MCP endpoint (streamable HTTP) — only started with `--profile ams-mcp` |
 | `app` | Built from `Dockerfile` | 8080 | Spring Boot application (workshop profile only) |
 | `redis-insight` | `redis/redisinsight:latest` | 5540 | Visual Redis browser (workshop profile only) |
+
+### Agent Memory Server (local workshop)
+
+The `agent-memory-server` service is started by default alongside Redis. It exposes the AMS REST API at `http://localhost:8000`:
+
+```bash
+# Start Redis + AMS REST (default)
+docker compose up -d
+
+# Smoke test
+curl -s http://localhost:8000/v1/health
+
+# Optionally expose the MCP endpoint (streamable HTTP) on port 9000
+docker compose --profile ams-mcp up -d
+
+# Workshop mode: Redis + AMS + App + Redis Insight
+docker compose --profile workshop up -d --build
+```
+
+Spring reads the AMS URL from environment variables with sensible local defaults (`src/main/resources/application.yml`):
+
+| Property | Env var | Default |
+|----------|---------|---------|
+| `workshop.ams.base-url` | `WORKSHOP_AMS_BASE_URL` | `http://localhost:8000` |
+| `workshop.ams.mcp-url` | `WORKSHOP_AMS_MCP_URL` | `http://localhost:9000` |
+| `workshop.ams.default-namespace` | — | `workshop` |
+
+Notes:
+- Auth is disabled (`DISABLE_AUTH=true`) and the `asyncio` task backend is used so no separate worker container is needed — this is a local workshop setup, not a production deployment.
+- AMS stores its data in the same Redis instance used by the workshop. UC9 uses the `workshop:*` key namespace; AMS uses its own separate namespace, so they do not collide.
+- To roll back, remove the `agent-memory-server` / `agent-memory-server-mcp` services from `docker-compose.yml` and unset the `WORKSHOP_AMS_*` env vars.
 
 ### Redis container
 

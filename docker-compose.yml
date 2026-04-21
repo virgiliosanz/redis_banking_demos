@@ -14,6 +14,49 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  agent-memory-server:
+    image: redislabs/agent-memory-server:0.15.2
+    container_name: workshop-ams
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DISABLE_AUTH=true
+      - LONG_TERM_MEMORY=true
+      - ENABLE_DISCRETE_MEMORY_EXTRACTION=true
+      - PORT=8000
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    command: ["uv", "run", "agent-memory", "api", "--host", "0.0.0.0", "--port", "8000", "--task-backend", "asyncio"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health', timeout=2).read()\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  agent-memory-server-mcp:
+    image: redislabs/agent-memory-server:0.15.2
+    container_name: workshop-ams-mcp
+    profiles:
+      - ams-mcp
+    ports:
+      - "9000:9000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DISABLE_AUTH=true
+      - LONG_TERM_MEMORY=true
+      - ENABLE_DISCRETE_MEMORY_EXTRACTION=true
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    command: ["uv", "run", "agent-memory", "mcp", "--mode", "streamable-http", "--host", "0.0.0.0", "--port", "9000", "--task-backend", "asyncio"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   app:
     build: .
     container_name: workshop-app
@@ -24,6 +67,8 @@ services:
     environment:
       - SPRING_DATA_REDIS_HOST=redis
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - WORKSHOP_AMS_BASE_URL=http://agent-memory-server:8000
+      - WORKSHOP_AMS_MCP_URL=http://agent-memory-server-mcp:9000
     depends_on:
       redis:
         condition: service_healthy
