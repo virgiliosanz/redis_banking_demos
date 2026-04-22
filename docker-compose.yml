@@ -26,7 +26,15 @@ services:
       - ENABLE_DISCRETE_MEMORY_EXTRACTION=true
       - PORT=8000
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-    command: ["agent-memory", "api", "--host", "0.0.0.0", "--port", "8000", "--task-backend", "asyncio"]
+    # AMS 0.15.2 does not auto-create the long-term memory `memory_records`
+    # index at startup: it only gets created via `agent-memory rebuild-index`.
+    # Without it, /v1/long-term-memory/search and /v1/memory/prompt fail with
+    # "No such index memory_records" and UC14 seed traces surface as
+    # AMS unreachable. `rebuild-index` is non-destructive for stored memory
+    # hashes (FT.CREATE auto-indexes matching `memory_idx:*` keys), so we run
+    # it on every container start to guarantee the index is present before
+    # the API accepts requests.
+    command: ["sh", "-c", "agent-memory rebuild-index && exec agent-memory api --host 0.0.0.0 --port 8000 --task-backend asyncio"]
     depends_on:
       redis:
         condition: service_healthy
@@ -51,7 +59,9 @@ services:
       - LONG_TERM_MEMORY=true
       - ENABLE_DISCRETE_MEMORY_EXTRACTION=true
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-    command: ["agent-memory", "mcp", "--mode", "streamable-http", "--host", "0.0.0.0", "--port", "9000", "--task-backend", "asyncio"]
+    # Keep parity with the REST service: ensure the long-term memory index
+    # exists before the MCP server starts serving tool calls.
+    command: ["sh", "-c", "agent-memory rebuild-index && exec agent-memory mcp --mode streamable-http --host 0.0.0.0 --port 9000 --task-backend asyncio"]
     depends_on:
       redis:
         condition: service_healthy
