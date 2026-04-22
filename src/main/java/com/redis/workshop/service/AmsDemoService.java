@@ -157,8 +157,8 @@ public class AmsDemoService {
         promptReq.put("session", sessionCtx);
         Map<String, Object> ltSearch = new LinkedHashMap<>();
         ltSearch.put("limit", DEFAULT_SEARCH_LIMIT);
-        Map<String, String> userFilter = Map.of("eq", userId);
-        ltSearch.put("user_id", userFilter);
+        ltSearch.put("user_id", Map.of("eq", userId));
+        ltSearch.put("namespace", Map.of("eq", namespace));
         promptReq.put("long_term_search", ltSearch);
         Map<String, Object> promptResp = ams.memoryPrompt(promptReq);
 
@@ -220,6 +220,7 @@ public class AmsDemoService {
         Map<String, Object> lt = new LinkedHashMap<>();
         lt.put("limit", DEFAULT_SEARCH_LIMIT);
         if (userId != null) lt.put("user_id", Map.of("eq", userId));
+        lt.put("namespace", Map.of("eq", props.getDefaultNamespace()));
         req.put("long_term_search", lt);
         return ams.memoryPrompt(req);
     }

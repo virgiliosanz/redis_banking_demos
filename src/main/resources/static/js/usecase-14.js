@@ -91,7 +91,7 @@
     }
 
     function renderLongTerm(ctx) {
-        var memories = (ctx && ctx.context && ctx.context.long_term_memories) || [];
+        var memories = (ctx && ctx.long_term_memories) || [];
         if (!memories.length) {
             ltBody.textContent = 'No long-term memories retrieved for this query.';
             return;
