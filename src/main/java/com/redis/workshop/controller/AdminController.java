@@ -2,9 +2,11 @@ package com.redis.workshop.controller;
 
 import com.redis.workshop.config.DocumentDataLoader;
 import com.redis.workshop.service.AssistantService;
+import com.redis.workshop.service.AiGatewayService;
 import com.redis.workshop.service.CacheAsideService;
 import com.redis.workshop.service.FeatureStoreService;
 import com.redis.workshop.service.FraudService;
+import com.redis.workshop.service.GuardrailsService;
 import com.redis.workshop.service.GeoFinderService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +39,8 @@ public class AdminController {
     private final GeoFinderService geoFinderService;
     private final FeatureStoreService featureStoreService;
     private final CacheAsideService cacheAsideService;
+    private final GuardrailsService guardrailsService;
+    private final AiGatewayService aiGatewayService;
 
     public AdminController(StringRedisTemplate redis,
                            DocumentDataLoader documentDataLoader,
@@ -44,7 +48,9 @@ public class AdminController {
                            FraudService fraudService,
                            GeoFinderService geoFinderService,
                            FeatureStoreService featureStoreService,
-                           CacheAsideService cacheAsideService) {
+                           CacheAsideService cacheAsideService,
+                           GuardrailsService guardrailsService,
+                           AiGatewayService aiGatewayService) {
         this.redis = redis;
         this.documentDataLoader = documentDataLoader;
         this.assistantService = assistantService;
@@ -52,6 +58,8 @@ public class AdminController {
         this.geoFinderService = geoFinderService;
         this.featureStoreService = featureStoreService;
         this.cacheAsideService = cacheAsideService;
+        this.guardrailsService = guardrailsService;
+        this.aiGatewayService = aiGatewayService;
     }
 
     /**
@@ -77,6 +85,9 @@ public class AdminController {
         ok &= runStep(steps, "GeoFinderService.init", geoFinderService::init);
         ok &= runStep(steps, "FeatureStoreService.loadInitialFeatures", featureStoreService::loadInitialFeatures);
         ok &= runStep(steps, "CacheAsideService.init", cacheAsideService::init);
+        ok &= runStep(steps, "GuardrailsService.init", guardrailsService::init);
+        ok &= runStep(steps, "AiGatewayService.init", aiGatewayService::init);
+        ok &= runStep(steps, "AiGatewayService.seedDemoData", aiGatewayService::seedDemoData);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", ok ? "ok" : "partial");
