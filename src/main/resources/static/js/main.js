@@ -393,5 +393,6 @@
     document.addEventListener('DOMContentLoaded', function () {
         if (!window.WORKSHOP_UC) return;
         initRedisCommands();
+        initCodeTabs();
     });
 })();
