@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${useCaseTitle}">AI Gateway</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">UC16</span>
+            <h1 th:text="${useCaseTitle}">AI Gateway</h1>
+        </div>
+
+        <details class="how-it-works" open>
+            <summary><h2>How it works</h2></summary>
+            <div class="how-it-works-steps">
+                <ol>
+                    <li><strong>Semantic routing</strong> stores model capability vectors in Redis and uses KNN search to choose the best provider for each prompt.</li>
+                    <li><strong>Semantic cache</strong> checks for a similar request per model before any mock LLM work happens.</li>
+                    <li><strong>Per-model rate limiting</strong> uses <code>INCR</code> + <code>EXPIRE</code> so each provider gets its own request budget.</li>
+                    <li><strong>Cost tracking</strong> accumulates estimated token usage and spend in Redis Hashes per session.</li>
+                    <li><strong>Observability</strong> appends every request to a Redis Stream so the UI can show recent gateway traffic.</li>
+                </ol>
+            </div>
+            <div class="how-it-works-diagram">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 260" width="920" height="260">
+                    <defs>
+                        <marker id="uc16-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                            <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                        </marker>
+                    </defs>
+                    <rect x="20" y="95" width="120" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="80" y="120" text-anchor="middle" font-size="13" font-weight="700">Client App</text>
+                    <text x="80" y="139" text-anchor="middle" font-size="10" class="svg-label">Prompt</text>
+
+                    <line x1="140" y1="125" x2="230" y2="125" class="svg-arrow" stroke-width="2" marker-end="url(#uc16-arrow)"/>
+
+                    <rect x="235" y="72" width="170" height="110" rx="5" ry="5" class="svg-box svg-box-accent" stroke-width="1"/>
+                    <text x="320" y="100" text-anchor="middle" font-size="14" font-weight="700">AI Gateway</text>
+                    <text x="320" y="122" text-anchor="middle" font-size="10" class="svg-label">route → cache → limit</text>
+                    <text x="320" y="140" text-anchor="middle" font-size="10" class="svg-label">cost → log</text>
+
+                    <line x1="405" y1="125" x2="505" y2="125" class="svg-arrow" stroke-width="2" marker-end="url(#uc16-arrow)"/>
+
+                    <circle cx="570" cy="125" r="56" class="svg-redis-circle"/>
+                    <text x="570" y="116" text-anchor="middle" font-size="13" class="svg-redis-text">Redis</text>
+                    <text x="570" y="134" text-anchor="middle" font-size="10" class="svg-redis-text">Vector + Cache</text>
+                    <text x="570" y="150" text-anchor="middle" font-size="10" class="svg-redis-text">Limits + Streams</text>
+
+                    <line x1="570" y1="69" x2="570" y2="30" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc16-arrow)"/>
+                    <rect x="482" y="5" width="176" height="28" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="570" y="23" text-anchor="middle" font-size="10">Route index + semantic cache</text>
+
+                    <line x1="626" y1="125" x2="730" y2="72" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc16-arrow)"/>
+                    <line x1="626" y1="125" x2="730" y2="125" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc16-arrow)"/>
+                    <line x1="626" y1="125" x2="730" y2="178" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc16-arrow)"/>
+
+                    <rect x="735" y="46" width="150" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="810" y="62" text-anchor="middle" font-size="11" font-weight="700">GPT-4o</text>
+                    <text x="810" y="77" text-anchor="middle" font-size="10" class="svg-label">complex reasoning</text>
+
+                    <rect x="735" y="99" width="150" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="810" y="115" text-anchor="middle" font-size="11" font-weight="700">GPT-4o-mini</text>
+                    <text x="810" y="130" text-anchor="middle" font-size="10" class="svg-label">fast FAQ</text>
+
+                    <rect x="735" y="152" width="150" height="40" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="810" y="168" text-anchor="middle" font-size="11" font-weight="700">Internal Numeric</text>
+                    <text x="810" y="183" text-anchor="middle" font-size="10" class="svg-label">tables + KPIs</text>
+
+                    <line x1="570" y1="181" x2="570" y2="228" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc16-arrow)"/>
+                    <rect x="485" y="228" width="170" height="24" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                    <text x="570" y="244" text-anchor="middle" font-size="10">Observability stream + per-model stats</text>
+                </svg>
+            </div>
+        </details>
+
+        <div class="usecase-panels">
+            <section class="panel demo-panel">
+                <div class="uc16-panel-head">
+                    <h2 style="margin:0;">Live Demo</h2>
+                    <span id="gateway-badge" class="ai-badge mock" title="Gateway mode">Providers: mock</span>
+                </div>
+
+                <div id="demo-container" class="demo-container">
+                    <div class="data-card">
+                        <h3>Route a prompt through the gateway</h3>
+                        <p class="uc16-subtitle">
+                            Try a regulation question, a short FAQ, or a metric-heavy prompt. Redis decides the route,
+                            checks the semantic cache, applies the provider budget, and records the interaction.
+                        </p>
+                        <div class="data-row"><span class="data-label">Session</span><span class="data-value" id="sessionIdValue">—</span></div>
+                        <div class="data-row"><span class="data-label">User</span><span class="data-value" id="userIdValue">demo-user</span></div>
+                        <div class="form-group" style="margin-top:16px;">
+                            <label for="queryInput">Prompt</label>
+                            <input id="queryInput" class="form-input" placeholder="Explain Basel III capital requirements"/>
+                        </div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                            <button id="sendBtn" class="btn btn-primary">Send through gateway</button>
+                            <button id="resetBtn" class="btn btn-outline">Reset demo</button>
+                        </div>
+                        <div class="uc16-prompt-list">
+                            <button class="btn btn-sm btn-secondary uc16-prompt" data-prompt="Explain Basel III capital requirements">Basel III</button>
+                            <button class="btn btn-sm btn-secondary uc16-prompt" data-prompt="What is PSD2?">PSD2 FAQ</button>
+                            <button class="btn btn-sm btn-secondary uc16-prompt" data-prompt="Show capital ratio by quarter for 2024">Quarterly ratios</button>
+                            <button class="btn btn-sm btn-secondary uc16-prompt" data-prompt="Compare GDPR and MiFID II obligations for client data retention">Policy compare</button>
+                        </div>
+                    </div>
+
+                    <div class="data-card">
+                        <h3>Gateway pipeline</h3>
+                        <div class="uc16-pipeline">
+                            <div id="step-route" class="uc16-step is-idle">
+                                <div class="uc16-step-index">1</div>
+                                <div>
+                                    <div class="uc16-step-title">Route</div>
+                                    <div id="step-route-copy" class="uc16-step-copy">Vector routing decision pending.</div>
+                                </div>
+                            </div>
+                            <div id="step-cache" class="uc16-step is-idle">
+                                <div class="uc16-step-index">2</div>
+                                <div>
+                                    <div class="uc16-step-title">Semantic cache</div>
+                                    <div id="step-cache-copy" class="uc16-step-copy">No cache lookup yet.</div>
+                                </div>
+                            </div>
+                            <div id="step-limit" class="uc16-step is-idle">
+                                <div class="uc16-step-index">3</div>
+                                <div>
+                                    <div class="uc16-step-title">Rate limit</div>
+                                    <div id="step-limit-copy" class="uc16-step-copy">Per-model budget not checked yet.</div>
+                                </div>
+                            </div>
+                            <div id="step-response" class="uc16-step is-idle">
+                                <div class="uc16-step-index">4</div>
+                                <div>
+                                    <div class="uc16-step-title">Response + log</div>
+                                    <div id="step-response-copy" class="uc16-step-copy">Awaiting response and stream append.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="uc16-summary-grid">
+                            <div class="uc16-mini-card"><span>Selected model</span><strong id="selectedModel">—</strong></div>
+                            <div class="uc16-mini-card"><span>Route reason</span><strong id="routeReason">—</strong></div>
+                            <div class="uc16-mini-card"><span>Cache</span><strong id="cacheValue">—</strong></div>
+                            <div class="uc16-mini-card"><span>Matched question</span><strong id="matchedQuestion">—</strong></div>
+                            <div class="uc16-mini-card"><span>Budget remaining</span><strong id="budgetRemaining">—</strong></div>
+                            <div class="uc16-mini-card"><span>Query cost</span><strong id="costValue">—</strong></div>
+                            <div class="uc16-mini-card"><span>Session total</span><strong id="sessionSpend">—</strong></div>
+                            <div class="uc16-mini-card"><span>Total latency</span><strong id="latencyValue">—</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="data-card">
+                        <h3>Gateway response</h3>
+                        <div class="uc16-response-head">
+                            <span id="resultBadge" class="status-badge">Ready</span>
+                            <span id="resultMeta" class="uc16-inline-meta">Run a query to inspect route, cache, cost, and latency.</span>
+                        </div>
+                        <pre id="responseOutput" class="uc16-response-box">Run a query to inspect the final answer, the selected model, and the accumulated session cost.</pre>
+                        <div id="latencyBreakdown" class="uc16-breakdown">No latency breakdown captured yet.</div>
+                    </div>
+
+                    <div class="data-card">
+                        <h3>Per-model stats</h3>
+                        <div id="statsGrid" class="uc16-stats-grid">
+                            <div class="uc16-empty">Loading gateway stats…</div>
+                        </div>
+                    </div>
+
+                    <div class="data-card">
+                        <h3>Request log</h3>
+                        <div id="logList" class="uc16-log-list">
+                            <div class="uc16-empty">No gateway requests yet.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="data-card redis-commands-card" id="redis-commands-card" style="display:none;">
+                    <h3>Redis Commands Executed</h3>
+                    <div class="commands-list" id="commands-output"></div>
+                </div>
+            </section>
+
+            <section class="panel code-panel">
+                <h2>Code Showcase</h2>
+                <div class="code-container">
+                    <div class="code-tabs">
+                        <button class="code-tab active" data-tab="java">Java</button>
+                        <button class="code-tab" data-tab="cli">Redis CLI</button>
+                    </div>
+
+                    <div class="code-block active" id="tab-java">
+                        <pre><code class="language-java">// 1. Semantic routing — model capability vectors
+RouteDecision route = routeQuery(query, queryVector);
+
+// 2. Semantic cache — only within the selected model tier
+CacheResult cache = checkSemanticCache(route.model(), queryVector);
+
+// 3. Per-model rate limit — INCR + EXPIRE window
+Map&lt;String, Object&gt; limit = consumeRateLimit(route.model());
+
+// 4. Session usage + cost tracking — Hash increments
+redis.opsForHash().increment("uc16:usage:session:" + sessionId,
+    route.model().tag() + ":costUsd", estimatedCostUsd);
+
+// 5. Observability — append one event per request
+redis.opsForStream().add(StreamRecords.string(Map.of(
+    "model", route.model().label(),
+    "cacheHit", String.valueOf(cache.hit()),
+    "latencyMs", String.valueOf(totalMs),
+    "costUsd", String.format(Locale.US, "%.6f", estimatedCostUsd)
+)).withStreamKey("uc16:stream:gateway"));</code></pre>
+                    </div>
+
+                    <div class="code-block" id="tab-cli">
+                        <pre><code class="language-bash"># 1. Route index — capability vectors per model
+FT.CREATE idx:uc16:routes \
+  ON HASH PREFIX 1 uc16:route:model: \
+  SCHEMA \
+    modelId TEXT modelTag TAG label TEXT capability TEXT rationale TEXT \
+    vector VECTOR HNSW 6 TYPE FLOAT32 DIM 10 DISTANCE_METRIC COSINE
+
+# 2. Semantic route selection (KNN)
+FT.SEARCH idx:uc16:routes \
+  "*=&gt;[KNN 1 @vector $BLOB]" \
+  PARAMS 2 BLOB "&lt;query_vector&gt;" \
+  RETURN 5 modelId modelTag label capability rationale \
+  DIALECT 2
+
+# 3. Gateway-level semantic cache per model
+FT.SEARCH idx:uc16:cache \
+  "@modelTag:{gpt4o}=&gt;[KNN 1 @vector $BLOB]" \
+  PARAMS 2 BLOB "&lt;query_vector&gt;" \
+  RETURN 4 question response modelId createdAt \
+  DIALECT 2
+
+# 4. Per-model fixed window rate limit
+INCR uc16:ratelimit:gpt4o
+EXPIRE uc16:ratelimit:gpt4o 60
+
+# 5. Session usage + cost
+HINCRBYFLOAT uc16:usage:session:gw-001 gpt4o:costUsd 0.0043
+HINCRBY uc16:usage:session:gw-001 totalTokens 842
+
+# 6. Observability stream
+XADD uc16:stream:gateway * \
+  model "GPT-4o" cacheHit "false" rateLimited "false" \
+  latencyMs "214" costUsd "0.0043" query "Explain Basel III..."
+
+# 7. Inspect recent gateway traffic
+XREVRANGE uc16:stream:gateway + - COUNT 10</code></pre>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div layout:fragment="scripts">
+        <style>
+            .uc16-panel-head {
+                display:flex; align-items:center; gap:12px;
+                margin-bottom:16px; flex-wrap:wrap;
+            }
+            .uc16-subtitle {
+                font-size:0.85rem; color:var(--text-secondary);
+                line-height:1.6; margin-bottom:0;
+            }
+            .uc16-prompt-list {
+                display:flex; gap:6px; flex-wrap:wrap; margin-top:12px;
+            }
+            .uc16-pipeline {
+                display:grid; grid-template-columns:repeat(2, minmax(0, 1fr));
+                gap:12px; margin-bottom:16px;
+            }
+            .uc16-step {
+                display:flex; gap:12px; align-items:flex-start;
+                padding:12px; border-radius:var(--border-radius);
+                border:1px solid var(--border-color); background:var(--bg-secondary);
+            }
+            .uc16-step-index {
+                width:28px; height:28px; border-radius:999px;
+                display:flex; align-items:center; justify-content:center;
+                font-family:var(--font-code); font-size:0.75rem; font-weight:700;
+                background:var(--bg-tertiary); color:var(--text-muted); flex-shrink:0;
+            }
+            .uc16-step-title {
+                font-size:0.82rem; font-weight:700; color:var(--text-primary); margin-bottom:4px;
+            }
+            .uc16-step-copy {
+                font-size:0.78rem; color:var(--text-muted); line-height:1.5;
+            }
+            .uc16-step.is-active { border-color:rgba(255, 68, 56, 0.35); }
+            .uc16-step.is-active .uc16-step-index { background:rgba(255, 68, 56, 0.12); color:var(--redis-primary); }
+            .uc16-step.is-hit { border-color:rgba(5, 150, 105, 0.25); }
+            .uc16-step.is-hit .uc16-step-index { background:rgba(5, 150, 105, 0.15); color:#059669; }
+            .uc16-step.is-ok .uc16-step-index { background:rgba(5, 150, 105, 0.15); color:#059669; }
+            .uc16-step.is-blocked { border-color:rgba(255, 68, 56, 0.35); }
+            .uc16-step.is-blocked .uc16-step-index { background:rgba(255, 68, 56, 0.15); color:var(--redis-primary); }
+            .uc16-step.is-miss .uc16-step-index,
+            .uc16-step.is-idle .uc16-step-index { background:var(--bg-tertiary); color:var(--text-muted); }
+            .uc16-summary-grid {
+                display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:12px;
+            }
+            .uc16-mini-card {
+                background:var(--bg-secondary); border:1px solid var(--border-color);
+                border-radius:var(--border-radius); padding:12px;
+            }
+            .uc16-mini-card span {
+                display:block; font-size:0.72rem; color:var(--text-muted);
+                font-family:var(--font-code); margin-bottom:6px;
+            }
+            .uc16-mini-card strong {
+                display:block; font-size:0.84rem; color:var(--text-primary); line-height:1.5;
+            }
+            .uc16-response-head {
+                display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px;
+            }
+            .uc16-inline-meta {
+                font-size:0.8rem; color:var(--text-muted);
+            }
+            .uc16-response-box {
+                margin:0; padding:14px; white-space:pre-wrap; line-height:1.6;
+                background:var(--bg-secondary); border:1px solid var(--border-color);
+                border-radius:var(--border-radius); color:var(--text-primary);
+                font-family:var(--font-body); font-size:0.88rem;
+            }
+            .uc16-breakdown {
+                margin-top:12px; font-family:var(--font-code); font-size:0.75rem;
+                color:var(--text-muted); line-height:1.6;
+            }
+            .uc16-stats-grid {
+                display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px;
+            }
+            .uc16-stat-card {
+                background:var(--bg-secondary); border:1px solid var(--border-color);
+                border-radius:var(--border-radius); padding:14px;
+            }
+            .uc16-stat-card h4 {
+                margin:0 0 6px 0; font-size:0.92rem; color:var(--text-primary);
+            }
+            .uc16-stat-card p {
+                margin:0 0 10px 0; font-size:0.78rem; color:var(--text-muted); line-height:1.5;
+            }
+            .uc16-log-list {
+                display:flex; flex-direction:column; gap:8px;
+            }
+            .uc16-log-item {
+                border:1px solid var(--border-color); border-radius:var(--border-radius);
+                background:var(--bg-secondary); padding:10px 12px;
+            }
+            .uc16-log-top {
+                display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap;
+                margin-bottom:6px;
+            }
+            .uc16-log-query {
+                color:var(--text-primary); font-size:0.84rem; font-weight:600; line-height:1.5;
+            }
+            .uc16-log-meta {
+                font-size:0.74rem; color:var(--text-muted); line-height:1.5;
+            }
+            .uc16-log-flags {
+                display:flex; gap:6px; flex-wrap:wrap;
+            }
+            .uc16-flag {
+                display:inline-flex; align-items:center; gap:4px; padding:3px 8px;
+                border-radius:999px; font-size:0.68rem; font-family:var(--font-code);
+                font-weight:700; background:var(--bg-tertiary); color:var(--text-muted);
+            }
+            .uc16-flag.ok { background:rgba(5, 150, 105, 0.15); color:#059669; }
+            .uc16-flag.warn { background:rgba(255, 68, 56, 0.15); color:var(--redis-primary); }
+            .uc16-empty {
+                padding:12px; border-radius:var(--border-radius); background:var(--bg-secondary);
+                color:var(--text-muted); font-size:0.82rem;
+            }
+            @media (max-width: 1100px) {
+                .uc16-summary-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+                .uc16-stats-grid { grid-template-columns:1fr; }
+            }
+            @media (max-width: 780px) {
+                .uc16-pipeline { grid-template-columns:1fr; }
+                .uc16-summary-grid { grid-template-columns:1fr; }
+            }
+        </style>
+        <script th:src="@{/js/usecase-16.js}"></script>
+    </div>
+</body>
+</html>

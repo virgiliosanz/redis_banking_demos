@@ -26,7 +26,8 @@ public class UseCaseController {
             Map.entry(11, "Real-time Transaction Monitoring"),
             Map.entry(12, "ATM & Branch Finder (Geospatial)"),
             Map.entry(13, "Distributed Locking"),
-            Map.entry(14, "Agent Memory Server")
+            Map.entry(14, "Agent Memory Server"),
+            Map.entry(16, "AI Gateway")
     );
 
     @GetMapping("/{id}")
