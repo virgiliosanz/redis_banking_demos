@@ -115,6 +115,11 @@ class ApiEndpointTests {
 
     @Test
     void uc7_featureInference() throws Exception {
+        String simulateBody = "{\"clientId\":\"C1001\",\"amount\":125.0,\"country\":\"ES\"}";
+        mockMvc.perform(post("/api/features/simulate")
+                        .contentType(MediaType.APPLICATION_JSON).content(simulateBody))
+                .andExpect(status().isOk());
+
         mockMvc.perform(get("/api/features/inference/C1001").param("version", "feature_set_v2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.decision").exists())
@@ -208,6 +213,32 @@ class ApiEndpointTests {
                 .andExpect(status().isOk());
     }
 
+    // -------- UC15: AI Guardrails --------
+    @Test
+    void uc15_guardrailsChat() throws Exception {
+        String body = "{\"message\":\"Can I increase my transfer limit today?\"," +
+                "\"userId\":\"user-test-uc15\"}";
+        mockMvc.perform(post("/api/guardrails/chat")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void uc15_guardrailsAudit() throws Exception {
+        mockMvc.perform(get("/api/guardrails/audit").param("limit", "5"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void uc15_guardrailsStats() throws Exception {
+        mockMvc.perform(get("/api/guardrails/stats")).andExpect(status().isOk());
+    }
+
+    @Test
+    void uc15_guardrailsReset() throws Exception {
+        mockMvc.perform(post("/api/guardrails/reset")).andExpect(status().isOk());
+    }
+
     // -------- UC16: AI Gateway --------
     @Test
     void uc16_gatewayQuery() throws Exception {
@@ -226,5 +257,10 @@ class ApiEndpointTests {
     @Test
     void uc16_gatewayLog() throws Exception {
         mockMvc.perform(get("/api/gateway/log")).andExpect(status().isOk());
+    }
+
+    @Test
+    void uc16_gatewayReset() throws Exception {
+        mockMvc.perform(post("/api/gateway/reset")).andExpect(status().isOk());
     }
 }

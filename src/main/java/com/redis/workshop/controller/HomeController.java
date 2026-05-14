@@ -52,7 +52,13 @@ public class HomeController {
                     "icon", "security", "features", "SET NX EX · Lua · EVAL · TTL"),
             Map.of("id", "14", "title", "Agent Memory Server",
                     "description", "Memory-only agent: working memory, long-term memory and context assembly via Redis AMS (synchronous chat, no RAG/docs)",
-                    "icon", "ai-agent-memory", "features", "AMS · REST · MCP · Context Assembly")
+                    "icon", "ai-agent-memory", "features", "AMS · REST · MCP · Context Assembly"),
+            Map.of("id", "15", "title", "AI Guardrails",
+                    "description", "Banking chat with Redis-powered guardrails: rate limiting, topic routing, PII detection, prompt injection defense",
+                    "icon", "security", "features", "Vector · Streams · INCR · Hash"),
+            Map.of("id", "16", "title", "AI Gateway",
+                    "description", "Route AI requests, apply semantic cache, rate limits, and observability from Redis",
+                    "icon", "ai-agent-memory", "features", "Vector · Hash · INCR · Streams · TTL")
     );
 
     @GetMapping("/")
