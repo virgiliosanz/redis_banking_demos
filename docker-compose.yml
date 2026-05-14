@@ -92,8 +92,7 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    profiles:
-      - workshop
+    restart: unless-stopped
 
 volumes:
   workshop-redis-data:
