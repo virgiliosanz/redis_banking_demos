@@ -11,15 +11,16 @@
             <span class="usecase-badge">UC7</span>
             <h1 th:text="${useCaseTitle}">Feature Store (Risk Scoring)</h1>
         </div>
+        <p class="usecase-subtitle">Online feature store for real-time credit decisioning — versioned feature sets, Redis sub-ms fetches, and simulated ML inference.</p>
 
         <details class="how-it-works" open>
             <summary><h2>How it works</h2></summary>
             <div class="how-it-works-steps">
                 <ol>
-                    <li>Client features (transaction velocity, amounts, countries, devices) are pre-computed and stored in Redis Hashes.</li>
-                    <li>When a new transaction arrives, features are updated atomically using HINCRBY and HSET — no read-modify-write cycle needed.</li>
-                    <li>The risk scoring model retrieves all features with HGETALL in sub-millisecond latency.</li>
-                    <li>A risk score (0-100) is computed from the features and written back to Redis for the next evaluation.</li>
+                    <li>Batch credit features and real-time behavioural features are materialized into versioned Redis Hashes (`feature_set_v1`, `feature_set_v2`).</li>
+                    <li>When a new transaction arrives, the online feature set is refreshed with `HINCRBY` + `HSET` so inference always reads current behaviour.</li>
+                    <li>The inference API fetches the full feature vector with `HGETALL` in sub-millisecond latency and sends it to a simulated credit model.</li>
+                    <li>The UI shows the end-to-end pipeline plus a Redis vs database latency comparison for inline credit decisioning.</li>
                 </ol>
             </div>
             <div class="how-it-works-diagram">
@@ -66,11 +67,11 @@
                     <text x="475" y="115" text-anchor="middle" font-size="9" class="svg-muted-text">HGETALL</text>
                     <text x="475" y="127" text-anchor="middle" font-size="9" class="svg-muted-text">&lt;1ms</text>
 
-                    <!-- Risk Scoring Model -->
+                    <!-- ML Inference Model -->
                     <rect x="515" y="55" width="130" height="80" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                    <text x="580" y="82" text-anchor="middle" font-size="12" font-weight="600">Model</text>
-                    <text x="580" y="102" text-anchor="middle" font-size="11" font-weight="600">Risk Scoring</text>
-                    <text x="580" y="118" text-anchor="middle" font-size="9" class="svg-muted-text">score 0-100</text>
+                    <text x="580" y="82" text-anchor="middle" font-size="12" font-weight="600">ML Model</text>
+                    <text x="580" y="102" text-anchor="middle" font-size="11" font-weight="600">Inference</text>
+                    <text x="580" y="118" text-anchor="middle" font-size="9" class="svg-muted-text">approve / review / deny</text>
 
                     <!-- Step 3 -->
                     <circle cx="670" cy="75" r="12" class="svg-step-circle"/>
@@ -81,12 +82,12 @@
 
                     <!-- Result -->
                     <rect x="695" y="70" width="45" height="50" rx="5" ry="5" class="svg-box" stroke-width="1"/>
-                    <text x="717" y="92" text-anchor="middle" font-size="10" font-weight="600">OK</text>
-                    <text x="717" y="110" text-anchor="middle" font-size="8" font-weight="600">Allow</text>
+                    <text x="717" y="92" text-anchor="middle" font-size="10" font-weight="600">ML</text>
+                    <text x="717" y="110" text-anchor="middle" font-size="8" font-weight="600">Decision</text>
 
                     <!-- Feedback arrow: score written back to Redis -->
                     <path d="M 580 137 L 580 195 L 340 195 L 340 182" class="svg-arrow" stroke-width="1.5" fill="none" stroke-dasharray="5,3" marker-end="url(#uc7-arrow)"/>
-                    <text x="460" y="210" text-anchor="middle" font-size="9" class="svg-muted-text">HSET risk_score (write back)</text>
+                    <text x="460" y="210" text-anchor="middle" font-size="9" class="svg-muted-text">HSET realtime features (write back)</text>
 
                     <!-- Step 4 -->
                     <circle cx="460" cy="195" r="12" class="svg-step-circle"/>
@@ -107,6 +108,14 @@
                         <select id="clientSelect" class="form-control"></select>
                     </div>
 
+                    <div class="form-group">
+                        <label for="featureSetSelect">Feature Set Version</label>
+                        <select id="featureSetSelect" class="form-control">
+                            <option value="feature_set_v2" selected>feature_set_v2 — ML-ready online features</option>
+                            <option value="feature_set_v1">feature_set_v1 — baseline heuristic features</option>
+                        </select>
+                    </div>
+
                     <!-- Risk Score Badge -->
                     <div id="risk-badge-container" style="text-align:center; margin-bottom:16px; display:none;">
                         <div id="risk-badge" style="display:inline-block; padding:8px 24px; border-radius:5px; font-weight:700; font-size:1.1rem;"></div>
@@ -114,7 +123,7 @@
 
                     <!-- Feature Dashboard Table -->
                     <div class="data-card" id="feature-card" style="display:none;">
-                        <h3>Feature Vector (Redis Hash)</h3>
+                        <h3>Selected Feature Vector (Redis Hash)</h3>
                         <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;" id="redis-key-display"></div>
                         <div id="feature-table"></div>
                     </div>
@@ -143,6 +152,42 @@
                         </button>
                     </div>
 
+                    <div class="data-card" style="margin-top:16px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                            <h3 style="margin-bottom:0;">Run ML Inference</h3>
+                            <span class="ai-badge mock">Mock Credit Model</span>
+                        </div>
+                        <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:12px;">Fetch online features from Redis → score with the simulated model → return approve / review / deny with latency breakdown.</div>
+
+                        <div id="inference-pipeline" style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin-bottom:12px;">
+                            <div id="pipeline-fetch" class="data-card" style="margin-bottom:0; border:1px solid var(--border-color);">
+                                <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Step 1</div>
+                                <div style="font-weight:700; margin-bottom:4px;">Fetch Features</div>
+                                <div data-step-status style="font-size:0.8rem; color:var(--text-muted);">Waiting</div>
+                            </div>
+                            <div id="pipeline-model" class="data-card" style="margin-bottom:0; border:1px solid var(--border-color);">
+                                <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Step 2</div>
+                                <div style="font-weight:700; margin-bottom:4px;">Model Inference</div>
+                                <div data-step-status style="font-size:0.8rem; color:var(--text-muted);">Waiting</div>
+                            </div>
+                            <div id="pipeline-decision" class="data-card" style="margin-bottom:0; border:1px solid var(--border-color);">
+                                <div style="font-family:var(--font-code); font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Step 3</div>
+                                <div style="font-weight:700; margin-bottom:4px;">Credit Decision</div>
+                                <div data-step-status style="font-size:0.8rem; color:var(--text-muted);">Waiting</div>
+                            </div>
+                        </div>
+
+                        <button id="inferenceBtn" class="btn btn-primary" style="width:100%;">Run ML Inference</button>
+                        <div id="inference-latency" style="margin-top:12px; display:none;"></div>
+                        <div id="inference-result" class="result-box" style="display:none;"></div>
+                    </div>
+
+                    <div class="data-card" style="margin-top:16px;">
+                        <h3>Compare: Redis vs Database</h3>
+                        <div id="latency-comparison-empty" style="font-size:0.8rem; color:var(--text-muted);">Run inference to compare a Redis online feature fetch with a simulated 150ms database read.</div>
+                        <div id="latency-comparison" style="display:none;"></div>
+                    </div>
+
                 </div>
 
                 <!-- Redis Commands Executed (auto-populated after each request) -->
@@ -162,96 +207,51 @@
                     </div>
 
                     <div class="code-block" id="tab-java">
-                        <pre><code class="language-java">// 1. Store client features — HSET (bulk)
-String key = "uc7:client:C1001";
+                        <pre><code class="language-java">String key = "uc7:feature_set_v2:client:C1001";
 
-Map&lt;String, String&gt; features = Map.of(
-    "tx_count_1h",         "2",
-    "tx_count_24h",        "5",
-    "tx_amount_avg_24h",   "120.50",
-    "tx_amount_max_24h",   "250.00",
-    "distinct_countries_7d","1",
-    "distinct_devices_30d", "2",
-    "risk_score",           "12"
-);
+// 1. Online feature fetch from Redis Hash
+long fetchStart = System.nanoTime();
+Map&lt;Object, Object&gt; features = redis.opsForHash().entries(key);
+double redisFetchMs = (System.nanoTime() - fetchStart) / 1_000_000.0;
 
-// HSET — write all features atomically
-redis.opsForHash().putAll(key, features);
+// 2. Batch + real-time features served together
+String paymentRatio = (String) features.get("batch_payment_ratio_90d");
+String txRisk = (String) features.get("realtime_risk_score");
 
-// 2. Read full feature vector — HGETALL
-Map&lt;Object, Object&gt; allFeatures =
-    redis.opsForHash().entries(key);
-// Returns ALL fields in ~0.1ms (vs 50-200ms
-// from a data warehouse query)
+// 3. Simulated ML inference for credit decisioning
+double approvalProbability = creditDecisionModel(features);
+String decision = approvalProbability &gt;= 0.72 ? "APPROVE"
+        : approvalProbability &lt;= 0.40 ? "DENY"
+        : "REVIEW";
 
-// 3. Atomic counter update — HINCRBY
-// New transaction arrives → increment counters
-redis.opsForHash().increment(key,
-    "tx_count_1h", 1);
-redis.opsForHash().increment(key,
-    "tx_count_24h", 1);
+// 4. Keep online features fresh after each event
+redis.opsForHash().increment(key, "realtime_tx_count_1h", 1);
+redis.opsForHash().put(key, "realtime_risk_score", "42");
 
-// 4. Update computed features — HSET
-redis.opsForHash().put(key,
-    "tx_amount_avg_24h", "135.25");
-redis.opsForHash().put(key,
-    "risk_score", "15");
-
-// 5. Pipeline for bulk updates
-// (multiple HSET in one round-trip)
-redis.executePipelined((RedisCallback&lt;Object&gt;) conn -&gt; {
-    byte[] k = key.getBytes();
-    conn.hashCommands().hSet(k,
-        "tx_count_1h".getBytes(), "3".getBytes());
-    conn.hashCommands().hSet(k,
-        "last_tx_timestamp".getBytes(),
-        String.valueOf(now).getBytes());
-    conn.hashCommands().hSet(k,
-        "risk_score".getBytes(), "18".getBytes());
-    return null;
-});
-
-// 6. Read single feature — HGET
-String riskScore = (String) redis.opsForHash()
-    .get(key, "risk_score");</code></pre>
+// 5. Compare with slower database fetch
+double dbFetchMs = 150.0;
+double savedMs = dbFetchMs - redisFetchMs;</code></pre>
                     </div>
 
                     <div class="code-block active" id="tab-cli">
-                        <pre><code class="language-bash"># 1. Store feature vector (bulk HSET)
-HSET uc7:client:C1001 \
-  tx_count_1h 2 \
-  tx_count_24h 5 \
-  tx_amount_avg_24h "120.50" \
-  tx_amount_max_24h "250.00" \
-  distinct_countries_7d 1 \
-  distinct_devices_30d 2 \
-  risk_score 12
+                        <pre><code class="language-bash"># 1. Versioned feature sets in Redis
+HGETALL uc7:feature_set_v1:client:C1001
+HGETALL uc7:feature_set_v2:client:C1001
 
-# 2. Read full feature vector (~0.1ms)
-HGETALL uc7:client:C1001
+# 2. Online updates after a transaction event
+HINCRBY uc7:feature_set_v2:client:C1001 \
+  realtime_tx_count_1h 1
+HSET uc7:feature_set_v2:client:C1001 \
+  realtime_tx_amount_max_24h "850.00" \
+  realtime_risk_score 42
 
-# 3. Atomic counter increment
-HINCRBY uc7:client:C1001 \
-  tx_count_1h 1
-HINCRBY uc7:client:C1001 \
-  tx_count_24h 1
+# 3. Read the full feature vector for inference
+HGETALL uc7:feature_set_v2:client:C1001
 
-# 4. Update computed features
-HSET uc7:client:C1001 \
-  tx_amount_avg_24h "135.25" \
-  risk_score 15
-
-# 5. Read single feature
-HGET uc7:client:C1001 risk_score
-
-# 6. Feature store vs data warehouse
-# Redis Hash: HGETALL → ~0.1ms latency
-# SQL query:  SELECT * FROM features
-#             WHERE client_id = 'C1001'
-#             → 50-200ms latency
-#
-# For real-time ML scoring, sub-ms
-# feature retrieval is critical.</code></pre>
+# 4. Redis vs database fetch comparison
+# Redis online feature store  -> ~0.1-1.0ms
+# Simulated DB / warehouse    -> 150ms
+# Inline credit decisioning   -> needs Redis latency</code></pre>
                     </div>
                 </div>
             </section>

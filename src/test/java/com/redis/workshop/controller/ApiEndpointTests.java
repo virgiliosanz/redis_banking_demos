@@ -113,6 +113,17 @@ class ApiEndpointTests {
         mockMvc.perform(get("/api/features/client/C1001")).andExpect(status().isOk());
     }
 
+    @Test
+    void uc7_featureInference() throws Exception {
+        mockMvc.perform(get("/api/features/inference/C1001").param("version", "feature_set_v2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.decision").exists())
+                .andExpect(jsonPath("$.probabilityScore").exists())
+                .andExpect(jsonPath("$.confidenceScore").exists())
+                .andExpect(jsonPath("$.latency.redisFeatureFetchMs").exists())
+                .andExpect(jsonPath("$.comparison.simulatedDatabaseFetchMs").value(150.0));
+    }
+
     // -------- UC8: Document Database --------
     @Test
     void uc8_docsSearch() throws Exception {
@@ -195,5 +206,25 @@ class ApiEndpointTests {
         mockMvc.perform(post("/api/lock/acquire")
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk());
+    }
+
+    // -------- UC16: AI Gateway --------
+    @Test
+    void uc16_gatewayQuery() throws Exception {
+        String body = "{\"query\":\"Explain Basel III capital requirements\"," +
+                "\"userId\":\"user1\",\"sessionId\":\"sess-test-uc16\"}";
+        mockMvc.perform(post("/api/gateway/query")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void uc16_gatewayStats() throws Exception {
+        mockMvc.perform(get("/api/gateway/stats")).andExpect(status().isOk());
+    }
+
+    @Test
+    void uc16_gatewayLog() throws Exception {
+        mockMvc.perform(get("/api/gateway/log")).andExpect(status().isOk());
     }
 }
