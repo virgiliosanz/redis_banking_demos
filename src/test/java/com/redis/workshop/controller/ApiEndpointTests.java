@@ -263,4 +263,22 @@ class ApiEndpointTests {
     void uc16_gatewayReset() throws Exception {
         mockMvc.perform(post("/api/gateway/reset")).andExpect(status().isOk());
     }
+
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void adminResetAll_reseedsUc15AndUc16() throws Exception {
+        mockMvc.perform(post("/api/reset-all"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"));
+
+        String guardrailsBody = "{\"message\":\"What is my account balance?\",\"userId\":\"reset-user\"}";
+        mockMvc.perform(post("/api/guardrails/chat")
+                        .contentType(MediaType.APPLICATION_JSON).content(guardrailsBody))
+                .andExpect(status().isOk());
+
+        String gatewayBody = "{\"query\":\"Explain Basel III\",\"userId\":\"reset-user\",\"sessionId\":\"reset-session\"}";
+        mockMvc.perform(post("/api/gateway/query")
+                        .contentType(MediaType.APPLICATION_JSON).content(gatewayBody))
+                .andExpect(status().isOk());
+    }
 }

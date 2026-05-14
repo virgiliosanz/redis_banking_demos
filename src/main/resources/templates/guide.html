@@ -468,6 +468,76 @@
 
             <hr class="guide-hr"/>
 
+            <!-- UC15 -->
+            <h2>UC15: AI Guardrails for Banking Chat</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"Before an AI answer reaches a banking customer, you need guardrails. Redis lets us enforce them in real time: rate-limit abusive users, route the question to the right policy bucket, detect and scrub PII, block prompt injection attempts, and keep an auditable event trail — all with sub-millisecond primitives."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Send a safe banking question — show the request flows through all guardrail stages and returns a compliant answer</li>
+                <li>Ask a PII-heavy question — show PII detection, masking, and the updated audit trail</li>
+                <li>Try a prompt-injection style message — show the guardrail blocks or downgrades the response</li>
+                <li>Repeat requests quickly — show the Redis-backed rate limiter step in</li>
+                <li>Open the audit panel — connect each stage to the stored Redis events</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>INCR</code> + <code>EXPIRE</code> — per-user guardrail rate limiting</li>
+                <li><code>FT.SEARCH ... KNN</code> — topic routing against policy vectors</li>
+                <li><code>HSET</code> / <code>HGETALL</code> — guardrail counters and session state</li>
+                <li><code>XADD</code> / <code>XRANGE</code> — auditable guardrail event stream</li>
+            </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>String + INCR:</strong> Guardrail throttling is just an atomic counter with a TTL window. Simple, fast, and race-free under burst traffic.</li>
+                <li><strong>Vector search:</strong> Routing the user message to the right policy/topic bucket benefits from semantic similarity, not just keyword matching.</li>
+                <li><strong>Hash:</strong> Guardrail outcomes and counters are compact per-user state that need field-level reads and updates.</li>
+                <li><strong>Stream:</strong> Every safety decision becomes part of an ordered audit trail you can replay during incident review or demo narration.</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>Safety is a runtime pipeline, not a post-processing afterthought</li>
+                <li>Redis combines rate limiting, semantic routing, and audit logging in one platform</li>
+                <li>The workshop uses mock banking prompts, but the pattern maps directly to production guardrail layers</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
+            <!-- UC16 -->
+            <h2>UC16: AI Gateway (Routing + Semantic Cache + Observability)</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"This use case shows Redis acting as the AI control plane. The gateway classifies the request, chooses a route, checks a semantic cache before doing extra work, enforces per-user throughput, and writes a detailed observability trail. That means lower latency, lower cost, and a much clearer operational picture."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Submit a regulatory question — show the gateway route selection and the Redis-backed request trace</li>
+                <li>Repeat or slightly rephrase the same request — highlight the semantic cache hit and latency drop</li>
+                <li>Try different prompts — show routing across policy, product, and general-assistant paths</li>
+                <li>Open the stats panel — call out counters, hit rate, and recent request log entries</li>
+                <li>Reset the demo — show how the gateway state can be cleared between workshop runs</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>FT.SEARCH ... KNN</code> — semantic routing and cache similarity lookup</li>
+                <li><code>HSET</code> / <code>HGETALL</code> — route metadata and aggregated metrics</li>
+                <li><code>INCR</code> + <code>EXPIRE</code> — gateway rate limiting</li>
+                <li><code>XADD</code> / <code>XRANGE</code> — request log and observability stream</li>
+            </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>Vector search:</strong> Route selection and semantic cache lookup both rely on similarity, so the same Redis search capability serves two high-value gateway jobs.</li>
+                <li><strong>Hash:</strong> Gateway metrics and per-route summaries are naturally small structured objects that need cheap partial updates.</li>
+                <li><strong>String + INCR:</strong> Throughput control stays atomic and predictable even when many requests hit the gateway at once.</li>
+                <li><strong>Stream:</strong> Observability needs an ordered event log so the workshop can show exactly what happened for each request.</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>AI gateways are about control, not just proxying</li>
+                <li>Semantic cache hits reduce cost and latency without changing the UI flow</li>
+                <li>Redis gives routing, throttling, caching, and observability from the same operational surface</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
             <!-- Workshop Tools -->
             <h2>Workshop Tools</h2>
             <h3>What to say</h3>

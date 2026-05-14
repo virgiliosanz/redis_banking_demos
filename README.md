@@ -1,6 +1,6 @@
 # Redis Banking Workshop Demo
 
-Spring Boot 3.x workshop application showcasing **13 Redis use cases** for banking.
+Spring Boot 3.x workshop application showcasing **16 Redis use cases** for banking.
 Each use case includes a **live interactive demo** and a **code showcase panel** with curated Redis snippets.
 
 ## Use Cases
@@ -20,6 +20,9 @@ Each use case includes a **live interactive demo** and a **code showcase panel**
 | 11 | Real-time Transaction Monitoring | Streams, XADD, XRANGE, XLEN |
 | 12 | ATM & Branch Finder (Geospatial) | Geo, JSON, RQE, GEOSEARCH |
 | 13 | Distributed Locking | SET NX EX, Lua, EVAL, TTL |
+| 14 | Agent Memory Server | AMS, REST, MCP, Context Assembly |
+| 15 | AI Guardrails for Banking Chat | Vector, Streams, INCR, Hash |
+| 16 | AI Gateway (Routing + Semantic Cache + Observability) | Vector, Semantic Cache, INCR, Hash, Streams |
 
 ## Screenshots
 
@@ -82,7 +85,7 @@ docker compose --profile workshop down
 | `agent-memory-server` | `redislabs/agent-memory-server:0.15.2` | 8000 | Redis Agent Memory Server — REST API, single-process (`asyncio` backend), auth disabled for local workshop |
 | `agent-memory-server-mcp` | `redislabs/agent-memory-server:0.15.2` | 9000 | Agent Memory Server MCP endpoint (streamable HTTP) — only started with `--profile ams-mcp` |
 | `app` | Built from `Dockerfile` | 8080 | Spring Boot application (workshop profile only) |
-| `redis-insight` | `redis/redisinsight:latest` | 5540 | Visual Redis browser (workshop profile only) |
+| `redis-insight` | `redis/redisinsight:latest` | 5540 | Visual Redis browser (starts by default on port 5540) |
 
 ### Agent Memory Server (local workshop)
 
@@ -144,14 +147,14 @@ The app uses a multi-stage Dockerfile:
 
 The app container automatically connects to the Redis container by service name (`SPRING_DATA_REDIS_HOST=redis`).
 
-### Redis Insight (workshop profile)
+### Redis Insight
 
 [Redis Insight](https://redis.io/insight/) provides a visual interface to inspect keys, run commands, and monitor Redis in real time.
 
-It starts automatically with the workshop profile:
+It now starts by default with Docker Compose:
 
 ```bash
-docker compose --profile workshop up -d --build
+docker compose up -d
 # Redis Insight available at http://localhost:5540
 ```
 
@@ -203,7 +206,9 @@ The workshop is designed to work **with or without** an OpenAI API key:
 | **Without API key** | Fully functional | Full-text search works; vector search uses mock vectors (deterministic but not semantic) | Chat works with mock responses; RAG uses keyword matching; semantic cache disabled |
 | **With API key** | No change | Vector search uses real embeddings (semantic similarity) | Real LLM responses via GPT-4o-mini; RAG uses real embeddings; semantic cache active with token savings |
 
-**Bottom line**: All 13 use cases work without an API key. The OpenAI integration enhances UC8 and UC9 with real semantic search and AI-generated responses.
+**Note**: UC15 and UC16 also work without an API key. They use mock responses and deterministic workshop data, following the same no-key pattern as the other AI-oriented demos.
+
+**Bottom line**: All 16 use cases work without an API key. The OpenAI integration enhances UC8 and UC9 with real semantic search and AI-generated responses.
 
 ### Setting up OpenAI
 
@@ -305,14 +310,19 @@ Both tools read PDFs from `src/main/resources/docs/` and write to `src/main/reso
 src/main/java/com/redis/workshop/
 ├── WorkshopApplication.java        # Spring Boot entry point
 ├── config/
+│   ├── AiGatewayDataLoader.java    # UC16 mock routing + cache seed data
 │   ├── RedisConfig.java            # Lettuce connection pool
 │   └── DocumentDataLoader.java     # PDF chunks + vector index loader
 ├── controller/
+│   ├── AiGatewayController.java    # UC16: AI gateway demo endpoints
+│   ├── GuardrailsController.java   # UC15: AI guardrails demo endpoints
 │   ├── HomeController.java         # Landing page
 │   └── UseCaseController.java      # Use case routing
 ├── service/                        # Business logic (per use case)
+│   ├── AiGatewayService.java       # UC16: routing, cache, observability
 │   ├── OpenAiService.java          # OpenAI API client (chat + embeddings)
 │   ├── AssistantService.java       # UC9: AI agent memory + RAG
+│   ├── GuardrailsService.java      # UC15: guardrail pipeline + audit trail
 │   └── ...                         # One service per use case
 └── tools/                          # Offline utilities
     ├── EmbeddingGenerator.java     # Generate real embeddings from PDFs
@@ -325,15 +335,15 @@ src/main/resources/
 ├── docs/*.pdf                      # Regulation PDFs (PSD2, DORA, MiFID II, GDPR)
 ├── templates/
 │   ├── layout.html                 # Shared layout with nav
-│   ├── index.html                  # Landing page (13 cards)
+│   ├── index.html                  # Landing page (16 cards)
 │   ├── guide.html                  # Workshop Presenter Guide
-│   └── usecase-{1..13}.html        # Use case pages
+│   └── usecase-{1..16}.html        # Use case pages
 └── static/
     ├── css/redis-brand.css         # Redis brand design tokens
     ├── img/icons/{light,dark}/     # Redis brand icons per theme
     ├── js/main.js                  # Dark mode toggle + utils
     ├── js/qr-landing.js            # Landing page QR code renderer
-    ├── js/usecase-{1..13}.js       # Per-use-case JS
+    ├── js/usecase-{1..16}.js       # Per-use-case JS
     ├── vendor/prism/               # Syntax highlighting
     └── vendor/qrcode/              # qrcode-generator library (landing QR)
 ```

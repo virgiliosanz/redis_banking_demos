@@ -24,13 +24,26 @@ public class FeatureStoreController {
 
     /** Get all features for a client (HGETALL). */
     @GetMapping("/client/{clientId}")
-    public ResponseEntity<?> getFeatures(@PathVariable String clientId) {
-        Map<String, Object> features = featureStoreService.getFeatures(clientId);
+    public ResponseEntity<?> getFeatures(@PathVariable String clientId,
+                                         @RequestParam(required = false) String version) {
+        Map<String, Object> features = featureStoreService.getFeatures(clientId, version);
         if (features == null) {
             return ResponseEntity.status(404)
                     .body(Map.of("error", "Client not found: " + clientId));
         }
         return ResponseEntity.ok(features);
+    }
+
+    /** Run mock ML inference using versioned online features from Redis. */
+    @GetMapping("/inference/{clientId}")
+    public ResponseEntity<?> runInference(@PathVariable String clientId,
+                                          @RequestParam(required = false) String version) {
+        Map<String, Object> result = featureStoreService.runInference(clientId, version);
+        if (result == null) {
+            return ResponseEntity.status(404)
+                    .body(Map.of("error", "Client not found: " + clientId));
+        }
+        return ResponseEntity.ok(result);
     }
 
     /** Simulate a transaction for a client. */
