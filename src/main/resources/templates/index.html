@@ -7,22 +7,31 @@
 </head>
 <body>
     <div layout:fragment="content">
-        <section class="use-case-grid">
-            <a th:each="uc : ${useCases}"
-               th:href="@{'/usecase/' + ${uc.id}}"
-               class="use-case-card">
-                <div class="card-header">
-                    <img class="card-icon card-icon-light" th:src="@{'/img/icons/light/' + ${uc.icon} + '.png'}" th:alt="${uc.title}" width="40" height="40"/>
-                    <img class="card-icon card-icon-dark" th:src="@{'/img/icons/dark/' + ${uc.icon} + '.png'}" th:alt="${uc.title}" width="40" height="40"/>
-                    <span class="card-number" th:text="'UC' + ${uc.id}"></span>
+        <div class="use-case-groups">
+            <section class="use-case-group" th:each="group : ${useCaseGroups}">
+                <h2 class="use-case-group-title">
+                    <span class="use-case-group-icon" aria-hidden="true" th:text="${group.icon}"></span>
+                    <span th:text="${group.name}"></span>
+                </h2>
+
+                <div class="use-case-grid">
+                    <a th:each="uc : ${group.useCases}"
+                       th:href="@{'/usecase/' + ${uc.id}}"
+                       class="use-case-card">
+                        <div class="card-header">
+                            <img class="card-icon card-icon-light" th:src="@{'/img/icons/light/' + ${uc.icon} + '.png'}" th:alt="${uc.title}" width="40" height="40"/>
+                            <img class="card-icon card-icon-dark" th:src="@{'/img/icons/dark/' + ${uc.icon} + '.png'}" th:alt="${uc.title}" width="40" height="40"/>
+                            <span class="card-number" th:text="'UC' + ${uc.id}"></span>
+                        </div>
+                        <h2 class="card-title" th:text="${uc.title}"></h2>
+                        <p class="card-description" th:text="${uc.description}"></p>
+                        <div class="card-features">
+                            <span class="card-feature-badge" th:text="${uc.features}"></span>
+                        </div>
+                    </a>
                 </div>
-                <h2 class="card-title" th:text="${uc.title}"></h2>
-                <p class="card-description" th:text="${uc.description}"></p>
-                <div class="card-features">
-                    <span class="card-feature-badge" th:text="${uc.features}"></span>
-                </div>
-            </a>
-        </section>
+            </section>
+        </div>
 
         <div style="text-align: center; margin: 24px 0;">
             <a th:href="@{/guide}" class="guide-link-text">Workshop Presenter Guide</a>

@@ -260,6 +260,29 @@ a:hover {
 }
 
 /* --- Use Case Grid --- */
+.use-case-groups {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 5);
+}
+
+.use-case-group-title {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing-unit) * 1);
+    margin: 0;
+    padding-bottom: calc(var(--spacing-unit) * 1.5);
+    border-bottom: 1px solid var(--border-color);
+    font-family: var(--font-body);
+    font-size: 1.1875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.use-case-group-icon {
+    line-height: 1;
+}
+
 .use-case-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

@@ -17,12 +17,15 @@
     var userId = 'demo-user';
     var currentRunId = 0;
     var currentStream = null;
+    var EXAMPLE_PLACEHOLDER = '';
 
     var queryInput = document.getElementById('uc17-query');
     var exampleSelect = document.getElementById('uc17-example');
-    var loadExampleBtn = document.getElementById('uc17-load-example');
     var sendBtn = document.getElementById('uc17-send');
     var resetBtn = document.getElementById('uc17-reset');
+    var fullscreenToggleBtn = document.getElementById('uc17-fullscreen-toggle');
+    var fullscreenThemeBtn = document.getElementById('uc17-theme-toggle');
+    var fullscreenExitBtn = document.getElementById('uc17-exit-fullscreen');
     var modeBadge = document.getElementById('uc17-mode-badge');
     var sessionValue = document.getElementById('uc17-session-id');
     var userValue = document.getElementById('uc17-user-id');
@@ -31,6 +34,7 @@
     var coordinatorCopy = document.getElementById('uc17-coordinator-copy');
     var coordinatorPlan = document.getElementById('uc17-plan');
     var coordinatorResponse = document.getElementById('uc17-final-response');
+    var coordinatorDashboardResponse = document.getElementById('uc17-final-response-dashboard');
     var coordinatorCommands = document.getElementById('uc17-coordinator-commands');
     var totalLatency = document.getElementById('uc17-total-latency');
     var streamLog = document.getElementById('uc17-stream-log');
@@ -69,6 +73,61 @@
     function formatTokens(value) {
         var number = Number(value);
         return isFinite(number) && number > 0 ? Math.round(number) + ' tok' : null;
+    }
+
+    function isEditableTarget(target) {
+        if (!target) return false;
+        if (target.isContentEditable) return true;
+        var tagName = (target.tagName || '').toLowerCase();
+        return tagName === 'input' || tagName === 'textarea' || tagName === 'select';
+    }
+
+    function setFullscreen(enabled) {
+        document.body.classList.toggle('uc17-fullscreen', enabled);
+        if (fullscreenToggleBtn) {
+            fullscreenToggleBtn.setAttribute('aria-pressed', String(enabled));
+            fullscreenToggleBtn.setAttribute('title', enabled ? 'Exit fullscreen demo mode' : 'Enter fullscreen demo mode');
+        }
+        if (fullscreenThemeBtn) {
+            fullscreenThemeBtn.setAttribute('aria-hidden', enabled ? 'false' : 'true');
+        }
+        if (fullscreenExitBtn) {
+            fullscreenExitBtn.setAttribute('aria-hidden', enabled ? 'false' : 'true');
+        }
+    }
+
+    function toggleFullscreen(forceState) {
+        var nextState = typeof forceState === 'boolean'
+            ? forceState
+            : !document.body.classList.contains('uc17-fullscreen');
+        setFullscreen(nextState);
+    }
+
+    function handleFullscreenShortcut(event) {
+        if (event.altKey || event.ctrlKey || event.metaKey || event.repeat) return;
+        if (event.key === 'Escape' && document.body.classList.contains('uc17-fullscreen')) {
+            event.preventDefault();
+            toggleFullscreen(false);
+            return;
+        }
+        if ((event.key === 'f' || event.key === 'F') && !isEditableTarget(event.target)) {
+            event.preventDefault();
+            toggleFullscreen();
+        }
+    }
+
+    function updateFullscreenThemeToggle() {
+        if (!fullscreenThemeBtn) return;
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        fullscreenThemeBtn.textContent = isDark ? '☀ Light mode' : '☾ Dark mode';
+    }
+
+    function toggleFullscreenTheme() {
+        var currentTheme = document.documentElement.getAttribute('data-theme');
+        var nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', nextTheme);
+        localStorage.setItem('redis-workshop-theme', nextTheme);
+        updateFullscreenThemeToggle();
     }
 
     function truncate(text, max) {
@@ -187,6 +246,7 @@
         coordinatorStatus.textContent = coordinatorState.badge;
         coordinatorCopy.innerHTML = coordinatorState.copy;
         coordinatorResponse.textContent = coordinatorState.response;
+        if (coordinatorDashboardResponse) coordinatorDashboardResponse.textContent = coordinatorState.response;
         totalLatency.textContent = 'Total · ' + (coordinatorState.totalLatency ? formatMs(coordinatorState.totalLatency) : '—');
         renderPlan();
         renderCommandStrip(coordinatorCommands, coordinatorState.commands);
@@ -564,13 +624,14 @@
         }
         if (queryInput) queryInput.disabled = isRunning;
         if (exampleSelect) exampleSelect.disabled = isRunning;
-        if (loadExampleBtn) loadExampleBtn.disabled = isRunning;
     }
 
     function loadExample() {
         if (!exampleSelect || !queryInput) return;
         var value = exampleSelect.value || '';
-        if (value) queryInput.value = value;
+        if (!value) return;
+        queryInput.value = value;
+        exampleSelect.value = EXAMPLE_PLACEHOLDER;
         queryInput.focus();
     }
 
@@ -668,10 +729,19 @@
         });
     }
 
-    if (loadExampleBtn) loadExampleBtn.addEventListener('click', loadExample);
     if (exampleSelect) exampleSelect.addEventListener('change', loadExample);
     if (sendBtn) sendBtn.addEventListener('click', function () { runQuery(); });
     if (resetBtn) resetBtn.addEventListener('click', resetDemo);
+    if (fullscreenToggleBtn) fullscreenToggleBtn.addEventListener('click', function () { toggleFullscreen(); });
+    if (fullscreenThemeBtn) fullscreenThemeBtn.addEventListener('click', toggleFullscreenTheme);
+    if (fullscreenExitBtn) fullscreenExitBtn.addEventListener('click', function () { toggleFullscreen(false); });
+    document.addEventListener('keydown', handleFullscreenShortcut);
+    if (fullscreenThemeBtn && window.MutationObserver) {
+        new MutationObserver(updateFullscreenThemeToggle).observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['data-theme']
+        });
+    }
     if (queryInput) {
         queryInput.addEventListener('keydown', function (event) {
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -681,6 +751,8 @@
         });
     }
 
+    updateFullscreenThemeToggle();
+    setFullscreen(document.body.classList.contains('uc17-fullscreen'));
     resetView();
     loadMode();
 })();

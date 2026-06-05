@@ -538,6 +538,42 @@
 
             <hr class="guide-hr"/>
 
+            <!-- UC17 -->
+            <h2>UC17: AI Agent Coordination</h2>
+            <h3>What to say</h3>
+            <div class="guide-quote">"This use case turns Redis Streams into the coordination backbone for multiple AI specialists. One coordinator decomposes a banking question, pushes one task per specialist into a stream, Consumer Groups fan the work out reliably, and Redis keeps both the live state and the replayable event trail in one place."</div>
+            <h3>Demo steps</h3>
+            <ol>
+                <li>Submit a multi-domain banking question — show the coordinator split it into risk, compliance, portfolio, and fraud tasks</li>
+                <li>Point to the Redis Streams bus — explain how <code>XADD</code> dispatches work and the Consumer Group picks it up in parallel</li>
+                <li>Watch each specialist card change independently as the coordinator receives progress and tool events</li>
+                <li>Highlight the RAG context/tool output for one specialist — connect Redis search + domain context to the agent result</li>
+                <li>Show the final assembled answer and recent event trail — one orchestration flow, many specialized agents</li>
+            </ol>
+            <h3>Key Redis commands</h3>
+            <ul>
+                <li><code>XGROUP CREATE</code> — create the specialist worker Consumer Group</li>
+                <li><code>XADD</code> — append coordinator tasks and result events</li>
+                <li><code>XREADGROUP</code> + <code>XACK</code> — reliable task consumption and acknowledgement</li>
+                <li><code>HSET</code> / <code>HGETALL</code> — per-agent status and summary state</li>
+                <li><code>FT.SEARCH ... KNN</code> — RAG lookup for regulation and knowledge context</li>
+            </ul>
+            <h3>Why these data structures?</h3>
+            <ul>
+                <li><strong>Stream + Consumer Groups:</strong> This is the durable orchestration bus. Tasks stay in Redis until workers consume and acknowledge them, so the workshop can show fan-out, reliability, and replayable progress with native Redis primitives.</li>
+                <li><strong>Hash:</strong> Each agent needs compact mutable state — status, latency, summary, and timestamps. Hash keeps that state cheap to update and easy to inspect live.</li>
+                <li><strong>Vector search for RAG:</strong> The specialists are stronger when they retrieve regulation or knowledge-base context instead of answering from a blank prompt. Redis search keeps retrieval and orchestration on the same platform.</li>
+            </ul>
+            <h3>Talking points</h3>
+            <ul>
+                <li>Streams give you a message bus, audit trail, and replay surface in one Redis data structure</li>
+                <li>Consumer Groups turn one stream into parallel specialist work without losing delivery semantics</li>
+                <li>Multi-agent orchestration is a data problem as much as an LLM problem — Redis handles the coordination state cleanly</li>
+                <li>The same Redis deployment supports orchestration, agent state, and RAG context retrieval</li>
+            </ul>
+
+            <hr class="guide-hr"/>
+
             <!-- Workshop Tools -->
             <h2>Workshop Tools</h2>
             <h3>What to say</h3>

@@ -2,6 +2,7 @@ package com.redis.workshop.controller;
 
 import com.redis.workshop.config.DocumentDataLoader;
 import com.redis.workshop.service.AssistantService;
+import com.redis.workshop.service.AgentCoordinatorService;
 import com.redis.workshop.service.AiGatewayService;
 import com.redis.workshop.service.CacheAsideService;
 import com.redis.workshop.service.FeatureStoreService;
@@ -41,6 +42,7 @@ public class AdminController {
     private final CacheAsideService cacheAsideService;
     private final GuardrailsService guardrailsService;
     private final AiGatewayService aiGatewayService;
+    private final AgentCoordinatorService agentCoordinatorService;
 
     public AdminController(StringRedisTemplate redis,
                            DocumentDataLoader documentDataLoader,
@@ -50,7 +52,8 @@ public class AdminController {
                            FeatureStoreService featureStoreService,
                            CacheAsideService cacheAsideService,
                            GuardrailsService guardrailsService,
-                           AiGatewayService aiGatewayService) {
+                           AiGatewayService aiGatewayService,
+                           AgentCoordinatorService agentCoordinatorService) {
         this.redis = redis;
         this.documentDataLoader = documentDataLoader;
         this.assistantService = assistantService;
@@ -60,6 +63,7 @@ public class AdminController {
         this.cacheAsideService = cacheAsideService;
         this.guardrailsService = guardrailsService;
         this.aiGatewayService = aiGatewayService;
+        this.agentCoordinatorService = agentCoordinatorService;
     }
 
     /**
@@ -88,6 +92,7 @@ public class AdminController {
         ok &= runStep(steps, "GuardrailsService.init", guardrailsService::init);
         ok &= runStep(steps, "AiGatewayService.init", aiGatewayService::init);
         ok &= runStep(steps, "AiGatewayService.seedDemoData", aiGatewayService::seedDemoData);
+        ok &= runStep(steps, "AgentCoordinatorService.reset", agentCoordinatorService::reset);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", ok ? "ok" : "partial");

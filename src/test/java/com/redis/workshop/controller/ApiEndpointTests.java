@@ -6,9 +6,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.util.StringUtils;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -307,11 +310,22 @@ class ApiEndpointTests {
 
     @Test
     void views_includeUc17NavigationAndGuide() throws Exception {
-        mockMvc.perform(get("/"))
+        MvcResult homeResult = mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
+                .andExpect(content().string(Matchers.containsString("use-case-group-title")))
+                .andExpect(content().string(Matchers.containsString("Identity &amp; Access")))
+                .andExpect(content().string(Matchers.containsString("Transactions &amp; Risk")))
+                .andExpect(content().string(Matchers.containsString("Data &amp; Caching")))
+                .andExpect(content().string(Matchers.containsString("Infrastructure")))
+                .andExpect(content().string(Matchers.containsString("AI &amp; Agents")))
                 .andExpect(content().string(Matchers.containsString("UC17")))
                 .andExpect(content().string(Matchers.containsString("AI Agent Coordination")))
-                .andExpect(content().string(Matchers.containsString("/usecase/17")));
+                .andExpect(content().string(Matchers.containsString("/usecase/17")))
+                .andReturn();
+
+        String homeHtml = homeResult.getResponse().getContentAsString();
+        assertEquals(5, StringUtils.countOccurrencesOf(homeHtml, "use-case-group-title"));
+        assertEquals(17, StringUtils.countOccurrencesOf(homeHtml, "class=\"use-case-card\""));
 
         mockMvc.perform(get("/usecase/17"))
                 .andExpect(status().isOk())

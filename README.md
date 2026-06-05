@@ -35,6 +35,9 @@ Each use case includes a **live interactive demo** and a **code showcase panel**
 ### UC13: Distributed Locking
 ![UC13 Distributed Locking](docs/screenshots/uc13-distributed-locking.png)
 
+### UC17: AI Agent Coordination
+![UC17 Agent Coordination](docs/screenshots/uc17-agent-coordination.png)
+
 ## Prerequisites
 
 - Java 17+ (for development mode)

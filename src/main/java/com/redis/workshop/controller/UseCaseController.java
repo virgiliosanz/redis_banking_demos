@@ -28,7 +28,8 @@ public class UseCaseController {
             Map.entry(13, "Distributed Locking"),
             Map.entry(14, "Agent Memory Server"),
             Map.entry(15, "AI Guardrails (Banking Chat)"),
-            Map.entry(16, "AI Gateway (Routing + Semantic Cache + Observability)")
+            Map.entry(16, "AI Gateway (Routing + Semantic Cache + Observability)"),
+            Map.entry(17, "AI Agent Coordination")
     );
 
     @GetMapping("/{id}")
