@@ -2116,10 +2116,19 @@ details.how-it-works[open] > summary h2::before {
 .uc17-fullscreen .uc17-control-bar {
     display: flex;
     flex-direction: column;
-    width: min(100%, 720px);
-    gap: 12px;
-    margin-bottom: 16px;
-    padding: 16px 20px;
+    width: min(100%, 880px);
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 12px 16px;
+}
+
+.uc17-fullscreen .uc17-control-copy {
+    display: grid;
+    gap: 4px;
+}
+
+.uc17-fullscreen .uc17-control-copy h3 {
+    margin: 0;
 }
 
 .uc17-fullscreen .uc17-subtitle {
@@ -2129,7 +2138,7 @@ details.how-it-works[open] > summary h2::before {
 
 .uc17-fullscreen .uc17-control-meta {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
 }
 
@@ -2149,20 +2158,30 @@ details.how-it-works[open] > summary h2::before {
 }
 
 .uc17-fullscreen .uc17-control-inputs {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 0.38fr) minmax(0, 0.62fr);
+    align-items: end;
+    gap: 8px;
     min-width: 0;
 }
 
 .uc17-fullscreen .uc17-control-inputs .uc17-query-group {
+    order: 2;
     margin: 0;
+    min-width: 0;
+}
+
+.uc17-fullscreen .uc17-control-inputs .uc17-query-group label {
+    display: none;
+}
+
+.uc17-fullscreen .uc17-control-inputs .uc17-query-group .form-input {
+    width: 100%;
 }
 
 .uc17-fullscreen .uc17-control-inputs .uc17-controls {
-    flex-direction: column;
-    align-items: stretch;
+    order: 1;
+    min-width: 0;
 }
 
 .uc17-fullscreen .uc17-control-inputs .uc17-controls .form-input {
@@ -2174,6 +2193,7 @@ details.how-it-works[open] > summary h2::before {
 .uc17-fullscreen .uc17-actions {
     justify-content: flex-start;
     align-self: stretch;
+    gap: 8px;
 }
 
 .uc17-fullscreen .uc17-actions .btn {
@@ -2346,6 +2366,10 @@ details.how-it-works[open] > summary h2::before {
     .uc17-fullscreen .uc17-control-meta,
     .uc17-fullscreen .uc17-agent-grid,
     .uc17-fullscreen .uc17-lane-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .uc17-fullscreen .uc17-control-inputs {
         grid-template-columns: 1fr;
     }
 
