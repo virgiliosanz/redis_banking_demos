@@ -2114,21 +2114,22 @@ details.how-it-works[open] > summary h2::before {
 }
 
 .uc17-fullscreen .uc17-control-bar {
-    display: grid;
-    grid-template-columns: minmax(240px, 1fr) minmax(280px, 1fr) minmax(360px, 1.6fr) auto;
-    gap: 16px;
-    align-items: end;
+    display: flex;
+    flex-direction: column;
+    width: min(100%, 720px);
+    gap: 12px;
     margin-bottom: 16px;
-    padding: 16px 24px;
+    padding: 16px 20px;
 }
 
 .uc17-fullscreen .uc17-subtitle {
-    display: none;
+    display: block;
+    margin-bottom: 0;
 }
 
 .uc17-fullscreen .uc17-control-meta {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 8px;
 }
 
@@ -2149,35 +2150,34 @@ details.how-it-works[open] > summary h2::before {
 
 .uc17-fullscreen .uc17-control-inputs {
     display: flex;
-    flex-wrap: wrap;
-    align-items: end;
-    gap: 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
     min-width: 0;
 }
 
 .uc17-fullscreen .uc17-control-inputs .uc17-query-group {
-    flex: 1 1 320px;
-    min-width: 240px;
     margin: 0;
 }
 
 .uc17-fullscreen .uc17-control-inputs .uc17-controls {
-    flex: 1 1 280px;
+    flex-direction: column;
+    align-items: stretch;
 }
 
 .uc17-fullscreen .uc17-control-inputs .uc17-controls .form-input {
-    flex: 1 1 280px;
-    min-width: 240px;
-    width: auto;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
 }
 
 .uc17-fullscreen .uc17-actions {
-    justify-content: flex-end;
-    align-self: end;
+    justify-content: flex-start;
+    align-self: stretch;
 }
 
 .uc17-fullscreen .uc17-actions .btn {
-    min-width: 176px;
+    min-width: 160px;
 }
 
 .uc17-fullscreen .uc17-card,
@@ -2310,7 +2310,6 @@ details.how-it-works[open] > summary h2::before {
 }
 
 @media (max-width: 1199px) {
-    .uc17-fullscreen .uc17-control-bar,
     .uc17-fullscreen .uc17-coordinator,
     .uc17-fullscreen .uc17-streams-bar {
         grid-template-columns: 1fr;
