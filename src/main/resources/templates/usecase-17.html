@@ -72,34 +72,47 @@
     <div class="usecase-panels">
         <section class="panel demo-panel">
             <div class="uc17-panel-head">
-                <h2 style="margin:0;">Live Demo</h2>
-                <span id="uc17-mode-badge" class="ai-badge mock">AI: mock</span>
-                <span class="ai-badge on">Redis Streams live</span>
+                <div class="uc17-panel-head-main">
+                    <h2 style="margin:0;">Live Demo</h2>
+                    <span id="uc17-mode-badge" class="ai-badge mock">AI: mock</span>
+                    <span class="ai-badge on">Redis Streams live</span>
+                </div>
+                <div class="uc17-panel-head-actions">
+                    <button id="uc17-fullscreen-toggle" class="btn btn-outline" type="button" aria-pressed="false">⛶ Fullscreen</button>
+                </div>
             </div>
+            <button id="uc17-theme-toggle" class="btn btn-outline uc17-fullscreen-theme" type="button" aria-label="Toggle dark mode in fullscreen">☾ Dark mode</button>
+            <button id="uc17-exit-fullscreen" class="btn btn-outline uc17-fullscreen-exit" type="button" aria-label="Exit fullscreen demo mode">✕ Exit fullscreen</button>
 
             <div id="demo-container" class="demo-container">
-                <div class="data-card">
-                    <h3>Ask the coordinator</h3>
-                    <p class="uc17-subtitle">
-                        Use a multi-domain banking question so the coordinator can split work across risk, compliance,
-                        portfolio, and fraud specialists in parallel.
-                    </p>
-                    <div class="data-row"><span class="data-label">Session</span><span class="data-value" id="uc17-session-id">—</span></div>
-                    <div class="data-row"><span class="data-label">User</span><span class="data-value" id="uc17-user-id">demo-user</span></div>
-                    <div class="data-row"><span class="data-label">Bus</span><span class="data-value"><code>uc17:stream:tasks</code> → <code>uc17-agents</code> → <code>uc17:stream:results</code></span></div>
-                    <div class="form-group uc17-query-group">
-                        <label for="uc17-query">Complex banking query</label>
-                        <input id="uc17-query" class="form-input" placeholder="Analyze my portfolio risk and compliance exposure after recent cross-border card activity"/>
+                <div class="data-card uc17-control-bar">
+                    <div class="uc17-control-copy">
+                        <h3>Ask the coordinator</h3>
+                        <p class="uc17-subtitle">
+                            Use a multi-domain banking question so the coordinator can split work across risk, compliance,
+                            portfolio, and fraud specialists in parallel.
+                        </p>
                     </div>
-                    <div class="uc17-controls">
-                        <select id="uc17-example" class="form-input">
-                            <option value="">Choose an example banking scenario…</option>
-                            <option value="Analyze my portfolio risk exposure after I shifted 20% into EU tech ETFs while card spending spiked during travel.">Portfolio risk + travel spend</option>
-                            <option value="Compare MiFID II suitability obligations with my current ETF allocation and recent fraud alerts on cross-border card transactions.">Compliance + fraud overlap</option>
-                            <option value="I want to rebalance toward conservative income funds. Assess risk, regulation impact, liquidity, and any unusual payment activity.">Conservative rebalance review</option>
-                            <option value="Summarize investment, compliance, and fraud implications before I increase exposure to emerging market funds from my salary account.">Pre-trade decision review</option>
-                        </select>
-                        <button id="uc17-load-example" class="btn btn-outline" type="button">Load example</button>
+                    <div class="uc17-control-meta">
+                        <div class="data-row"><span class="data-label">Session</span><span class="data-value" id="uc17-session-id">—</span></div>
+                        <div class="data-row"><span class="data-label">User</span><span class="data-value" id="uc17-user-id">demo-user</span></div>
+                        <div class="data-row"><span class="data-label">Bus</span><span class="data-value"><code>uc17:stream:tasks</code> → <code>uc17-agents</code> → <code>uc17:stream:results</code></span></div>
+                    </div>
+                    <div class="uc17-control-inputs">
+                        <div class="form-group uc17-query-group">
+                            <label for="uc17-query">Complex banking query</label>
+                            <input id="uc17-query" class="form-input" placeholder="Analyze my portfolio risk and compliance exposure after recent cross-border card activity"/>
+                        </div>
+                        <div class="uc17-controls">
+                            <select id="uc17-example" class="form-input">
+                                <option value="">Choose an example banking scenario…</option>
+                                <option value="Analyze my portfolio risk exposure after I shifted 20% into EU tech ETFs while card spending spiked during travel.">Portfolio risk + travel spend</option>
+                                <option value="Compare MiFID II suitability obligations with my current ETF allocation and recent fraud alerts on cross-border card transactions.">Compliance + fraud overlap</option>
+                                <option value="I want to rebalance toward conservative income funds. Assess risk, regulation impact, liquidity, and any unusual payment activity.">Conservative rebalance review</option>
+                                <option value="Summarize investment, compliance, and fraud implications before I increase exposure to emerging market funds from my salary account.">Pre-trade decision review</option>
+                            </select>
+                            <button id="uc17-load-example" class="btn btn-outline" type="button">Load example</button>
+                        </div>
                     </div>
                     <div class="uc17-actions">
                         <button id="uc17-send" class="btn btn-primary" type="button">Coordinate agents</button>
@@ -111,26 +124,28 @@
                     <h3>Message Bus Orchestration</h3>
                     <div class="uc17-orchestration">
                         <article id="uc17-coordinator-card" class="uc17-card uc17-coordinator is-idle">
-                            <div class="uc17-card-head">
-                                <div>
-                                    <div class="uc17-card-title">Coordinator</div>
-                                    <div class="uc17-card-subtitle">Query decomposition and final assembly</div>
+                            <div class="uc17-coordinator-summary">
+                                <div class="uc17-card-head">
+                                    <div>
+                                        <div class="uc17-card-title">Coordinator</div>
+                                        <div class="uc17-card-subtitle">Query decomposition and final assembly</div>
+                                    </div>
+                                    <div class="uc17-badge-row">
+                                        <span id="uc17-coordinator-status" class="status-badge">Ready</span>
+                                        <span id="uc17-total-latency" class="uc17-inline-badge">Total · —</span>
+                                    </div>
                                 </div>
-                                <div class="uc17-badge-row">
-                                    <span id="uc17-coordinator-status" class="status-badge">Ready</span>
-                                    <span id="uc17-total-latency" class="uc17-inline-badge">Total · —</span>
-                                </div>
+                                <div id="uc17-coordinator-copy" class="uc17-card-copy">Submit a complex question to generate a coordination plan.</div>
                             </div>
-                            <div id="uc17-coordinator-copy" class="uc17-card-copy">Submit a complex question to generate a coordination plan.</div>
-                            <div class="uc17-card-section">
+                            <div class="uc17-card-section uc17-card-section-plan">
                                 <div class="uc17-section-label">Plan</div>
                                 <div id="uc17-plan" class="uc17-plan-list">No subtasks dispatched yet.</div>
                             </div>
-                            <div class="uc17-card-section">
+                            <div class="uc17-card-section uc17-card-section-final">
                                 <div class="uc17-section-label">Final assembled response</div>
                                 <div id="uc17-final-response" class="uc17-response-box">The coordinator response will appear here after all specialists finish.</div>
                             </div>
-                            <div class="uc17-card-section">
+                            <div class="uc17-card-section uc17-card-section-commands">
                                 <div class="uc17-section-label">Redis commands</div>
                                 <div id="uc17-coordinator-commands" class="uc17-command-strip">No coordination commands recorded yet.</div>
                             </div>
@@ -242,6 +257,16 @@
                                 <div class="uc17-card-section"><div class="uc17-section-label">Redis commands</div><div data-agent-commands class="uc17-command-strip">None yet.</div></div>
                             </article>
                         </div>
+
+                        <article class="uc17-card uc17-final-card">
+                            <div class="uc17-card-head">
+                                <div>
+                                    <div class="uc17-card-title">Final assembled response</div>
+                                    <div class="uc17-card-subtitle">Coordinator synthesis across all four specialists</div>
+                                </div>
+                            </div>
+                            <div id="uc17-final-response-dashboard" class="uc17-response-box">The coordinator response will appear here after all specialists finish.</div>
+                        </article>
                     </div>
                 </div>
 
@@ -321,9 +346,17 @@ XREVRANGE uc17:stream:events + - COUNT 10</code></pre>
         .uc17-panel-head {
             display:flex;
             align-items:center;
+            justify-content:space-between;
             gap:12px;
             flex-wrap:wrap;
             margin-bottom:16px;
+        }
+        .uc17-panel-head-main,
+        .uc17-panel-head-actions {
+            display:flex;
+            align-items:center;
+            gap:12px;
+            flex-wrap:wrap;
         }
         .uc17-subtitle {
             font-size:0.85rem;
