@@ -58,7 +58,10 @@ public class HomeController {
                     "icon", "security", "features", "Vector · Streams · INCR · Hash"),
             Map.of("id", "16", "title", "AI Gateway",
                     "description", "Route AI requests, apply semantic cache, rate limits, and observability from Redis",
-                    "icon", "ai-agent-memory", "features", "Vector · Hash · INCR · Streams · TTL")
+                    "icon", "ai-agent-memory", "features", "Vector · Hash · INCR · Streams · TTL"),
+            Map.of("id", "17", "title", "AI Agent Coordination",
+                    "description", "Coordinate specialized AI agents with Redis Streams and Consumer Groups",
+                    "icon", "ai-agent-memory", "features", "Streams · Consumer Groups · Hash · RAG")
     );
 
     @GetMapping("/")

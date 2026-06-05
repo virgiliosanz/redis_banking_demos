@@ -1,16 +1,21 @@
 package com.redis.workshop.controller;
 
 import org.junit.jupiter.api.Test;
+import org.hamcrest.Matchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -264,9 +269,63 @@ class ApiEndpointTests {
         mockMvc.perform(post("/api/gateway/reset")).andExpect(status().isOk());
     }
 
+    // -------- UC17: Agent Coordination --------
+    @Test
+    void uc17_agentsCoordinate() throws Exception {
+        String body = "{\"query\":\"Analyze my portfolio risk exposure\",\"userId\":\"user-test-uc17\"}";
+        MvcResult result = mockMvc.perform(post("/api/agents/coordinate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        result.getAsyncResult(5000);
+
+        mockMvc.perform(asyncDispatch(result))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void uc17_agentsStatus() throws Exception {
+        mockMvc.perform(get("/api/agents/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").exists())
+                .andExpect(jsonPath("$.agents").isArray());
+    }
+
+    @Test
+    void uc17_agentsEventsAndReset() throws Exception {
+        mockMvc.perform(get("/api/agents/events").param("limit", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").exists())
+                .andExpect(jsonPath("$.entries").isArray());
+
+        mockMvc.perform(post("/api/agents/reset"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"));
+    }
+
+    @Test
+    void views_includeUc17NavigationAndGuide() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(Matchers.containsString("UC17")))
+                .andExpect(content().string(Matchers.containsString("AI Agent Coordination")))
+                .andExpect(content().string(Matchers.containsString("/usecase/17")));
+
+        mockMvc.perform(get("/usecase/17"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(Matchers.containsString("AI Agent Coordination")));
+
+        mockMvc.perform(get("/guide"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(Matchers.containsString("UC17: AI Agent Coordination")))
+                .andExpect(content().string(Matchers.containsString("Consumer Groups")));
+    }
+
     @Test
     @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
-    void adminResetAll_reseedsUc15AndUc16() throws Exception {
+    void adminResetAll_reseedsUc15Uc16AndUc17() throws Exception {
         mockMvc.perform(post("/api/reset-all"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ok"));
@@ -280,5 +339,9 @@ class ApiEndpointTests {
         mockMvc.perform(post("/api/gateway/query")
                         .contentType(MediaType.APPLICATION_JSON).content(gatewayBody))
                 .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/agents/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.agents").isArray());
     }
 }
