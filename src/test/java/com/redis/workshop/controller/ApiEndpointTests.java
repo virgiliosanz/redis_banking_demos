@@ -309,7 +309,7 @@ class ApiEndpointTests {
     }
 
     @Test
-    void views_includeUc17NavigationAndGuide() throws Exception {
+    void views_includeGuideAnchorsAndSharedUsecaseGuideLinks() throws Exception {
         MvcResult homeResult = mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(Matchers.containsString("use-case-group-title")))
@@ -327,14 +327,24 @@ class ApiEndpointTests {
         assertEquals(5, StringUtils.countOccurrencesOf(homeHtml, "use-case-group-title"));
         assertEquals(17, StringUtils.countOccurrencesOf(homeHtml, "class=\"use-case-card\""));
 
-        mockMvc.perform(get("/usecase/17"))
-                .andExpect(status().isOk())
-                .andExpect(content().string(Matchers.containsString("AI Agent Coordination")));
+        for (int id = 1; id <= 17; id++) {
+            mockMvc.perform(get("/usecase/" + id))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(Matchers.containsString("/guide#uc" + id)));
+        }
 
-        mockMvc.perform(get("/guide"))
+        MvcResult guideResult = mockMvc.perform(get("/guide"))
                 .andExpect(status().isOk())
+                .andExpect(content().string(Matchers.containsString("UC14: Agent Memory Server")))
+                .andExpect(content().string(Matchers.containsString("POST /v1/memory/prompt")))
+                .andExpect(content().string(Matchers.containsString("id=\"uc14\"")))
                 .andExpect(content().string(Matchers.containsString("UC17: AI Agent Coordination")))
-                .andExpect(content().string(Matchers.containsString("Consumer Groups")));
+                .andExpect(content().string(Matchers.containsString("id=\"uc17\"")))
+                .andExpect(content().string(Matchers.containsString("Consumer Groups")))
+                .andReturn();
+
+        String guideHtml = guideResult.getResponse().getContentAsString();
+        assertEquals(17, StringUtils.countOccurrencesOf(guideHtml, "<h2 id=\"uc"));
     }
 
     @Test
