@@ -414,6 +414,33 @@ a:hover {
     margin-bottom: calc(var(--spacing-unit) * 4);
 }
 
+.usecase-guide-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: calc(var(--spacing-unit) * 4);
+}
+
+.usecase-guide-link {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-decoration: none;
+    opacity: 0.9;
+    transition: color var(--transition), opacity var(--transition);
+}
+
+.usecase-guide-link:hover {
+    color: var(--text-secondary);
+    opacity: 1;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+
+.usecase-guide-link:focus-visible {
+    outline: 2px solid var(--redis-primary);
+    outline-offset: 2px;
+}
+
 .usecase-badge {
     font-family: var(--font-code);
     font-size: 0.85rem;
@@ -437,6 +464,10 @@ a:hover {
 
 @media (max-width: 900px) {
     .usecase-panels { grid-template-columns: 1fr; }
+
+    .usecase-guide-row {
+        justify-content: center;
+    }
 }
 
 .panel {

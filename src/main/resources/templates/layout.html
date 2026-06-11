@@ -77,6 +77,10 @@
 
     <main class="main-content">
         <div layout:fragment="content"></div>
+        <div th:if="${useCaseId != null}" class="usecase-guide-row">
+            <a class="usecase-guide-link"
+               th:href="@{|/guide#uc${useCaseId}|}">Presenter notes →</a>
+        </div>
     </main>
 
     <footer class="site-footer">

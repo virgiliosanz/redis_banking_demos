@@ -50,12 +50,19 @@
             <ul>
                 <li><code>HSET uc1:token:{id} ...</code> — store token</li>
                 <li><code>EXPIRE</code> — auto-cleanup</li>
-                <li><code>HGET</code> / <code>EXISTS</code> — validate token</li>
+                <li><code>HGETALL</code> + <code>TTL</code> — validate token and inspect remaining lifetime</li>
             </ul>
             <h3>Why these data structures?</h3>
             <ul>
                 <li><strong>Hash:</strong> A token has multiple fields (userId, role, issuedAt, device). Hash stores them as a single unit — one key, multiple fields. Alternative would be a JSON string, but Hash lets you read/write individual fields without deserializing.</li>
                 <li><strong>TTL (EXPIRE):</strong> Tokens must expire. Instead of running a cleanup job ("delete all tokens older than X"), Redis auto-deletes the key when the TTL hits zero. Zero maintenance, zero memory leaks.</li>
+            </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>AuthTokenController</code> routes <code>/api/auth/login</code>, <code>/validate</code>, <code>/logout</code>, and <code>/token/{token}</code> into <code>AuthTokenService</code>.</li>
+                <li><code>login()</code> generates a UUID token and stores a Redis Hash at <code>uc1:token:{tokenId}</code> with <code>putAll</code> + <code>expire</code>.</li>
+                <li><code>validateToken()</code> reads the full Hash plus TTL so the UI can show both token fields and the live countdown.</li>
+                <li><code>logout()</code> simply deletes the token key, which makes the invalidation step immediate and easy to demo.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
@@ -72,20 +79,29 @@
             <div class="guide-quote">"Once authenticated, we need to store session state — form data, user preferences, recent actions. Instead of keeping this in the app server (which doesn't scale) or hitting the database on every request, we use Redis as a distributed session store."</div>
             <h3>Demo steps</h3>
             <ol>
-                <li>Create a new session — show data loaded from "RDBMS"</li>
-                <li>Modify session data (update a field)</li>
-                <li>Show the session in Redis with all fields</li>
-                <li>End the session — data "written back" to DB</li>
+                <li>Create a new session — show the Redis Hash and paired auth token</li>
+                <li>Open the session info view — show all stored fields for that username</li>
+                <li>Check the TTL endpoint — explain session expiry countdown</li>
+                <li>Validate the token — show Redis resolves it back to the username</li>
+                <li>Logout — both the session Hash and token String disappear</li>
             </ol>
             <h3>Key Redis commands</h3>
             <ul>
                 <li><code>HSET</code> / <code>HGETALL</code> — session CRUD</li>
                 <li><code>EXPIRE</code> — auto-cleanup on inactivity</li>
+                <li><code>SET uc2:token:{id}</code> — token → username lookup</li>
             </ul>
             <h3>Why these data structures?</h3>
             <ul>
                 <li><strong>Hash:</strong> A session is a collection of key-value pairs (userName, lastPage, cart, preferences). Hash maps directly to this shape. HSET/HGET let you update individual fields without reading the whole session — important when sessions are large.</li>
-                <li><strong>TTL:</strong> Abandoned sessions auto-expire. No background cleanup process needed. TTL resets on each interaction (EXPIRE), so active sessions stay alive.</li>
+                <li><strong>TTL:</strong> Abandoned sessions auto-expire. No background cleanup process needed, and the demo can show the same TTL on both the session Hash and the token lookup key.</li>
+            </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>SessionController</code> exposes <code>/api/session/login</code>, <code>/info/{username}</code>, <code>/ttl/{username}</code>, <code>/logout</code>, and <code>/validate</code>.</li>
+                <li><code>SessionService.login()</code> writes a Hash at <code>uc2:user:{username}</code> and a String at <code>uc2:token:{uuid}</code> with the same 5-minute TTL.</li>
+                <li>The validation path is token → username via Redis String; the info/TTL paths read the session Hash and expiry directly.</li>
+                <li><code>logout()</code> first reads the token field from the Hash, then deletes both Redis keys so the cleanup is easy to explain live.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
@@ -111,18 +127,25 @@
             <ul>
                 <li><code>HSET</code> with multiple fields — aggregated profile</li>
                 <li><code>HGETALL</code> — single read for complete profile</li>
-                <li>Pipeline for multi-DB aggregation</li>
+                <li><code>HSET field value</code> — partial profile updates</li>
             </ul>
             <h3>Why these data structures?</h3>
             <ul>
                 <li><strong>Hash:</strong> A user profile is naturally a flat map of fields (name, email, accountType, lastLogin, preferences). Hash is the perfect fit — HGETALL returns the complete profile in one call, HSET updates specific fields without touching the rest.</li>
-                <li><strong>HINCRBY:</strong> For numeric fields like loginCount or transactionCount, HINCRBY increments atomically — no read-modify-write cycle, no race conditions between concurrent requests.</li>
+                <li><strong>Prefixed fields:</strong> The service flattens three source systems into one Hash using prefixes like <code>account_</code>, <code>activity_</code>, and <code>pref_</code>, which keeps the merged profile readable in Redis.</li>
+            </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>UserProfileController</code> drives load, read, update, sync, and list actions through <code>UserProfileService</code>.</li>
+                <li><code>loadProfile()</code> merges three in-memory source maps and writes one Hash at <code>uc3:user:{userId}</code> with a 10-minute TTL.</li>
+                <li><code>getProfile()</code> uses <code>HGETALL</code>-style reads, while <code>updateProfile()</code> applies field-level <code>HSET</code> updates without rewriting the whole object.</li>
+                <li><code>syncProfile()</code> is intentionally simulated: it confirms the write-back step for the presenter without mutating the mock source datasets.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
-                <li>Single source of truth during the session</li>
-                <li>60x faster than querying 3 different databases</li>
-                <li>Write-back pattern for data consistency</li>
+                <li>Redis collapses three lookups into one fast profile read during the active session</li>
+                <li>Field-level updates keep profile writes simple and explicit</li>
+                <li>The demo shows the write-back pattern without hiding the source-system boundaries</li>
             </ul>
 
             <hr class="guide-hr"/>
@@ -136,23 +159,30 @@
                 <li>Click "Send Request" a few times — see counter increment</li>
                 <li>Hit the limit — see the request denied in red</li>
                 <li>Wait for the window to reset — see it allow again</li>
-                <li>Show the sliding window vs fixed window difference</li>
+                <li>Open the status view — show remaining budget and retry-after from Redis TTL</li>
             </ol>
             <h3>Key Redis commands</h3>
             <ul>
                 <li><code>INCR</code> — atomic counter</li>
                 <li><code>EXPIRE</code> — window reset</li>
-                <li><code>ZADD</code> + <code>ZRANGEBYSCORE</code> — sliding window</li>
+                <li><code>GET</code> + <code>TTL</code> — inspect current usage without consuming another request</li>
             </ul>
             <h3>Why these data structures?</h3>
             <ul>
-                <li><strong>String + INCR:</strong> For fixed-window rate limiting, a String counter is the simplest approach. INCR is atomic — even under 10,000 concurrent requests, the count is always accurate. One key per window (e.g., "api:user123:202501151430"), TTL auto-deletes old windows.</li>
-                <li><strong>Sorted Set (ZADD + ZRANGEBYSCORE):</strong> For sliding-window rate limiting, each request is a member scored by its timestamp. ZRANGEBYSCORE counts requests in the last N seconds. More precise than fixed windows, slightly more memory.</li>
+                <li><strong>String + INCR:</strong> This implementation is intentionally the simplest useful limiter: one String counter per client, atomically incremented on every call.</li>
+                <li><strong>TTL (EXPIRE):</strong> The first hit in a new window sets the expiry, so Redis automatically resets the budget without any cleanup job.</li>
+            </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>RateLimitController</code> calls <code>checkRateLimit()</code>, <code>getStatus()</code>, and <code>reset()</code> in <code>RateLimitService</code>.</li>
+                <li>Each client uses one Redis String key: <code>uc4:{clientId}</code>.</li>
+                <li><code>checkRateLimit()</code> does <code>INCR</code>, sets <code>EXPIRE</code> only when the counter is first created, then returns remaining budget and retry-after based on TTL.</li>
+                <li>This demo is fixed-window only — no Sorted Set or token bucket logic is hiding behind the UI.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
                 <li>Atomic operations = no race conditions under load</li>
-                <li>Multiple strategies: fixed window, sliding window, token bucket</li>
+                <li>Fixed window is often enough when you want the simplest operational story</li>
                 <li>Per-user, per-API-key, per-IP — flexible key design</li>
             </ul>
 
@@ -161,29 +191,36 @@
             <!-- UC5 -->
             <h2 id="uc5">UC5: Transaction Deduplication</h2>
             <h3>What to say</h3>
-            <div class="guide-quote">"Duplicate payments are a real problem in banking — network retries, user double-clicks, system failures. Redis gives you instant dedup with SET NX (set if not exists) and Bloom filters for memory-efficient duplicate checking."</div>
+            <div class="guide-quote">"Duplicate payments are a real problem in banking — network retries, user double-clicks, system failures. Redis gives you instant dedup with one atomic command: SET NX with a TTL. If the transaction fingerprint already exists, the retry is rejected immediately."</div>
             <h3>Demo steps</h3>
             <ol>
                 <li>Submit a transaction — see it accepted</li>
                 <li>Submit the same transaction again — see it rejected as duplicate</li>
                 <li>Submit a different transaction — accepted</li>
-                <li>Show the Bloom filter approach for high-volume scenarios</li>
+                <li>Show the 5-minute dedup window and the generated transaction fingerprint</li>
             </ol>
             <h3>Key Redis commands</h3>
             <ul>
                 <li><code>SET key value NX EX ttl</code> — atomic check-and-set</li>
-                <li><code>BF.ADD</code> / <code>BF.EXISTS</code> — probabilistic dedup</li>
+                <li><code>DEL</code> / key expiry — clear markers when the dedup window ends</li>
             </ul>
             <h3>Why these data structures?</h3>
             <ul>
-                <li><strong>String with SET NX EX:</strong> The transaction hash becomes the key. NX (Not eXists) ensures the SET only succeeds once — if the key already exists, the transaction is a duplicate. EX adds a TTL so the dedup window is time-bounded (e.g., 24h). One command, two guarantees: uniqueness + auto-cleanup.</li>
-                <li><strong>Bloom Filter (BF.ADD/BF.EXISTS):</strong> For millions of transactions per day, storing every hash as a key uses significant memory. A Bloom filter answers "have I seen this before?" with 99.97% accuracy using a fraction of the memory. Trade-off: tiny false-positive rate, but zero false-negatives.</li>
+                <li><strong>String with SET NX EX:</strong> The transaction fingerprint becomes the key. NX (Not eXists) ensures the write only succeeds once, and EX keeps the dedup window bounded automatically.</li>
+                <li><strong>Deterministic fingerprint:</strong> The service hashes sender, receiver, amount, and a 5-minute time window, so retries land on the same Redis key while genuinely new transfers do not.</li>
+            </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>DeduplicationController</code> sends <code>POST /api/dedup/submit</code> into <code>DeduplicationService.submitTransaction()</code>.</li>
+                <li>The service builds a short SHA-256 fingerprint and uses key <code>uc5:{txHash}</code> in Redis.</li>
+                <li>Acceptance vs duplicate is decided by a single <code>setIfAbsent(..., TTL)</code> call, which maps directly to <code>SET NX EX</code>.</li>
+                <li>The visible transaction log is a bounded in-memory list for the UI; Redis only stores the dedup marker for the active time window.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
-                <li>SETNX is atomic — impossible to have two transactions slip through</li>
-                <li>Bloom filter: 99.97% accurate with fraction of the memory</li>
-                <li>TTL controls the dedup window (e.g., 24 hours)</li>
+                <li>SETNX-style dedup is atomic — impossible to have two retries slip through simultaneously</li>
+                <li>The TTL defines the business dedup window explicitly</li>
+                <li>This demo keeps the pattern simple and deterministic instead of adding probabilistic filters</li>
             </ul>
 
             <hr class="guide-hr"/>
@@ -191,7 +228,7 @@
             <!-- UC6 -->
             <h2 id="uc6">UC6: Fraud Detection (Transaction Risk Scoring)</h2>
             <h3>What to say</h3>
-            <div class="guide-quote">"This is where Redis really shines in banking. Redis serves as the online feature store for real-time fraud scoring. Account features, customer features, transaction features — all stored in Redis Hashes for sub-millisecond access. A scoring microservice queries Redis and gets a risk score in under 10ms."</div>
+            <div class="guide-quote">"This demo focuses on three fast fraud signals: transaction velocity, amount thresholds, and geo anomalies. Redis keeps the rolling transaction window in a Sorted Set and appends every scored transaction to a Stream so the dashboard can show both the live decision and the audit trail."</div>
             <h3>Demo steps</h3>
             <ol>
                 <li>Submit a normal transaction — see LOW risk score (green)</li>
@@ -204,20 +241,26 @@
             <ul>
                 <li><code>ZADD</code> + <code>ZRANGEBYSCORE</code> — velocity tracking</li>
                 <li><code>XADD</code> / <code>XRANGE</code> — transaction stream</li>
-                <li><code>HGETALL</code> — feature retrieval</li>
+                <li><code>ZREMRANGEBYSCORE</code> — evict transactions outside the rolling window</li>
             </ul>
             <h3>Why these data structures?</h3>
             <ul>
-                <li><strong>Hash (feature store):</strong> Each customer's fraud features (avg amount, tx count, last location, risk score) are stored as Hash fields. HGETALL retrieves the entire feature vector in &lt;1ms — critical when the scoring model needs to evaluate in real time.</li>
                 <li><strong>Sorted Set (velocity tracking):</strong> ZADD stores each transaction scored by timestamp. ZRANGEBYSCORE with a time window (last 5 minutes) instantly counts recent transactions. This is how velocity checks work — "how many transactions in the last X minutes?"</li>
-                <li><strong>Stream (audit trail):</strong> XADD appends each transaction event with all fields. Streams are append-only, time-ordered, and support range queries — perfect for audit logs and model retraining pipelines.</li>
+                <li><strong>Stream (audit trail):</strong> XADD appends each scored transaction with amount, country, risk score, and factors, so the dashboard can replay the recent fraud decisions in order.</li>
+                <li><strong>Java scoring on top of Redis state:</strong> Redis holds the rolling evidence, while the risk score itself is calculated in service code from amount, velocity, and geo rules.</li>
+            </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>FraudController</code> posts each evaluation request to <code>FraudService.evaluateTransaction()</code> and exposes the recent Stream view separately.</li>
+                <li>Velocity data lives in Sorted Sets <code>uc6:velocity:{cardNumber}</code>; startup seeds baseline entries so the rolling-window demo is never empty.</li>
+                <li>The service adds the new transaction with <code>ZADD</code>, counts the last 5 minutes with <code>ZRANGEBYSCORE</code>, removes stale entries, and computes the risk score in Java.</li>
+                <li>Every evaluated transaction is appended to <code>uc6:stream:transactions</code>, which powers the audit panel via reverse-range reads.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
-                <li>60x faster than traditional database for feature serving</li>
-                <li>Active-Active for multi-geo with 99.999% SLA</li>
                 <li>Sorted Sets for time-windowed velocity checks</li>
-                <li>Streams for audit trail and model retraining</li>
+                <li>Streams give you a replayable fraud decision log without a separate queue</li>
+                <li>The risk score is explainable because each rule is visible in the response payload</li>
             </ul>
 
             <hr class="guide-hr"/>
@@ -225,30 +268,38 @@
             <!-- UC7 -->
             <h2 id="uc7">UC7: Feature Store</h2>
             <h3>What to say</h3>
-            <div class="guide-quote">"Redis isn't just a cache — it's a real-time data platform. Here we use it as a feature store, ingesting time series data from multiple sources and serving it via the Redis Query Engine. Sub-millisecond response times, no matter where your users are."</div>
+            <div class="guide-quote">"This use case shows Redis as an online feature store for banking decisions. Each client has pre-seeded feature vectors in Redis Hashes, the service fetches them in one read for mock inference, and live transactions update the real-time features immediately."</div>
             <h3>Demo steps</h3>
             <ol>
                 <li>Show pre-loaded client features (3 different risk profiles)</li>
-                <li>Select a client — view their feature vector</li>
-                <li>Update a feature in real-time (e.g., increment transaction count)</li>
-                <li>Recalculate risk score — see it change based on updated features</li>
+                <li>Select a client — view both feature-set versions stored in Redis</li>
+                <li>Run inference — compare Redis fetch time with the simulated database latency</li>
+                <li>Simulate a transaction — watch the real-time counters and risk score update</li>
+                <li>Re-run inference — see the decision reflect the updated features</li>
             </ol>
             <h3>Key Redis commands</h3>
             <ul>
                 <li><code>HSET</code> / <code>HGETALL</code> — feature storage</li>
                 <li><code>HINCRBY</code> — real-time feature updates</li>
-                <li><code>FT.SEARCH</code> — query features via RQE</li>
+                <li><code>HSET</code> — recompute derived values such as averages and risk score</li>
             </ul>
             <h3>Why these data structures?</h3>
             <ul>
                 <li><strong>Hash:</strong> ML features are naturally key-value pairs (feature_name → value). Hash stores the complete feature vector for a client. HGETALL serves the model in &lt;1ms. HINCRBY updates counters (tx_count, login_count) without read-modify-write.</li>
-                <li><strong>Redis Query Engine (FT.SEARCH):</strong> Unlike a plain key lookup, RQE lets you query across all feature vectors — "find all clients where risk_score > 0.8 AND region = EU". This enables batch monitoring and model validation without scanning every key.</li>
+                <li><strong>Versioned keys:</strong> The demo keeps <code>feature_set_v1</code> and <code>feature_set_v2</code> side by side so the presenter can explain legacy vs richer real-time features without changing the UI flow.</li>
+            </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>FeatureStoreController</code> exposes client listing, feature reads, inference, and transaction simulation through <code>FeatureStoreService</code>.</li>
+                <li>The service seeds two Redis Hashes per client: <code>uc7:feature_set_v1:client:{id}</code> and <code>uc7:feature_set_v2:client:{id}</code>.</li>
+                <li><code>runInference()</code> fetches the full Hash, scores it in Java, and returns a side-by-side comparison against a simulated 150ms database fetch.</li>
+                <li><code>simulateTransaction()</code> updates counters and derived features with <code>HINCRBY</code>/<code>HSET</code>, then recomputes the mock risk score for the live demo.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
                 <li>Online feature store for ML model serving</li>
                 <li>Real-time feature updates (not batch)</li>
-                <li>Redis Query Engine for complex queries on features</li>
+                <li>Versioned feature sets let you compare model inputs without changing the serving path</li>
             </ul>
 
             <hr class="guide-hr"/>
@@ -277,6 +328,13 @@
                 <li><strong>RQE with TEXT fields:</strong> FT.CREATE indexes specific JSON fields for full-text search. The query engine handles stemming, stop words, and relevance scoring — like Elasticsearch, but inside Redis.</li>
                 <li><strong>RQE with VECTOR fields:</strong> Same index can include vector embeddings. KNN search finds semantically similar documents even when the exact words differ. One index, two search modes (text + vector), combined in a single query.</li>
             </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>DocumentSearchController</code> routes search, list, query-by-field, read-by-id, and create requests into <code>DocumentSearchService</code>.</li>
+                <li>Documents live as JSON records under <code>uc8:doc:{id}</code> and are indexed by <code>idx:uc8:documents</code>.</li>
+                <li><code>fullTextSearch()</code>, <code>vectorSearch()</code>, and <code>hybridSearch()</code> each build the exact <code>FT.SEARCH</code> command string returned to the UI.</li>
+                <li>Embeddings come from <code>OpenAiService</code> when configured, with mock vectors as fallback so the demo still works offline.</li>
+            </ul>
             <h3>Talking points</h3>
             <ul>
                 <li>No need for Elasticsearch + separate vector DB</li>
@@ -294,7 +352,7 @@
             <h3>Demo steps</h3>
             <ol>
                 <li>Start a conversation — ask about wire transfers</li>
-                <li>Show the Memory Inspection panel — see short-term memory (Hash with TTL)</li>
+                <li>Show the Memory Inspection panel — see the conversation Hash with TTL and stored messages</li>
                 <li>Ask a follow-up — agent recalls context from short-term memory</li>
                 <li>Ask about a topic from past interactions — agent retrieves from long-term memory (vector search)</li>
                 <li>Ask a regulatory question — agent pulls from knowledge base (RAG)</li>
@@ -303,18 +361,25 @@
             <h3>Key Redis commands</h3>
             <ul>
                 <li><code>HSET</code> + <code>EXPIRE</code> — short-term conversation memory</li>
-                <li><code>JSON.SET</code> + <code>FT.SEARCH KNN</code> — long-term memory retrieval</li>
-                <li><code>FT.SEARCH KNN</code> — RAG document retrieval</li>
+                <li><code>HSET</code> + vector field + <code>FT.SEARCH KNN</code> — long-term memory and KB retrieval</li>
+                <li><code>FT.SEARCH KNN</code> — regulation-doc retrieval and semantic cache lookup</li>
             </ul>
             <h3>Why these data structures?</h3>
             <ul>
-                <li><strong>Hash + TTL (short-term memory):</strong> The current conversation is a Hash with a TTL. Each message is a field. TTL auto-expires the conversation after inactivity — no memory leaks, no cleanup jobs. Hash lets you append messages with HSET without reading the full conversation.</li>
-                <li><strong>Vector index (long-term memory + RAG):</strong> Past interactions and KB documents are stored with vector embeddings. FT.SEARCH KNN finds the most relevant memories/documents by semantic similarity — not keyword matching. This is how the agent "remembers" relevant past conversations and retrieves knowledge.</li>
+                <li><strong>Hash + TTL (short-term memory):</strong> The conversation lives in one Redis Hash keyed by session, with metadata fields plus a serialized <code>messages</code> array. TTL auto-expires inactive chats.</li>
+                <li><strong>Vector indexes (long-term memory + RAG):</strong> Past interactions, KB articles, and semantic cache entries are Hash records with vector fields, so <code>FT.SEARCH KNN</code> can retrieve relevant context by similarity.</li>
                 <li><strong>Semantic cache (Vector + TTL):</strong> Identical or similar questions hit a vector cache before calling the LLM. Saves tokens, reduces latency, cuts costs. TTL ensures the cache stays fresh.</li>
+            </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>AssistantController</code> exposes synchronous chat, SSE streaming, conversation inspection, KB browsing, and semantic-cache stats through <code>AssistantService</code>.</li>
+                <li>Short-term state is stored at <code>uc9:conversation:{sessionId}</code>; <code>AssistantService</code> then fans out to <code>MemoryService</code>, <code>KnowledgeBaseService</code>, and <code>SemanticCacheService</code>.</li>
+                <li><code>MemoryService</code> seeds <code>uc9:memory:*</code> / <code>idx:uc9:memory</code>, while <code>KnowledgeBaseService</code> owns <code>uc9:kb:*</code> / <code>idx:uc9:kb</code> and also queries UC8's regulation index.</li>
+                <li>When OpenAI is configured, <code>OpenAiService</code> provides real embeddings and optional SSE token streaming; otherwise the same flow falls back to deterministic mock responses.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
-                <li>Short-term memory: Redis Hash with TTL = automatic cleanup</li>
+                <li>Short-term memory: one session Hash with TTL = automatic cleanup</li>
                 <li>Long-term memory: vector search over past interactions</li>
                 <li>RAG: same Redis instance serves as vector store</li>
                 <li>No external vector database needed — Redis does it all</li>
@@ -348,12 +413,19 @@
                 <li><strong>TTL (EX):</strong> Controls cache freshness. A 5-minute TTL means data is never more than 5 minutes stale. When the TTL expires, the next request triggers a fresh database fetch. No invalidation logic needed for time-based freshness.</li>
                 <li><strong>DEL:</strong> For write-through invalidation — when the source data changes, DEL the cached key. Next read triggers a fresh fetch. Simple, reliable, consistent.</li>
             </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>CacheAsideController</code> delegates fetch, single-key eviction, full eviction, and stats endpoints to <code>CacheAsideService</code>.</li>
+                <li>Products come from an in-memory mock database, while cache entries are JSON strings at <code>uc10:product:{productId}</code> with a 300-second TTL.</li>
+                <li><code>getProduct()</code> is explicit cache-aside: <code>GET</code> Redis first, sleep 200ms to simulate the database on miss, then <code>SET</code> the cache.</li>
+                <li>Hit/miss counters stay in Java <code>AtomicLong</code>s so the presenter can explain latency savings without hiding the Redis calls.</li>
+            </ul>
             <h3>Talking points</h3>
             <ul>
                 <li>200x speedup: 200ms → &lt;1ms on cache hit</li>
                 <li>TTL = automatic freshness control, no stale data forever</li>
                 <li>Cache eviction on write for data consistency</li>
-                <li>Spring <code>@Cacheable</code> annotation for zero-code caching</li>
+                <li>This demo keeps the cache-aside logic explicit instead of hiding it behind annotations</li>
                 <li>Hit ratio is the key metric — aim for &gt;80% in production</li>
             </ul>
 
@@ -383,6 +455,13 @@
                 <li><strong>Stream (XADD/XRANGE):</strong> Streams are an append-only log with auto-generated timestamp IDs. XADD writes a transaction event with all its fields (amount, type, risk). XRANGE reads entries in a time window. This is exactly what event sourcing needs — ordered, timestamped, queryable.</li>
                 <li><strong>XLEN:</strong> Returns the stream length in O(1) — useful for total transaction count without scanning.</li>
                 <li><strong>XTRIM MAXLEN:</strong> Bounds the stream to prevent unbounded growth. Keep the last 10,000 entries, older ones auto-deleted. Memory-safe by design.</li>
+            </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>TransactionMonitorController</code> starts/stops the simulator, injects anomalies, and reads metrics/history from <code>TransactionMonitorService</code>.</li>
+                <li>Each generated transaction is <code>XADD</code>ed to <code>uc11:stream:transactions</code>, and the stream is trimmed to 10,000 entries.</li>
+                <li>The simulator runs on a single scheduled executor at 500ms intervals, while <code>injectAnomaly()</code> adds a burst of high-risk events in one shot.</li>
+                <li>History queries read a Redis time range first and then aggregate TPS, averages, and risk buckets in Java for the chart.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
@@ -422,6 +501,13 @@
                 <li><strong>Geo (GEOADD/GEOSEARCH):</strong> Redis Geo stores coordinates in a Sorted Set using geohash encoding. GEOSEARCH returns all points within a radius, sorted by distance — sub-millisecond for thousands of locations. No external geo database needed.</li>
                 <li><strong>JSON + RQE (FT.SEARCH with GEO field):</strong> When you need geo + filtering (e.g., "ATMs within 2km that have deposit service"), JSON stores rich location documents and RQE combines geo radius with TAG/TEXT filters in a single query. More powerful than native geo, same Redis instance.</li>
             </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>GeoFinderController</code> exposes a native Redis geo path and a Redis Query Engine path through <code>GeoFinderService</code>.</li>
+                <li>Each location is loaded twice: <code>GEOADD</code> into <code>uc12:geo:atms</code> plus Hash metadata <code>uc12:meta:{id}</code>, and <code>JSON.SET</code> into <code>uc12:branch:{id}</code> indexed by <code>idx:uc12:branches</code>.</li>
+                <li><code>searchNative()</code> runs <code>GEOSEARCH</code> and enriches each hit from the metadata Hash.</li>
+                <li><code>searchRQE()</code> builds one <code>FT.SEARCH</code> query with geo radius plus optional <code>@type</code> and <code>@services</code> filters, then sorts the distances in Java.</li>
+            </ul>
             <h3>Talking points</h3>
             <ul>
                 <li>Native geo: O(N+log(M)) — extremely fast for pure proximity</li>
@@ -457,6 +543,13 @@
                 <li><strong>String with NX:</strong> The NX flag makes SET atomic — only one client can set the key. This IS the lock. No race conditions, no two-phase locking needed.</li>
                 <li><strong>EX (TTL):</strong> Prevents deadlocks. If the lock holder crashes, the key expires automatically. No manual cleanup, no orphaned locks.</li>
                 <li><strong>Lua scripting (EVAL):</strong> The release must be atomic — check owner AND delete in one step. Without Lua, another client could acquire between your GET and DEL. Lua runs server-side as a single atomic operation.</li>
+            </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>DistributedLockController</code> routes acquire, release, info, and contention simulation requests into <code>DistributedLockService</code>.</li>
+                <li>Each lock is a Redis String at <code>uc13:lock:{resourceId}</code> written with <code>SET NX EX</code> semantics via <code>setIfAbsent</code>.</li>
+                <li><code>releaseLock()</code> executes a Lua script that verifies the client id before deleting the key, so release stays atomic.</li>
+                <li><code>simulateContention()</code> uses a small Java executor to show one winner and multiple blocked contenders against the same Redis lock.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
@@ -496,6 +589,13 @@
                 <li><strong>Separated short-term + long-term memory:</strong> The demo can clearly show what was just said versus what the agent remembered from prior seeded knowledge.</li>
                 <li><strong>REST/MCP over the same Redis backend:</strong> Web apps can keep a simple synchronous REST flow, while agent frameworks can use MCP without changing the memory substrate.</li>
             </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>AmsController</code> is a thin REST facade over <code>AmsDemoService</code>, intentionally separate from UC9 so both memory patterns can be demoed side by side.</li>
+                <li><code>AmsDemoService</code> talks to the external AMS via <code>AmsClient</code>: seed/reset memories, fetch working memory, call <code>/v1/memory/prompt</code>, and return traces.</li>
+                <li>Each chat turn follows the same flow: load working memory, append the user message, ask AMS to assemble context, call <code>OpenAiService.chatCompletion()</code> or a mock fallback, then write the assistant reply back.</li>
+                <li>The Redis key patterns are owned by AMS itself, so this app deliberately surfaces the AMS REST/MCP contract rather than writing Redis keys directly.</li>
+            </ul>
             <h3>Talking points</h3>
             <ul>
                 <li>AMS gives agentic architectures a dedicated memory layer instead of forcing every team to hand-roll chat memory and context assembly</li>
@@ -522,15 +622,22 @@
             <ul>
                 <li><code>INCR</code> + <code>EXPIRE</code> — per-user guardrail rate limiting</li>
                 <li><code>FT.SEARCH ... KNN</code> — topic routing against policy vectors</li>
-                <li><code>HSET</code> / <code>HGETALL</code> — guardrail counters and session state</li>
+                <li><code>HSET</code> / <code>HINCRBY</code> — route seeds and aggregated guardrail stats</li>
                 <li><code>XADD</code> / <code>XRANGE</code> — auditable guardrail event stream</li>
             </ul>
             <h3>Why these data structures?</h3>
             <ul>
                 <li><strong>String + INCR:</strong> Guardrail throttling is just an atomic counter with a TTL window. Simple, fast, and race-free under burst traffic.</li>
                 <li><strong>Vector search:</strong> Routing the user message to the right policy/topic bucket benefits from semantic similarity, not just keyword matching.</li>
-                <li><strong>Hash:</strong> Guardrail outcomes and counters are compact per-user state that need field-level reads and updates.</li>
+                <li><strong>Hash:</strong> Route seeds, prompt-injection seeds, and aggregate counters are compact structured records that are easy to update and inspect live.</li>
                 <li><strong>Stream:</strong> Every safety decision becomes part of an ordered audit trail you can replay during incident review or demo narration.</li>
+            </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>GuardrailsController</code> sends each chat request into <code>GuardrailsService.chat()</code> and exposes audit/stats/reset endpoints for observability.</li>
+                <li>Redis keys are split by purpose: <code>uc15:rate:{userId}</code> for throttling, <code>uc15:route:*</code> and <code>uc15:injection:*</code> for vector seeds, <code>uc15:stream:audit</code> for the pipeline log, and <code>uc15:stats</code> for counters.</li>
+                <li>The service executes the stages in order: rate limit, topic classification, regex PII scan, prompt-injection detection, output scrubbing, and compliance rewriting.</li>
+                <li>Every stage becomes a structured decision object and an <code>XADD</code> audit event, so the UI can replay exactly why a response passed or was blocked.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
@@ -549,7 +656,7 @@
             <ol>
                 <li>Submit a regulatory question — show the gateway route selection and the Redis-backed request trace</li>
                 <li>Repeat or slightly rephrase the same request — highlight the semantic cache hit and latency drop</li>
-                <li>Try different prompts — show routing across policy, product, and general-assistant paths</li>
+                <li>Try different prompts — show routing across GPT-4o, GPT-4o-mini, and the internal numeric model</li>
                 <li>Open the stats panel — call out counters, hit rate, and recent request log entries</li>
                 <li>Reset the demo — show how the gateway state can be cleared between workshop runs</li>
             </ol>
@@ -558,7 +665,7 @@
                 <li><code>FT.SEARCH ... KNN</code> — semantic routing and cache similarity lookup</li>
                 <li><code>HSET</code> / <code>HGETALL</code> — route metadata and aggregated metrics</li>
                 <li><code>INCR</code> + <code>EXPIRE</code> — gateway rate limiting</li>
-                <li><code>XADD</code> / <code>XRANGE</code> — request log and observability stream</li>
+                <li><code>XADD</code> / <code>XREVRANGE</code> — request log and observability stream</li>
             </ul>
             <h3>Why these data structures?</h3>
             <ul>
@@ -566,6 +673,13 @@
                 <li><strong>Hash:</strong> Gateway metrics and per-route summaries are naturally small structured objects that need cheap partial updates.</li>
                 <li><strong>String + INCR:</strong> Throughput control stays atomic and predictable even when many requests hit the gateway at once.</li>
                 <li><strong>Stream:</strong> Observability needs an ordered event log so the workshop can show exactly what happened for each request.</li>
+            </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>AiGatewayController</code> delegates <code>POST /api/gateway/query</code> to <code>AiGatewayService.handleQuery()</code> and returns HTTP 429 when the chosen model budget is exhausted.</li>
+                <li>Route seeds live at <code>uc16:route:model:{tag}</code>, semantic-cache entries at <code>uc16:cache:{tag}:{id}</code>, and both are indexed for KNN lookup.</li>
+                <li>For every request the service routes first, checks semantic cache, applies per-model rate limiting, generates a mock model response, and updates usage/stat Hashes such as <code>uc16:usage:session:{id}</code> and <code>uc16:stats:model:{tag}</code>.</li>
+                <li>Observability is first-class: each request is appended to <code>uc16:stream:gateway</code>, and the stats/log endpoints read the same Redis state shown in the UI.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
@@ -601,6 +715,13 @@
                 <li><strong>Stream + Consumer Groups:</strong> This is the durable orchestration bus. Tasks stay in Redis until workers consume and acknowledge them, so the workshop can show fan-out, reliability, and replayable progress with native Redis primitives.</li>
                 <li><strong>Hash:</strong> Each agent needs compact mutable state — status, latency, summary, and timestamps. Hash keeps that state cheap to update and easy to inspect live.</li>
                 <li><strong>Vector search for RAG:</strong> The specialists are stronger when they retrieve regulation or knowledge-base context instead of answering from a blank prompt. Redis search keeps retrieval and orchestration on the same platform.</li>
+            </ul>
+            <h3>Under the hood</h3>
+            <ul>
+                <li><code>AgentCoordinatorController</code> streams <code>POST /api/agents/coordinate</code> over SSE while <code>AgentCoordinatorService</code> orchestrates the run.</li>
+                <li>Startup creates consumer groups for <code>uc17:stream:tasks</code> and <code>uc17:stream:results</code>, plus per-agent Hash state at <code>uc17:agent:{agentId}</code> and an event stream at <code>uc17:stream:events</code>.</li>
+                <li><code>coordinate()</code> fans out one task per specialist, processes them in parallel with <code>CompletableFuture</code> on a fixed thread pool, and uses a <code>Semaphore</code> to prevent overlapping runs.</li>
+                <li>Each worker reads with <code>XREADGROUP</code>, gathers KB and regulation RAG hits, simulates tools, appends results, acknowledges the task, and the coordinator assembles the final response plus live SSE events.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
@@ -668,7 +789,7 @@
                 <li>One database for sessions, rate limiting, fraud detection, feature store, document search, AI memory, AND distributed locking</li>
                 <li>Sub-millisecond latency for all operations</li>
                 <li>Built-in search engine (full-text + vector) since Redis 8</li>
-                <li>Active-Active for multi-geo banking requirements</li>
+                <li>The same Redis patterns can be extended to larger banking topologies without changing the application model</li>
                 <li>Workshop tools: inline Redis command logging, presentation mode, and QR sharing — all built with Redis data</li>
             </ol>
             <h3>Questions?</h3>
