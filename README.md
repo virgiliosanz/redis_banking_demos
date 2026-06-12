@@ -39,6 +39,8 @@ Each use case includes a **live interactive demo** and a **code showcase panel**
 ### UC17: AI Agent Coordination
 ![UC17 Agent Coordination](docs/screenshots/uc17-agent-coordination.png)
 
+UC17 shows a **6-phase agent lifecycle** (`start → thinking → searching → tools → reasoning → done`) with **staggered parallel execution** and **per-agent progress indicators**, making the Redis Streams coordination flow easy to follow in a live workshop.
+
 ## Prerequisites
 
 - Java 17+ (for development mode)
@@ -199,31 +201,35 @@ spring:
       password: your-password
 ```
 
-## LLM Integration (optional OpenAI chat)
+## LLM Integration (OpenAI for AI responses)
 
 ### How it works
 
 Embeddings are now **100% local** across the workshop using **BGE-small-en-v1.5** (384 dimensions, ONNX in-process).
 You do **not** need an API key for vector search, RAG retrieval, semantic cache lookup, or document indexing.
 
-OpenAI is now **optional** and used only for **chat completions in UC9**.
+OpenAI is **optional for the overall workshop** and required only for the **LLM response step in UC9, UC14, UC15, UC16, and UC17**.
+Non-AI use cases (**UC1-UC8, UC10-UC13**) work without any API key.
 
-| Mode | UC1-UC8, UC10-UC17 | UC9 (AI Assistant) |
-|------|---------------------|--------------------|
-| **Without API key** | Fully functional, including local embeddings and vector search | Local embeddings, RAG retrieval, and semantic cache still work; chat responses use deterministic mock output |
-| **With API key** | No change | Same local embedding pipeline, plus real chat completions via GPT-4o-mini |
+| Mode | Non-AI UCs (UC1-UC8, UC10-UC13) | AI UCs (UC9, UC14, UC15, UC16, UC17) |
+|------|-----------------------------------|----------------------------------------|
+| **Without API key** | Fully functional, including local embeddings and vector search | AI UCs show a clear error at the LLM response step; Redis features such as vector search, RAG retrieval, semantic cache, guardrails, routing, and streams still work |
+| **With API key** | No change | Same Redis pipelines, plus real chat completions via GPT-4o-mini |
 
-**Bottom line**: All 17 use cases work without an API key. Adding `OPENAI_API_KEY` only upgrades UC9 chat responses.
+**Bottom line**: Non-AI use cases run without any API key. AI use cases need `OPENAI_API_KEY` only for LLM-generated responses; local BGE embeddings and Redis-side retrieval/caching still work without it.
 
 ### Setting up OpenAI
 
 1. Get an API key from [platform.openai.com](https://platform.openai.com/api-keys)
 
-2. Set the environment variable if you want real UC9 chat completions:
+2. Set the environment variable if you want LLM responses in UC9, UC14, UC15, UC16, and UC17:
 
 ```bash
 # Development mode
 OPENAI_API_KEY=sk-... ./mvnw spring-boot:run
+
+# Makefile shortcut
+OPENAI_API_KEY=sk-... make dev
 
 # Workshop mode (Docker) — pass to the app container
 OPENAI_API_KEY=sk-... docker compose --profile workshop up -d --build
@@ -238,14 +244,14 @@ OpenAI chat integration enabled (model=gpt-4o-mini)
 Or if no key is set:
 
 ```
-OpenAI chat integration disabled — no API key configured. Using mock fallback.
+OpenAI chat integration disabled — no API key configured. AI features will return a configuration error.
 ```
 
 ### Models used
 
 | Purpose | Model | Used by |
 |---------|-------|---------|
-| Chat completions | `gpt-4o-mini` | UC9 AI Assistant |
+| Chat completions | `gpt-4o-mini` | UC9 AI Assistant, UC14 Agent Memory Server, UC15 Guardrails, UC16 AI Gateway, UC17 Agent Coordination |
 | Text embeddings | `BGE-small-en-v1.5` (384 dimensions, ONNX) | UC8 vector search, UC9 RAG + semantic cache |
 
 `application.yml` only configures optional OpenAI chat:
