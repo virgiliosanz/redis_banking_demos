@@ -85,7 +85,7 @@ public class DocumentDataLoader {
             List<Map<String, Object>> generated = generateEmbeddingsFromPdfs();
             if (generated != null && !generated.isEmpty()) {
                 docs = generated;
-                log.info("UC6: Auto-generated {} document chunks from PDFs (mock vectors)", docs.size());
+                log.info("UC6: Auto-generated {} document chunks from PDFs", docs.size());
             } else {
                 // 3. No PDFs either — fall back to hand-crafted mock documents
                 log.info("UC6: No PDFs found under /docs/, using built-in mock documents");
@@ -183,7 +183,6 @@ public class DocumentDataLoader {
                     entry.put("source", chunk.get("source"));
                     entry.put("chunkIndex", chunk.get("chunkIndex"));
                     entry.put("content", chunk.get("content"));
-                    entry.put("vector", generateVector(chunk.get("content")));
                     chunks.add(entry);
                 }
             } catch (Exception e) {
@@ -191,7 +190,32 @@ public class DocumentDataLoader {
             }
         }
         if (chunks.isEmpty()) return null;
-        log.info("UC6: Generated {} chunks from {} PDFs (mock vectors)", chunks.size(), pdfCount);
+        log.info("UC6: Generated {} chunks from {} PDFs", chunks.size(), pdfCount);
+
+        if (openAiService.isConfigured()) {
+            log.info("UC6: Generating real embeddings for {} PDF chunks via OpenAI...", chunks.size());
+            List<String> texts = chunks.stream()
+                    .map(c -> c.getOrDefault("title", "") + " " + c.getOrDefault("content", ""))
+                    .map(Object::toString)
+                    .toList();
+            List<float[]> allEmbeddings = new ArrayList<>();
+            int totalBatches = (texts.size() + 499) / 500;
+            for (int i = 0; i < texts.size(); i += 500) {
+                List<String> batch = texts.subList(i, Math.min(i + 500, texts.size()));
+                log.info("UC6: Embedding batch {}/{} ({} chunks)...",
+                        (i / 500) + 1, totalBatches, batch.size());
+                allEmbeddings.addAll(openAiService.getEmbeddings(batch));
+            }
+            for (int i = 0; i < chunks.size(); i++) {
+                chunks.get(i).put("vector", allEmbeddings.get(i));
+            }
+            log.info("UC6: Using real OpenAI embeddings for {} PDF chunks", chunks.size());
+        } else {
+            for (Map<String, Object> chunk : chunks) {
+                chunk.put("vector", generateVector(chunk.getOrDefault("content", "").toString()));
+            }
+            log.info("UC6: Using deterministic mock embeddings for {} PDF chunks", chunks.size());
+        }
 
         tryWriteEmbeddings(chunks);
 
