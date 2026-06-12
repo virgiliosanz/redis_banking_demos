@@ -2,7 +2,7 @@ package com.redis.workshop.config;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.redis.workshop.service.OpenAiService;
+import com.redis.workshop.service.LocalEmbeddingService;
 import com.redis.workshop.tools.PdfChunker;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
@@ -24,7 +24,7 @@ public class DocumentDataLoader {
     private static final Logger log = LoggerFactory.getLogger(DocumentDataLoader.class);
     private static final String DOC_PREFIX = "uc8:doc:";
     private static final String INDEX_NAME = "idx:uc8:documents";
-    private static final int VECTOR_DIM = 3072;
+    private static final int VECTOR_DIM = 384;
     private static final String EMBEDDINGS_RESOURCE = "/data/kb-embeddings.json";
     private static final String EMBEDDINGS_WRITE_PATH = "src/main/resources/data/kb-embeddings.json";
 
@@ -40,7 +40,7 @@ public class DocumentDataLoader {
     private record PdfSource(String id, String title) {}
 
     private final StringRedisTemplate redis;
-    private final OpenAiService openAiService;
+    private final LocalEmbeddingService localEmbeddingService;
 
     @Value("${workshop.startup.load-data:true}")
     private boolean loadData;
@@ -48,9 +48,9 @@ public class DocumentDataLoader {
     @Value("${workshop.startup.force-reload:false}")
     private boolean forceReload;
 
-    public DocumentDataLoader(StringRedisTemplate redis, OpenAiService openAiService) {
+    public DocumentDataLoader(StringRedisTemplate redis, LocalEmbeddingService localEmbeddingService) {
         this.redis = redis;
-        this.openAiService = openAiService;
+        this.localEmbeddingService = localEmbeddingService;
     }
 
     @PostConstruct
@@ -158,7 +158,7 @@ public class DocumentDataLoader {
     }
 
     /**
-     * Auto-generate document chunks with mock vectors from the PDFs bundled under /docs/.
+     * Auto-generate document chunks with local BGE embeddings from the PDFs bundled under /docs/.
      * Writes the result to kb-embeddings.json on a best-effort basis (dev mode only).
      * Returns null if no PDFs are available.
      */
@@ -192,30 +192,23 @@ public class DocumentDataLoader {
         if (chunks.isEmpty()) return null;
         log.info("UC6: Generated {} chunks from {} PDFs", chunks.size(), pdfCount);
 
-        if (openAiService.isConfigured()) {
-            log.info("UC6: Generating real embeddings for {} PDF chunks via OpenAI...", chunks.size());
-            List<String> texts = chunks.stream()
-                    .map(c -> c.getOrDefault("title", "") + " " + c.getOrDefault("content", ""))
-                    .map(Object::toString)
-                    .toList();
-            List<float[]> allEmbeddings = new ArrayList<>();
-            int totalBatches = (texts.size() + 499) / 500;
-            for (int i = 0; i < texts.size(); i += 500) {
-                List<String> batch = texts.subList(i, Math.min(i + 500, texts.size()));
-                log.info("UC6: Embedding batch {}/{} ({} chunks)...",
-                        (i / 500) + 1, totalBatches, batch.size());
-                allEmbeddings.addAll(openAiService.getEmbeddings(batch));
-            }
-            for (int i = 0; i < chunks.size(); i++) {
-                chunks.get(i).put("vector", allEmbeddings.get(i));
-            }
-            log.info("UC6: Using real OpenAI embeddings for {} PDF chunks", chunks.size());
-        } else {
-            for (Map<String, Object> chunk : chunks) {
-                chunk.put("vector", generateVector(chunk.getOrDefault("content", "").toString()));
-            }
-            log.info("UC6: Using deterministic mock embeddings for {} PDF chunks", chunks.size());
+        log.info("UC6: Generating local BGE embeddings for {} PDF chunks...", chunks.size());
+        List<String> texts = chunks.stream()
+                .map(c -> c.getOrDefault("title", "") + " " + c.getOrDefault("content", ""))
+                .map(Object::toString)
+                .toList();
+        List<float[]> allEmbeddings = new ArrayList<>();
+        int totalBatches = (texts.size() + 499) / 500;
+        for (int i = 0; i < texts.size(); i += 500) {
+            List<String> batch = texts.subList(i, Math.min(i + 500, texts.size()));
+            log.info("UC6: Embedding batch {}/{} ({} chunks)...",
+                    (i / 500) + 1, totalBatches, batch.size());
+            allEmbeddings.addAll(localEmbeddingService.getEmbeddings(batch));
         }
+        for (int i = 0; i < chunks.size(); i++) {
+            chunks.get(i).put("vector", allEmbeddings.get(i));
+        }
+        log.info("UC6: Using local BGE embeddings for {} PDF chunks", chunks.size());
 
         tryWriteEmbeddings(chunks);
 
@@ -246,7 +239,7 @@ public class DocumentDataLoader {
                 }
                 doc.put("vector", vector);
             } else {
-                doc.put("vector", generateVector(content));
+                doc.put("vector", localEmbeddingService.getEmbedding(content));
             }
             docs.add(doc);
         }
@@ -357,7 +350,7 @@ public class DocumentDataLoader {
      * Hand-crafted fallback when neither kb-embeddings.json nor PDF files are available.
      * Produces 5 regulations (one per PDF expected under /docs/) with 3 chunks each,
      * using chunk-style IDs ({source}:chunk:{n}) so the UI dropdowns resolve the same way
-     * as the PDF-derived path. Vectors are mock (deterministic hash-based).
+     * as the PDF-derived path. Vectors are generated with the local BGE model.
      */
     private List<Map<String, Object>> buildMockDocuments() {
         List<Map<String, Object>> chunks = new ArrayList<>();
@@ -402,21 +395,14 @@ public class DocumentDataLoader {
         chunks.add(mockChunk("euaiact", 2, "EU AI Act - Artificial Intelligence Act",
                 "Deployers of high-risk AI systems in financial services must assign human oversight to competent individuals, monitor the operation of the system, keep logs for at least six months, and inform natural persons when they are subject to automated decisions. Providers of general-purpose AI models must publish training data summaries and comply with EU copyright law. Banks using generative AI for customer communications must disclose the AI-generated nature of content."));
 
-        // Attach vectors — real embeddings if OpenAI configured, deterministic mock otherwise
-        if (openAiService.isConfigured()) {
-            log.info("UC6: Generating real embeddings for {} fallback chunks via OpenAI...", chunks.size());
-            List<String> texts = new ArrayList<>();
-            for (Map<String, Object> c : chunks) {
-                texts.add(c.get("title") + " " + c.get("content"));
-            }
-            List<float[]> embeddings = openAiService.getEmbeddings(texts);
-            for (int i = 0; i < chunks.size(); i++) {
-                chunks.get(i).put("vector", embeddings.get(i));
-            }
-        } else {
-            for (Map<String, Object> c : chunks) {
-                c.put("vector", generateVector(c.getOrDefault("content", "").toString()));
-            }
+        log.info("UC6: Generating local BGE embeddings for {} fallback chunks...", chunks.size());
+        List<String> texts = new ArrayList<>();
+        for (Map<String, Object> c : chunks) {
+            texts.add(c.get("title") + " " + c.get("content"));
+        }
+        List<float[]> embeddings = localEmbeddingService.getEmbeddings(texts);
+        for (int i = 0; i < chunks.size(); i++) {
+            chunks.get(i).put("vector", embeddings.get(i));
         }
 
         return convertChunksToDocs(chunks);
@@ -430,27 +416,6 @@ public class DocumentDataLoader {
         chunk.put("chunkIndex", String.valueOf(idx));
         chunk.put("content", content);
         return chunk;
-    }
-
-    /** Generate a deterministic pseudo-random vector from a seed string. */
-    public static float[] generateVector(String seed) {
-        long hash = 0;
-        for (char c : seed.toCharArray()) {
-            hash = 31 * hash + c;
-        }
-        Random rng = new Random(hash);
-        float[] vec = new float[VECTOR_DIM];
-        double norm = 0;
-        for (int i = 0; i < VECTOR_DIM; i++) {
-            vec[i] = (float) rng.nextGaussian();
-            norm += vec[i] * vec[i];
-        }
-        // Normalize for COSINE
-        norm = Math.sqrt(norm);
-        for (int i = 0; i < VECTOR_DIM; i++) {
-            vec[i] /= (float) norm;
-        }
-        return vec;
     }
 
     /** Convert float array to JSON array string. */

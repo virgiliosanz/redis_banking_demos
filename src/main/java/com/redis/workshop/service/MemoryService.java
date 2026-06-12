@@ -1,15 +1,20 @@
 package com.redis.workshop.service;
 
-import com.redis.workshop.config.DocumentDataLoader;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.redis.workshop.config.RedisScanHelper;
 import com.redis.workshop.config.RedisSearchHelper;
+import com.redis.workshop.config.RedisStartupHelper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
+import java.io.InputStream;
 import java.util.*;
 
 /**
@@ -25,30 +30,60 @@ public class MemoryService {
 
     private static final String MEMORY_PREFIX = "uc9:memory:";
     private static final String MEMORY_INDEX = "idx:uc9:memory";
-    private static final int VECTOR_DIM = 1536;
+    private static final int VECTOR_DIM = 384;
+    private static final int MEMORY_SEED_COUNT = 6;
+    private static final String EMBEDDINGS_RESOURCE = "/data/uc9-memory-embeddings.json";
+    private static final String EMBEDDINGS_WRITE_PATH = "src/main/resources/data/uc9-memory-embeddings.json";
 
     private final StringRedisTemplate redis;
-    private final OpenAiService openAiService;
+    private final LocalEmbeddingService localEmbeddingService;
     private final RedisSearchHelper redisSearchHelper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Value("${workshop.startup.load-data:true}")
+    private boolean loadData;
+
+    @Value("${workshop.startup.force-reload:false}")
+    private boolean forceReload;
 
     private final List<Map<String, String>> memories = new ArrayList<>();
 
-    public MemoryService(StringRedisTemplate redis, OpenAiService openAiService,
+    public MemoryService(StringRedisTemplate redis, LocalEmbeddingService localEmbeddingService,
                          RedisSearchHelper redisSearchHelper) {
         this.redis = redis;
-        this.openAiService = openAiService;
+        this.localEmbeddingService = localEmbeddingService;
         this.redisSearchHelper = redisSearchHelper;
     }
 
     @PostConstruct
     public void init() {
-        loadLongTermMemories();
+        if (!loadData) return;
+        List<Map<String, String>> items = buildLongTermMemories();
+        memories.clear();
+        memories.addAll(items);
+
+        if (forceReload) {
+            log.info("UC9: force reload enabled for memory index, rebuilding {} memories", items.size());
+        } else {
+            long existingDocs = existingMemoryDocCount();
+            if (existingDocs >= MEMORY_SEED_COUNT) {
+                int existingVectorDim = existingMemoryVectorDimension();
+                if (existingVectorDim == VECTOR_DIM) {
+                    log.info("UC9: Memory index already present ({} docs, {}-dim vectors), skipping reload",
+                            existingDocs, existingVectorDim);
+                    return;
+                }
+                log.info("UC9: Memory data present but vector dimension is {} (expected {}), rebuilding",
+                        existingVectorDim, VECTOR_DIM);
+            }
+        }
+
+        loadLongTermMemories(items);
         createIndex();
     }
 
-    private void loadLongTermMemories() {
-        memories.clear();
-        var items = List.of(
+    private List<Map<String, String>> buildLongTermMemories() {
+        return List.of(
             Map.of("id", "mem-001", "summary", "Asked about international wire transfer fees",
                     "detail", "Customer inquired about SWIFT transfer costs to the UK. Quoted €15 flat fee for SEPA, €35 for SWIFT. Recommended SEPA for EU destinations.",
                     "date", "2024-03-15", "tags", "transfer,international,fees,swift,sepa"),
@@ -68,26 +103,19 @@ public class MemoryService {
                     "detail", "Customer starting a fintech company, needed business current account with API access. Recommended Business Pro plan with Open Banking APIs.",
                     "date", "2024-01-20", "tags", "business,account,startup,api,openbanking")
         );
-        memories.addAll(items);
+    }
 
-        List<float[]> vectors;
-        if (openAiService.isConfigured()) {
-            log.info("UC9: Generating real embeddings for {} memories via OpenAI...", items.size());
-            List<String> texts = items.stream()
-                    .map(m -> m.get("summary") + " " + m.get("tags") + " " + m.get("detail"))
-                    .toList();
-            try {
-                vectors = openAiService.getEmbeddings(texts);
-            } catch (OpenAiException e) {
-                log.warn("UC9: OpenAI embeddings failed for memories ({}), falling back to mock vectors", e.getMessage());
-                vectors = items.stream()
-                        .map(m -> DocumentDataLoader.generateVector(m.get("summary") + " " + m.get("tags")))
-                        .toList();
-            }
+    private void loadLongTermMemories(List<Map<String, String>> items) {
+        List<float[]> vectors = loadPrecomputedVectors(items);
+        if (vectors != null) {
+            log.info("UC9: Loaded {} memory embeddings from {}", vectors.size(), EMBEDDINGS_RESOURCE);
         } else {
-            vectors = items.stream()
-                    .map(m -> DocumentDataLoader.generateVector(m.get("summary") + " " + m.get("tags")))
+            log.info("UC9: Generating local BGE embeddings for {} memories...", items.size());
+            List<String> texts = items.stream()
+                    .map(this::toEmbeddingText)
                     .toList();
+            vectors = localEmbeddingService.getEmbeddings(texts);
+            tryWriteEmbeddings(items, vectors);
         }
 
         for (int i = 0; i < items.size(); i++) {
@@ -104,6 +132,111 @@ public class MemoryService {
         }
     }
 
+    private List<float[]> loadPrecomputedVectors(List<Map<String, String>> items) {
+        try (InputStream is = getClass().getResourceAsStream(EMBEDDINGS_RESOURCE)) {
+            if (is == null) {
+                return null;
+            }
+            List<Map<String, Object>> storedEntries = objectMapper.readValue(is, new TypeReference<>() {});
+            if (storedEntries == null || storedEntries.size() != items.size()) {
+                return null;
+            }
+
+            Map<String, Map<String, Object>> byId = new HashMap<>();
+            for (Map<String, Object> entry : storedEntries) {
+                byId.put(String.valueOf(entry.get("id")), entry);
+            }
+
+            List<float[]> vectors = new ArrayList<>();
+            for (Map<String, String> item : items) {
+                Map<String, Object> entry = byId.get(item.get("id"));
+                if (entry == null) {
+                    return null;
+                }
+                float[] vector = vectorFromObject(entry.get("vector"));
+                if (vector == null || vector.length != VECTOR_DIM) {
+                    return null;
+                }
+                vectors.add(vector);
+            }
+            return vectors;
+        } catch (Exception e) {
+            log.warn("UC9: Failed to load pre-computed memory embeddings: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private void tryWriteEmbeddings(List<Map<String, String>> items, List<float[]> vectors) {
+        try {
+            File target = new File(EMBEDDINGS_WRITE_PATH);
+            File parent = target.getParentFile();
+            if (parent != null && !parent.isDirectory()) {
+                parent.mkdirs();
+            }
+            if (parent == null || !parent.isDirectory()) {
+                log.debug("UC9: Skipping memory embeddings write ({} not available)", EMBEDDINGS_WRITE_PATH);
+                return;
+            }
+
+            List<Map<String, Object>> payload = new ArrayList<>();
+            for (int i = 0; i < items.size(); i++) {
+                Map<String, String> item = items.get(i);
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("id", item.get("id"));
+                entry.put("summary", item.get("summary"));
+                entry.put("detail", item.get("detail"));
+                entry.put("tags", item.get("tags"));
+                entry.put("date", item.get("date"));
+                entry.put("vector", vectors.get(i));
+                payload.add(entry);
+            }
+
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(target, payload);
+            log.info("UC9: Saved memory embeddings to {}", target.getAbsolutePath());
+        } catch (Exception e) {
+            log.warn("UC9: Failed to write memory embeddings JSON: {}", e.getMessage());
+        }
+    }
+
+    private float[] vectorFromObject(Object vectorObj) {
+        if (vectorObj instanceof float[] arr) {
+            return arr;
+        }
+        if (vectorObj instanceof List<?> vectorList) {
+            float[] vector = new float[vectorList.size()];
+            for (int i = 0; i < vectorList.size(); i++) {
+                vector[i] = ((Number) vectorList.get(i)).floatValue();
+            }
+            return vector;
+        }
+        return null;
+    }
+
+    private String toEmbeddingText(Map<String, String> memory) {
+        return (memory.getOrDefault("summary", "") + " "
+                + memory.getOrDefault("detail", "") + " "
+                + memory.getOrDefault("tags", "")).trim();
+    }
+
+    private long existingMemoryDocCount() {
+        try {
+            return Math.max(
+                    RedisStartupHelper.indexDocCount(redis, MEMORY_INDEX),
+                    RedisStartupHelper.countKeys(redis, MEMORY_PREFIX + "*")
+            );
+        } catch (Exception e) {
+            return RedisStartupHelper.countKeys(redis, MEMORY_PREFIX + "*");
+        }
+    }
+
+    private int existingMemoryVectorDimension() {
+        Set<String> keys = RedisScanHelper.scanKeys(redis, MEMORY_PREFIX + "*");
+        if (keys == null || keys.isEmpty()) {
+            return -1;
+        }
+        return RedisStartupHelper.hashVectorDimension(redis, keys.iterator().next());
+    }
+
     private void createIndex() {
         RedisVectorOps.dropIndex(redis, MEMORY_INDEX);
         RedisVectorOps.createVectorIndex(redis, MEMORY_INDEX, MEMORY_PREFIX,
@@ -114,7 +247,7 @@ public class MemoryService {
         return memories;
     }
 
-    /** Keyword-based scoring fallback when OpenAI isn't configured. */
+    /** Keyword-based retrieval used for demo context previews. */
     public List<Map<String, String>> findRelevantMemories(String query) {
         String lower = query.toLowerCase();
         List<Map<String, String>> results = new ArrayList<>();
@@ -133,7 +266,7 @@ public class MemoryService {
 
     /** KNN vector search against the memory index. */
     public List<Map<String, Object>> vectorSearchMemories(String query, int k) {
-        return RedisVectorOps.vectorSearch(redisSearchHelper, openAiService, MEMORY_INDEX, query, k);
+        return RedisVectorOps.vectorSearch(redisSearchHelper, localEmbeddingService, MEMORY_INDEX, query, k);
     }
 
     public void reset() {

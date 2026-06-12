@@ -5,6 +5,7 @@ import com.redis.workshop.config.RedisSearchHelper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -14,7 +15,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Semantic cache for UC9: stores question/response pairs with OpenAI embeddings and
+ * Semantic cache for UC9: stores question/response pairs with local BGE embeddings and
  * returns cached responses when a new question is close enough (cosine distance).
  */
 @Service
@@ -25,7 +26,7 @@ public class SemanticCacheService {
 
     private static final String CACHE_PREFIX = "uc9:cache:";
     private static final String CACHE_INDEX = "idx:uc9:cache";
-    private static final int VECTOR_DIM = 1536;
+    private static final int VECTOR_DIM = 384;
     private static final long CACHE_TTL_SECONDS = 600;
     private static final double CACHE_DISTANCE_THRESHOLD = 0.15;
 
@@ -35,18 +36,22 @@ public class SemanticCacheService {
     private final AtomicLong tokensSaved = new AtomicLong(0);
 
     private final StringRedisTemplate redis;
-    private final OpenAiService openAiService;
+    private final LocalEmbeddingService localEmbeddingService;
     private final RedisSearchHelper redisSearchHelper;
 
-    public SemanticCacheService(StringRedisTemplate redis, OpenAiService openAiService,
+    @Value("${workshop.startup.load-data:true}")
+    private boolean loadData;
+
+    public SemanticCacheService(StringRedisTemplate redis, LocalEmbeddingService localEmbeddingService,
                                 RedisSearchHelper redisSearchHelper) {
         this.redis = redis;
-        this.openAiService = openAiService;
+        this.localEmbeddingService = localEmbeddingService;
         this.redisSearchHelper = redisSearchHelper;
     }
 
     @PostConstruct
     public void init() {
+        if (!loadData) return;
         createIndex();
     }
 
@@ -61,9 +66,8 @@ public class SemanticCacheService {
      * Returns cached response map if distance < threshold, null otherwise.
      */
     public Map<String, String> checkSemanticCache(String question) {
-        if (!openAiService.isConfigured()) return null;
         try {
-            float[] queryVector = openAiService.getEmbedding(question);
+            float[] queryVector = localEmbeddingService.getEmbedding(question);
             byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
 
             String knnQuery = "*=>[KNN 1 @vector $BLOB]";
@@ -97,12 +101,11 @@ public class SemanticCacheService {
 
     /** Store question + response in semantic cache with vector and TTL. */
     public void storeInSemanticCache(String question, String response) {
-        if (!openAiService.isConfigured()) return;
         try {
             String cacheId = "cache-" + UUID.randomUUID().toString().substring(0, 8);
             String key = CACHE_PREFIX + cacheId;
 
-            float[] embedding = openAiService.getEmbedding(question);
+            float[] embedding = localEmbeddingService.getEmbedding(question);
 
             Map<String, String> hash = new LinkedHashMap<>();
             hash.put("question", question);
@@ -117,7 +120,7 @@ public class SemanticCacheService {
 
     public Map<String, Object> getSemanticCacheStats() {
         Map<String, Object> stats = new LinkedHashMap<>();
-        stats.put("enabled", openAiService.isConfigured());
+        stats.put("enabled", true);
         stats.put("hits", cacheHits.get());
         stats.put("misses", cacheMisses.get());
         stats.put("distanceThreshold", CACHE_DISTANCE_THRESHOLD);

@@ -39,7 +39,7 @@ public class AiGatewayService {
     private static final String USAGE_PREFIX = "uc16:usage:session:";
     private static final String STATS_PREFIX = "uc16:stats:model:";
     private static final String STREAM_KEY = "uc16:stream:gateway";
-    private static final int VECTOR_DIM = 10;
+    private static final int VECTOR_DIM = 384;
     private static final double CACHE_DISTANCE_THRESHOLD = 0.12d;
     private static final long MAX_STREAM_LEN = 500L;
 
@@ -87,16 +87,23 @@ public class AiGatewayService {
 
     private final StringRedisTemplate redis;
     private final RedisSearchHelper redisSearchHelper;
+    private final LocalEmbeddingService localEmbeddingService;
+
+    @Value("${workshop.startup.load-data:true}")
+    private boolean loadData;
 
     @Value("${workshop.startup.force-reload:false}")
     private boolean forceReload;
 
-    public AiGatewayService(StringRedisTemplate redis, RedisSearchHelper redisSearchHelper) {
+    public AiGatewayService(StringRedisTemplate redis, RedisSearchHelper redisSearchHelper,
+                            LocalEmbeddingService localEmbeddingService) {
         this.redis = redis;
         this.redisSearchHelper = redisSearchHelper;
+        this.localEmbeddingService = localEmbeddingService;
     }
 
     public void init() {
+        if (!loadData) return;
         if (shouldSkipReload()) {
             return;
         }
@@ -109,6 +116,7 @@ public class AiGatewayService {
     }
 
     public void seedDemoData() {
+        if (!loadData) return;
         if (shouldSkipReload()) {
             return;
         }
@@ -121,7 +129,7 @@ public class AiGatewayService {
             hash.put("capability", config.capability());
             hash.put("rationale", config.routingReason());
             redis.opsForHash().putAll(key, hash);
-            RedisVectorOps.storeVectorField(redis, key, embed(config.routingPrompt()));
+            RedisVectorOps.storeVectorField(redis, key, localEmbeddingService.getEmbedding(config.routingPrompt()));
         }
 
         seedCacheEntry(getModel("gpt4o"), "Explain Basel III capital requirements",
@@ -155,7 +163,7 @@ public class AiGatewayService {
     }
 
     public Map<String, Object> handleQuery(String query, String userId, String sessionId) {
-        float[] queryVector = embed(query);
+        float[] queryVector = localEmbeddingService.getEmbedding(query);
 
         long routeStart = System.nanoTime();
         RouteDecision route = routeQuery(query, queryVector);
@@ -363,7 +371,8 @@ public class AiGatewayService {
             reason = top.getOrDefault("rationale", model.routingReason());
         }
 
-        return new RouteDecision(model, reason, cosineDistance(queryVector, embed(model.routingPrompt())));
+        return new RouteDecision(model, reason,
+                cosineDistance(queryVector, localEmbeddingService.getEmbedding(model.routingPrompt())));
     }
 
     private CacheResult checkSemanticCache(ModelConfig model, float[] queryVector) {
@@ -392,7 +401,7 @@ public class AiGatewayService {
 
         Map<String, String> top = results.get(0);
         String matchedQuestion = top.getOrDefault("question", "");
-        double distance = cosineDistance(queryVector, embed(matchedQuestion));
+        double distance = cosineDistance(queryVector, localEmbeddingService.getEmbedding(matchedQuestion));
         if (distance > CACHE_DISTANCE_THRESHOLD) {
             return CacheResult.miss();
         }
@@ -410,7 +419,7 @@ public class AiGatewayService {
         hash.put("ttlSeconds", String.valueOf(model.cacheTtlSeconds()));
         hash.put("createdAt", Instant.now().toString());
         redis.opsForHash().putAll(key, hash);
-        RedisVectorOps.storeVectorField(redis, key, embed(query));
+        RedisVectorOps.storeVectorField(redis, key, localEmbeddingService.getEmbedding(query));
         redis.expire(key, model.cacheTtlSeconds(), TimeUnit.SECONDS);
     }
 
@@ -548,66 +557,6 @@ public class AiGatewayService {
     private long simulateModelLatency(ModelConfig model, String query) {
         int jitter = Math.abs(query.hashCode()) % 25;
         return model.baseModelLatencyMs() + jitter;
-    }
-
-    private float[] embed(String text) {
-        String lower = text == null ? "" : text.toLowerCase(Locale.ROOT);
-        float[] vector = new float[VECTOR_DIM];
-
-        addKeywordWeight(lower, vector, 0, 2.2f, "basel", "mifid", "gdpr", "psd2", "regulation", "regulatory", "capital", "compliance", "governance", "policy", "architecture", "trade-off", "reasoning", "explain", "analyze", "analyse", "compare", "summarize", "implications", "guardrail", "risk");
-        addKeywordWeight(lower, vector, 1, 1.8f, "what is", "what are", "define", "faq", "support", "how do", "can i", "quick", "simple", "list", "product", "feature", "customer");
-        addKeywordWeight(lower, vector, 2, 2.4f, "ratio", "quarter", "monthly", "weekly", "metric", "kpi", "calculate", "calculation", "numeric", "number", "table", "tabular", "csv", "percentage", "limit", "latency", "cost", "volume", "throughput", "balance");
-        addKeywordWeight(lower, vector, 3, 1.2f, "redis", "gateway", "provider", "routing", "route", "model", "cache", "semantic", "observability", "stream", "rate limit");
-        addKeywordWeight(lower, vector, 4, 1.1f, "account", "card", "loan", "mortgage", "savings", "transfer", "payment", "atm", "branch", "portfolio");
-        addKeywordWeight(lower, vector, 5, 1.4f, "why", "recommend", "because", "decision", "impact", "tradeoff", "trade-off", "best", "safest");
-        addKeywordWeight(lower, vector, 6, 1.3f, "show", "report", "dashboard", "trend", "compare", "rows", "columns", "dataset", "series");
-        addKeywordWeight(lower, vector, 7, 0.9f, "who", "when", "where", "which");
-
-        if (lower.matches(".*\\d.*")) {
-            vector[2] += 2.0f;
-            vector[6] += 0.8f;
-        }
-        int tokenCount = lower.isBlank() ? 0 : lower.split("\\s+").length;
-        if (tokenCount > 10) {
-            vector[0] += 1.0f;
-            vector[5] += 0.5f;
-        }
-        if (tokenCount <= 6) {
-            vector[1] += 0.8f;
-            vector[7] += 0.3f;
-        }
-        if (vectorMagnitude(vector) == 0d) {
-            vector[1] = 1.0f;
-            vector[4] = 0.5f;
-        }
-        normalize(vector);
-        return vector;
-    }
-
-    private void addKeywordWeight(String text, float[] vector, int idx, float weight, String... keywords) {
-        for (String keyword : keywords) {
-            if (text.contains(keyword)) {
-                vector[idx] += weight;
-            }
-        }
-    }
-
-    private void normalize(float[] vector) {
-        double magnitude = vectorMagnitude(vector);
-        if (magnitude == 0d) {
-            return;
-        }
-        for (int i = 0; i < vector.length; i++) {
-            vector[i] /= (float) magnitude;
-        }
-    }
-
-    private double vectorMagnitude(float[] vector) {
-        double sum = 0d;
-        for (float v : vector) {
-            sum += v * v;
-        }
-        return Math.sqrt(sum);
     }
 
     private double cosineDistance(float[] left, float[] right) {

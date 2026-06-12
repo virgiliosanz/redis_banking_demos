@@ -1,10 +1,7 @@
 package com.redis.workshop.service;
 
-import com.redis.workshop.config.DocumentDataLoader;
 import com.redis.workshop.config.RedisScanHelper;
 import com.redis.workshop.config.RedisSearchHelper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -14,19 +11,19 @@ import java.util.*;
 @Service
 public class DocumentSearchService {
 
-    private static final Logger log = LoggerFactory.getLogger(DocumentSearchService.class);
     private static final String INDEX_NAME = "idx:uc8:documents";
     private static final String DOC_PREFIX = "uc8:doc:";
-    private static final int VECTOR_DIM = 1536;
+    private static final int VECTOR_DIM = 384;
 
     private final StringRedisTemplate redis;
     private final RedisSearchHelper redisSearchHelper;
-    private final OpenAiService openAiService;
+    private final LocalEmbeddingService localEmbeddingService;
 
-    public DocumentSearchService(StringRedisTemplate redis, RedisSearchHelper redisSearchHelper, OpenAiService openAiService) {
+    public DocumentSearchService(StringRedisTemplate redis, RedisSearchHelper redisSearchHelper,
+                                 LocalEmbeddingService localEmbeddingService) {
         this.redis = redis;
         this.redisSearchHelper = redisSearchHelper;
-        this.openAiService = openAiService;
+        this.localEmbeddingService = localEmbeddingService;
     }
 
     /**
@@ -53,21 +50,16 @@ public class DocumentSearchService {
      * Vector similarity search using FT.SEARCH with KNN.
      */
     public Map<String, Object> vectorSearch(String query) {
-        // Use real embeddings if OpenAI is configured, otherwise mock vectors
         float[] queryVector = getQueryVector(query);
         byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
 
         List<Map<String, Object>> results = executeVectorSearch(vectorBytes, "*", 10);
 
-        boolean mockVectors = !openAiService.isConfigured();
-        String embedLine = mockVectors
-                ? "(mock vector generated — OpenAI not configured)"
-                : "OpenAI text-embedding-3-small → 1536-dim query vector";
         String cmd = "FT.SEARCH " + INDEX_NAME + " \"*=>[KNN 10 @vector $BLOB AS score]\" RETURN 7 title category summary content tags score SORTBY score PARAMS 2 BLOB <vector_bytes> DIALECT 2";
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("mode", "vector");
         response.put("query", query);
-        response.put("mockVectors", mockVectors);
+        response.put("mockVectors", false);
         response.put("resultCount", results.size());
         response.put("results", results);
         response.put("redisCommand", cmd);
@@ -79,7 +71,6 @@ public class DocumentSearchService {
      */
     public Map<String, Object> hybridSearch(String query) {
         String escaped = escapeQuery(query);
-        // Use real embeddings if OpenAI is configured, otherwise mock vectors
         float[] queryVector = getQueryVector(query);
         byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
 
@@ -92,15 +83,11 @@ public class DocumentSearchService {
             results = executeVectorSearch(vectorBytes, "*", 10);
         }
 
-        boolean mockVectors = !openAiService.isConfigured();
-        String embedLine = mockVectors
-                ? "(mock vector generated — OpenAI not configured)"
-                : "OpenAI text-embedding-3-small → 1536-dim query vector";
         String cmd = "FT.SEARCH " + INDEX_NAME + " \"" + preFilter + "=>[KNN 10 @vector $BLOB AS score]\" RETURN 7 title category summary content tags score SORTBY score PARAMS 2 BLOB <vector_bytes> DIALECT 2";
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("mode", "hybrid");
         response.put("query", query);
-        response.put("mockVectors", mockVectors);
+        response.put("mockVectors", false);
         response.put("resultCount", results.size());
         response.put("results", results);
         response.put("redisCommand", cmd);
@@ -204,8 +191,7 @@ public class DocumentSearchService {
         fullDoc.put("summary", doc.getOrDefault("summary", ""));
         fullDoc.put("content", doc.getOrDefault("content", ""));
         fullDoc.put("tags", doc.getOrDefault("tags", "custom"));
-        // Add a mock vector so it's indexed for search
-        fullDoc.put("vector", DocumentDataLoader.generateVector(fullDoc.get("title") + " " + fullDoc.get("summary")));
+        fullDoc.put("vector", localEmbeddingService.getEmbedding(fullDoc.get("title") + " " + fullDoc.get("summary")));
 
         String json = toSimpleJson(fullDoc);
         String redisCmd = "JSON.SET " + key + " $ '" + json.replace("'", "\\'") + "'";
@@ -260,18 +246,8 @@ public class DocumentSearchService {
 
     // --- Private helpers ---
 
-    /**
-     * Get query vector: real OpenAI embedding if configured, deterministic mock otherwise.
-     */
     private float[] getQueryVector(String query) {
-        if (openAiService.isConfigured()) {
-            try {
-                return openAiService.getEmbedding(query);
-            } catch (Exception e) {
-                log.warn("Failed to get OpenAI embedding, falling back to mock vector: {}", e.getMessage());
-            }
-        }
-        return DocumentDataLoader.generateVector(query);
+        return localEmbeddingService.getEmbedding(query);
     }
 
     private List<Map<String, Object>> executeFtSearch(String query, byte[] vectorBytes) {
@@ -366,13 +342,7 @@ public class DocumentSearchService {
                     // JSON path returns quoted value
                     doc.put("id", fieldValue.replace("\"", "").replace("[", "").replace("]", ""));
                 } else if ("score".equals(fieldName)) {
-                    try {
-                        double score = Double.parseDouble(fieldValue);
-                        // Convert COSINE distance to similarity (1 - distance)
-                        doc.put("score", Math.round((1.0 - score) * 1000.0) / 1000.0);
-                    } catch (NumberFormatException e) {
-                        doc.put("score", 0.0);
-                    }
+                    doc.put("score", RedisVectorOps.distanceToSimilarity(fieldValue));
                 } else {
                     doc.put(fieldName, fieldValue);
                 }
@@ -401,6 +371,10 @@ public class DocumentSearchService {
                     doc.put("score", Math.round((raw / maxScore) * 1000.0) / 1000.0);
                 }
             }
+        }
+
+        if (hasScore && !withScores) {
+            RedisVectorOps.sortByScoreDescending(results);
         }
 
         return results;

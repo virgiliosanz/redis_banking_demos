@@ -31,12 +31,6 @@ public class OpenAiService {
     @Value("${openai.model:gpt-4o-mini}")
     private String model;
 
-    @Value("${openai.embedding-model:text-embedding-3-large}")
-    private String embeddingModel;
-
-    @Value("${openai.embedding-dimension:3072}")
-    private int embeddingDimension;
-
     private HttpClient httpClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -46,65 +40,14 @@ public class OpenAiService {
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
         if (isConfigured()) {
-            log.info("OpenAI integration enabled (model={}, embeddingModel={}, embeddingDimension={})",
-                    model, embeddingModel, embeddingDimension);
+            log.info("OpenAI chat integration enabled (model={})", model);
         } else {
-            log.info("OpenAI integration disabled — no API key configured. Using mock fallback.");
+            log.info("OpenAI chat integration disabled — no API key configured. Using mock fallback.");
         }
     }
 
     public boolean isConfigured() {
         return apiKey != null && !apiKey.isBlank();
-    }
-
-    public float[] getEmbedding(String text) {
-        List<float[]> results = getEmbeddings(List.of(text));
-        return results.get(0);
-    }
-
-    public List<float[]> getEmbeddings(List<String> texts) {
-        try {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("model", embeddingModel);
-            body.put("dimensions", embeddingDimension);
-            body.put("input", texts);
-            String json = objectMapper.writeValueAsString(body);
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(API_BASE + "/embeddings"))
-                    .header("Authorization", "Bearer " + apiKey)
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(json))
-                    .timeout(Duration.ofSeconds(30))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                throw new OpenAiException(response.statusCode(), response.body(),
-                        "OpenAI embeddings API error " + response.statusCode());
-            }
-
-            JsonNode root = objectMapper.readTree(response.body());
-            JsonNode dataArray = root.get("data");
-            List<float[]> results = new ArrayList<>();
-            for (JsonNode item : dataArray) {
-                JsonNode embedding = item.get("embedding");
-                float[] vec = new float[embedding.size()];
-                for (int i = 0; i < embedding.size(); i++) {
-                    vec[i] = (float) embedding.get(i).asDouble();
-                }
-                results.add(vec);
-            }
-            return results;
-        } catch (OpenAiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new OpenAiException("Failed to get embeddings from OpenAI", e);
-        }
-    }
-
-    public int getEmbeddingDimension() {
-        return embeddingDimension;
     }
 
     /**

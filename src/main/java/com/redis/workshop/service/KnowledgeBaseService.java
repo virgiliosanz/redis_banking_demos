@@ -1,6 +1,7 @@
 package com.redis.workshop.service;
 
-import com.redis.workshop.config.DocumentDataLoader;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.redis.workshop.config.RedisScanHelper;
 import com.redis.workshop.config.RedisSearchHelper;
 import com.redis.workshop.config.RedisStartupHelper;
@@ -12,7 +13,10 @@ import org.springframework.context.annotation.DependsOn;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
+import java.io.InputStream;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Knowledge base articles and regulation document retrieval for UC9.
@@ -29,27 +33,35 @@ public class KnowledgeBaseService {
     // UC8 regulation documents (PDF chunks) — reused for RAG
     private static final String DOC_INDEX = "idx:uc8:documents";
     private static final String DOC_PREFIX = "uc8:doc:";
-    private static final int VECTOR_DIM = 1536;
+    private static final int VECTOR_DIM = 384;
     private static final int KB_SEED_COUNT = 10;
+    private static final String EMBEDDINGS_RESOURCE = "/data/uc9-kb-embeddings.json";
+    private static final String EMBEDDINGS_WRITE_PATH = "src/main/resources/data/uc9-kb-embeddings.json";
 
     private final StringRedisTemplate redis;
-    private final OpenAiService openAiService;
+    private final LocalEmbeddingService localEmbeddingService;
     private final RedisSearchHelper redisSearchHelper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Value("${workshop.startup.load-data:true}")
+    private boolean loadData;
 
     @Value("${workshop.startup.force-reload:false}")
     private boolean forceReload;
 
     private final List<Map<String, String>> kbArticles = new ArrayList<>();
+    private final AtomicBoolean keywordFallbackWarningLogged = new AtomicBoolean(false);
 
-    public KnowledgeBaseService(StringRedisTemplate redis, OpenAiService openAiService,
+    public KnowledgeBaseService(StringRedisTemplate redis, LocalEmbeddingService localEmbeddingService,
                                 RedisSearchHelper redisSearchHelper) {
         this.redis = redis;
-        this.openAiService = openAiService;
+        this.localEmbeddingService = localEmbeddingService;
         this.redisSearchHelper = redisSearchHelper;
     }
 
     @PostConstruct
     public void init() {
+        if (!loadData) return;
         List<Map<String, String>> articles = buildKnowledgeBaseArticles();
         kbArticles.clear();
         kbArticles.addAll(articles);
@@ -59,8 +71,14 @@ public class KnowledgeBaseService {
         } else {
             long existingDocs = existingKbDocCount();
             if (existingDocs >= KB_SEED_COUNT) {
-                log.info("UC9: KB index already present ({} docs), skipping reload", existingDocs);
-                return;
+                int existingVectorDim = existingKbVectorDimension();
+                if (existingVectorDim == VECTOR_DIM) {
+                    log.info("UC9: KB index already present ({} docs, {}-dim vectors), skipping reload",
+                            existingDocs, existingVectorDim);
+                    return;
+                }
+                log.info("UC9: KB data present but vector dimension is {} (expected {}), rebuilding",
+                        existingVectorDim, VECTOR_DIM);
             }
         }
 
@@ -114,24 +132,16 @@ public class KnowledgeBaseService {
     }
 
     private void loadKnowledgeBase(List<Map<String, String>> articles) {
-        List<float[]> vectors;
-        if (openAiService.isConfigured()) {
-            log.info("UC9: Generating real embeddings for {} KB articles via OpenAI...", articles.size());
-            List<String> texts = articles.stream()
-                    .map(a -> a.get("title") + " " + a.get("tags") + " " + a.get("content"))
-                    .toList();
-            try {
-                vectors = openAiService.getEmbeddings(texts);
-            } catch (OpenAiException e) {
-                log.warn("UC9: OpenAI embeddings failed for KB articles ({}), falling back to mock vectors", e.getMessage());
-                vectors = articles.stream()
-                        .map(a -> DocumentDataLoader.generateVector(a.get("title") + " " + a.get("tags")))
-                        .toList();
-            }
+        List<float[]> vectors = loadPrecomputedVectors(articles);
+        if (vectors != null) {
+            log.info("UC9: Loaded {} KB embeddings from {}", vectors.size(), EMBEDDINGS_RESOURCE);
         } else {
-            vectors = articles.stream()
-                    .map(a -> DocumentDataLoader.generateVector(a.get("title") + " " + a.get("tags")))
+            log.info("UC9: Generating local BGE embeddings for {} KB articles...", articles.size());
+            List<String> texts = articles.stream()
+                    .map(this::toEmbeddingText)
                     .toList();
+            vectors = localEmbeddingService.getEmbeddings(texts);
+            tryWriteEmbeddings(articles, vectors);
         }
 
         for (int i = 0; i < articles.size(); i++) {
@@ -148,6 +158,92 @@ public class KnowledgeBaseService {
         }
     }
 
+    private List<float[]> loadPrecomputedVectors(List<Map<String, String>> articles) {
+        try (InputStream is = getClass().getResourceAsStream(EMBEDDINGS_RESOURCE)) {
+            if (is == null) {
+                return null;
+            }
+            List<Map<String, Object>> storedEntries = objectMapper.readValue(is, new TypeReference<>() {});
+            if (storedEntries == null || storedEntries.size() != articles.size()) {
+                return null;
+            }
+
+            Map<String, Map<String, Object>> byId = new HashMap<>();
+            for (Map<String, Object> entry : storedEntries) {
+                byId.put(String.valueOf(entry.get("id")), entry);
+            }
+
+            List<float[]> vectors = new ArrayList<>();
+            for (Map<String, String> article : articles) {
+                Map<String, Object> entry = byId.get(article.get("id"));
+                if (entry == null) {
+                    return null;
+                }
+                float[] vector = vectorFromObject(entry.get("vector"));
+                if (vector == null || vector.length != VECTOR_DIM) {
+                    return null;
+                }
+                vectors.add(vector);
+            }
+            return vectors;
+        } catch (Exception e) {
+            log.warn("UC9: Failed to load pre-computed KB embeddings: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private void tryWriteEmbeddings(List<Map<String, String>> articles, List<float[]> vectors) {
+        try {
+            File target = new File(EMBEDDINGS_WRITE_PATH);
+            File parent = target.getParentFile();
+            if (parent != null && !parent.isDirectory()) {
+                parent.mkdirs();
+            }
+            if (parent == null || !parent.isDirectory()) {
+                log.debug("UC9: Skipping KB embeddings write ({} not available)", EMBEDDINGS_WRITE_PATH);
+                return;
+            }
+
+            List<Map<String, Object>> payload = new ArrayList<>();
+            for (int i = 0; i < articles.size(); i++) {
+                Map<String, String> article = articles.get(i);
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("id", article.get("id"));
+                entry.put("title", article.get("title"));
+                entry.put("content", article.get("content"));
+                entry.put("tags", article.get("tags"));
+                entry.put("source", article.get("source"));
+                entry.put("vector", vectors.get(i));
+                payload.add(entry);
+            }
+
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(target, payload);
+            log.info("UC9: Saved KB embeddings to {}", target.getAbsolutePath());
+        } catch (Exception e) {
+            log.warn("UC9: Failed to write KB embeddings JSON: {}", e.getMessage());
+        }
+    }
+
+    private float[] vectorFromObject(Object vectorObj) {
+        if (vectorObj instanceof float[] arr) {
+            return arr;
+        }
+        if (vectorObj instanceof List<?> vectorList) {
+            float[] vector = new float[vectorList.size()];
+            for (int i = 0; i < vectorList.size(); i++) {
+                vector[i] = ((Number) vectorList.get(i)).floatValue();
+            }
+            return vector;
+        }
+        return null;
+    }
+
+    private String toEmbeddingText(Map<String, String> article) {
+        return (article.getOrDefault("title", "") + " "
+                + article.getOrDefault("tags", "") + " "
+                + article.getOrDefault("content", "")).trim();
+    }
+
     private long existingKbDocCount() {
         try {
             return Math.max(
@@ -157,6 +253,14 @@ public class KnowledgeBaseService {
         } catch (Exception e) {
             return RedisStartupHelper.countKeys(redis, KB_PREFIX + "*");
         }
+    }
+
+    private int existingKbVectorDimension() {
+        Set<String> keys = RedisScanHelper.scanKeys(redis, KB_PREFIX + "*");
+        if (keys == null || keys.isEmpty()) {
+            return -1;
+        }
+        return RedisStartupHelper.hashVectorDimension(redis, keys.iterator().next());
     }
 
     private void createIndex() {
@@ -193,6 +297,10 @@ public class KnowledgeBaseService {
     }
 
     public List<Map<String, String>> findRelevantKBDocs(String query) {
+        if (!loadData && kbArticles.isEmpty()
+                && keywordFallbackWarningLogged.compareAndSet(false, true)) {
+            log.warn("UC9: Keyword KB fallback is unavailable because startup data loading was disabled");
+        }
         String lower = query.toLowerCase();
         List<Map<String, String>> results = new ArrayList<>();
         for (var art : kbArticles) {
@@ -214,7 +322,7 @@ public class KnowledgeBaseService {
     }
 
     public List<Map<String, Object>> vectorSearchKB(String query, int k) {
-        return RedisVectorOps.vectorSearch(redisSearchHelper, openAiService, KB_INDEX, query, k);
+        return RedisVectorOps.vectorSearch(redisSearchHelper, localEmbeddingService, KB_INDEX, query, k);
     }
 
     /**
@@ -222,9 +330,8 @@ public class KnowledgeBaseService {
      * Documents are JSON-backed PDF chunks with fields: title, category, summary, content, tags.
      */
     public List<Map<String, Object>> vectorSearchRegulationDocs(String query, int k) {
-        if (!openAiService.isConfigured()) return List.of();
         try {
-            float[] queryVector = openAiService.getEmbedding(query);
+            float[] queryVector = localEmbeddingService.getEmbedding(query);
             byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
 
             String knnQuery = "*=>[KNN " + k + " @vector $BLOB]";

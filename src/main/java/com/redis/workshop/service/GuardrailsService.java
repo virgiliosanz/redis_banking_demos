@@ -2,7 +2,11 @@ package com.redis.workshop.service;
 
 import com.redis.workshop.config.RedisScanHelper;
 import com.redis.workshop.config.RedisSearchHelper;
+import com.redis.workshop.config.RedisStartupHelper;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.Limit;
@@ -39,6 +43,8 @@ import java.util.regex.Pattern;
 @DependsOn("startupCleanup")
 public class GuardrailsService {
 
+    private static final Logger log = LoggerFactory.getLogger(GuardrailsService.class);
+
     private static final String PREFIX = "uc15:";
     private static final String ROUTE_PREFIX = PREFIX + "route:";
     private static final String INJECTION_PREFIX = PREFIX + "injection:";
@@ -49,7 +55,7 @@ public class GuardrailsService {
     private static final String ROUTE_INDEX = "idx:uc15:routes";
     private static final String INJECTION_INDEX = "idx:uc15:injections";
 
-    private static final int VECTOR_DIM = 1536;
+    private static final int VECTOR_DIM = 384;
     private static final int RATE_LIMIT = 10;
     private static final int WINDOW_SECONDS = 60;
     private static final long MAX_AUDIT_STREAM_LEN = 2_000;
@@ -83,17 +89,65 @@ public class GuardrailsService {
 
     private final StringRedisTemplate redis;
     private final RedisSearchHelper redisSearchHelper;
+    private final LocalEmbeddingService localEmbeddingService;
 
-    public GuardrailsService(StringRedisTemplate redis, RedisSearchHelper redisSearchHelper) {
+    @Value("${workshop.startup.load-data:true}")
+    private boolean loadData;
+
+    @Value("${workshop.startup.force-reload:false}")
+    private boolean forceReload;
+
+    public GuardrailsService(StringRedisTemplate redis, RedisSearchHelper redisSearchHelper,
+                             LocalEmbeddingService localEmbeddingService) {
         this.redis = redis;
         this.redisSearchHelper = redisSearchHelper;
+        this.localEmbeddingService = localEmbeddingService;
     }
 
     @PostConstruct
     public void init() {
+        if (!loadData) return;
+        if (shouldSkipReload()) {
+            return;
+        }
         loadRouteVectors();
         loadInjectionVectors();
         createIndexes();
+    }
+
+    private boolean shouldSkipReload() {
+        if (forceReload) {
+            log.info("UC15: force reload enabled for guardrail vectors, rebuilding indices");
+            return false;
+        }
+        try {
+            long routeDocs = RedisStartupHelper.indexDocCount(redis, ROUTE_INDEX);
+            long injectionDocs = RedisStartupHelper.indexDocCount(redis, INJECTION_INDEX);
+            long routeKeys = RedisStartupHelper.countKeys(redis, ROUTE_PREFIX + "*");
+            long injectionKeys = RedisStartupHelper.countKeys(redis, INJECTION_PREFIX + "*");
+            if ((routeDocs >= 4 || routeKeys >= 4) && (injectionDocs >= 5 || injectionKeys >= 5)) {
+                int routeVectorDim = existingVectorDimension(ROUTE_PREFIX + "*");
+                int injectionVectorDim = existingVectorDimension(INJECTION_PREFIX + "*");
+                if (routeVectorDim == VECTOR_DIM && injectionVectorDim == VECTOR_DIM) {
+                    log.info("UC15: guardrail indices already present (routes={}, injections={}, dim={}), skipping reload",
+                            routeDocs, injectionDocs, VECTOR_DIM);
+                    return true;
+                }
+                log.info("UC15: guardrail vectors present but dimensions are route={} injection={} (expected {}), rebuilding",
+                        routeVectorDim, injectionVectorDim, VECTOR_DIM);
+            }
+        } catch (Exception e) {
+            return false;
+        }
+        return false;
+    }
+
+    private int existingVectorDimension(String pattern) {
+        Set<String> keys = RedisScanHelper.scanKeys(redis, pattern);
+        if (keys == null || keys.isEmpty()) {
+            return -1;
+        }
+        return RedisStartupHelper.hashVectorDimension(redis, keys.iterator().next());
     }
 
     public Map<String, Object> chat(String userId, String message) {
@@ -295,7 +349,7 @@ public class GuardrailsService {
             fields.put("description", route.description());
             fields.put("severity", route.severity());
             redis.opsForHash().putAll(key, fields);
-            RedisVectorOps.storeVectorField(redis, key, buildMockVector(route.description()));
+            RedisVectorOps.storeVectorField(redis, key, localEmbeddingService.getEmbedding(route.description()));
         }
     }
 
@@ -328,7 +382,7 @@ public class GuardrailsService {
             fields.put("severity", injection.severity());
             fields.put("response", injection.response());
             redis.opsForHash().putAll(key, fields);
-            RedisVectorOps.storeVectorField(redis, key, buildMockVector(injection.pattern()));
+            RedisVectorOps.storeVectorField(redis, key, localEmbeddingService.getEmbedding(injection.pattern()));
         }
     }
 
@@ -382,7 +436,7 @@ public class GuardrailsService {
 
     private RouteMatch classifyTopic(String userId, String message) {
         long start = System.nanoTime();
-        Map<String, String> result = firstVectorMatch(ROUTE_INDEX, buildMockVector(message),
+        Map<String, String> result = firstVectorMatch(ROUTE_INDEX, localEmbeddingService.getEmbedding(message),
                 "label", "action", "description", "severity");
 
         String label = result.getOrDefault("label", "support");
@@ -420,7 +474,7 @@ public class GuardrailsService {
 
     private PromptInjectionMatch detectPromptInjection(String userId, String message) {
         long start = System.nanoTime();
-        Map<String, String> result = firstVectorMatch(INJECTION_INDEX, buildMockVector(message),
+        Map<String, String> result = firstVectorMatch(INJECTION_INDEX, localEmbeddingService.getEmbedding(message),
                 "pattern", "severity", "response");
 
         double similarity = distanceToSimilarity(result.get("score"));
@@ -610,57 +664,6 @@ public class GuardrailsService {
             return "For mortgages and loans, the banking assistant can explain product categories, indicative rates and the next secure onboarding step.";
         }
         return "This demo assistant can answer banking questions about accounts, cards, transfers, loans and service journeys while logging each guardrail decision in Redis.";
-    }
-
-    private float[] buildMockVector(String text) {
-        float[] vector = new float[VECTOR_DIM];
-        String normalized = normalizeText(text);
-        List<String> tokens = tokenize(normalized);
-
-        for (String token : tokens) {
-            if (BANKING_KEYWORDS.contains(token)) addWeight(vector, 0, 1.6f);
-            if (INVESTMENT_KEYWORDS.contains(token)) addWeight(vector, 16, 1.6f);
-            if (SUPPORT_KEYWORDS.contains(token)) addWeight(vector, 32, 1.5f);
-            if (BLOCKED_KEYWORDS.contains(token)) addWeight(vector, 48, 2.0f);
-            if (INJECTION_KEYWORDS.contains(token)) addWeight(vector, 80, 1.9f);
-
-            int hashIndex = 128 + Math.floorMod(token.hashCode(), VECTOR_DIM - 128);
-            vector[hashIndex] += 0.12f;
-        }
-
-        if (normalized.contains("account balance")) addWeight(vector, 2, 2.2f);
-        if (normalized.contains("wire transfer") || normalized.contains("sepa")) addWeight(vector, 4, 1.8f);
-        if (normalized.contains("portfolio") || normalized.contains("etf")) addWeight(vector, 18, 2.1f);
-        if (normalized.contains("password reset") || normalized.contains("app issue")) addWeight(vector, 34, 1.8f);
-        if (normalized.contains("politics") || normalized.contains("religion")) addWeight(vector, 50, 2.5f);
-        if (normalized.contains("ignore previous instructions")) addWeight(vector, 82, 3.0f);
-        if (normalized.contains("reveal system prompt")) addWeight(vector, 84, 3.0f);
-        if (normalized.contains("developer message")) addWeight(vector, 86, 2.8f);
-        if (normalized.contains("bypass guardrails")) addWeight(vector, 88, 2.8f);
-
-        normalizeVector(vector);
-        return vector;
-    }
-
-    private void addWeight(float[] vector, int index, float weight) {
-        if (index >= 0 && index < vector.length) {
-            vector[index] += weight;
-        }
-    }
-
-    private void normalizeVector(float[] vector) {
-        double sum = 0.0;
-        for (float value : vector) {
-            sum += value * value;
-        }
-        if (sum == 0.0) {
-            vector[0] = 1.0f;
-            return;
-        }
-        float magnitude = (float) Math.sqrt(sum);
-        for (int i = 0; i < vector.length; i++) {
-            vector[i] = vector[i] / magnitude;
-        }
     }
 
     private void incrementStat(String field) {

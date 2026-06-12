@@ -1,6 +1,5 @@
 package com.redis.workshop.service;
 
-import com.redis.workshop.config.DocumentDataLoader;
 import com.redis.workshop.config.RedisSearchHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,48 +78,47 @@ final class RedisVectorOps {
     }
 
     /**
-     * KNN vector search using real OpenAI embeddings (or mock fallback) as the query vector.
+     * KNN vector search using local BGE embeddings as the query vector.
      * Returns entries with redisKey, score, and passthrough fields (minus raw vector blob).
      */
-    static List<Map<String, Object>> vectorSearch(RedisSearchHelper helper, OpenAiService openAiService,
+    static List<Map<String, Object>> vectorSearch(RedisSearchHelper helper, LocalEmbeddingService localEmbeddingService,
                                                   String indexName, String query, int k) {
-        float[] queryVector;
         try {
-            queryVector = openAiService.getEmbedding(query);
-        } catch (OpenAiException e) {
-            log.warn("UC9: OpenAI embedding failed ({}), falling back to mock vector for KNN on {}", e.getMessage(), indexName);
-            queryVector = DocumentDataLoader.generateVector(query);
-        }
-        byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
+            float[] queryVector = localEmbeddingService.getEmbedding(query);
+            byte[] vectorBytes = RedisSearchHelper.vectorToBytes(queryVector);
 
-        String knnQuery = "*=>[KNN " + k + " @vector $BLOB]";
-        byte[][] binaryArgs = new byte[][] {
-                knnQuery.getBytes(),
-                "PARAMS".getBytes(),
-                "2".getBytes(),
-                "BLOB".getBytes(),
-                vectorBytes,
-                "DIALECT".getBytes(),
-                "2".getBytes()
-        };
+            String knnQuery = "*=>[KNN " + k + " @vector $BLOB]";
+            byte[][] binaryArgs = new byte[][] {
+                    knnQuery.getBytes(),
+                    "PARAMS".getBytes(),
+                    "2".getBytes(),
+                    "BLOB".getBytes(),
+                    vectorBytes,
+                    "DIALECT".getBytes(),
+                    "2".getBytes()
+            };
 
-        List<Object> rawResult = helper.ftSearchWithBinaryArgs(indexName, binaryArgs);
-        List<Map<String, String>> parsed = helper.parseSearchResults(rawResult);
+            List<Object> rawResult = helper.ftSearchWithBinaryArgs(indexName, binaryArgs);
+            List<Map<String, String>> parsed = helper.parseSearchResults(rawResult);
 
-        List<Map<String, Object>> results = new ArrayList<>();
-        for (var doc : parsed) {
-            Map<String, Object> entry = new LinkedHashMap<>();
-            entry.put("redisKey", doc.get("_key"));
-            entry.put("score", distanceToSimilarity(doc.getOrDefault("__vector_score", "1.0")));
-            for (var e : doc.entrySet()) {
-                if (!e.getKey().equals("_key") && !e.getKey().equals("vector") && !e.getKey().equals("__vector_score")) {
-                    entry.put(e.getKey(), e.getValue());
+            List<Map<String, Object>> results = new ArrayList<>();
+            for (var doc : parsed) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("redisKey", doc.get("_key"));
+                entry.put("score", distanceToSimilarity(doc.getOrDefault("__vector_score", "1.0")));
+                for (var e : doc.entrySet()) {
+                    if (!e.getKey().equals("_key") && !e.getKey().equals("vector") && !e.getKey().equals("__vector_score")) {
+                        entry.put(e.getKey(), e.getValue());
+                    }
                 }
+                results.add(entry);
             }
-            results.add(entry);
+            sortByScoreDescending(results);
+            return results;
+        } catch (Exception e) {
+            log.warn("Vector search failed for {}: {}", indexName, e.getMessage());
+            return List.of();
         }
-        sortByScoreDescending(results);
-        return results;
     }
 
     static double distanceToSimilarity(String rawDistance) {

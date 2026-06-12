@@ -1,44 +1,34 @@
 package com.redis.workshop.tools;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.langchain4j.data.embedding.Embedding;
+import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.embedding.onnx.bgesmallenv15.BgeSmallEnV15EmbeddingModel;
 
 import java.io.File;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.*;
 
 /**
- * Standalone tool to parse EU regulation PDFs, generate OpenAI embeddings,
+ * Standalone tool to parse EU regulation PDFs, generate local BGE embeddings,
  * and save everything to a pre-computed JSON file.
  *
  * Usage:
- *   OPENAI_API_KEY=sk-... ./mvnw compile exec:java \
+ *   ./mvnw compile exec:java \
  *     -Dexec.mainClass="com.redis.workshop.tools.EmbeddingGenerator" \
  *     -Dexec.classpathScope=compile
  */
 public class EmbeddingGenerator {
 
-    private static final String OPENAI_API_KEY = System.getenv("OPENAI_API_KEY");
-    private static final String EMBEDDING_MODEL = "text-embedding-3-small";
+    private static final int EMBEDDING_DIMENSION = 384;
     private static final String OUTPUT_FILE = "src/main/resources/data/kb-embeddings.json";
     private static final int BATCH_SIZE = 20;
 
     private static final ObjectMapper mapper = new ObjectMapper();
-    private static final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final BgeSmallEnV15EmbeddingModel model = new BgeSmallEnV15EmbeddingModel();
 
     public static void main(String[] args) throws Exception {
-        if (OPENAI_API_KEY == null || OPENAI_API_KEY.isBlank()) {
-            System.err.println("ERROR: Set OPENAI_API_KEY environment variable");
-            System.exit(1);
-        }
+        System.out.println("Generating local BGE-small-en-v1.5 embeddings (" + EMBEDDING_DIMENSION + " dims)...");
 
-        // Define PDF sources
         var pdfs = List.of(
             Map.of("path", "src/main/resources/docs/psd2.pdf",
                    "id", "psd2", "title", "PSD2 - Payment Services Directive 2"),
@@ -71,13 +61,7 @@ public class EmbeddingGenerator {
                     entry.put("vector", embeddings.get(j));
                     allChunks.add(entry);
                 }
-                System.out.println("  Embedded " + Math.min(i + BATCH_SIZE, chunks.size())
-                        + "/" + chunks.size());
-
-                // Small delay to avoid rate limiting
-                if (i + BATCH_SIZE < chunks.size()) {
-                    Thread.sleep(200);
-                }
+                System.out.println("  Embedded " + Math.min(i + BATCH_SIZE, chunks.size()) + "/" + chunks.size());
             }
         }
 
@@ -86,39 +70,20 @@ public class EmbeddingGenerator {
 
         // Save to JSON
         mapper.writerWithDefaultPrettyPrinter().writeValue(new File(OUTPUT_FILE), allChunks);
-        System.out.println("\nSaved " + allChunks.size() + " chunks with embeddings to " + OUTPUT_FILE);
+        System.out.println("\nSaved " + allChunks.size() + " chunks with local BGE embeddings to " + OUTPUT_FILE);
     }
 
     private static List<float[]> getEmbeddings(List<String> texts) throws Exception {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", EMBEDDING_MODEL);
-        body.put("input", texts);
-        String json = mapper.writeValueAsString(body);
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://api.openai.com/v1/embeddings"))
-                .header("Authorization", "Bearer " + OPENAI_API_KEY)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(json))
-                .timeout(Duration.ofSeconds(60))
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() != 200) {
-            throw new RuntimeException("OpenAI API error " + response.statusCode() + ": " + response.body());
+        if (texts == null || texts.isEmpty()) {
+            return List.of();
         }
 
-        JsonNode root = mapper.readTree(response.body());
-        JsonNode dataArray = root.get("data");
-        List<float[]> results = new ArrayList<>();
-        for (JsonNode item : dataArray) {
-            JsonNode embedding = item.get("embedding");
-            float[] vec = new float[embedding.size()];
-            for (int i = 0; i < embedding.size(); i++) {
-                vec[i] = (float) embedding.get(i).asDouble();
-            }
-            results.add(vec);
-        }
-        return results;
+        List<TextSegment> segments = texts.stream()
+                .map(TextSegment::from)
+                .toList();
+        List<Embedding> embeddings = model.embedAll(segments).content();
+        return embeddings.stream()
+                .map(Embedding::vector)
+                .toList();
     }
 }
