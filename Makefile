@@ -35,6 +35,8 @@ seed: ## Flush Redis and reload all data from pre-computed JSON embeddings
 	@docker exec workshop-redis redis-cli FLUSHALL >/dev/null
 	@printf "$(GREEN)Redis data flushed.$(RESET)\n"
 	@log_file="$$(mktemp -t workshop-seed.XXXXXX.log)"; \
+	last_line=0; \
+	startup_reported=0; \
 	printf "$(YELLOW)Starting application with workshop.startup.force-reload=true...$(RESET)\n"; \
 	./mvnw spring-boot:run -Dspring-boot.run.fork=false -Dspring-boot.run.arguments="--workshop.startup.force-reload=true" > "$$log_file" 2>&1 & \
 	pid=$$!; \
@@ -49,17 +51,43 @@ seed: ## Flush Redis and reload all data from pre-computed JSON embeddings
 	}; \
 	trap 'cleanup' EXIT INT TERM; \
 	while kill -0 "$$pid" >/dev/null 2>&1; do \
+		if [ -f "$$log_file" ]; then \
+			total_lines="$$(wc -l < "$$log_file" | tr -d ' ')"; \
+			if [ "$$total_lines" -gt "$$last_line" ]; then \
+				new_lines="$$(sed -n "$$(($$last_line + 1)),$${total_lines}p" "$$log_file")"; \
+				relevant_lines="$$(printf '%s\n' "$$new_lines" | grep -iE 'UC[0-9]|cleanup|Generating|Loaded|skipping|pre-computed|embedding|index|OpenAI|force reload|Data loading|Started|created' || true)"; \
+				if [ -n "$$relevant_lines" ]; then \
+					if [ "$$startup_reported" -eq 0 ] && printf '%s\n' "$$relevant_lines" | grep -m 1 'Started WorkshopApplication' >/dev/null 2>&1; then \
+						startup_reported=1; \
+					fi; \
+					printf '%s\n' "$$relevant_lines" | \
+						sed -E 's/^[0-9-]{10}[T ][0-9:.+-]+[[:space:]]+[A-Z]+[[:space:]]+[0-9]+[[:space:]]+---[[:space:]]+\[[^]]+\][[:space:]]+[^:]+:[[:space:]]*//' | \
+						while IFS= read -r line; do \
+							[ -z "$$line" ] && continue; \
+							if printf '%s\n' "$$line" | grep -q 'Started WorkshopApplication'; then \
+								printf "$(GREEN)✓ Started successfully$(RESET)\n"; \
+							else \
+								printf "$(YELLOW)→ %s$(RESET)\n" "$$line"; \
+							fi; \
+						done; \
+				fi; \
+				last_line=$$total_lines; \
+			fi; \
+		fi; \
 		if grep -m 1 "Started WorkshopApplication" "$$log_file" >/dev/null 2>&1; then \
-			printf "$(GREEN)Workshop application started; stopping seed run.$(RESET)\n"; \
+			if [ "$$startup_reported" -eq 0 ]; then \
+				printf "$(GREEN)✓ Started successfully$(RESET)\n"; \
+			fi; \
 			cleanup; \
-			printf "$(GREEN)Redis seeded from pre-computed embeddings$(RESET)\n"; \
 			trap - EXIT INT TERM; \
 			exit 0; \
 		fi; \
-		sleep 2; \
+		sleep 1; \
 	done; \
 	if grep -m 1 "Started WorkshopApplication" "$$log_file" >/dev/null 2>&1; then \
-		printf "$(GREEN)Workshop application completed startup.$(RESET)\n"; \
+		if [ "$$startup_reported" -eq 0 ]; then \
+			printf "$(GREEN)✓ Started successfully$(RESET)\n"; \
+		fi; \
 		trap - EXIT INT TERM; \
 		rm -f "$$log_file"; \
 	else \
@@ -75,44 +103,12 @@ embeddings: ## Generate OpenAI embeddings and save to JSON (requires OPENAI_API_
 		printf "$(RED)OPENAI_API_KEY is not set. Export it or pass OPENAI_API_KEY=... to make embeddings.$(RESET)\n"; \
 		exit 1; \
 	fi
-	@printf "$(YELLOW)Removing cached embedding JSON files...$(RESET)\n"
+	@printf "$(YELLOW)→ Deleting cached JSON files...$(RESET)\n"
 	@rm -f $(EMBEDDING_FILES)
-	@printf "$(GREEN)Cached embedding JSON files removed.$(RESET)\n"
-	@log_file="$$(mktemp -t workshop-embeddings.XXXXXX.log)"; \
-	printf "$(YELLOW)Starting application with workshop.startup.force-reload=true...$(RESET)\n"; \
-	./mvnw spring-boot:run -Dspring-boot.run.fork=false -Dspring-boot.run.arguments="--workshop.startup.force-reload=true" > "$$log_file" 2>&1 & \
-	pid=$$!; \
-	cleanup() { \
-		if kill -0 "$$pid" >/dev/null 2>&1; then \
-			kill "$$pid" 2>/dev/null || true; \
-			sleep 3; \
-			kill -0 "$$pid" 2>/dev/null && kill -9 "$$pid" 2>/dev/null || true; \
-		fi; \
-		wait "$$pid" >/dev/null 2>&1 || true; \
-		rm -f "$$log_file"; \
-	}; \
-	trap 'cleanup' EXIT INT TERM; \
-	while kill -0 "$$pid" >/dev/null 2>&1; do \
-		if grep -m 1 "Started WorkshopApplication" "$$log_file" >/dev/null 2>&1; then \
-			printf "$(GREEN)Workshop application started; stopping embeddings run.$(RESET)\n"; \
-			cleanup; \
-			printf "$(GREEN)Embeddings generated and saved to $(DATA_DIR)/$(RESET)\n"; \
-			ls -lh $(EMBEDDING_FILES); \
-			trap - EXIT INT TERM; \
-			exit 0; \
-		fi; \
-		sleep 2; \
-	done; \
-	if grep -m 1 "Started WorkshopApplication" "$$log_file" >/dev/null 2>&1; then \
-		printf "$(GREEN)Embeddings generated and saved to $(DATA_DIR)/$(RESET)\n"; \
-		ls -lh $(EMBEDDING_FILES); \
-		trap - EXIT INT TERM; \
-		rm -f "$$log_file"; \
-	else \
-		printf "$(RED)Embeddings run failed before startup completed. Last log lines:$(RESET)\n"; \
-		tail -n 40 "$$log_file"; \
-		exit 1; \
-	fi
+	@printf "$(YELLOW)→ Regenerating embeddings via OpenAI (this may take a few minutes)...$(RESET)\n"
+	@$(MAKE) seed
+	@printf "$(GREEN)Embeddings generated and saved to $(DATA_DIR)/$(RESET)\n"
+	@ls -lh $(EMBEDDING_FILES)
 
 dev: ## Run the app (no data loading — assumes Redis is already populated)
 	@echo "\033[1;36m>>> dev\033[0m"
