@@ -338,11 +338,12 @@ public class KnowledgeBaseService {
             byte[][] binaryArgs = new byte[][] {
                     knnQuery.getBytes(),
                     "RETURN".getBytes(),
-                    "4".getBytes(),
+                    "5".getBytes(),
                     "title".getBytes(),
                     "category".getBytes(),
                     "summary".getBytes(),
                     "content".getBytes(),
+                    "__vector_score".getBytes(),
                     "PARAMS".getBytes(),
                     "2".getBytes(),
                     "BLOB".getBytes(),
