@@ -33,6 +33,7 @@ openai:
 
 workshop:
   startup:
+    load-data: true
     force-reload: false
   ams:
     base-url: ${WORKSHOP_AMS_BASE_URL:http://localhost:8000}
