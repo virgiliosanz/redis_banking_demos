@@ -11,7 +11,7 @@ RESET := \033[0m
 DATA_DIR := src/main/resources/data
 EMBEDDING_FILES := $(DATA_DIR)/kb-embeddings.json $(DATA_DIR)/uc9-kb-embeddings.json $(DATA_DIR)/uc9-memory-embeddings.json
 
-.PHONY: help up down seed dev embeddings
+.PHONY: help up down clean seed dev embeddings
 
 help: ## Show all available workshop commands
 	@echo "\033[1;36m>>> help\033[0m"
@@ -28,6 +28,14 @@ up: ## Start Docker services and wait for Redis to respond to PING
 down: ## Stop workshop Docker services
 	@echo "\033[1;36m>>> down\033[0m"
 	@docker compose down
+
+clean: ## Clean Docker containers/volumes and Java build outputs
+	@echo "\033[1;36m>>> clean\033[0m"
+	@printf "$(YELLOW)→ Stopping Docker services and removing volumes...$(RESET)\n"
+	@docker compose down -v
+	@printf "$(YELLOW)→ Removing Maven build outputs...$(RESET)\n"
+	@./mvnw clean
+	@printf "$(GREEN)Cleanup complete.$(RESET)\n"
 
 seed: ## Flush Redis and reload all data from pre-computed JSON embeddings
 	@echo "\033[1;36m>>> seed\033[0m"
