@@ -62,6 +62,11 @@ public class GuardrailsService {
     private static final int DEFAULT_AUDIT_LIMIT = 50;
     private static final double ALLOW_ROUTE_THRESHOLD = 0.50;
     private static final double BLOCK_ROUTE_THRESHOLD = 0.35;
+    private static final String LLM_NOT_CONFIGURED_ERROR = "LLM not configured";
+    private static final String LLM_NOT_CONFIGURED_MESSAGE =
+            "Set OPENAI_API_KEY environment variable to enable AI assistant features.";
+    private static final String GUARDRAILS_SYSTEM_PROMPT =
+            "You are a banking assistant in a workshop demo. Respond concisely (2-3 sentences) to banking, investment, and support queries. Stay professional and factual.";
 
     private static final String BLOCKED_ROUTE_DESCRIPTION =
             "Blocked non-banking topics such as politics, elections, government opinions, religion, faith or ideological persuasion.";
@@ -105,6 +110,7 @@ public class GuardrailsService {
     private final StringRedisTemplate redis;
     private final RedisSearchHelper redisSearchHelper;
     private final LocalEmbeddingService localEmbeddingService;
+    private final OpenAiService openAiService;
 
     @Value("${workshop.startup.load-data:true}")
     private boolean loadData;
@@ -113,10 +119,11 @@ public class GuardrailsService {
     private boolean forceReload;
 
     public GuardrailsService(StringRedisTemplate redis, RedisSearchHelper redisSearchHelper,
-                             LocalEmbeddingService localEmbeddingService) {
+                             LocalEmbeddingService localEmbeddingService, OpenAiService openAiService) {
         this.redis = redis;
         this.redisSearchHelper = redisSearchHelper;
         this.localEmbeddingService = localEmbeddingService;
+        this.openAiService = openAiService;
     }
 
     @PostConstruct
@@ -218,7 +225,30 @@ public class GuardrailsService {
                     routeMatch.label(), pipeline, requestStart);
         }
 
-        String rawResponse = mockLlmReply(routeMatch.label(), resolvedMessage, inputScan);
+        if (!openAiService.isConfigured()) {
+            pipeline.add(recordDecision(
+                    resolvedUserId,
+                    "response",
+                    "BLOCK",
+                    false,
+                    elapsedMs(System.nanoTime()),
+                    LLM_NOT_CONFIGURED_MESSAGE,
+                    Map.of(
+                            "source", "openai",
+                            "configured", false,
+                            "route", routeMatch.label()
+                    ),
+                    safePreview(inputScan.scrubbedText())
+            ));
+            return buildLlmUnavailableResponse(resolvedUserId, resolvedMessage, routeMatch.label(), pipeline, requestStart);
+        }
+
+        String rawResponse = openAiService.chatCompletion(List.of(
+                Map.of("role", "system", "content", GUARDRAILS_SYSTEM_PROMPT),
+                Map.of("role", "user", "content",
+                        "Route: " + routeMatch.label() + "\n" +
+                                "User message: " + inputScan.scrubbedText())
+        ));
 
         SensitiveScan outputScan = inspectSensitiveData(rawResponse);
         String scrubbedResponse = outputScan.scrubbedText();
@@ -263,7 +293,9 @@ public class GuardrailsService {
         response.put("route", routeMatch.label());
         response.put("routeSimilarity", round3(routeMatch.similarity()));
         response.put("response", compliance.response());
-        response.put("llmMode", "mock");
+        response.put("llmMode", "openai");
+        response.put("openaiConfigured", openAiService.isConfigured());
+        response.put("openaiUsed", true);
         response.put("pipeline", pipeline);
         response.put("latencyMs", elapsedMs(requestStart));
         response.put("stats", getStats());
@@ -651,7 +683,31 @@ public class GuardrailsService {
         response.put("userId", userId);
         response.put("route", route);
         response.put("response", responseText);
-        response.put("llmMode", "mock");
+        response.put("llmMode", "openai");
+        response.put("openaiConfigured", openAiService.isConfigured());
+        response.put("openaiUsed", false);
+        response.put("pipeline", pipeline);
+        response.put("latencyMs", elapsedMs(requestStart));
+        response.put("stats", getStats());
+        response.put("preview", safePreview(message));
+        return response;
+    }
+
+    private Map<String, Object> buildLlmUnavailableResponse(String userId,
+                                                            String message,
+                                                            String route,
+                                                            List<Map<String, Object>> pipeline,
+                                                            long requestStart) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("status", "ERROR");
+        response.put("blocked", false);
+        response.put("userId", userId);
+        response.put("route", route);
+        response.put("llmMode", "openai");
+        response.put("openaiConfigured", false);
+        response.put("openaiUsed", false);
+        response.put("error", LLM_NOT_CONFIGURED_ERROR);
+        response.put("message", LLM_NOT_CONFIGURED_MESSAGE);
         response.put("pipeline", pipeline);
         response.put("latencyMs", elapsedMs(requestStart));
         response.put("stats", getStats());
@@ -694,27 +750,6 @@ public class GuardrailsService {
         }
         matcher.appendTail(buffer);
         return found ? buffer.toString() : input;
-    }
-
-    private String mockLlmReply(String route, String message, SensitiveScan inputScan) {
-        String lower = message.toLowerCase(Locale.ROOT);
-        if ("investment".equals(route)) {
-            return "You asked about investing, so the demo would route this turn to the investment assistant. "
-                    + "It can explain ETFs, managed portfolios, risk profiles and diversification options for banking customers.";
-        }
-        if ("support".equals(route)) {
-            return "I can help with customer support flows such as password resets, app access issues, card freeze actions and secure next steps.";
-        }
-        if (lower.contains("balance") && inputScan.hasMatches()) {
-            String sample = inputScan.maskedMatches().isEmpty() ? "****1234" : inputScan.maskedMatches().get(0);
-            String rawEcho = sample.replace("*", "1");
-            return "For the demo, I found account " + rawEcho + " in your message. "
-                    + "The mock balance for account " + rawEcho + " is €12,450.27 and the latest card payment was €43.10.";
-        }
-        if (lower.contains("mortgage") || lower.contains("loan")) {
-            return "For mortgages and loans, the banking assistant can explain product categories, indicative rates and the next secure onboarding step.";
-        }
-        return "This demo assistant can answer banking questions about accounts, cards, transfers, loans and service journeys while logging each guardrail decision in Redis.";
     }
 
     private void incrementStat(String field) {

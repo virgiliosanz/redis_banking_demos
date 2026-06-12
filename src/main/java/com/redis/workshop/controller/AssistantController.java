@@ -155,7 +155,7 @@ public class AssistantController {
     public ResponseEntity<Map<String, Object>> status() {
         return ResponseEntity.ok(Map.of(
                 "openaiConfigured", openAiService.isConfigured(),
-                "mode", openAiService.isConfigured() ? "openai" : "mock"
+                "mode", openAiService.isConfigured() ? "openai" : "unconfigured"
         ));
     }
 

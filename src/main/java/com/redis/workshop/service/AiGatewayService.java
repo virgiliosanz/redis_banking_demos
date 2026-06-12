@@ -52,6 +52,9 @@ public class AiGatewayService {
     private static final double BLOCK_ROUTE_THRESHOLD = 0.35d;
     private static final double INJECTION_THRESHOLD = 0.52d;
     private static final long MAX_STREAM_LEN = 500L;
+    private static final String LLM_NOT_CONFIGURED_ERROR = "LLM not configured";
+    private static final String LLM_NOT_CONFIGURED_MESSAGE =
+            "Set OPENAI_API_KEY environment variable to enable AI assistant features.";
 
     private static final String BLOCKED_ROUTE_DESCRIPTION =
             "Blocked non-banking topics such as politics, elections, government opinions, religion, faith or ideological persuasion.";
@@ -125,6 +128,7 @@ public class AiGatewayService {
     private final StringRedisTemplate redis;
     private final RedisSearchHelper redisSearchHelper;
     private final LocalEmbeddingService localEmbeddingService;
+    private final OpenAiService openAiService;
 
     @Value("${workshop.startup.load-data:true}")
     private boolean loadData;
@@ -133,10 +137,11 @@ public class AiGatewayService {
     private boolean forceReload;
 
     public AiGatewayService(StringRedisTemplate redis, RedisSearchHelper redisSearchHelper,
-                            LocalEmbeddingService localEmbeddingService) {
+                            LocalEmbeddingService localEmbeddingService, OpenAiService openAiService) {
         this.redis = redis;
         this.redisSearchHelper = redisSearchHelper;
         this.localEmbeddingService = localEmbeddingService;
+        this.openAiService = openAiService;
     }
 
     public void init() {
@@ -273,7 +278,7 @@ public class AiGatewayService {
                     topicMs, 0d, response, rateLimit, 0L);
             logMs = elapsedMs(logStart);
             return buildResponse(status, resolvedQuery, userId, sessionId, route, cacheResult, rateLimit, response,
-                    pipeline, guardrailRoute, blocked, false, inputTokens, 0L, 0d,
+                    pipeline, guardrailRoute, blocked, false, false, inputTokens, 0L, 0d,
                     topicMs, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, logMs);
         }
 
@@ -307,7 +312,7 @@ public class AiGatewayService {
                     topicMs + inputPiiMs + injectionMs, 0d, response, rateLimit, 0L);
             logMs = elapsedMs(logStart);
             return buildResponse(status, resolvedQuery, userId, sessionId, route, cacheResult, rateLimit, response,
-                    pipeline, guardrailRoute, blocked, false, inputTokens, 0L, 0d,
+                    pipeline, guardrailRoute, blocked, false, false, inputTokens, 0L, 0d,
                     topicMs, inputPiiMs, injectionMs, 0L, 0L, 0L, 0L, 0L, 0L, 0L, logMs);
         }
 
@@ -386,8 +391,28 @@ public class AiGatewayService {
                     preLogTotalMs + statsMs, 0d, response, rateLimit, 0L);
             logMs = elapsedMs(logStart);
             return buildResponse(status, resolvedQuery, userId, sessionId, route, cacheResult, rateLimit, response,
-                    pipeline, guardrailRoute, blocked, true, inputTokens, 0L, 0d,
+                    pipeline, guardrailRoute, blocked, true, false, inputTokens, 0L, 0d,
                     topicMs, inputPiiMs, injectionMs, routingMs, cacheMs, rateLimitMs, 0L, 0L, 0L, statsMs, logMs);
+        }
+
+        if (!openAiService.isConfigured()) {
+            pipeline.add(recordDecision(
+                    "response",
+                    "BLOCK",
+                    false,
+                    0L,
+                    LLM_NOT_CONFIGURED_MESSAGE,
+                    Map.of(
+                            "source", "openai",
+                            "configured", false,
+                            "modelId", route.model().id(),
+                            "model", route.model().label()
+                    ),
+                    safePreview(resolvedQuery)
+            ));
+            return buildLlmUnavailableResponse(resolvedQuery, userId, sessionId, route, cacheResult, rateLimit,
+                    pipeline, guardrailRoute, inputTokens,
+                    topicMs, inputPiiMs, injectionMs, routingMs, cacheMs, rateLimitMs);
         }
 
         if (cacheResult.hit()) {
@@ -402,27 +427,33 @@ public class AiGatewayService {
                     Map.of(
                             "source", "cache",
                             "cacheHit", true,
+                            "responseSource", cacheResult.responseSource(),
                             "model", route.model().label()
                     ),
                     safePreview(response)
             ));
         } else {
-            response = generateMockResponse(route.model(), resolvedQuery, inputScan);
-            modelMs = simulateModelLatency(route.model(), resolvedQuery);
-            responseMs = modelMs;
-            storeCacheEntry(route.model(), resolvedQuery, response);
+            long responseStart = System.nanoTime();
+            response = openAiService.chatCompletion(List.of(
+                    Map.of("role", "system", "content", systemPromptFor(route.model())),
+                    Map.of("role", "user", "content",
+                            "Guardrail route: " + guardrailRoute + "\n" +
+                                    "User query: " + inputScan.scrubbedText())
+            ));
+            responseMs = elapsedMs(responseStart);
+            modelMs = responseMs;
+            storeCacheEntry(route.model(), resolvedQuery, response, "openai");
             pipeline.add(recordDecision(
                     "response",
                     "PASS",
                     false,
                     responseMs,
-                    "Generated mock response with " + route.model().label(),
+                    "Generated OpenAI response with " + route.model().label(),
                     Map.of(
-                            "source", "model",
+                            "source", "openai",
                             "cacheHit", false,
                             "modelId", route.model().id(),
-                            "model", route.model().label(),
-                            "estimatedModelLatencyMs", modelMs
+                            "model", route.model().label()
                     ),
                     safePreview(response)
             ));
@@ -503,7 +534,7 @@ public class AiGatewayService {
         ));
 
         return buildResponse(status, resolvedQuery, userId, sessionId, route, cacheResult, rateLimit, response,
-                pipeline, guardrailRoute, false, false, inputTokens, outputTokens, estimatedCostUsd,
+                pipeline, guardrailRoute, false, false, !cacheResult.hit(), inputTokens, outputTokens, estimatedCostUsd,
                 topicMs, inputPiiMs, injectionMs, routingMs, cacheMs, rateLimitMs, responseMs, outputPiiMs,
                 complianceMs, statsMs, logMs);
     }
@@ -520,6 +551,7 @@ public class AiGatewayService {
                                               String guardrailRoute,
                                               boolean blocked,
                                               boolean rateLimited,
+                                              boolean openAiUsed,
                                               long inputTokens,
                                               long outputTokens,
                                               double estimatedCostUsd,
@@ -550,6 +582,9 @@ public class AiGatewayService {
         result.put("model", model == null ? "" : model.label());
         result.put("cacheHit", cacheResult.hit());
         result.put("rateLimited", rateLimited);
+        result.put("llmMode", "openai");
+        result.put("openaiConfigured", openAiService.isConfigured());
+        result.put("openaiUsed", openAiUsed);
         result.put("response", response);
         result.put("guardrailRoute", guardrailRoute);
         result.put("pipeline", pipeline);
@@ -597,6 +632,31 @@ public class AiGatewayService {
         if (rateLimited) {
             result.put("error", "Rate limit exceeded for " + (model == null ? "the selected model" : model.label()));
         }
+        return result;
+    }
+
+    private Map<String, Object> buildLlmUnavailableResponse(String query,
+                                                            String userId,
+                                                            String sessionId,
+                                                            RouteDecision route,
+                                                            CacheResult cacheResult,
+                                                            Map<String, Object> rateLimit,
+                                                            List<Map<String, Object>> pipeline,
+                                                            String guardrailRoute,
+                                                            long inputTokens,
+                                                            long topicMs,
+                                                            long inputPiiMs,
+                                                            long injectionMs,
+                                                            long routingMs,
+                                                            long cacheMs,
+                                                            long rateLimitMs) {
+        Map<String, Object> result = buildResponse("ERROR", query, userId, sessionId, route, cacheResult, rateLimit,
+                "", pipeline, guardrailRoute, false, false, false,
+                inputTokens, 0L, 0d,
+                topicMs, inputPiiMs, injectionMs, routingMs, cacheMs, rateLimitMs,
+                0L, 0L, 0L, 0L, 0L);
+        result.put("error", LLM_NOT_CONFIGURED_ERROR);
+        result.put("message", LLM_NOT_CONFIGURED_MESSAGE);
         return result;
     }
 
@@ -726,11 +786,12 @@ public class AiGatewayService {
                 "BLOB".getBytes(StandardCharsets.UTF_8),
                 vectorBytes,
                 "RETURN".getBytes(StandardCharsets.UTF_8),
-                "4".getBytes(StandardCharsets.UTF_8),
+                "5".getBytes(StandardCharsets.UTF_8),
                 "question".getBytes(StandardCharsets.UTF_8),
                 "response".getBytes(StandardCharsets.UTF_8),
                 "modelId".getBytes(StandardCharsets.UTF_8),
                 "createdAt".getBytes(StandardCharsets.UTF_8),
+                "responseSource".getBytes(StandardCharsets.UTF_8),
                 "DIALECT".getBytes(StandardCharsets.UTF_8),
                 "2".getBytes(StandardCharsets.UTF_8)
         };
@@ -747,16 +808,22 @@ public class AiGatewayService {
             return CacheResult.miss();
         }
 
-        return new CacheResult(true, matchedQuestion, top.getOrDefault("response", ""), distance);
+        String responseSource = top.getOrDefault("responseSource", "");
+        if (!"openai".equalsIgnoreCase(responseSource)) {
+            return CacheResult.miss();
+        }
+
+        return new CacheResult(true, matchedQuestion, top.getOrDefault("response", ""), distance, responseSource);
     }
 
-    private void storeCacheEntry(ModelConfig model, String query, String response) {
+    private void storeCacheEntry(ModelConfig model, String query, String response, String responseSource) {
         String key = CACHE_PREFIX + model.tag() + ":" + UUID.randomUUID().toString().substring(0, 8);
         Map<String, String> hash = new LinkedHashMap<>();
         hash.put("modelId", model.id());
         hash.put("modelTag", model.tag());
         hash.put("question", query);
         hash.put("response", response);
+        hash.put("responseSource", responseSource);
         hash.put("ttlSeconds", String.valueOf(model.cacheTtlSeconds()));
         hash.put("createdAt", Instant.now().toString());
         redis.opsForHash().putAll(key, hash);
@@ -768,7 +835,17 @@ public class AiGatewayService {
         if (model == null) {
             return;
         }
-        storeCacheEntry(model, query, response);
+        storeCacheEntry(model, query, response, "seed");
+    }
+
+    private String systemPromptFor(ModelConfig model) {
+        if ("gpt4o".equals(model.tag())) {
+            return "You are a banking workshop demo assistant handling complex regulatory and reasoning-heavy questions. Respond in 3-5 concise sentences, explain key trade-offs, and stay factual and professional.";
+        }
+        if ("gpt4omini".equals(model.tag())) {
+            return "You are a banking workshop demo assistant for fast FAQ and support prompts. Respond concisely in 2-3 sentences, stay factual, and use clear user-facing language.";
+        }
+        return "You are a banking workshop demo assistant for numeric and KPI-heavy questions. Respond with data-focused, structured banking output, using short bullet points when helpful. Stay factual and concise.";
     }
 
     private Map<String, Object> consumeRateLimit(ModelConfig model) {
@@ -866,34 +943,6 @@ public class AiGatewayService {
         fields.put("response", truncate(maskSensitiveData(response), 180));
         redis.opsForStream().add(StreamRecords.string(fields).withStreamKey(STREAM_KEY));
         redis.opsForStream().trim(STREAM_KEY, MAX_STREAM_LEN);
-    }
-
-    private String generateMockResponse(ModelConfig model, String query, SensitiveScan inputScan) {
-        String lower = query.toLowerCase(Locale.ROOT);
-        if (inputScan.hasMatches() && (lower.contains("balance") || lower.contains("account"))) {
-            String sample = inputScan.maskedMatches().isEmpty() ? "****1234" : inputScan.maskedMatches().get(0);
-            String rawEcho = sample.replace("*", "1");
-            return "Gateway located account " + rawEcho + " in the request. "
-                    + "The demo balance for account " + rawEcho + " is €12,450.27 and the latest card payment was €43.10.";
-        }
-        if ("internalnumeric".equals(model.tag())) {
-            int base = Math.abs(query.toLowerCase(Locale.ROOT).hashCode());
-            double q1 = 11.5 + (base % 40) / 10.0;
-            double q2 = q1 + 0.3;
-            double q3 = q2 + 0.2;
-            double q4 = q3 + 0.4;
-            return "Internal gateway result for numeric/tabular intent:\n"
-                    + "• Query: " + query + "\n"
-                    + String.format(Locale.US,
-                    "• Demo metrics — Q1 %.1f%% | Q2 %.1f%% | Q3 %.1f%% | Q4 %.1f%%%n• Delta vs Q1: +%.1fpp%n• Recommended route: keep this request on the internal numeric model for low-latency structured output.",
-                    q1, q2, q3, q4, q4 - q1);
-        }
-        if ("gpt4o".equals(model.tag())) {
-            return "Gateway routed this request to GPT-4o because it looks policy-heavy and multi-step. "
-                    + "For \"" + query + "\", the key takeaway is that the answer needs explanation, trade-offs, and regulatory context rather than a short factual lookup.";
-        }
-        return "Gateway routed this request to GPT-4o-mini for a fast FAQ-style answer. "
-                + "For \"" + query + "\", the demo response is concise, low-cost, and optimized for short user-facing explanations.";
     }
 
     private long estimateTokens(String text) {
@@ -1376,9 +1425,9 @@ public class AiGatewayService {
     private record RouteDecision(ModelConfig model, String reason, double distance) {
     }
 
-    private record CacheResult(boolean hit, String question, String response, double distance) {
+    private record CacheResult(boolean hit, String question, String response, double distance, String responseSource) {
         private static CacheResult miss() {
-            return new CacheResult(false, "", "", 1.0d);
+            return new CacheResult(false, "", "", 1.0d, "");
         }
     }
 

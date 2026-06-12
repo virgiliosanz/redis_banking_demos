@@ -24,6 +24,9 @@ public class AssistantService {
     private static final String CONV_PREFIX = "uc9:conversation:";
     private static final long CONV_TTL_SECONDS = 600;
     private static final int MAX_MESSAGES = 20;
+    private static final String LLM_NOT_CONFIGURED_ERROR = "LLM not configured";
+    private static final String LLM_NOT_CONFIGURED_MESSAGE =
+            "Set OPENAI_API_KEY environment variable to enable AI assistant features.";
 
     private final StringRedisTemplate redis;
     private final OpenAiService openAiService;
@@ -83,6 +86,10 @@ public class AssistantService {
     }
 
     public Map<String, Object> chat(String sessionId, String userName, String userMessage) {
+        if (!openAiService.isConfigured()) {
+            return llmNotConfiguredResponse(sessionId);
+        }
+
         long startTime = System.currentTimeMillis();
         String convKey = CONV_PREFIX + sessionId;
         List<Map<String, String>> messageHistory = loadConversation(convKey, userName);
@@ -92,28 +99,21 @@ public class AssistantService {
         String responseText;
         boolean semanticCacheHit = false;
 
-        if (openAiService.isConfigured()) {
-            ChatContext ctx = resolveContext(userMessage);
-            memoriesOut = flatten(ctx.relevantMemories());
-            kbOut = flatten(ctx.relevantKB());
-            regDocsOut = flatten(ctx.relevantRegDocs());
-            semanticCacheHit = ctx.semanticCacheHit();
-            if (semanticCacheHit) {
-                responseText = ctx.responseText();
-            } else {
-                List<Map<String, String>> combined = new ArrayList<>(kbOut);
-                combined.addAll(regDocsOut);
-                responseText = generateResponse(userMessage, memoriesOut, combined);
-                int usedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
-                semanticCacheService.addTokensUsed(usedTokens);
-                semanticCacheService.storeInSemanticCache(userMessage, responseText);
-                log.info("UC9: Semantic cache MISS — stored response for: {} (~{} tokens used)", userMessage, usedTokens);
-            }
+        ChatContext ctx = resolveContext(userMessage);
+        memoriesOut = flatten(ctx.relevantMemories());
+        kbOut = flatten(ctx.relevantKB());
+        regDocsOut = flatten(ctx.relevantRegDocs());
+        semanticCacheHit = ctx.semanticCacheHit();
+        if (semanticCacheHit) {
+            responseText = ctx.responseText();
         } else {
-            memoriesOut = memoryService.findRelevantMemories(userMessage);
-            kbOut = knowledgeBaseService.findRelevantKBDocs(userMessage);
-            regDocsOut = new ArrayList<>();
-            responseText = generateResponse(userMessage, memoriesOut, kbOut);
+            List<Map<String, String>> combined = new ArrayList<>(kbOut);
+            combined.addAll(regDocsOut);
+            responseText = generateResponse(userMessage, memoriesOut, combined);
+            int usedTokens = estimateTokens(userMessage) + estimateTokens(responseText);
+            semanticCacheService.addTokensUsed(usedTokens);
+            semanticCacheService.storeInSemanticCache(userMessage, responseText);
+            log.info("UC9: Semantic cache MISS — stored response for: {} (~{} tokens used)", userMessage, usedTokens);
         }
 
         appendMessage(messageHistory, "assistant", responseText);
@@ -132,6 +132,12 @@ public class AssistantService {
     }
 
     public void chatStream(String sessionId, String userName, String userMessage, SseEmitter emitter) {
+        if (!openAiService.isConfigured()) {
+            sendSources(emitter, List.of(), List.of(), List.of(), false);
+            sendConfigurationError(emitter, sessionId);
+            return;
+        }
+
         long startTime = System.currentTimeMillis();
         String convKey = CONV_PREFIX + sessionId;
         List<Map<String, String>> messageHistory = loadConversation(convKey, userName);
@@ -189,6 +195,29 @@ public class AssistantService {
             emitter.send(SseEmitter.event().name("done").data(objectMapper.writeValueAsString(data)));
             emitter.complete();
         } catch (Exception e) { log.error("Failed to send done event", e); }
+    }
+
+    private void sendConfigurationError(SseEmitter emitter, String sessionId) {
+        try {
+            Map<String, Object> data = llmNotConfiguredResponse(sessionId);
+            data.put("conversationLength", 0);
+            data.put("latencyMs", 0);
+            data.put("semanticCacheHit", false);
+            data.put("semanticCacheEnabled", false);
+            emitter.send(SseEmitter.event().name("done").data(objectMapper.writeValueAsString(data)));
+            emitter.complete();
+        } catch (Exception e) {
+            log.error("Failed to send configuration error event", e);
+            emitter.completeWithError(e);
+        }
+    }
+
+    private Map<String, Object> llmNotConfiguredResponse(String sessionId) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("sessionId", sessionId);
+        response.put("error", LLM_NOT_CONFIGURED_ERROR);
+        response.put("message", LLM_NOT_CONFIGURED_MESSAGE);
+        return response;
     }
 
     private List<Map<String, String>> loadConversation(String convKey, String userName) {

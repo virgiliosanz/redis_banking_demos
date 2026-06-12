@@ -42,7 +42,7 @@ public class OpenAiService {
         if (isConfigured()) {
             log.info("OpenAI chat integration enabled (model={})", model);
         } else {
-            log.info("OpenAI chat integration disabled — no API key configured. Using mock fallback.");
+            log.info("OpenAI chat integration disabled — no API key configured. AI features will return a configuration error.");
         }
     }
 

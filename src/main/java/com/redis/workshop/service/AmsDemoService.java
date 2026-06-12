@@ -29,6 +29,9 @@ public class AmsDemoService {
 
     private static final Logger log = LoggerFactory.getLogger(AmsDemoService.class);
     private static final int DEFAULT_SEARCH_LIMIT = 5;
+    private static final String LLM_NOT_CONFIGURED_ERROR = "LLM not configured";
+    private static final String LLM_NOT_CONFIGURED_MESSAGE =
+            "Set OPENAI_API_KEY environment variable to enable AI assistant features.";
 
     private final AmsClient ams;
     private final AmsProperties props;
@@ -163,12 +166,24 @@ public class AmsDemoService {
         Map<String, Object> promptResp = ams.memoryPrompt(promptReq);
 
         List<Map<String, String>> llmMessages = coerceToLlmMessages(promptResp);
-        String responseText;
-        if (openAiService.isConfigured()) {
-            responseText = openAiService.chatCompletion(llmMessages);
-        } else {
-            responseText = mockResponse(userMessage, llmMessages);
+        if (!openAiService.isConfigured()) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("sessionId", sessionId);
+            out.put("userId", userId);
+            out.put("namespace", namespace);
+            out.put("userMessage", userMessage);
+            out.put("contextAssembly", promptResp);
+            out.put("assembledMessages", llmMessages);
+            out.put("workingMemory", afterUserWm);
+            out.put("openaiConfigured", false);
+            out.put("openaiUsed", false);
+            out.put("error", LLM_NOT_CONFIGURED_ERROR);
+            out.put("message", LLM_NOT_CONFIGURED_MESSAGE);
+            out.put("latencyMs", System.currentTimeMillis() - start);
+            return out;
         }
+
+        String responseText = openAiService.chatCompletion(llmMessages);
 
         messages.add(msg("assistant", responseText));
         Map<String, Object> afterAssistantWm = new LinkedHashMap<>(currentWm);
@@ -185,6 +200,7 @@ public class AmsDemoService {
         out.put("contextAssembly", promptResp);
         out.put("assembledMessages", llmMessages);
         out.put("workingMemory", finalWm);
+        out.put("openaiConfigured", true);
         out.put("openaiUsed", openAiService.isConfigured());
         out.put("latencyMs", System.currentTimeMillis() - start);
         return out;
@@ -290,16 +306,4 @@ public class AmsDemoService {
         return out;
     }
 
-    private String mockResponse(String userMessage, List<Map<String, String>> assembled) {
-        int systemCount = 0, userCount = 0, assistantCount = 0;
-        for (var m : assembled) switch (m.get("role")) {
-            case "system" -> systemCount++;
-            case "user" -> userCount++;
-            case "assistant" -> assistantCount++;
-            default -> {}
-        }
-        return "[AMS demo — OpenAI not configured] Assembled context sent to the LLM: "
-                + systemCount + " system / " + userCount + " user / " + assistantCount + " assistant message(s). "
-                + "Your message was: \"" + userMessage + "\".";
-    }
 }

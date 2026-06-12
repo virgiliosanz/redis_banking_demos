@@ -1,5 +1,6 @@
 package com.redis.workshop.controller;
 
+import com.redis.workshop.service.OpenAiService;
 import org.junit.jupiter.api.Test;
 import org.hamcrest.Matchers;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,9 @@ class ApiEndpointTests {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private OpenAiService openAiService;
 
     // -------- Health check --------
     @Test
@@ -160,6 +164,27 @@ class ApiEndpointTests {
         mockMvc.perform(get("/api/assistant/cache/stats")).andExpect(status().isOk());
     }
 
+    @Test
+    void uc9_assistantChatReturnsOpenAiReplyOrConfigError() throws Exception {
+        String body = "{\"sessionId\":\"test-uc9\",\"userName\":\"Demo User\",\"message\":\"What is Basel III?\"}";
+        var result = mockMvc.perform(post("/api/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        if (openAiService.isConfigured()) {
+            org.assertj.core.api.Assertions.assertThat(result.getResponse().getContentAsString())
+                    .contains("response")
+                    .doesNotContain("\"error\":\"LLM not configured\"");
+        } else {
+            mockMvc.perform(post("/api/assistant/chat")
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.error").value("LLM not configured"))
+                    .andExpect(jsonPath("$.message").value("Set OPENAI_API_KEY environment variable to enable AI assistant features."));
+        }
+    }
+
     // -------- AMS (dedicated Agent Memory Server use case) --------
     @Test
     void ams_status() throws Exception {
@@ -224,11 +249,25 @@ class ApiEndpointTests {
     // -------- UC15: AI Guardrails --------
     @Test
     void uc15_guardrailsChat() throws Exception {
-        String body = "{\"message\":\"Can I increase my transfer limit today?\"," +
+        String body = "{\"message\":\"What ETF options fit a moderate risk profile?\"," +
                 "\"userId\":\"user-test-uc15\"}";
-        mockMvc.perform(post("/api/guardrails/chat")
+        var result = mockMvc.perform(post("/api/guardrails/chat")
                         .contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+
+        if (openAiService.isConfigured()) {
+            org.assertj.core.api.Assertions.assertThat(result.getResponse().getContentAsString())
+                    .contains("response")
+                    .contains("\"llmMode\":\"openai\"")
+                    .doesNotContain("\"error\":\"LLM not configured\"");
+        } else {
+            mockMvc.perform(post("/api/guardrails/chat")
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.error").value("LLM not configured"))
+                    .andExpect(jsonPath("$.message").value("Set OPENAI_API_KEY environment variable to enable AI assistant features."));
+        }
     }
 
     @Test
@@ -252,9 +291,23 @@ class ApiEndpointTests {
     void uc16_gatewayQuery() throws Exception {
         String body = "{\"query\":\"Explain Basel III capital requirements\"," +
                 "\"userId\":\"user1\",\"sessionId\":\"sess-test-uc16\"}";
-        mockMvc.perform(post("/api/gateway/query")
+        var result = mockMvc.perform(post("/api/gateway/query")
                         .contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+
+        if (openAiService.isConfigured()) {
+            org.assertj.core.api.Assertions.assertThat(result.getResponse().getContentAsString())
+                    .contains("response")
+                    .contains("\"llmMode\":\"openai\"")
+                    .doesNotContain("\"error\":\"LLM not configured\"");
+        } else {
+            mockMvc.perform(post("/api/gateway/query")
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.error").value("LLM not configured"))
+                    .andExpect(jsonPath("$.message").value("Set OPENAI_API_KEY environment variable to enable AI assistant features."));
+        }
     }
 
     @Test
