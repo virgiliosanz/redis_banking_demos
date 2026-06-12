@@ -1,6 +1,6 @@
 # Redis Banking Workshop Demo
 
-Spring Boot 3.x workshop application showcasing **16 Redis use cases** for banking.
+Spring Boot 3.x workshop application showcasing **17 Redis use cases** for banking.
 Each use case includes a **live interactive demo** and a **code showcase panel** with curated Redis snippets.
 
 ## Use Cases
@@ -23,6 +23,7 @@ Each use case includes a **live interactive demo** and a **code showcase panel**
 | 14 | Agent Memory Server | AMS, REST, MCP, Context Assembly |
 | 15 | AI Guardrails for Banking Chat | Vector, Streams, INCR, Hash |
 | 16 | AI Gateway (Routing + Semantic Cache + Observability) | Vector, Semantic Cache, INCR, Hash, Streams |
+| 17 | AI Agent Coordination | Streams, Consumer Groups, XREADGROUP, XACK, Hash |
 
 ## Screenshots
 
@@ -198,26 +199,27 @@ spring:
       password: your-password
 ```
 
-## LLM Integration (OpenAI)
+## LLM Integration (optional OpenAI chat)
 
 ### How it works
 
-The workshop is designed to work **with or without** an OpenAI API key:
+Embeddings are now **100% local** across the workshop using **BGE-small-en-v1.5** (384 dimensions, ONNX in-process).
+You do **not** need an API key for vector search, RAG retrieval, semantic cache lookup, or document indexing.
 
-| Mode | UC1-UC7, UC10-UC13 | UC8 (Document DB) | UC9 (AI Assistant) |
-|------|--------------------|--------------------|---------------------|
-| **Without API key** | Fully functional | Full-text search works; vector search uses mock vectors (deterministic but not semantic) | Chat works with mock responses; RAG uses keyword matching; semantic cache disabled |
-| **With API key** | No change | Vector search uses real embeddings (semantic similarity) | Real LLM responses via GPT-4o-mini; RAG uses real embeddings; semantic cache active with token savings |
+OpenAI is now **optional** and used only for **chat completions in UC9**.
 
-**Note**: UC15 and UC16 also work without an API key. They use mock responses and deterministic workshop data, following the same no-key pattern as the other AI-oriented demos.
+| Mode | UC1-UC8, UC10-UC17 | UC9 (AI Assistant) |
+|------|---------------------|--------------------|
+| **Without API key** | Fully functional, including local embeddings and vector search | Local embeddings, RAG retrieval, and semantic cache still work; chat responses use deterministic mock output |
+| **With API key** | No change | Same local embedding pipeline, plus real chat completions via GPT-4o-mini |
 
-**Bottom line**: All 16 use cases work without an API key. The OpenAI integration enhances UC8 and UC9 with real semantic search and AI-generated responses.
+**Bottom line**: All 17 use cases work without an API key. Adding `OPENAI_API_KEY` only upgrades UC9 chat responses.
 
 ### Setting up OpenAI
 
 1. Get an API key from [platform.openai.com](https://platform.openai.com/api-keys)
 
-2. Set the environment variable:
+2. Set the environment variable if you want real UC9 chat completions:
 
 ```bash
 # Development mode
@@ -227,16 +229,16 @@ OPENAI_API_KEY=sk-... ./mvnw spring-boot:run
 OPENAI_API_KEY=sk-... docker compose --profile workshop up -d --build
 ```
 
-3. On startup, the app logs whether OpenAI is enabled:
+3. On startup, the app logs whether OpenAI chat is enabled. Local BGE embeddings always run in-process and do not require configuration:
 
 ```
-OpenAI integration enabled (model=gpt-4o-mini, embeddingModel=text-embedding-3-small)
+OpenAI chat integration enabled (model=gpt-4o-mini)
 ```
 
 Or if no key is set:
 
 ```
-OpenAI integration disabled — no API key configured. Using mock fallback.
+OpenAI chat integration disabled — no API key configured. Using mock fallback.
 ```
 
 ### Models used
@@ -244,46 +246,19 @@ OpenAI integration disabled — no API key configured. Using mock fallback.
 | Purpose | Model | Used by |
 |---------|-------|---------|
 | Chat completions | `gpt-4o-mini` | UC9 AI Assistant |
-| Text embeddings | `text-embedding-3-small` (1536 dimensions) | UC8 vector search, UC9 RAG + semantic cache |
+| Text embeddings | `BGE-small-en-v1.5` (384 dimensions, ONNX) | UC8 vector search, UC9 RAG + semantic cache |
 
-Override models in `application.yml`:
+`application.yml` only configures optional OpenAI chat:
 
 ```yaml
 openai:
   api-key: ${OPENAI_API_KEY:}
   model: gpt-4o-mini          # or gpt-4o, gpt-3.5-turbo
-  embedding-model: text-embedding-3-small  # or text-embedding-3-large
 ```
 
 ### Cost estimate
 
-The workshop uses minimal tokens. A typical demo session (10-20 questions) costs < $0.01 with gpt-4o-mini.
-
-## Pre-computed Embeddings (UC8)
-
-UC8 (Document Database) includes 4 regulation PDFs (PSD2, DORA, MiFID II, GDPR) that are chunked and embedded for vector search.
-
-### Using pre-computed embeddings (default)
-
-The file `src/main/resources/data/kb-embeddings.json` contains pre-computed chunks with mock vectors. These load automatically on startup — no API key needed.
-
-### Generating real embeddings
-
-For higher-quality semantic search, generate real embeddings from the PDFs:
-
-```bash
-# With OpenAI API key — generates real embeddings
-OPENAI_API_KEY=sk-... ./mvnw compile exec:java \
-  -Dexec.mainClass="com.redis.workshop.tools.EmbeddingGenerator" \
-  -Dexec.classpathScope=compile
-
-# Without API key — generates mock embeddings from PDF content
-./mvnw compile exec:java \
-  -Dexec.mainClass="com.redis.workshop.tools.MockEmbeddingGenerator" \
-  -Dexec.classpathScope=compile
-```
-
-Both tools read PDFs from `src/main/resources/docs/` and write to `src/main/resources/data/kb-embeddings.json`.
+Only chat tokens are billable. A typical UC9 demo session (10-20 questions) costs < $0.01 with gpt-4o-mini.
 
 ## Monitor endpoint
 
@@ -318,35 +293,37 @@ src/main/java/com/redis/workshop/
 │   └── DocumentDataLoader.java     # PDF chunks + vector index loader
 ├── controller/
 │   ├── AiGatewayController.java    # UC16: AI gateway demo endpoints
+│   ├── AgentCoordinatorController.java # UC17: multi-agent coordination demo
 │   ├── GuardrailsController.java   # UC15: AI guardrails demo endpoints
 │   ├── HomeController.java         # Landing page
 │   └── UseCaseController.java      # Use case routing
 ├── service/                        # Business logic (per use case)
+│   ├── AgentCoordinatorService.java # UC17: Streams orchestration + SSE updates
 │   ├── AiGatewayService.java       # UC16: routing, cache, observability
-│   ├── OpenAiService.java          # OpenAI API client (chat + embeddings)
+│   ├── LocalEmbeddingService.java  # Local BGE-small-en-v1.5 embeddings (384d, ONNX)
+│   ├── OpenAiService.java          # Optional OpenAI chat client
 │   ├── AssistantService.java       # UC9: AI agent memory + RAG
 │   ├── GuardrailsService.java      # UC15: guardrail pipeline + audit trail
 │   └── ...                         # One service per use case
 └── tools/                          # Offline utilities
-    ├── EmbeddingGenerator.java     # Generate real embeddings from PDFs
-    ├── MockEmbeddingGenerator.java # Generate mock embeddings (no API key)
+    ├── EmbeddingGenerator.java     # Generate local BGE embeddings from PDFs
     └── PdfChunker.java             # PDF → text chunks
 
 src/main/resources/
-├── application.yml                 # Redis + OpenAI config
-├── data/kb-embeddings.json         # Pre-computed document chunks
-├── docs/*.pdf                      # Regulation PDFs (PSD2, DORA, MiFID II, GDPR)
+├── application.yml                 # Redis + optional OpenAI chat config
+├── data/kb-embeddings.json         # Pre-generated document chunks + local vectors
+├── docs/*.pdf                      # Regulation PDFs (PSD2, DORA, MiFID II, GDPR, EU AI Act)
 ├── templates/
 │   ├── layout.html                 # Shared layout with nav
-│   ├── index.html                  # Landing page (16 cards)
+│   ├── index.html                  # Landing page (17 cards)
 │   ├── guide.html                  # Workshop Presenter Guide
-│   └── usecase-{1..16}.html        # Use case pages
+│   └── usecase-{1..17}.html        # Use case pages
 └── static/
     ├── css/redis-brand.css         # Redis brand design tokens
     ├── img/icons/{light,dark}/     # Redis brand icons per theme
     ├── js/main.js                  # Dark mode toggle + utils
     ├── js/qr-landing.js            # Landing page QR code renderer
-    ├── js/usecase-{1..16}.js       # Per-use-case JS
+    ├── js/usecase-{1..17}.js       # Per-use-case JS
     ├── vendor/prism/               # Syntax highlighting
     └── vendor/qrcode/              # qrcode-generator library (landing QR)
 ```
@@ -356,7 +333,7 @@ src/main/resources/
 - **Backend**: Spring Boot 3.4.x, Spring Data Redis (Lettuce), Java 17+
 - **Frontend**: Thymeleaf + Vanilla JS, Redis brand CSS, Prism.js
 - **Database**: Redis 8 (RQE, JSON, Search, Vector support)
-- **LLM** (optional): OpenAI GPT-4o-mini + text-embedding-3-small
+- **LLM / embeddings**: OpenAI GPT-4o-mini (optional chat) + BGE-small-en-v1.5 (ONNX, local embeddings)
 
 ## UI Features
 
