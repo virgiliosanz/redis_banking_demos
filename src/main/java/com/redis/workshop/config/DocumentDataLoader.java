@@ -7,6 +7,7 @@ import com.redis.workshop.tools.PdfChunker;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
@@ -23,7 +24,7 @@ public class DocumentDataLoader {
     private static final Logger log = LoggerFactory.getLogger(DocumentDataLoader.class);
     private static final String DOC_PREFIX = "uc8:doc:";
     private static final String INDEX_NAME = "idx:uc8:documents";
-    private static final int VECTOR_DIM = 1536;
+    private static final int VECTOR_DIM = 3072;
     private static final String EMBEDDINGS_RESOURCE = "/data/kb-embeddings.json";
     private static final String EMBEDDINGS_WRITE_PATH = "src/main/resources/data/kb-embeddings.json";
 
@@ -41,6 +42,12 @@ public class DocumentDataLoader {
     private final StringRedisTemplate redis;
     private final OpenAiService openAiService;
 
+    @Value("${workshop.startup.load-data:true}")
+    private boolean loadData;
+
+    @Value("${workshop.startup.force-reload:false}")
+    private boolean forceReload;
+
     public DocumentDataLoader(StringRedisTemplate redis, OpenAiService openAiService) {
         this.redis = redis;
         this.openAiService = openAiService;
@@ -48,6 +55,23 @@ public class DocumentDataLoader {
 
     @PostConstruct
     public void loadDocuments() {
+        if (!loadData) return;
+        if (forceReload) {
+            log.info("UC8: force reload enabled for regulation documents, rebuilding index and JSON docs");
+        } else {
+            long existingDocs = existingDocCount();
+            if (existingDocs >= 1) {
+                int existingVectorDim = existingStoredVectorDimension();
+                if (existingVectorDim == VECTOR_DIM) {
+                    log.info("UC8: document index already present ({} docs, {}-dim vectors), skipping reload",
+                            existingDocs, existingVectorDim);
+                    return;
+                }
+                log.info("UC8: document data present but vector dimension is {} (expected {}), rebuilding",
+                        existingVectorDim, VECTOR_DIM);
+            }
+        }
+
         List<Map<String, Object>> docs;
 
         // 1. Try loading pre-computed embeddings from classpath first
@@ -87,6 +111,25 @@ public class DocumentDataLoader {
         log.info("UC6: Loaded {} regulation documents with vector embeddings", docs.size());
     }
 
+    private long existingDocCount() {
+        try {
+            return Math.max(
+                    RedisStartupHelper.indexDocCount(redis, INDEX_NAME),
+                    RedisStartupHelper.countKeys(redis, DOC_PREFIX + "*")
+            );
+        } catch (Exception e) {
+            return RedisStartupHelper.countKeys(redis, DOC_PREFIX + "*");
+        }
+    }
+
+    private int existingStoredVectorDimension() {
+        Set<String> keys = RedisScanHelper.scanKeys(redis, DOC_PREFIX + "*");
+        if (keys == null || keys.isEmpty()) {
+            return -1;
+        }
+        return RedisStartupHelper.jsonVectorDimension(redis, keys.iterator().next());
+    }
+
     /**
      * Load pre-computed embeddings from /data/kb-embeddings.json on the classpath.
      * Returns null if the file is not found or cannot be parsed.
@@ -100,6 +143,11 @@ public class DocumentDataLoader {
             ObjectMapper mapper = new ObjectMapper();
             List<Map<String, Object>> chunks = mapper.readValue(is, new TypeReference<>() {});
             if (chunks == null || chunks.isEmpty()) {
+                return null;
+            }
+            if (!hasExpectedVectorDimensions(chunks)) {
+                log.info("UC8: Ignoring pre-computed embeddings with mismatched vector dimensions (expected {})",
+                        VECTOR_DIM);
                 return null;
             }
             return convertChunksToDocs(chunks);
@@ -181,11 +229,33 @@ public class DocumentDataLoader {
         return docs;
     }
 
+    private boolean hasExpectedVectorDimensions(List<Map<String, Object>> chunks) {
+        for (Map<String, Object> chunk : chunks) {
+            if (vectorDimension(chunk.get("vector")) != VECTOR_DIM) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private int vectorDimension(Object vectorObj) {
+        if (vectorObj instanceof float[] arr) {
+            return arr.length;
+        }
+        if (vectorObj instanceof List<?> vectorList) {
+            return vectorList.size();
+        }
+        return -1;
+    }
+
     /** Best-effort write of generated chunks to kb-embeddings.json. No-op if write target is unavailable (e.g. JAR). */
     private void tryWriteEmbeddings(List<Map<String, Object>> chunks) {
         try {
             File target = new File(EMBEDDINGS_WRITE_PATH);
             File parent = target.getParentFile();
+            if (parent != null && !parent.isDirectory()) {
+                parent.mkdirs();
+            }
             if (parent == null || !parent.isDirectory()) {
                 log.debug("UC6: Skipping embeddings write ({} not available)", EMBEDDINGS_WRITE_PATH);
                 return;
