@@ -60,6 +60,17 @@ public class GuardrailsService {
     private static final int WINDOW_SECONDS = 60;
     private static final long MAX_AUDIT_STREAM_LEN = 2_000;
     private static final int DEFAULT_AUDIT_LIMIT = 50;
+    private static final double ALLOW_ROUTE_THRESHOLD = 0.50;
+    private static final double BLOCK_ROUTE_THRESHOLD = 0.35;
+
+    private static final String BLOCKED_ROUTE_DESCRIPTION =
+            "Blocked non-banking topics such as politics, elections, government opinions, religion, faith or ideological persuasion.";
+    private static final String OFF_TOPIC_ROUTE_DESCRIPTION =
+            "Off-topic requests unrelated to banking or finance, such as cooking recipes, programming questions, software development, hardware and systems, DIY crafts, sports scores, entertainment, travel planning, health and medical advice, science experiments, weather forecasts, gaming, fashion, gardening, pet care, automotive repair, home improvement and general knowledge trivia.";
+    private static final String BLOCKED_TOPIC_MESSAGE =
+            "This demo blocks political and religious topics to focus on banking use cases.";
+    private static final String OFF_TOPIC_MESSAGE =
+            "This question falls outside the banking scope. The guardrail demo only allows banking, investment, and support topics.";
 
     private static final Pattern ACCOUNT_PATTERN = Pattern.compile("\\b(?:acc(?:ount)?[\\s:#-]*)?([0-9]{8,16})\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern IBAN_PATTERN = Pattern.compile("\\b[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}\\b");
@@ -81,6 +92,10 @@ public class GuardrailsService {
     private static final Set<String> BLOCKED_KEYWORDS = Set.of(
             "politics", "political", "election", "government", "party", "religion",
             "religious", "church", "faith", "prayer", "mosque", "temple"
+    );
+    private static final Set<String> OFF_TOPIC_KEYWORDS = Set.of(
+            "recipe", "cooking", "programming", "code", "software", "hardware", "craft",
+            "diy", "sports", "game", "movie", "travel", "weather", "garden", "pet", "fashion"
     );
     private static final Set<String> INJECTION_KEYWORDS = Set.of(
             "ignore", "system", "prompt", "instruction", "developer", "reveal", "bypass",
@@ -125,7 +140,7 @@ public class GuardrailsService {
             long injectionDocs = RedisStartupHelper.indexDocCount(redis, INJECTION_INDEX);
             long routeKeys = RedisStartupHelper.countKeys(redis, ROUTE_PREFIX + "*");
             long injectionKeys = RedisStartupHelper.countKeys(redis, INJECTION_PREFIX + "*");
-            if ((routeDocs >= 4 || routeKeys >= 4) && (injectionDocs >= 5 || injectionKeys >= 5)) {
+            if ((routeDocs >= 5 || routeKeys >= 5) && (injectionDocs >= 5 || injectionKeys >= 5)) {
                 int routeVectorDim = existingVectorDimension(ROUTE_PREFIX + "*");
                 int injectionVectorDim = existingVectorDimension(INJECTION_PREFIX + "*");
                 if (routeVectorDim == VECTOR_DIM && injectionVectorDim == VECTOR_DIM) {
@@ -173,7 +188,7 @@ public class GuardrailsService {
         if (Boolean.TRUE.equals(routeMatch.decision().get("blocked"))) {
             incrementStat("chat:blocked");
             return buildBlockedResponse(resolvedUserId, resolvedMessage,
-                    "I can help with banking, investments and support topics, but this demo intentionally blocks politics and religion.",
+                    topicBlockMessage(routeMatch.label()),
                     routeMatch.label(), pipeline, requestStart);
         }
 
@@ -336,8 +351,11 @@ public class GuardrailsService {
                         "Support requests about login issues, password reset, app problems, card freeze, account access, technical help and customer support routing.",
                         "standard"),
                 new RouteSeed("blocked", "blocked", "block",
-                        "Blocked non-banking topics such as politics, elections, government opinions, religion, faith or ideological persuasion.",
-                        "strict")
+                        BLOCKED_ROUTE_DESCRIPTION,
+                        "strict"),
+                new RouteSeed("off-topic", "off-topic", "block",
+                        OFF_TOPIC_ROUTE_DESCRIPTION,
+                        "standard")
         );
 
         for (RouteSeed route : routes) {
@@ -439,20 +457,46 @@ public class GuardrailsService {
         Map<String, String> result = firstVectorMatch(ROUTE_INDEX, localEmbeddingService.getEmbedding(message),
                 "label", "action", "description", "severity");
 
-        String label = result.getOrDefault("label", "support");
-        String action = result.getOrDefault("action", "allow");
+        String matchedLabel = result.getOrDefault("label", "support");
+        String matchedAction = result.getOrDefault("action", "allow");
+        String matchedDescription = result.getOrDefault("description", "");
         double similarity = distanceToSimilarity(result.get("score"));
         boolean blockedByKeywords = containsAnyToken(message, BLOCKED_KEYWORDS)
                 || containsPhrase(message, "political opinion")
                 || containsPhrase(message, "religious advice");
-        boolean blocked = blockedByKeywords || ("blocked".equals(label) && similarity >= 0.35);
+        boolean offTopicKeywordHit = containsAnyToken(message, OFF_TOPIC_KEYWORDS);
+        boolean allowPass = "allow".equals(matchedAction) && similarity >= ALLOW_ROUTE_THRESHOLD;
+        boolean politicsBlock = blockedByKeywords || ("blocked".equals(matchedLabel) && similarity >= BLOCK_ROUTE_THRESHOLD);
 
-        if (blocked && !"blocked".equals(label)) {
+        String label = matchedLabel;
+        String action = matchedAction;
+        String matchedRouteDescription = matchedDescription;
+        boolean blocked;
+
+        if (politicsBlock) {
             label = "blocked";
             action = "block";
+            matchedRouteDescription = BLOCKED_ROUTE_DESCRIPTION;
+            blocked = true;
+        } else if (allowPass) {
+            blocked = false;
+        } else {
+            label = "off-topic";
+            action = "block";
+            matchedRouteDescription = OFF_TOPIC_ROUTE_DESCRIPTION;
+            blocked = true;
         }
 
-        String detail = "Classified as " + label + " (similarity " + round3(similarity) + ")";
+        String detail;
+        if (politicsBlock) {
+            detail = "Blocked politics/religion topic (similarity " + round3(similarity) + ")";
+        } else if (!blocked) {
+            detail = "Allowed topic " + label + " (similarity " + round3(similarity) + ")";
+        } else if (offTopicKeywordHit) {
+            detail = "Blocked off-topic request via keyword/default-deny (similarity " + round3(similarity) + ")";
+        } else {
+            detail = "Blocked by default deny outside banking scope (similarity " + round3(similarity) + ")";
+        }
         Map<String, Object> decision = recordDecision(
                 userId,
                 "topic",
@@ -464,7 +508,10 @@ public class GuardrailsService {
                         "route", label,
                         "action", action,
                         "similarity", round3(similarity),
-                        "matchedDescription", result.getOrDefault("description", "")
+                        "matchedDescription", matchedRouteDescription,
+                        "matchedLabel", matchedLabel,
+                        "blockedKeywordHit", blockedByKeywords,
+                        "offTopicKeywordHit", offTopicKeywordHit
                 ),
                 safePreview(message)
         );
@@ -610,6 +657,10 @@ public class GuardrailsService {
         response.put("stats", getStats());
         response.put("preview", safePreview(message));
         return response;
+    }
+
+    private String topicBlockMessage(String route) {
+        return "blocked".equals(route) ? BLOCKED_TOPIC_MESSAGE : OFF_TOPIC_MESSAGE;
     }
 
     private SensitiveScan inspectSensitiveData(String text) {
