@@ -4,7 +4,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.redis.workshop.config.RedisScanHelper;
+import com.redis.workshop.config.RedisStartupHelper;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -20,14 +25,24 @@ import java.util.concurrent.atomic.AtomicLong;
  * TTL: 300 seconds (5 minutes)
  */
 @Service
+@DependsOn("startupCleanup")
 public class CacheAsideService {
 
+    private static final Logger log = LoggerFactory.getLogger(CacheAsideService.class);
+
     private static final String CACHE_PREFIX = "uc10:product:";
+    private static final String MOCK_DB_PREFIX = "uc10:mockdb:";
     private static final long CACHE_TTL_SECONDS = 300;
     private static final long DB_SIMULATED_DELAY_MS = 200;
 
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
+
+    @Value("${workshop.startup.load-data:true}")
+    private boolean loadData;
+
+    @Value("${workshop.startup.force-reload:false}")
+    private boolean forceReload;
 
     // Mock "database" — simulates a slow relational DB
     private final Map<String, Map<String, Object>> mockDatabase = new LinkedHashMap<>();
@@ -45,21 +60,50 @@ public class CacheAsideService {
 
     @PostConstruct
     public void init() {
-        mockDatabase.put("mortgage-fixed", buildProduct("mortgage-fixed",
+        if (!loadData) return;
+        mockDatabase.clear();
+
+        List<Map<String, Object>> products = List.of(
+                buildProduct("mortgage-fixed",
                 "Fixed Rate Mortgage", "Mortgage", "3.25%", "25 years",
-                "€50,000", "€500,000", "Fixed rate mortgage with stable monthly payments", "2024-01-15"));
-        mockDatabase.put("mortgage-variable", buildProduct("mortgage-variable",
+                "€50,000", "€500,000", "Fixed rate mortgage with stable monthly payments", "2024-01-15"),
+                buildProduct("mortgage-variable",
                 "Variable Rate Mortgage", "Mortgage", "Euribor + 1.5%", "30 years",
-                "€50,000", "€750,000", "Variable rate mortgage linked to Euribor", "2024-01-15"));
-        mockDatabase.put("savings-premium", buildProduct("savings-premium",
+                "€50,000", "€750,000", "Variable rate mortgage linked to Euribor", "2024-01-15"),
+                buildProduct("savings-premium",
                 "Premium Savings Account", "Savings", "2.10%", null,
-                "€10,000", null, "High-yield savings for premium clients", "2024-02-01"));
-        mockDatabase.put("credit-gold", buildProduct("credit-gold",
+                "€10,000", null, "High-yield savings for premium clients", "2024-02-01"),
+                buildProduct("credit-gold",
                 "Gold Credit Card", "Credit Card", null, null,
-                null, null, "Premium credit card with travel insurance and cashback", "2024-01-20"));
-        mockDatabase.put("business-loan", buildProduct("business-loan",
+                null, null, "Premium credit card with travel insurance and cashback", "2024-01-20"),
+                buildProduct("business-loan",
                 "Business Growth Loan", "Business", "4.50%", "10 years",
-                "€25,000", "€1,000,000", "Flexible business loan for growth and expansion", "2024-03-01"));
+                "€25,000", "€1,000,000", "Flexible business loan for growth and expansion", "2024-03-01")
+        );
+
+        for (Map<String, Object> product : products) {
+            mockDatabase.put(String.valueOf(product.get("id")), product);
+        }
+
+        if (forceReload) {
+            log.info("UC10: force reload enabled for mock DB markers, rebuilding {} products", products.size());
+        } else {
+            long existingKeys = RedisStartupHelper.countKeys(redis, MOCK_DB_PREFIX + "*");
+            if (existingKeys >= products.size()) {
+                log.info("UC10: mock DB keys already present ({} keys), skipping reload", existingKeys);
+                return;
+            }
+        }
+
+        for (Map<String, Object> product : products) {
+            redis.opsForHash().putAll(MOCK_DB_PREFIX + product.get("id"), stringify(product));
+        }
+    }
+
+    private Map<String, String> stringify(Map<String, Object> product) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        product.forEach((key, value) -> fields.put(key, value == null ? "" : value.toString()));
+        return fields;
     }
 
     private Map<String, Object> buildProduct(String id, String name, String type, String rate,

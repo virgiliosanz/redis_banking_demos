@@ -29,6 +29,9 @@ public class GeoFinderService {
     private final ObjectMapper objectMapper;
     private final RedisSearchHelper redisSearchHelper;
 
+    @Value("${workshop.startup.load-data:true}")
+    private boolean loadData;
+
     @Value("${workshop.startup.force-reload:false}")
     private boolean forceReload;
 
@@ -46,6 +49,7 @@ public class GeoFinderService {
 
     @PostConstruct
     public void init() {
+        if (!loadData) return;
         if (forceReload) {
             log.info("UC12: force reload enabled for geo data, rebuilding GEO/JSON structures");
         } else {

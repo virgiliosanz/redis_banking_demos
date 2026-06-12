@@ -19,7 +19,10 @@
     var responseOutput = document.getElementById('responseOutput');
     var resultBadge = document.getElementById('resultBadge');
     var resultMeta = document.getElementById('resultMeta');
+    var gatewayErrorBanner = document.getElementById('uc16-error-banner');
     var latencyBreakdown = document.getElementById('latencyBreakdown');
+    var pipelineEl = document.getElementById('uc16-pipeline');
+    var guardrailRouteValue = document.getElementById('guardrailRouteValue');
     var selectedModel = document.getElementById('selectedModel');
     var routeReason = document.getElementById('routeReason');
     var cacheValue = document.getElementById('cacheValue');
@@ -28,20 +31,12 @@
     var costValue = document.getElementById('costValue');
     var sessionSpend = document.getElementById('sessionSpend');
     var latencyValue = document.getElementById('latencyValue');
-    var routeStep = document.getElementById('step-route');
-    var cacheStep = document.getElementById('step-cache');
-    var limitStep = document.getElementById('step-limit');
-    var responseStep = document.getElementById('step-response');
-    var routeCopy = document.getElementById('step-route-copy');
-    var cacheCopy = document.getElementById('step-cache-copy');
-    var limitCopy = document.getElementById('step-limit-copy');
-    var responseCopy = document.getElementById('step-response-copy');
 
     window.initCodeTabs();
 
     if (sessionIdValue) sessionIdValue.textContent = sessionId;
     if (userIdValue) userIdValue.textContent = userId;
-    if (gatewayBadge) gatewayBadge.textContent = 'Providers: mock';
+    if (gatewayBadge) gatewayBadge.textContent = 'AI: checking…';
 
     function escapeHtml(text) {
         var div = document.createElement('div');
@@ -69,20 +64,93 @@
         return n.toFixed(1) + '%';
     }
 
-    function setStepState(el, state) {
-        if (!el) return;
-        el.className = 'uc16-step ' + state;
+    function stageClass(status) {
+        var normalized = String(status || '').toLowerCase();
+        if (normalized === 'block' || normalized === 'blocked') return 'block';
+        if (normalized === 'flag') return 'flag';
+        return 'pass';
+    }
+
+    function stageLabel(stage) {
+        var labels = {
+            topic: 'Topic',
+            inputPii: 'Input PII',
+            promptInjection: 'Prompt Injection',
+            modelRoute: 'Model Route',
+            semanticCache: 'Semantic Cache',
+            rateLimit: 'Rate Limit',
+            response: 'Response',
+            outputPii: 'Output PII',
+            compliance: 'Compliance',
+            cost: 'Cost + Log'
+        };
+        return labels[stage] || String(stage || 'Stage');
+    }
+
+    function setResultBadge(text, state) {
+        if (!resultBadge) return;
+        resultBadge.textContent = text;
+        resultBadge.className = 'status-badge' + (state ? ' ' + state : '');
+    }
+
+    function setGatewayBadge(text, state) {
+        if (!gatewayBadge) return;
+        gatewayBadge.textContent = text;
+        gatewayBadge.classList.remove('mock', 'on');
+        gatewayBadge.classList.add(state || 'mock');
+    }
+
+    function showGatewayError(message) {
+        if (!gatewayErrorBanner) return;
+        gatewayErrorBanner.textContent = message;
+        gatewayErrorBanner.style.display = 'block';
+    }
+
+    function hideGatewayError() {
+        if (!gatewayErrorBanner) return;
+        gatewayErrorBanner.textContent = '';
+        gatewayErrorBanner.style.display = 'none';
+    }
+
+    function hasPipelineStage(pipeline, stage) {
+        return Array.isArray(pipeline) && pipeline.some(function (step) {
+            return step && step.stage === stage;
+        });
+    }
+
+    function clearPipeline() {
+        if (pipelineEl) pipelineEl.innerHTML = '';
+    }
+
+    function renderPipeline(pipeline) {
+        if (!pipelineEl) return;
+        if (!Array.isArray(pipeline) || !pipeline.length) {
+            pipelineEl.innerHTML = '<div class="uc16-empty">No pipeline data.</div>';
+            return;
+        }
+
+        var stagesHtml = '';
+        var detailHtml = '';
+        pipeline.forEach(function (step) {
+            var label = stageLabel(step.stage);
+            stagesHtml += '<span class="uc16-stage ' + stageClass(step.status) + '">'
+                + escapeHtml(label) + ' · ' + escapeHtml(step.status || 'PASS') + ' · ' + escapeHtml(formatMs(step.latencyMs))
+                + '</span>';
+            detailHtml += '<div><strong>' + escapeHtml(label) + ':</strong> '
+                + escapeHtml(step.detail || 'No detail provided.')
+                + '</div>';
+        });
+
+        pipelineEl.innerHTML = stagesHtml
+            + '<details class="uc16-pipeline-detail" open>'
+            + '<summary>Step details</summary>'
+            + '<div class="uc16-pipeline-detail-list">' + detailHtml + '</div>'
+            + '</details>';
     }
 
     function resetView() {
-        setStepState(routeStep, 'is-idle');
-        setStepState(cacheStep, 'is-idle');
-        setStepState(limitStep, 'is-idle');
-        setStepState(responseStep, 'is-idle');
-        routeCopy.textContent = 'Vector routing decision pending.';
-        cacheCopy.textContent = 'No cache lookup yet.';
-        limitCopy.textContent = 'Per-model budget not checked yet.';
-        responseCopy.textContent = 'Awaiting response and stream append.';
+        clearPipeline();
+        if (guardrailRouteValue) guardrailRouteValue.textContent = '—';
         selectedModel.textContent = '—';
         routeReason.textContent = '—';
         cacheValue.textContent = '—';
@@ -91,10 +159,11 @@
         costValue.textContent = '—';
         sessionSpend.textContent = '—';
         latencyValue.textContent = '—';
-        resultBadge.textContent = 'Ready';
+        setResultBadge('Ready', '');
         resultMeta.textContent = 'Run a query to inspect route, cache, cost, and latency.';
         responseOutput.textContent = 'Run a query to inspect the final answer, the selected model, and the accumulated session cost.';
         latencyBreakdown.textContent = 'No latency breakdown captured yet.';
+        hideGatewayError();
         if (queryInput) queryInput.focus();
     }
 
@@ -154,14 +223,20 @@
         logList.innerHTML = html;
     }
 
+    function refreshStatsPanel() {
+        return window.workshopGet('/api/gateway/stats').then(renderStats);
+    }
+
+    function refreshLogPanel() {
+        return window.workshopGet('/api/gateway/log?limit=10').then(renderLog);
+    }
+
     function refreshDashboard() {
-        return Promise.all([
-            window.workshopGet('/api/gateway/stats').then(renderStats),
-            window.workshopGet('/api/gateway/log?limit=10').then(renderLog)
-        ]);
+        return Promise.all([refreshStatsPanel(), refreshLogPanel()]);
     }
 
     function renderResult(data) {
+        var blocked = !!data.blocked;
         var cacheHit = !!data.cacheHit;
         var rateLimited = !!data.rateLimited;
         var rateLimit = data.rateLimit || {};
@@ -169,57 +244,64 @@
         var cache = data.cache || {};
         var latency = data.latency || {};
         var cost = data.cost || {};
+        var llmUnavailable = data.error === 'LLM not configured' || data.openaiConfigured === false;
 
-        setStepState(routeStep, 'is-active');
-        setStepState(cacheStep, cacheHit ? 'is-hit' : 'is-miss');
-        setStepState(limitStep, rateLimited ? 'is-blocked' : 'is-ok');
-        setStepState(responseStep, rateLimited ? 'is-blocked' : 'is-active');
-
-        routeCopy.textContent = (route.model || data.model || '—') + ' · distance ' + formatDistance(route.distance);
-        cacheCopy.textContent = cacheHit
-            ? 'Hit on “' + (cache.matchedQuestion || 'similar prompt') + '”'
-            : 'Miss · will store response for ' + (route.model || data.model || 'selected model');
-        limitCopy.textContent = rateLimited
-            ? 'Blocked · retry after ' + (rateLimit.retryAfter || 0) + 's'
-            : 'Allowed · ' + (rateLimit.remaining || 0) + ' remaining in current window';
-        responseCopy.textContent = rateLimited
-            ? 'Returned rate-limit message and logged the request.'
-            : 'Returned ' + (data.model || 'response') + ' and appended stream event.';
-
+        renderPipeline(data.pipeline);
+        if (guardrailRouteValue) guardrailRouteValue.textContent = data.guardrailRoute || '—';
         selectedModel.textContent = data.model || '—';
         routeReason.textContent = route.reason || '—';
-        cacheValue.textContent = cacheHit ? 'Hit @ ' + formatDistance(cache.distance) : 'Miss';
+        cacheValue.textContent = cacheHit
+            ? 'Hit @ ' + formatDistance(cache.distance)
+            : (hasPipelineStage(data.pipeline, 'semanticCache') ? 'Miss' : 'Skipped');
         matchedQuestion.textContent = cache.matchedQuestion || '—';
-        budgetRemaining.textContent = (rateLimit.remaining != null ? rateLimit.remaining : '—')
-            + (rateLimit.limit != null ? ' / ' + rateLimit.limit : '');
+        budgetRemaining.textContent = hasPipelineStage(data.pipeline, 'rateLimit')
+            ? ((rateLimit.remaining != null ? rateLimit.remaining : '—')
+                + (rateLimit.limit != null ? ' / ' + rateLimit.limit : ''))
+            : 'Skipped';
         costValue.textContent = formatUsd(cost.estimatedCostUsd);
         sessionSpend.textContent = formatUsd(cost.sessionTotalUsd) + ' · ' + (cost.sessionTotalTokens || 0) + ' tok';
         latencyValue.textContent = formatMs(latency.totalMs);
 
-        if (rateLimited) {
-            resultBadge.textContent = 'Rate limited';
-            resultMeta.textContent = (data.model || 'Provider') + ' budget exhausted for this window.';
+        if (llmUnavailable) {
+            setResultBadge('LLM unavailable', 'expired');
+            resultMeta.textContent = 'Gateway completed the Redis pipeline but could not call OpenAI.';
+            showGatewayError(data.message || 'LLM not configured — set OPENAI_API_KEY');
+        } else if (blocked) {
+            setResultBadge('Blocked', 'expired');
+            resultMeta.textContent = rateLimited
+                ? (data.model || 'Provider') + ' budget exhausted before model execution.'
+                : 'Gateway stopped at the ' + stageLabel((data.pipeline && data.pipeline[data.pipeline.length - 1] && data.pipeline[data.pipeline.length - 1].stage) || 'topic').toLowerCase() + ' step.';
+            hideGatewayError();
         } else if (cacheHit) {
-            resultBadge.textContent = 'Cache hit';
+            setResultBadge('Cache hit', 'active');
             resultMeta.textContent = 'Response served from semantic cache for the selected model.';
+            hideGatewayError();
         } else {
-            resultBadge.textContent = 'Routed live';
+            setResultBadge('Routed live', 'active');
             resultMeta.textContent = 'Gateway called ' + (data.model || 'the selected model') + ' and cached the result.';
+            hideGatewayError();
         }
 
-        responseOutput.textContent = data.response || data.error || 'No response body returned.';
-        latencyBreakdown.textContent = 'routing ' + formatMs(latency.routingMs)
+        responseOutput.textContent = llmUnavailable
+            ? (data.message || data.error || 'LLM not configured — set OPENAI_API_KEY')
+            : (data.response || data.error || 'No response body returned.');
+        latencyBreakdown.textContent = 'topic ' + formatMs(latency.topicMs)
+            + ' · input PII ' + formatMs(latency.inputPiiMs)
+            + ' · injection ' + formatMs(latency.injectionMs)
+            + ' · routing ' + formatMs(latency.routingMs)
             + ' · cache ' + formatMs(latency.cacheMs)
             + ' · rate-limit ' + formatMs(latency.rateLimitMs)
-            + ' · model ' + formatMs(latency.modelMs)
+            + ' · response ' + formatMs(latency.responseMs)
+            + ' · output PII ' + formatMs(latency.outputPiiMs)
+            + ' · compliance ' + formatMs(latency.complianceMs)
             + ' · stats ' + formatMs(latency.statsMs)
             + ' · log ' + formatMs(latency.logMs)
             + ' · total ' + formatMs(latency.totalMs);
 
-        if (gatewayBadge) {
-            gatewayBadge.textContent = 'Model: ' + (data.model || 'mock');
-            gatewayBadge.classList.remove('mock', 'on');
-            gatewayBadge.classList.add(rateLimited ? 'mock' : 'on');
+        if (llmUnavailable) {
+            setGatewayBadge('AI: unavailable', 'mock');
+        } else {
+            setGatewayBadge('AI: OpenAI live', 'on');
         }
     }
 
@@ -233,18 +315,22 @@
         queryInput.style.borderColor = '';
         sendBtn.disabled = true;
         sendBtn.textContent = 'Routing…';
+        hideGatewayError();
 
         window.workshopFetch('/api/gateway/query', {
             query: query,
             userId: userId,
             sessionId: sessionId
         }).then(function (data) {
-            renderResult(data || {});
-            return refreshDashboard();
+            data = data || {};
+            renderResult(data);
+            return data.blocked ? refreshLogPanel() : refreshDashboard();
         }).catch(function () {
-            resultBadge.textContent = 'Error';
+            setResultBadge('Error', 'expired');
             resultMeta.textContent = 'Gateway request failed.';
             responseOutput.textContent = 'Could not reach /api/gateway/query. Verify the app and Redis are running.';
+            setGatewayBadge('AI: unavailable', 'mock');
+            showGatewayError('LLM request failed. Check OPENAI_API_KEY and server connectivity.');
         }).finally(function () {
             sendBtn.disabled = false;
             sendBtn.textContent = 'Send through gateway';
@@ -259,11 +345,7 @@
             sessionId = 'gw-' + Math.random().toString(36).substring(2, 10);
             if (sessionIdValue) sessionIdValue.textContent = sessionId;
             if (queryInput) queryInput.value = '';
-            if (gatewayBadge) {
-                gatewayBadge.textContent = 'Providers: mock';
-                gatewayBadge.classList.remove('on');
-                gatewayBadge.classList.add('mock');
-            }
+            setGatewayBadge('AI: checking…', 'mock');
             resetView();
             return refreshDashboard();
         }).finally(function () {

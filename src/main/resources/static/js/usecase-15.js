@@ -11,6 +11,8 @@
     var userInputEl = document.getElementById('uc15-user-id');
     var userLabelEl = document.getElementById('uc15-user-label');
     var auditBodyEl = document.getElementById('uc15-audit-body');
+    var modeBadgeEl = document.getElementById('uc15-mode-badge');
+    var errorBannerEl = document.getElementById('uc15-error-banner');
 
     var totalChatsEl = document.getElementById('uc15-total-chats');
     var blockedChatsEl = document.getElementById('uc15-blocked-chats');
@@ -25,6 +27,25 @@
 
     function currentUserId() {
         return (userInputEl && userInputEl.value ? userInputEl.value : 'demo-user').trim() || 'demo-user';
+    }
+
+    function setModeBadge(label, state) {
+        if (!modeBadgeEl) return;
+        modeBadgeEl.textContent = label;
+        modeBadgeEl.classList.remove('on', 'mock');
+        modeBadgeEl.classList.add(state || 'mock');
+    }
+
+    function showErrorBanner(message) {
+        if (!errorBannerEl) return;
+        errorBannerEl.textContent = message;
+        errorBannerEl.style.display = 'block';
+    }
+
+    function hideErrorBanner() {
+        if (!errorBannerEl) return;
+        errorBannerEl.textContent = '';
+        errorBannerEl.style.display = 'none';
     }
 
     function syncUserLabel() {
@@ -130,6 +151,7 @@
         addMessage('user', message, null);
         inputEl.value = '';
         sendEl.disabled = true;
+        hideErrorBanner();
 
         return fetchJson('/api/guardrails/chat', {
             method: 'POST',
@@ -138,10 +160,19 @@
                 message: message
             })
         }).then(function (data) {
-            addMessage('assistant', data.response || '(empty response)', data);
+            var llmUnavailable = data.error === 'LLM not configured' || data.openaiConfigured === false;
+            if (llmUnavailable) {
+                setModeBadge('AI: unavailable', 'mock');
+                showErrorBanner(data.message || 'LLM not configured — set OPENAI_API_KEY');
+            } else {
+                setModeBadge('AI: OpenAI live', 'on');
+            }
+            addMessage('assistant', llmUnavailable ? (data.message || data.error) : (data.response || '(empty response)'), data);
             renderStats(data.stats || null);
             return refreshAudit();
         }).catch(function (err) {
+            setModeBadge('AI: unavailable', 'mock');
+            showErrorBanner('LLM request failed. Check OPENAI_API_KEY and server connectivity.');
             addMessage('assistant', '⚠ ' + (err.message || err), { blocked: true, route: 'error', pipeline: [] });
         }).finally(function () {
             sendEl.disabled = false;
@@ -153,6 +184,8 @@
         resetEl.disabled = true;
         return fetchJson('/api/guardrails/reset', { method: 'POST' }).then(function () {
             chatEl.innerHTML = '<div class="chat-welcome">Runtime state reset. Send another prompt to rebuild the guardrail trail.</div>';
+            hideErrorBanner();
+            setModeBadge('AI: checking…', 'mock');
             return Promise.all([refreshStats(), refreshAudit()]);
         }).finally(function () {
             resetEl.disabled = false;
@@ -192,5 +225,6 @@
     });
 
     syncUserLabel();
+    setModeBadge('AI: checking…', 'mock');
     refreshStats().then(refreshAudit);
 })();

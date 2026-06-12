@@ -1,6 +1,7 @@
 package com.redis.workshop.controller;
 
 import com.redis.workshop.config.DocumentDataLoader;
+import com.redis.workshop.config.StartupCleanup;
 import com.redis.workshop.service.AssistantService;
 import com.redis.workshop.service.AgentCoordinatorService;
 import com.redis.workshop.service.AiGatewayService;
@@ -34,6 +35,7 @@ public class AdminController {
     private static final Logger log = LoggerFactory.getLogger(AdminController.class);
 
     private final StringRedisTemplate redis;
+    private final StartupCleanup startupCleanup;
     private final DocumentDataLoader documentDataLoader;
     private final AssistantService assistantService;
     private final FraudService fraudService;
@@ -45,6 +47,7 @@ public class AdminController {
     private final AgentCoordinatorService agentCoordinatorService;
 
     public AdminController(StringRedisTemplate redis,
+                           StartupCleanup startupCleanup,
                            DocumentDataLoader documentDataLoader,
                            AssistantService assistantService,
                            FraudService fraudService,
@@ -55,6 +58,7 @@ public class AdminController {
                            AiGatewayService aiGatewayService,
                            AgentCoordinatorService agentCoordinatorService) {
         this.redis = redis;
+        this.startupCleanup = startupCleanup;
         this.documentDataLoader = documentDataLoader;
         this.assistantService = assistantService;
         this.fraudService = fraudService;
@@ -67,21 +71,17 @@ public class AdminController {
     }
 
     /**
-     * Reset all demo data: FLUSHALL + re-run every {@code @PostConstruct}
-     * data loader. Returns per-step timing so the frontend can surface
-     * progress and failures.
+     * Reset all demo data: scoped workshop cleanup + re-run every demo loader.
+     * Supports both the legacy {@code /api/reset-all} path and the explicit
+     * {@code /api/admin/reload} alias used for force reload automation.
      */
-    @PostMapping("/reset-all")
+    @PostMapping({"/reset-all", "/admin/reload"})
     public ResponseEntity<Map<String, Object>> resetAll() {
         long overallStart = System.currentTimeMillis();
         List<Map<String, Object>> steps = new ArrayList<>();
         boolean ok = true;
 
-        ok &= runStep(steps, "flushAll", () -> {
-            var cf = redis.getConnectionFactory();
-            if (cf == null) throw new IllegalStateException("Redis connection factory not available");
-            cf.getConnection().serverCommands().flushAll();
-        });
+        ok &= runStep(steps, "StartupCleanup.cleanupWorkshopState", () -> startupCleanup.cleanupWorkshopState());
 
         ok &= runStep(steps, "DocumentDataLoader.loadDocuments", documentDataLoader::loadDocuments);
         ok &= runStep(steps, "AssistantService.init", assistantService::init);

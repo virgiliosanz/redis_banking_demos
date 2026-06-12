@@ -17,7 +17,7 @@
             <div class="how-it-works-steps">
                 <ol>
                     <li><strong>Semantic routing</strong> stores model capability vectors in Redis and uses KNN search to choose the best provider for each prompt.</li>
-                    <li><strong>Semantic cache</strong> checks for a similar request per model before any mock LLM work happens.</li>
+                    <li><strong>Semantic cache</strong> checks for a similar request per model before any OpenAI call happens.</li>
                     <li><strong>Per-model rate limiting</strong> uses <code>INCR</code> + <code>EXPIRE</code> so each provider gets its own request budget.</li>
                     <li><strong>Cost tracking</strong> accumulates estimated token usage and spend in Redis Hashes per session.</li>
                     <li><strong>Observability</strong> appends every request to a Redis Stream so the UI can show recent gateway traffic.</li>
@@ -79,7 +79,7 @@
             <section class="panel demo-panel">
                 <div class="uc16-panel-head">
                     <h2 style="margin:0;">Live Demo</h2>
-                    <span id="gateway-badge" class="ai-badge mock" title="Gateway mode">Providers: mock</span>
+                    <span id="gateway-badge" class="ai-badge mock" title="Gateway mode">AI: checking…</span>
                 </div>
 
                 <div id="demo-container" class="demo-container">
@@ -133,6 +133,7 @@
                             <span id="resultBadge" class="status-badge">Ready</span>
                             <span id="resultMeta" class="uc16-inline-meta">Run a query to inspect route, cache, cost, and latency.</span>
                         </div>
+                        <div id="uc16-error-banner" class="uc16-error-banner" style="display:none;"></div>
                         <pre id="responseOutput" class="uc16-response-box">Run a query to inspect the final answer, the selected model, and the accumulated session cost.</pre>
                         <div id="latencyBreakdown" class="uc16-breakdown">No latency breakdown captured yet.</div>
                     </div>
@@ -316,6 +317,16 @@ XREVRANGE uc16:stream:gateway + - COUNT 10</code></pre>
             }
             .uc16-inline-meta {
                 font-size:0.8rem; color:var(--text-muted);
+            }
+            .uc16-error-banner {
+                margin-bottom:12px;
+                padding:12px 14px;
+                border-radius:var(--border-radius);
+                border:1px solid rgba(255, 68, 56, 0.35);
+                background:rgba(255, 68, 56, 0.12);
+                color:var(--redis-primary);
+                font-size:0.82rem;
+                font-weight:600;
             }
             .uc16-response-box {
                 margin:0; padding:14px; white-space:pre-wrap; line-height:1.6;

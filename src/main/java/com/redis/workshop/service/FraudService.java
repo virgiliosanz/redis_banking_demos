@@ -1,7 +1,11 @@
 package com.redis.workshop.service;
 
 import com.redis.workshop.config.RedisScanHelper;
+import com.redis.workshop.config.RedisStartupHelper;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.StreamRecords;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -14,6 +18,8 @@ import java.util.*;
 @Service
 @DependsOn("startupCleanup")
 public class FraudService {
+
+    private static final Logger log = LoggerFactory.getLogger(FraudService.class);
 
     private static final String VELOCITY_KEY_PREFIX = "uc6:velocity:";
     private static final String STREAM_KEY = "uc6:stream:transactions";
@@ -33,6 +39,12 @@ public class FraudService {
 
     private final StringRedisTemplate redis;
 
+    @Value("${workshop.startup.load-data:true}")
+    private boolean loadData;
+
+    @Value("${workshop.startup.force-reload:false}")
+    private boolean forceReload;
+
     public FraudService(StringRedisTemplate redis) {
         this.redis = redis;
     }
@@ -42,6 +54,17 @@ public class FraudService {
      */
     @PostConstruct
     public void loadBaselineData() {
+        if (!loadData) return;
+        if (forceReload) {
+            log.info("UC6: force reload enabled for fraud baseline, rebuilding velocity keys");
+        } else {
+            long existingVelocityKeys = RedisStartupHelper.countKeys(redis, VELOCITY_KEY_PREFIX + "*");
+            if (existingVelocityKeys >= CARD_HOME_COUNTRY.size()) {
+                log.info("UC6: fraud velocity keys already present ({} keys), skipping reload", existingVelocityKeys);
+                return;
+            }
+        }
+
         long now = Instant.now().toEpochMilli();
         // Add 2 "normal" past transactions per card (spread over last 4 minutes)
         CARD_HOME_COUNTRY.forEach((card, country) -> {

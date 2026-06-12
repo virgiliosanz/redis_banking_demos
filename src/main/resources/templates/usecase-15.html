@@ -17,8 +17,8 @@
         <div class="how-it-works-steps">
             <ol>
                 <li><strong>Rate limit</strong> uses Redis <code>INCR</code> + <code>EXPIRE</code> per user to enforce a 60-second token budget.</li>
-                <li><strong>Topic routing</strong> embeds the prompt with a mock 1536-dim vector and runs <code>FT.SEARCH ... KNN</code> against Redis route vectors.</li>
-                <li><strong>PII and injection checks</strong> flag sensitive values and block jailbreak-style prompts before the mock LLM runs.</li>
+                <li><strong>Topic routing</strong> embeds the prompt with a local 384-dim ONNX vector and runs <code>FT.SEARCH ... KNN</code> against Redis route vectors.</li>
+                <li><strong>PII and injection checks</strong> flag sensitive values and block jailbreak-style prompts before the OpenAI call runs.</li>
                 <li><strong>Output guardrails</strong> scrub leaked identifiers and add an investment disclaimer when the reply needs compliance hardening.</li>
                 <li><strong>Audit trail</strong> writes every decision to a Redis Stream so the UI can replay the pipeline step-by-step.</li>
             </ol>
@@ -29,9 +29,10 @@
         <section class="panel demo-panel">
             <div class="uc15-panel-head">
                 <h2 style="margin:0;">Live Demo</h2>
-                <span id="uc15-mode-badge" class="ai-badge mock">Mock LLM</span>
+                <span id="uc15-mode-badge" class="ai-badge mock">AI: checking…</span>
                 <span id="uc15-stream-badge" class="ai-badge on">Audit Stream</span>
             </div>
+            <div id="uc15-error-banner" class="uc15-error-banner" style="display:none;"></div>
 
             <div id="demo-container" class="demo-container">
                 <div class="data-card">
@@ -155,7 +156,7 @@ XRANGE uc15:stream:audit - + COUNT 20</code></pre>
 [3] PII scan (regex)
 [4] Prompt injection detection (Redis vector KNN)
   ↓
-Mock LLM reply
+OpenAI reply
   ↓
 [5] Output PII scrub
 [6] Compliance disclaimer
@@ -202,6 +203,16 @@ Redis Stream audit + UI pipeline render</code></pre>
             display:flex;
             flex-direction:column;
             gap:12px;
+        }
+        .uc15-error-banner {
+            margin-bottom:16px;
+            padding:12px 14px;
+            border-radius:var(--border-radius);
+            border:1px solid rgba(255, 68, 56, 0.35);
+            background:rgba(255, 68, 56, 0.12);
+            color:var(--redis-primary);
+            font-size:0.82rem;
+            font-weight:600;
         }
         .uc15-msg {
             background:var(--bg-secondary);

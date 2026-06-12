@@ -1,5 +1,7 @@
 package com.redis.workshop.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
@@ -10,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 
 public final class RedisStartupHelper {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private RedisStartupHelper() {}
 
@@ -30,6 +34,35 @@ public final class RedisStartupHelper {
 
     public static boolean indexExistsWithMinDocs(StringRedisTemplate redis, String indexName, long minDocs) {
         return indexDocCount(redis, indexName) >= minDocs;
+    }
+
+    public static int hashVectorDimension(StringRedisTemplate redis, String key) {
+        Object raw = redis.execute((RedisCallback<Object>) connection ->
+                connection.hashCommands().hGet(bytes(key), bytes("vector")));
+        if (raw instanceof byte[] vectorBytes && vectorBytes.length > 0) {
+            return vectorBytes.length / Float.BYTES;
+        }
+        return -1;
+    }
+
+    public static int jsonVectorDimension(StringRedisTemplate redis, String key) {
+        try {
+            Object raw = redis.execute((RedisCallback<Object>) connection ->
+                    connection.execute("JSON.GET", bytes(key), bytes("$.vector")));
+            if (raw == null) {
+                return -1;
+            }
+            JsonNode root = OBJECT_MAPPER.readTree(stringValue(raw));
+            JsonNode vectorNode = root.path("$.vector");
+            if (vectorNode.isArray() && !vectorNode.isEmpty()) {
+                JsonNode first = vectorNode.get(0);
+                if (first.isArray()) {
+                    return first.size();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return -1;
     }
 
     public static boolean streamGroupExists(StringRedisTemplate redis, String streamKey, String groupName) {

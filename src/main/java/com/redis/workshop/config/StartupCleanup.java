@@ -53,18 +53,37 @@ public class StartupCleanup {
     @Value("${workshop.startup.redis-ready-poll-millis:1000}")
     private long readyPollMillis;
 
+    @Value("${workshop.startup.load-data:true}")
+    private boolean loadData;
+
+    @Value("${workshop.startup.force-reload:false}")
+    private boolean forceReload;
+
     public StartupCleanup(StringRedisTemplate redis) {
         this.redis = redis;
     }
 
     @PostConstruct
     public void flush() {
-        awaitRedisReady();
-        log.info("Cleaning workshop-owned Redis state (preserving AMS indices/keys)...");
-        int deletedKeys = deleteWorkshopKeys();
-        int droppedIndices = dropWorkshopIndices();
+        if (!loadData) {
+            log.info("Data loading disabled (workshop.startup.load-data=false)");
+            return;
+        }
+        if (!forceReload) {
+            awaitRedisReady();
+            log.info("Startup mode: skip-if-present enabled; Redis readiness verified and existing workshop data preserved.");
+            return;
+        }
+
+        log.info("Startup mode: force reload enabled; cleaning workshop-owned Redis state (preserving AMS indices/keys)...");
+        CleanupSummary summary = cleanupWorkshopState();
         log.info("Workshop cleanup complete: {} keys deleted, {} indices dropped",
-                deletedKeys, droppedIndices);
+                summary.deletedKeys(), summary.droppedIndices());
+    }
+
+    public CleanupSummary cleanupWorkshopState() {
+        awaitRedisReady();
+        return new CleanupSummary(deleteWorkshopKeys(), dropWorkshopIndices());
     }
 
     /**
@@ -173,4 +192,6 @@ public class StartupCleanup {
         if (o instanceof byte[] bytes) return new String(bytes, StandardCharsets.UTF_8);
         return o.toString();
     }
+
+    public record CleanupSummary(int deletedKeys, int droppedIndices) {}
 }

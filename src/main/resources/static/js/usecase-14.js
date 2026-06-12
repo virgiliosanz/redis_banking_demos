@@ -162,7 +162,7 @@
             if (amsUser) amsUser.textContent = USER_ID;
             if (amsSeedCount) amsSeedCount.textContent = (data.seededMemoryIds || []).length;
             setBadge(amsBadge, data.reachable ? 'AMS: reachable' : 'AMS: unreachable', data.reachable ? 'ok' : 'fail');
-            setBadge(aiBadge, data.openaiConfigured ? 'AI: live' : 'AI: mock', data.openaiConfigured ? 'ok' : 'mock');
+            setBadge(aiBadge, data.openaiConfigured ? 'AI: live' : 'AI: unavailable', data.openaiConfigured ? 'ok' : 'mock');
         }).catch(function (e) {
             setBadge(amsBadge, 'AMS: error', 'fail');
             console.error('UC14 status failed', e);
@@ -209,12 +209,17 @@
             method: 'POST',
             body: JSON.stringify({ sessionId: SESSION_ID, userId: USER_ID, message: message })
         }).then(function (data) {
-            addMessage('assistant', data.response || '(empty response)');
+            var llmUnavailable = data.error === 'LLM not configured' || data.openaiConfigured === false;
+            addMessage('assistant', llmUnavailable
+                ? (data.message || 'LLM not configured — set OPENAI_API_KEY')
+                : (data.response || '(empty response)'));
             renderWorkingMemory(data.workingMemory);
             renderLongTerm(data.contextAssembly);
             renderAssembled(data.assembledMessages);
-            latencyDisplay.textContent = 'Context assembly + LLM latency: ' + data.latencyMs + 'ms'
-                + (data.openaiUsed ? ' · OpenAI live' : ' · mock reply');
+            setBadge(aiBadge, llmUnavailable ? 'AI: unavailable' : 'AI: live', llmUnavailable ? 'mock' : 'ok');
+            latencyDisplay.textContent = llmUnavailable
+                ? 'Context assembly completed, but the LLM is unavailable. Set OPENAI_API_KEY.'
+                : ('Context assembly + LLM latency: ' + data.latencyMs + 'ms · OpenAI live');
             return refreshTraces();
         }).catch(function (e) {
             addMessage('assistant', '⚠ Chat failed: ' + (e.message || e));

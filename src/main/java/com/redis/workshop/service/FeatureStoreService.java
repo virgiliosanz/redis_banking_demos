@@ -1,6 +1,7 @@
 package com.redis.workshop.service;
 
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -116,12 +117,16 @@ public class FeatureStoreService {
 
     private final StringRedisTemplate redis;
 
+    @Value("${workshop.startup.load-data:true}")
+    private boolean loadData;
+
     public FeatureStoreService(StringRedisTemplate redis) {
         this.redis = redis;
     }
 
     @PostConstruct
     public void loadInitialFeatures() {
+        if (!loadData) return;
         FEATURE_SET_V1_DATA.forEach((clientId, features) -> storeFeatures(clientId, FEATURE_SET_V1, features));
         FEATURE_SET_V2_DATA.forEach((clientId, features) -> storeFeatures(clientId, FEATURE_SET_V2, features));
     }

@@ -333,7 +333,7 @@
                 <li><code>DocumentSearchController</code> routes search, list, query-by-field, read-by-id, and create requests into <code>DocumentSearchService</code>.</li>
                 <li>Documents live as JSON records under <code>uc8:doc:{id}</code> and are indexed by <code>idx:uc8:documents</code>.</li>
                 <li><code>fullTextSearch()</code>, <code>vectorSearch()</code>, and <code>hybridSearch()</code> each build the exact <code>FT.SEARCH</code> command string returned to the UI.</li>
-                <li>Embeddings come from <code>OpenAiService</code> when configured, with mock vectors as fallback so the demo still works offline.</li>
+                <li>Embeddings are generated locally using <code>BGE-small-en-v1.5</code> (384 dims, ONNX). No API key is needed for vector search.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
@@ -375,7 +375,7 @@
                 <li><code>AssistantController</code> exposes synchronous chat, SSE streaming, conversation inspection, KB browsing, and semantic-cache stats through <code>AssistantService</code>.</li>
                 <li>Short-term state is stored at <code>uc9:conversation:{sessionId}</code>; <code>AssistantService</code> then fans out to <code>MemoryService</code>, <code>KnowledgeBaseService</code>, and <code>SemanticCacheService</code>.</li>
                 <li><code>MemoryService</code> seeds <code>uc9:memory:*</code> / <code>idx:uc9:memory</code>, while <code>KnowledgeBaseService</code> owns <code>uc9:kb:*</code> / <code>idx:uc9:kb</code> and also queries UC8's regulation index.</li>
-                <li>When OpenAI is configured, <code>OpenAiService</code> provides real embeddings and optional SSE token streaming; otherwise the same flow falls back to deterministic mock responses.</li>
+                <li>Embeddings are generated locally by <code>LocalEmbeddingService</code> using <code>BGE-small-en-v1.5</code>; OpenAI is only used for chat completions when configured.</li>
             </ul>
             <h3>Talking points</h3>
             <ul>
@@ -593,7 +593,7 @@
             <ul>
                 <li><code>AmsController</code> is a thin REST facade over <code>AmsDemoService</code>, intentionally separate from UC9 so both memory patterns can be demoed side by side.</li>
                 <li><code>AmsDemoService</code> talks to the external AMS via <code>AmsClient</code>: seed/reset memories, fetch working memory, call <code>/v1/memory/prompt</code>, and return traces.</li>
-                <li>Each chat turn follows the same flow: load working memory, append the user message, ask AMS to assemble context, call <code>OpenAiService.chatCompletion()</code> or a mock fallback, then write the assistant reply back.</li>
+                <li>Each chat turn follows the same flow: load working memory, append the user message, ask AMS to assemble context, call <code>OpenAiService.chatCompletion()</code>, then write the assistant reply back.</li>
                 <li>The Redis key patterns are owned by AMS itself, so this app deliberately surfaces the AMS REST/MCP contract rather than writing Redis keys directly.</li>
             </ul>
             <h3>Talking points</h3>
@@ -643,7 +643,7 @@
             <ul>
                 <li>Safety is a runtime pipeline, not a post-processing afterthought</li>
                 <li>Redis combines rate limiting, semantic routing, and audit logging in one platform</li>
-                <li>The workshop uses mock banking prompts, but the pattern maps directly to production guardrail layers</li>
+                <li>The workshop uses banking-themed demo prompts, but the pattern maps directly to production guardrail layers</li>
             </ul>
 
             <hr class="guide-hr"/>
@@ -678,7 +678,7 @@
             <ul>
                 <li><code>AiGatewayController</code> delegates <code>POST /api/gateway/query</code> to <code>AiGatewayService.handleQuery()</code> and returns HTTP 429 when the chosen model budget is exhausted.</li>
                 <li>Route seeds live at <code>uc16:route:model:{tag}</code>, semantic-cache entries at <code>uc16:cache:{tag}:{id}</code>, and both are indexed for KNN lookup.</li>
-                <li>For every request the service routes first, checks semantic cache, applies per-model rate limiting, generates a mock model response, and updates usage/stat Hashes such as <code>uc16:usage:session:{id}</code> and <code>uc16:stats:model:{tag}</code>.</li>
+                <li>For every request the service routes first, checks semantic cache, applies per-model rate limiting, calls OpenAI for live generation when needed, and updates usage/stat Hashes such as <code>uc16:usage:session:{id}</code> and <code>uc16:stats:model:{tag}</code>.</li>
                 <li>Observability is first-class: each request is appended to <code>uc16:stream:gateway</code>, and the stats/log endpoints read the same Redis state shown in the UI.</li>
             </ul>
             <h3>Talking points</h3>

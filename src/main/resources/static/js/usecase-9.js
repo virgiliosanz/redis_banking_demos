@@ -1,7 +1,7 @@
 /**
  * UC9: AI Agent Memory + RAG
  * Chat interface with short-term, long-term memory and RAG inspection.
- * Supports SSE streaming (when OpenAI is configured) and mock fallback.
+ * Uses SSE streaming for assistant responses and surfaces configuration errors when OpenAI is unavailable.
  */
 (function () {
     'use strict';
@@ -35,6 +35,7 @@
     var cacheTokensUsedEl = document.getElementById('cache-tokens-used');
     var cacheTokensSavedEl = document.getElementById('cache-tokens-saved');
     var cacheCostSavedEl = document.getElementById('cache-cost-saved');
+    var aiBadge = document.getElementById('ai-badge');
 
     // --- Code Tabs ---
     window.initCodeTabs();
@@ -90,6 +91,10 @@
         if (ind) ind.remove();
     }
 
+    function renderAssistantError(target, text) {
+        target.innerHTML = '<span style="color:var(--redis-primary); font-weight:600;">' + escapeHtml(text) + '</span>';
+    }
+
     // --- Update Memory Inspection Panel ---
     function updateShortTermMemory() {
         window.workshopGet('/api/assistant/conversation/' + sessionId).then(function (data) {
@@ -108,17 +113,28 @@
         });
     }
 
-    function scoreClass(score) {
+    function sectionMaxScore(results) {
+        var maxScore = 0;
+        if (!results || results.length === 0) return maxScore;
+        results.forEach(function (item) {
+            var s = parseFloat(item && item.score);
+            if (!isNaN(s) && s > maxScore) maxScore = s;
+        });
+        return maxScore;
+    }
+
+    function scoreClass(score, maxScore) {
         var s = parseFloat(score);
-        if (isNaN(s)) return 'uc9-score-low';
-        if (s >= 0.8) return 'uc9-score-high';
-        if (s >= 0.5) return 'uc9-score-med';
+        var max = parseFloat(maxScore);
+        if (isNaN(s) || isNaN(max) || max <= 0) return 'uc9-score-low';
+        if (s >= max * 0.9) return 'uc9-score-high';
+        if (s >= max * 0.7) return 'uc9-score-med';
         return 'uc9-score-low';
     }
 
-    function scoreBadge(score) {
+    function scoreBadge(score, maxScore) {
         if (score == null || score === '') return '';
-        return '<span class="uc9-source-score ' + scoreClass(score) + '">Score: ' + parseFloat(score).toFixed(2) + '</span>';
+        return '<span class="uc9-source-score ' + scoreClass(score, maxScore) + '">Score: ' + parseFloat(score).toFixed(2) + '</span>';
     }
 
     function updateMemoryResults(memories) {
@@ -127,11 +143,12 @@
             return;
         }
         var html = '';
+        var maxScore = sectionMaxScore(memories);
         memories.forEach(function (mem) {
             html += '<div class="uc9-source-item">';
             if (mem.redisKey) html += '<span class="uc9-source-key">' + escapeHtml(mem.redisKey) + '</span>';
             html += '<span class="uc9-source-title">' + escapeHtml(mem.summary || mem.id || '') + '</span>';
-            html += scoreBadge(mem.score);
+            html += scoreBadge(mem.score, maxScore);
             var meta = [];
             if (mem.date) meta.push(escapeHtml(mem.date));
             if (mem.tags) meta.push('Tags: ' + escapeHtml(mem.tags));
@@ -147,11 +164,12 @@
             return;
         }
         var html = '';
+        var maxScore = sectionMaxScore(docs);
         docs.forEach(function (doc) {
             html += '<div class="uc9-source-item">';
             if (doc.redisKey) html += '<span class="uc9-source-key">' + escapeHtml(doc.redisKey) + '</span>';
             html += '<span class="uc9-source-title">' + escapeHtml(doc.title || doc.id || '') + '</span>';
-            html += scoreBadge(doc.score);
+            html += scoreBadge(doc.score, maxScore);
             if (doc.tags) html += '<div class="uc9-source-meta">Tags: ' + escapeHtml(doc.tags) + '</div>';
             html += '</div>';
         });
@@ -164,11 +182,12 @@
             return;
         }
         var html = '';
+        var maxScore = sectionMaxScore(docs);
         docs.forEach(function (doc) {
             html += '<div class="uc9-source-item">';
             if (doc.redisKey) html += '<span class="uc9-source-key">' + escapeHtml(doc.redisKey) + '</span>';
             html += '<span class="uc9-source-title">' + escapeHtml(doc.title || doc.id || '') + '</span>';
-            html += scoreBadge(doc.score);
+            html += scoreBadge(doc.score, maxScore);
             var meta = [];
             if (doc.category) meta.push('Category: ' + escapeHtml(doc.category));
             if (doc.tags && doc.tags !== doc.category) meta.push('Tags: ' + escapeHtml(doc.tags));
@@ -294,6 +313,18 @@
             updateCacheStats();
             try {
                 var meta = JSON.parse(e.data);
+                if (meta.error) {
+                    setAiBadge('unavailable');
+                    renderAssistantError(msgDiv, meta.message || 'LLM not configured — set OPENAI_API_KEY');
+                    latencyDisplay.textContent = meta.message || 'LLM not configured — set OPENAI_API_KEY';
+                    if (apiStatusText) {
+                        apiStatusText.innerHTML = 'LLM not configured <span style="font-weight:400;">— set OPENAI_API_KEY</span>';
+                        apiStatusText.style.color = 'var(--redis-primary)';
+                    }
+                    return;
+                }
+
+                setAiBadge('live');
                 if (meta.latencyMs) {
                     latencyDisplay.textContent = 'Total latency: ' + meta.latencyMs + 'ms';
                 }
@@ -308,7 +339,8 @@
             removeTypingIndicator();
             hideStreamingIndicator();
             if (!fullResponse) {
-                msgDiv.innerHTML = '<span style="color:var(--redis-primary);">Error connecting to AI service. Check your OpenAI API key or try again.</span>';
+                setAiBadge('unavailable');
+                renderAssistantError(msgDiv, 'Error connecting to AI service. Check OPENAI_API_KEY or try again.');
             }
             // Update short-term memory even on error (conversation may have been saved server-side)
             updateShortTermMemory();
@@ -316,61 +348,11 @@
         };
     }
 
-    // --- Mock send (existing behavior) ---
-    function sendMessageMock(message) {
-        addMessage('user', message);
-        addTypingIndicator();
-        setInputEnabled(false);
-
-        window.workshopFetch('/api/assistant/chat', {
-            sessionId: sessionId,
-            userName: userName,
-            message: message
-        }).then(function (data) {
-            removeTypingIndicator();
-            setInputEnabled(true);
-
-            if (data.error) {
-                addMessage('assistant', 'Sorry, something went wrong: ' + data.error);
-                return;
-            }
-
-            addMessage('assistant', data.response);
-
-            // Update unified Redis Context panel
-            updateShortTermMemory();
-            updateMemoryResults(data.memoriesRetrieved);
-            updateRagResults(data.kbDocsRetrieved);
-            updateRegResults(data.regDocsRetrieved);
-
-            // Semantic cache indicator
-            if (data.semanticCacheEnabled) {
-                showCacheBadge(data.semanticCacheHit, data.cacheLatencyMs, data.tokensSaved);
-            }
-            updateCacheStats();
-
-            if (data.latencyMs !== undefined) {
-                latencyDisplay.textContent = 'Total latency: ' + data.latencyMs + 'ms';
-            }
-        }).catch(function (err) {
-            console.error('UC9 chat error:', err);
-            removeTypingIndicator();
-            setInputEnabled(true);
-            addMessage('assistant', 'Sorry, I encountered an error. Please try again.');
-        });
-    }
-
-    // --- Send Message (router) ---
     function sendMessage() {
         var message = chatInput.value.trim();
         if (!message) return;
         chatInput.value = '';
-
-        if (openaiConfigured) {
-            sendMessageStream(message);
-        } else {
-            sendMessageMock(message);
-        }
+        sendMessageStream(message);
     }
 
     // --- Event Listeners ---
@@ -406,34 +388,38 @@
     });
 
     // --- Check API status on load ---
-    var aiBadge = document.getElementById('ai-badge');
-    function setAiBadge(configured) {
+    function setAiBadge(state) {
         if (!aiBadge) return;
         aiBadge.classList.remove('on', 'mock');
-        if (configured) {
+        if (state === 'live') {
             aiBadge.classList.add('on');
-            aiBadge.textContent = 'AI: ON';
+            aiBadge.textContent = 'AI: live';
             aiBadge.title = 'OpenAI is configured — real LLM responses';
+        } else if (state === 'checking') {
+            aiBadge.classList.add('mock');
+            aiBadge.textContent = 'AI: checking…';
+            aiBadge.title = 'Waiting to verify OpenAI availability';
         } else {
             aiBadge.classList.add('mock');
-            aiBadge.textContent = 'AI: Mock';
-            aiBadge.title = 'No OPENAI_API_KEY — using mock responses';
+            aiBadge.textContent = 'AI: unavailable';
+            aiBadge.title = 'LLM not configured — set OPENAI_API_KEY';
         }
     }
+    setAiBadge('checking');
     window.workshopGet('/api/assistant/status').then(function (data) {
         openaiConfigured = !!(data && data.openaiConfigured);
-        setAiBadge(openaiConfigured);
+        setAiBadge(openaiConfigured ? 'live' : 'unavailable');
         if (openaiConfigured) {
             apiStatusText.innerHTML = 'OpenAI Connected';
             apiStatusText.style.color = '#059669';
         } else {
-            apiStatusText.innerHTML = 'Mock Mode <span style="font-weight:400;">(set OPENAI_API_KEY for real AI)</span>';
-            apiStatusText.style.color = '#d97706';
+            apiStatusText.innerHTML = 'LLM not configured <span style="font-weight:400;">— set OPENAI_API_KEY</span>';
+            apiStatusText.style.color = 'var(--redis-primary)';
         }
     }).catch(function () {
         openaiConfigured = false;
-        setAiBadge(false);
-        apiStatusText.innerHTML = 'Mock Mode';
+        setAiBadge('checking');
+        apiStatusText.innerHTML = 'Could not verify AI status yet';
         apiStatusText.style.color = '#d97706';
     });
 
