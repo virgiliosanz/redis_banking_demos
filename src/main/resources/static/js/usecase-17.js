@@ -10,6 +10,7 @@
         { key: 'portfolio', name: 'Portfolio Advisor', role: 'Allocation and product guidance' },
         { key: 'fraud', name: 'Fraud Analyst', role: 'Alerts, anomalies, and suspicious activity' }
     ];
+    var PHASES = ['start', 'thinking', 'searching', 'tools', 'reasoning', 'done'];
     var AGENT_MAP = Object.create(null);
     AGENTS.forEach(function (agent) { AGENT_MAP[agent.key] = agent; });
 
@@ -46,6 +47,7 @@
             status: card.querySelector('[data-agent-status]'),
             stateCopy: card.querySelector('[data-agent-state-copy]'),
             task: card.querySelector('[data-agent-task]'),
+            progressSteps: Array.prototype.slice.call(card.querySelectorAll('[data-agent-progress-step]')),
             tools: card.querySelector('[data-agent-tools]'),
             response: card.querySelector('[data-agent-response]'),
             meta: card.querySelector('[data-agent-meta]'),
@@ -175,23 +177,40 @@
         });
     }
 
-    function setModeBadge(isLive) {
+    function setModeBadge(mode, message) {
         if (!modeBadge) return;
-        modeBadge.textContent = isLive ? 'AI: live LLM' : 'AI: mock';
-        modeBadge.classList.remove('on', 'mock');
-        modeBadge.classList.add(isLive ? 'on' : 'mock');
+        modeBadge.classList.remove('on', 'mock', 'error', 'checking');
+        if (mode === 'openai') {
+            modeBadge.textContent = 'AI: OpenAI';
+            modeBadge.classList.add('on');
+            return;
+        }
+        if (mode === 'error') {
+            modeBadge.textContent = /configur/i.test(String(message || '')) || !message
+                ? 'AI: not configured'
+                : 'AI: error';
+            modeBadge.classList.add('error');
+            return;
+        }
+        modeBadge.textContent = 'AI: checking…';
+        modeBadge.classList.add('checking');
     }
 
     function updateModeFromPayload(payload) {
         if (!payload || typeof payload !== 'object') return;
         if (typeof payload.openaiConfigured === 'boolean') {
-            setModeBadge(payload.openaiConfigured);
+            setModeBadge(payload.openaiConfigured ? 'openai' : 'error', payload.message);
         } else if (typeof payload.openAiConfigured === 'boolean') {
-            setModeBadge(payload.openAiConfigured);
+            setModeBadge(payload.openAiConfigured ? 'openai' : 'error', payload.message);
         } else if (typeof payload.openaiUsed === 'boolean') {
-            setModeBadge(payload.openaiUsed);
+            setModeBadge(payload.openaiUsed ? 'openai' : 'error', payload.message);
         } else if (typeof payload.mode === 'string') {
-            setModeBadge(payload.mode.toLowerCase() === 'openai' || payload.mode.toLowerCase() === 'live');
+            var mode = payload.mode.toLowerCase();
+            if (mode === 'openai' || mode === 'live') {
+                setModeBadge('openai', payload.message);
+            } else if (mode === 'error') {
+                setModeBadge('error', payload.message);
+            }
         }
     }
 
@@ -265,6 +284,19 @@
         refs.task.textContent = state.task;
         refs.response.textContent = state.response;
 
+        refs.progressSteps.forEach(function (step, index) {
+            step.className = 'uc17-progress-step';
+            if (state.state === 'done' && index <= state.progressIndex) {
+                step.classList.add('is-complete');
+            } else if (state.state === 'error' && index === state.progressIndex) {
+                step.classList.add('is-error');
+            } else if (index < state.progressIndex) {
+                step.classList.add('is-complete');
+            } else if (index === state.progressIndex) {
+                step.classList.add('is-current');
+            }
+        });
+
         if (state.tools.length || state.ragResults.length) {
             var html = '';
             if (state.tools.length) {
@@ -286,8 +318,8 @@
         }
 
         var meta = [];
-        if (state.state === 'working') {
-            meta.push('<span class="uc17-spinner-row"><span class="uc17-spinner"></span>Processing…</span>');
+        if (state.state === 'working' || state.state === 'thinking' || state.state === 'searching' || state.state === 'tools' || state.state === 'reasoning') {
+            meta.push('<span class="uc17-spinner-row"><span class="uc17-spinner"></span>' + escapeHtml(state.badge) + '…</span>');
         }
         if (state.latencyMs != null) {
             meta.push('<span class="uc17-inline-badge">Latency · ' + escapeHtml(formatMs(state.latencyMs)) + '</span>');
@@ -319,6 +351,7 @@
                 response: 'Response pending.',
                 latencyMs: null,
                 tokensLabel: null,
+                progressIndex: -1,
                 commands: [],
                 laneStatus: 'Idle'
             };
@@ -412,14 +445,45 @@
         if (!key) return;
         agentState[key].state = 'working';
         agentState[key].visual = 'is-working';
-        agentState[key].badge = 'Working';
+        agentState[key].badge = 'Starting';
         agentState[key].statusClass = 'uc17-status-working';
         agentState[key].stateCopy = 'Task picked up from the consumer group.';
         agentState[key].task = payload.task || agentState[key].task;
-        agentState[key].laneStatus = 'Working';
+        agentState[key].progressIndex = PHASES.indexOf('start');
+        agentState[key].laneStatus = 'Starting';
         uniquePush(agentState[key].commands, normalizeCommands(payload.redisCommands).concat(defaultCommands('agent-start', key)));
         pulseLane(key, 'outgoing');
         addStreamEvent(AGENT_MAP[key].name + ' started', payload.task || 'Processing assigned task');
+        renderAgent(key);
+    }
+
+    function handleAgentThinking(payload) {
+        var key = normalizeAgentKey(payload.agent || payload.name || payload.role);
+        if (!key) return;
+        agentState[key].state = 'thinking';
+        agentState[key].visual = 'is-thinking';
+        agentState[key].badge = 'Thinking';
+        agentState[key].statusClass = 'uc17-status-thinking';
+        agentState[key].stateCopy = payload.detail || 'Analyzing query and determining approach...';
+        agentState[key].progressIndex = PHASES.indexOf('thinking');
+        agentState[key].laneStatus = 'Thinking';
+        addStreamEvent(AGENT_MAP[key].name + ' thinking', agentState[key].stateCopy);
+        renderAgent(key);
+    }
+
+    function handleAgentSearching(payload) {
+        var key = normalizeAgentKey(payload.agent || payload.name || payload.role);
+        if (!key) return;
+        agentState[key].state = 'searching';
+        agentState[key].visual = 'is-searching';
+        agentState[key].badge = 'Searching';
+        agentState[key].statusClass = 'uc17-status-searching';
+        agentState[key].stateCopy = payload.detail || 'Searching knowledge base and regulations...';
+        agentState[key].toolsCopy = 'Searching knowledge base and regulations…';
+        if (Array.isArray(payload.ragResults)) agentState[key].ragResults = payload.ragResults;
+        agentState[key].progressIndex = PHASES.indexOf('searching');
+        agentState[key].laneStatus = 'Searching';
+        addStreamEvent(AGENT_MAP[key].name + ' searching', 'RAG hits ' + (payload.ragResults ? payload.ragResults.length : 0));
         renderAgent(key);
     }
 
@@ -432,12 +496,27 @@
         agentState[key].statusClass = 'uc17-status-tools';
         agentState[key].stateCopy = 'Tool results and RAG context are arriving in real time.';
         agentState[key].toolsCopy = 'Streaming tools and RAG hits…';
+        agentState[key].progressIndex = PHASES.indexOf('tools');
         uniquePush(agentState[key].commands, normalizeCommands(payload.redisCommands));
         if (Array.isArray(payload.tools)) agentState[key].tools = payload.tools;
         if (Array.isArray(payload.ragResults)) agentState[key].ragResults = payload.ragResults;
         agentState[key].laneStatus = 'Tools';
         pulseLane(key, 'outgoing');
         addStreamEvent(AGENT_MAP[key].name + ' used tools', 'Tool count ' + (payload.tools ? payload.tools.length : 0) + ' · RAG hits ' + (payload.ragResults ? payload.ragResults.length : 0));
+        renderAgent(key);
+    }
+
+    function handleAgentReasoning(payload) {
+        var key = normalizeAgentKey(payload.agent || payload.name || payload.role);
+        if (!key) return;
+        agentState[key].state = 'reasoning';
+        agentState[key].visual = 'is-reasoning';
+        agentState[key].badge = 'Reasoning';
+        agentState[key].statusClass = 'uc17-status-reasoning';
+        agentState[key].stateCopy = payload.detail || 'Generating specialist analysis...';
+        agentState[key].progressIndex = PHASES.indexOf('reasoning');
+        agentState[key].laneStatus = 'Reasoning';
+        addStreamEvent(AGENT_MAP[key].name + ' reasoning', agentState[key].stateCopy);
         renderAgent(key);
     }
 
@@ -452,6 +531,7 @@
         agentState[key].response = payload.response || payload.summary || 'Completed with no response body.';
         agentState[key].latencyMs = payload.latencyMs != null ? payload.latencyMs : agentState[key].latencyMs;
         agentState[key].tokensLabel = formatTokens(extractTokens(payload));
+        agentState[key].progressIndex = PHASES.indexOf('done');
         agentState[key].laneStatus = 'Done';
         uniquePush(agentState[key].commands, normalizeCommands(payload.redisCommands).concat(defaultCommands('agent-done', key)));
         pulseLane(key, 'incoming');
@@ -480,12 +560,21 @@
         }
         var tokens = formatTokens(extractTokens(summary));
         if (tokens && !agentState[key].tokensLabel) agentState[key].tokensLabel = tokens;
-        if (agentState[key].state !== 'done') {
+        if (summary.status === 'error') {
+            agentState[key].state = 'error';
+            agentState[key].visual = 'is-error';
+            agentState[key].badge = 'Error';
+            agentState[key].statusClass = 'uc17-status-error';
+            agentState[key].stateCopy = 'Agent execution failed.';
+            agentState[key].laneStatus = 'Error';
+            agentState[key].progressIndex = Math.max(agentState[key].progressIndex, PHASES.indexOf('reasoning'));
+        } else if (agentState[key].state !== 'done') {
             agentState[key].state = 'done';
             agentState[key].visual = 'is-done';
             agentState[key].badge = 'Done';
             agentState[key].statusClass = 'uc17-status-done';
             agentState[key].stateCopy = 'Finished specialist analysis and returned a result to the coordinator.';
+            agentState[key].progressIndex = PHASES.indexOf('done');
             agentState[key].laneStatus = 'Done';
         }
         renderAgent(key);
@@ -493,13 +582,16 @@
 
     function handleResult(payload) {
         updateModeFromPayload(payload);
-        coordinatorState.badge = 'Complete';
-        coordinatorState.statusClass = 'uc17-status-done';
-        coordinatorState.copy = 'Coordinator received all specialist outputs and assembled the final answer.';
+        var isErrorMode = payload && typeof payload.mode === 'string' && payload.mode.toLowerCase() === 'error';
+        coordinatorState.badge = isErrorMode ? 'Error' : 'Complete';
+        coordinatorState.statusClass = isErrorMode ? 'uc17-status-error' : 'uc17-status-done';
+        coordinatorState.copy = isErrorMode
+            ? 'Coordination finished with agent errors. Review the per-agent cards for details.'
+            : 'Coordinator received all specialist outputs and assembled the final answer.';
         coordinatorState.response = payload.response || payload.finalResponse || 'No final response returned.';
         coordinatorState.totalLatency = payload.totalLatencyMs != null ? payload.totalLatencyMs : payload.latencyMs;
         uniquePush(coordinatorState.commands, normalizeCommands(payload.redisCommandsUsed || payload.redisCommands));
-        setCoordinatorVisualState('is-done');
+        setCoordinatorVisualState(isErrorMode ? 'is-error' : 'is-done');
         if (Array.isArray(payload.agentSummaries)) {
             payload.agentSummaries.forEach(applyAgentSummary);
         }
@@ -508,6 +600,7 @@
     }
 
     function handleError(payload) {
+        updateModeFromPayload(payload || { mode: 'error' });
         var key = normalizeAgentKey(payload.agent || payload.name || payload.role);
         if (key) {
             agentState[key].state = 'error';
@@ -516,6 +609,7 @@
             agentState[key].statusClass = 'uc17-status-error';
             agentState[key].stateCopy = 'Agent execution failed.';
             agentState[key].response = payload.message || 'An unexpected agent error occurred.';
+            agentState[key].progressIndex = Math.max(agentState[key].progressIndex, PHASES.indexOf('reasoning'));
             agentState[key].laneStatus = 'Error';
             renderAgent(key);
         }
@@ -537,8 +631,17 @@
             case 'agent-start':
                 handleAgentStart(payload);
                 break;
+            case 'agent-thinking':
+                handleAgentThinking(payload);
+                break;
+            case 'agent-searching':
+                handleAgentSearching(payload);
+                break;
             case 'agent-tools':
                 handleAgentTools(payload);
+                break;
+            case 'agent-reasoning':
+                handleAgentReasoning(payload);
                 break;
             case 'agent-done':
                 handleAgentDone(payload);
@@ -636,15 +739,7 @@
     }
 
     function loadMode() {
-        fetch('/api/assistant/status', { headers: { Accept: 'application/json' } })
-            .then(function (res) { return res.ok ? res.json() : null; })
-            .then(function (data) {
-                if (!data) return;
-                updateModeFromPayload(data);
-            })
-            .catch(function () {
-                setModeBadge(false);
-            });
+        setModeBadge('checking');
     }
 
     function runQuery(prompt) {
@@ -660,6 +755,7 @@
         if (currentStream) currentStream.abort();
         currentStream = new AbortController();
         resetView();
+        setModeBadge('checking');
         coordinatorState.copy = 'Opening SSE coordination stream and waiting for the first planner event…';
         coordinatorState.badge = 'Starting';
         coordinatorState.statusClass = 'uc17-status-working';
@@ -719,6 +815,7 @@
             if (queryInput) queryInput.value = '';
             if (exampleSelect) exampleSelect.value = '';
             resetView();
+            setModeBadge('checking');
         }).catch(function (error) {
             resetView();
             handleError({ message: (error && error.message) || 'Could not reset /api/agents/reset. Verify the backend is available.' });

@@ -37,6 +37,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class AgentCoordinatorService {
@@ -56,13 +57,13 @@ public class AgentCoordinatorService {
 
     private static final List<AgentDefinition> AGENTS = List.of(
             new AgentDefinition("risk-analyst", "Risk Analyst", "Portfolio risk and stress exposure",
-                    "Quantify concentration, market and drawdown exposure for the user request.", 260L),
+                    "Quantify concentration, market and drawdown exposure for the user request."),
             new AgentDefinition("compliance-advisor", "Compliance Advisor", "Regulatory obligations and controls",
-                    "Highlight MiFID, PSD2, GDPR or policy obligations relevant to the query.", 320L),
+                    "Highlight MiFID, PSD2, GDPR or policy obligations relevant to the query."),
             new AgentDefinition("portfolio-advisor", "Portfolio Advisor", "Allocation and next-best-action guidance",
-                    "Recommend allocation or rebalancing actions that fit the banking scenario.", 300L),
+                    "Recommend allocation or rebalancing actions that fit the banking scenario."),
             new AgentDefinition("fraud-analyst", "Fraud Analyst", "Fraud and anomaly posture",
-                    "Flag suspicious patterns, abuse vectors or monitoring actions related to the request.", 280L)
+                    "Flag suspicious patterns, abuse vectors or monitoring actions related to the request.")
     );
 
     private final StringRedisTemplate redis;
@@ -71,6 +72,9 @@ public class AgentCoordinatorService {
     private final ObjectMapper objectMapper;
     private final ExecutorService agentExecutor = Executors.newFixedThreadPool(AGENTS.size());
     private final Semaphore coordinationGate = new Semaphore(1);
+
+    @Value("${workshop.startup.load-data:true}")
+    private boolean loadData;
 
     @Value("${workshop.startup.force-reload:false}")
     private boolean forceReload;
@@ -86,6 +90,7 @@ public class AgentCoordinatorService {
     }
 
     public void init() {
+        if (!loadData) return;
         if (shouldSkipReload()) {
             return;
         }
@@ -120,14 +125,14 @@ public class AgentCoordinatorService {
         Object emitterLock = new Object();
 
         if (trimmedQuery.isBlank()) {
-            emitError(emitter, emitterLock, null, null, "query is required");
+            emitError(emitter, emitterLock, null, null, null, "query is required");
             safeComplete(emitter);
             return;
         }
 
         boolean acquired = coordinationGate.tryAcquire();
         if (!acquired) {
-            emitError(emitter, emitterLock, null, null,
+            emitError(emitter, emitterLock, null, null, null,
                     "Coordinator is already processing another request. Please wait and retry.");
             safeComplete(emitter);
             return;
@@ -145,6 +150,7 @@ public class AgentCoordinatorService {
 
             emitEvent(emitter, emitterLock, requestId, "plan", Map.of(
                     "agents", plannedAgents,
+                    "mode", currentMode(),
                     "query", trimmedQuery,
                     "userId", effectiveUserId
             ));
@@ -156,8 +162,9 @@ public class AgentCoordinatorService {
             List<CompletableFuture<AgentResult>> futures = new ArrayList<>();
             for (int i = 0; i < AGENTS.size(); i++) {
                 String consumerName = "uc17-worker-" + (i + 1);
+                int staggerMs = i * ThreadLocalRandom.current().nextInt(200, 500);
                 futures.add(CompletableFuture.supplyAsync(
-                        () -> processNextTask(consumerName, emitter, emitterLock),
+                        () -> processNextTask(consumerName, staggerMs, emitter, emitterLock),
                         agentExecutor));
             }
 
@@ -182,13 +189,14 @@ public class AgentCoordinatorService {
             finalPayload.put("totalLatencyMs", elapsedMs(startedAtNs));
             finalPayload.put("agentSummaries", agentSummaries);
             finalPayload.put("redisCommandsUsed", REDIS_COMMANDS_USED);
-            finalPayload.put("mode", openAiService.isConfigured() ? "openai" : "mock");
+            finalPayload.put("mode", resolveMode(collectedResults));
 
             emitEvent(emitter, emitterLock, requestId, "result", finalPayload);
             safeComplete(emitter);
         } catch (Exception e) {
             log.error("UC17 coordination failed", e);
-            emitError(emitter, emitterLock, requestId, null, e.getMessage() == null ? "UC17 coordination failed" : e.getMessage());
+            emitError(emitter, emitterLock, requestId, null, null,
+                    e.getMessage() == null ? "UC17 coordination failed" : e.getMessage());
             safeComplete(emitter);
         } finally {
             coordinationGate.release();
@@ -211,7 +219,7 @@ public class AgentCoordinatorService {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("mode", openAiService.isConfigured() ? "openai" : "mock");
+        result.put("mode", currentMode());
         result.put("busy", coordinationGate.availablePermits() == 0);
         result.put("agents", agents);
         return result;
@@ -257,10 +265,15 @@ public class AgentCoordinatorService {
         agentExecutor.shutdownNow();
     }
 
-    private AgentResult processNextTask(String consumerName, SseEmitter emitter, Object emitterLock) {
+    private AgentResult processNextTask(String consumerName, int staggerMs, SseEmitter emitter, Object emitterLock) {
+        if (staggerMs > 0) {
+            sleepQuietly(staggerMs);
+        }
         AgentTask task = readNextTask(consumerName);
         AgentDefinition definition = task.definition();
         long startedAtNs = System.nanoTime();
+        List<Map<String, Object>> ragResults = List.of();
+        List<Map<String, Object>> tools = List.of();
 
         try {
             updateAgentState(definition, task.requestId(), "working", definition.task(), 0L, 0, "");
@@ -271,9 +284,28 @@ public class AgentCoordinatorService {
                     "status", "working"
             ));
 
-            sleepQuietly(definition.simulatedDelayMs() / 2);
-            List<Map<String, Object>> ragResults = gatherRagResults(task.query());
-            List<Map<String, Object>> tools = simulateTools(definition, task.query(), ragResults);
+            sleepRandom(400L, 801L);
+            updateAgentState(definition, task.requestId(), "thinking", definition.task(), 0L, 0, "");
+            emitEvent(emitter, emitterLock, task.requestId(), "agent-thinking", Map.of(
+                    "agent", definition.name(),
+                    "agentId", definition.id(),
+                    "status", "thinking",
+                    "detail", "Analyzing query and determining approach..."
+            ));
+
+            sleepRandom(500L, 1001L);
+            ragResults = gatherRagResults(task.query());
+            updateAgentState(definition, task.requestId(), "searching", definition.task(), 0L, 0, "");
+            emitEvent(emitter, emitterLock, task.requestId(), "agent-searching", Map.of(
+                    "agent", definition.name(),
+                    "agentId", definition.id(),
+                    "status", "searching",
+                    "detail", "Searching knowledge base and regulations...",
+                    "ragResults", ragResults
+            ));
+
+            sleepRandom(400L, 801L);
+            tools = simulateTools(definition, task.query(), ragResults);
 
             updateAgentState(definition, task.requestId(), "tooling", definition.task(), 0L, 0, "");
             Map<String, Object> toolPayload = new LinkedHashMap<>();
@@ -283,7 +315,14 @@ public class AgentCoordinatorService {
             toolPayload.put("ragResults", ragResults);
             emitEvent(emitter, emitterLock, task.requestId(), "agent-tools", toolPayload);
 
-            sleepQuietly(definition.simulatedDelayMs() / 2);
+            updateAgentState(definition, task.requestId(), "reasoning", definition.task(), 0L, 0, "");
+            emitEvent(emitter, emitterLock, task.requestId(), "agent-reasoning", Map.of(
+                    "agent", definition.name(),
+                    "agentId", definition.id(),
+                    "status", "reasoning",
+                    "detail", "Generating specialist analysis..."
+            ));
+
             String response = runAgent(definition, task.query(), tools, ragResults);
             int tokensUsed = estimateTokens(response);
             long latencyMs = elapsedMs(startedAtNs);
@@ -295,6 +334,7 @@ public class AgentCoordinatorService {
 
             appendResult(result);
             updateAgentState(definition, task.requestId(), "done", definition.task(), latencyMs, tokensUsed, response);
+            sleepRandom(200L, 401L);
             emitEvent(emitter, emitterLock, task.requestId(), "agent-done", Map.of(
                     "agent", definition.name(),
                     "agentId", definition.id(),
@@ -305,29 +345,19 @@ public class AgentCoordinatorService {
             ));
             return result;
         } catch (Exception e) {
-            log.warn("UC17 agent {} failed, using fallback: {}", definition.name(), e.getMessage());
-            emitError(emitter, emitterLock, task.requestId(), definition.name(),
-                    e.getMessage() == null ? "Agent execution failed" : e.getMessage());
+            String errorMessage = e.getMessage() == null ? "Agent execution failed" : e.getMessage();
+            log.warn("UC17 agent {} failed: {}", definition.name(), errorMessage);
+            emitError(emitter, emitterLock, task.requestId(), definition.name(), definition.id(), errorMessage);
 
-            String response = buildMockResponse(definition, task.query(), List.of(), List.of());
-            int tokensUsed = estimateTokens(response);
             long latencyMs = elapsedMs(startedAtNs);
-            AgentResult fallback = new AgentResult(
+            AgentResult failure = new AgentResult(
                     task.requestId(), definition.id(), definition.name(), definition.role(), definition.task(),
-                    response, latencyMs, tokensUsed, List.of(), List.of(), "done"
+                    errorMessage, latencyMs, 0, tools, ragResults, "error"
             );
 
-            appendResult(fallback);
-            updateAgentState(definition, task.requestId(), "done", definition.task(), latencyMs, tokensUsed, response);
-            emitEvent(emitter, emitterLock, task.requestId(), "agent-done", Map.of(
-                    "agent", definition.name(),
-                    "agentId", definition.id(),
-                    "response", response,
-                    "latencyMs", latencyMs,
-                    "tokensUsed", tokensUsed,
-                    "status", "done"
-            ));
-            return fallback;
+            appendResult(failure);
+            updateAgentState(definition, task.requestId(), "error", definition.task(), latencyMs, 0, errorMessage);
+            return failure;
         } finally {
             acknowledge(TASK_STREAM, TASK_GROUP, task.recordId());
         }
@@ -492,12 +522,12 @@ public class AgentCoordinatorService {
             case "compliance-advisor" -> complianceAdvisor(query, tools, ragResults);
             case "portfolio-advisor" -> portfolioAdvisor(query, tools, ragResults);
             case "fraud-analyst" -> fraudAnalyst(query, tools, ragResults);
-            default -> buildMockResponse(definition, query, tools, ragResults);
+            default -> throw new IllegalArgumentException("Unknown agent id: " + definition.id());
         };
     }
 
     private String riskAnalyst(String query, List<Map<String, Object>> tools, List<Map<String, Object>> ragResults) {
-        return callOpenAiOrMock(
+        return callLlm(
                 definitionById("risk-analyst"),
                 query,
                 tools,
@@ -506,7 +536,7 @@ public class AgentCoordinatorService {
     }
 
     private String complianceAdvisor(String query, List<Map<String, Object>> tools, List<Map<String, Object>> ragResults) {
-        return callOpenAiOrMock(
+        return callLlm(
                 definitionById("compliance-advisor"),
                 query,
                 tools,
@@ -515,7 +545,7 @@ public class AgentCoordinatorService {
     }
 
     private String portfolioAdvisor(String query, List<Map<String, Object>> tools, List<Map<String, Object>> ragResults) {
-        return callOpenAiOrMock(
+        return callLlm(
                 definitionById("portfolio-advisor"),
                 query,
                 tools,
@@ -524,7 +554,7 @@ public class AgentCoordinatorService {
     }
 
     private String fraudAnalyst(String query, List<Map<String, Object>> tools, List<Map<String, Object>> ragResults) {
-        return callOpenAiOrMock(
+        return callLlm(
                 definitionById("fraud-analyst"),
                 query,
                 tools,
@@ -532,14 +562,13 @@ public class AgentCoordinatorService {
                 "You are the Fraud Analyst for a banking workshop demo. Respond in 3 concise bullets plus one recommendation. Focus on anomaly patterns, abuse risk and monitoring controls.");
     }
 
-    private String callOpenAiOrMock(AgentDefinition definition,
-                                    String query,
-                                    List<Map<String, Object>> tools,
-                                    List<Map<String, Object>> ragResults,
-                                    String systemPrompt) {
-        String fallback = buildMockResponse(definition, query, tools, ragResults);
+    private String callLlm(AgentDefinition definition,
+                           String query,
+                           List<Map<String, Object>> tools,
+                           List<Map<String, Object>> ragResults,
+                           String systemPrompt) {
         if (!openAiService.isConfigured()) {
-            return fallback;
+            throw new IllegalStateException("LLM not configured. Set OPENAI_API_KEY to run UC17.");
         }
 
         List<Map<String, String>> messages = List.of(
@@ -553,43 +582,28 @@ public class AgentCoordinatorService {
         try {
             return openAiService.chatCompletion(messages);
         } catch (Exception e) {
-            log.warn("UC17 OpenAI call failed for {}: {}", definition.name(), e.getMessage());
-            return fallback;
+            throw new IllegalStateException(definition.name() + " LLM call failed: " + rootCauseMessage(e), e);
         }
-    }
-
-    private String buildMockResponse(AgentDefinition definition,
-                                     String query,
-                                     List<Map<String, Object>> tools,
-                                     List<Map<String, Object>> ragResults) {
-        String firstTool = tools.isEmpty() ? "No tool output" : String.valueOf(tools.get(0).get("result"));
-        String firstDoc = ragResults.isEmpty() ? "general banking guidance" : String.valueOf(ragResults.get(0).get("title"));
-
-        if ("risk-analyst".equals(definition.id())) {
-            return "• Risk posture: the request points to moderate downside sensitivity rather than acute distress.\n"
-                    + "• Tool signal: " + firstTool + "\n"
-                    + "• Retrieved context: " + firstDoc + " reinforces monitoring of concentration and rate sensitivity.\n"
-                    + "Recommendation: run a focused stress test before increasing exposure tied to ‘" + query + "’.";
-        }
-        if ("compliance-advisor".equals(definition.id())) {
-            return "• Compliance posture: this workflow needs explainability, retained evidence and customer disclosure.\n"
-                    + "• Tool signal: " + firstTool + "\n"
-                    + "• Retrieved context: " + firstDoc + " suggests documenting suitability and control checkpoints.\n"
-                    + "Recommendation: keep a decision trace and review the customer-facing rationale before execution.";
-        }
-        if ("portfolio-advisor".equals(definition.id())) {
-            return "• Portfolio view: the request is better served with incremental adjustment than a wholesale rebalance.\n"
-                    + "• Tool signal: " + firstTool + "\n"
-                    + "• Retrieved context: " + firstDoc + " supports phased allocation changes and review windows.\n"
-                    + "Recommendation: stage the change over the next review cycle and keep liquidity available.";
-        }
-        return "• Fraud posture: the request does not indicate confirmed abuse, but it merits monitoring for unusual sequence changes.\n"
-                + "• Tool signal: " + firstTool + "\n"
-                + "• Retrieved context: " + firstDoc + " suggests extra verification when behavior changes quickly.\n"
-                + "Recommendation: keep anomaly thresholds active and require step-up verification for exceptional actions.";
     }
 
     private String assembleResponse(String query, List<AgentResult> results) {
+        if (hasAgentErrors(results)) {
+            StringBuilder errorBuilder = new StringBuilder();
+            errorBuilder.append("Coordination finished with agent errors.\n\n");
+            for (AgentDefinition definition : AGENTS) {
+                AgentResult result = findResult(results, definition.id());
+                if (result == null || !"error".equals(result.status())) {
+                    continue;
+                }
+                errorBuilder.append("• ").append(result.agent()).append(": ")
+                        .append(firstSentence(result.response())).append("\n");
+            }
+            if (!openAiService.isConfigured()) {
+                errorBuilder.append("\nLLM not configured. Set OPENAI_API_KEY to run specialist analysis.");
+            }
+            return errorBuilder.toString().trim();
+        }
+
         StringBuilder builder = new StringBuilder();
         builder.append("Coordinator summary for: ").append(query).append("\n\n");
 
@@ -627,11 +641,17 @@ public class AgentCoordinatorService {
                            Object emitterLock,
                            String requestId,
                            String agent,
+                           String agentId,
                            String message) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("message", message == null ? "Unknown error" : message);
+        payload.put("mode", "error");
+        payload.put("status", "error");
         if (agent != null) {
             payload.put("agent", agent);
+        }
+        if (agentId != null) {
+            payload.put("agentId", agentId);
         }
         emitEvent(emitter, emitterLock, requestId, "error", payload);
     }
@@ -874,6 +894,22 @@ public class AgentCoordinatorService {
         }
     }
 
+    private boolean hasAgentErrors(List<AgentResult> results) {
+        return results.stream().anyMatch(result -> "error".equals(result.status()));
+    }
+
+    private String currentMode() {
+        return openAiService.isConfigured() ? "openai" : "error";
+    }
+
+    private String resolveMode(List<AgentResult> results) {
+        return hasAgentErrors(results) ? "error" : currentMode();
+    }
+
+    private void sleepRandom(long minInclusive, long maxExclusive) {
+        sleepQuietly(ThreadLocalRandom.current().nextLong(minInclusive, maxExclusive));
+    }
+
     private void sleepQuietly(long millis) {
         try {
             Thread.sleep(millis);
@@ -890,7 +926,7 @@ public class AgentCoordinatorService {
         return value.getBytes(StandardCharsets.UTF_8);
     }
 
-    private record AgentDefinition(String id, String name, String role, String task, long simulatedDelayMs) {}
+    private record AgentDefinition(String id, String name, String role, String task) {}
 
     private record AgentTask(String requestId, String userId, String query,
                              AgentDefinition definition, RecordId recordId) {}

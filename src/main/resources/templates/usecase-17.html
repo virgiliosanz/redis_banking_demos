@@ -18,7 +18,7 @@
             <ol>
                 <li><strong>Coordinator</strong> decomposes one banking query into 4 specialist tasks and appends them to <code>uc17:stream:tasks</code>.</li>
                 <li><strong>Consumer group workers</strong> pick up tasks with <code>XREADGROUP</code>, enrich them with tools + RAG, and write progress back through Redis Streams.</li>
-                <li><strong>Each agent card</strong> updates independently as <code>plan</code>, <code>agent-start</code>, <code>agent-tools</code>, and <code>agent-done</code> SSE events arrive.</li>
+                <li><strong>Each agent card</strong> updates independently as <code>agent-start</code>, <code>agent-thinking</code>, <code>agent-searching</code>, <code>agent-tools</code>, <code>agent-reasoning</code>, and <code>agent-done</code> SSE events arrive.</li>
                 <li><strong>Coordinator assembly</strong> waits for all results, assembles the final answer, and shows the full coordination trail in the UI.</li>
             </ol>
         </div>
@@ -74,7 +74,7 @@
             <div class="uc17-panel-head">
                 <div class="uc17-panel-head-main">
                     <h2 style="margin:0;">Live Demo</h2>
-                    <span id="uc17-mode-badge" class="ai-badge mock">AI: mock</span>
+                    <span id="uc17-mode-badge" class="ai-badge checking">AI: checking…</span>
                     <span class="ai-badge on">Redis Streams live</span>
                 </div>
                 <div class="uc17-panel-head-actions">
@@ -202,6 +202,14 @@
                                 </div>
                                 <div class="uc17-agent-state" data-agent-state-copy>Waiting for coordinator dispatch.</div>
                                 <div class="uc17-agent-task" data-agent-task>Will assess portfolio exposure, concentration, and market risk.</div>
+                                <div class="uc17-progress" data-agent-progress aria-label="Agent progress">
+                                    <span class="uc17-progress-step" data-agent-progress-step="start"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="thinking"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="searching"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="tools"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="reasoning"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="done"></span>
+                                </div>
                                 <div class="uc17-card-section"><div class="uc17-section-label">Tools + RAG</div><div data-agent-tools class="uc17-card-copy">No tool calls yet.</div></div>
                                 <div class="uc17-card-section"><div class="uc17-section-label">Response</div><div data-agent-response class="uc17-response-box">Response pending.</div></div>
                                 <div data-agent-meta class="uc17-badge-row"></div>
@@ -218,6 +226,14 @@
                                 </div>
                                 <div class="uc17-agent-state" data-agent-state-copy>Waiting for coordinator dispatch.</div>
                                 <div class="uc17-agent-task" data-agent-task>Will review MiFID II, PSD2, and GDPR implications.</div>
+                                <div class="uc17-progress" data-agent-progress aria-label="Agent progress">
+                                    <span class="uc17-progress-step" data-agent-progress-step="start"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="thinking"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="searching"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="tools"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="reasoning"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="done"></span>
+                                </div>
                                 <div class="uc17-card-section"><div class="uc17-section-label">Tools + RAG</div><div data-agent-tools class="uc17-card-copy">No tool calls yet.</div></div>
                                 <div class="uc17-card-section"><div class="uc17-section-label">Response</div><div data-agent-response class="uc17-response-box">Response pending.</div></div>
                                 <div data-agent-meta class="uc17-badge-row"></div>
@@ -234,6 +250,14 @@
                                 </div>
                                 <div class="uc17-agent-state" data-agent-state-copy>Waiting for coordinator dispatch.</div>
                                 <div class="uc17-agent-task" data-agent-task>Will evaluate holdings, available balance, and next-step recommendations.</div>
+                                <div class="uc17-progress" data-agent-progress aria-label="Agent progress">
+                                    <span class="uc17-progress-step" data-agent-progress-step="start"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="thinking"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="searching"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="tools"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="reasoning"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="done"></span>
+                                </div>
                                 <div class="uc17-card-section"><div class="uc17-section-label">Tools + RAG</div><div data-agent-tools class="uc17-card-copy">No tool calls yet.</div></div>
                                 <div class="uc17-card-section"><div class="uc17-section-label">Response</div><div data-agent-response class="uc17-response-box">Response pending.</div></div>
                                 <div data-agent-meta class="uc17-badge-row"></div>
@@ -250,6 +274,14 @@
                                 </div>
                                 <div class="uc17-agent-state" data-agent-state-copy>Waiting for coordinator dispatch.</div>
                                 <div class="uc17-agent-task" data-agent-task>Will inspect recent transactions, fraud alerts, and anomaly risk.</div>
+                                <div class="uc17-progress" data-agent-progress aria-label="Agent progress">
+                                    <span class="uc17-progress-step" data-agent-progress-step="start"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="thinking"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="searching"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="tools"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="reasoning"></span>
+                                    <span class="uc17-progress-step" data-agent-progress-step="done"></span>
+                                </div>
                                 <div class="uc17-card-section"><div class="uc17-section-label">Tools + RAG</div><div data-agent-tools class="uc17-card-copy">No tool calls yet.</div></div>
                                 <div class="uc17-card-section"><div class="uc17-section-label">Response</div><div data-agent-response class="uc17-response-box">Response pending.</div></div>
                                 <div data-agent-meta class="uc17-badge-row"></div>
@@ -394,6 +426,22 @@ XREVRANGE uc17:stream:events + - COUNT 10</code></pre>
             border-color:var(--redis-primary);
             box-shadow:0 0 0 1px rgba(255, 68, 56, 0.12);
         }
+        .uc17-card.is-thinking {
+            border-color:var(--redis-primary);
+            box-shadow:0 0 0 1px rgba(255, 68, 56, 0.12);
+            animation:uc17-thinking-pulse 1.8s ease-in-out infinite;
+        }
+        .uc17-card.is-searching {
+            border-color:var(--redis-primary);
+            box-shadow:0 0 0 1px rgba(255, 68, 56, 0.12);
+            background-image:linear-gradient(90deg, rgba(255, 68, 56, 0) 0%, rgba(255, 68, 56, 0.08) 50%, rgba(255, 68, 56, 0) 100%);
+            background-size:220% 100%;
+            animation:uc17-search-scan 1.8s linear infinite;
+        }
+        .uc17-card.is-reasoning {
+            border-color:var(--redis-primary);
+            box-shadow:0 0 0 1px rgba(255, 68, 56, 0.16), 0 8px 20px rgba(255, 68, 56, 0.08);
+        }
         .uc17-card.is-done,
         .uc17-coordinator.is-done {
             border-color:#0a7e3e;
@@ -472,11 +520,22 @@ XREVRANGE uc17:stream:events + - COUNT 10</code></pre>
             font-size:0.72rem;
             font-weight:700;
         }
+        .ai-badge.checking {
+            color:var(--text-secondary);
+            background:var(--bg-tertiary);
+        }
+        .ai-badge.error {
+            color:var(--redis-primary);
+            background:rgba(255, 68, 56, 0.16);
+        }
         .status-badge.uc17-status-idle {
             color:var(--text-secondary);
             background:var(--bg-tertiary);
         }
         .status-badge.uc17-status-working,
+        .status-badge.uc17-status-thinking,
+        .status-badge.uc17-status-searching,
+        .status-badge.uc17-status-reasoning,
         .status-badge.uc17-status-tools {
             color:var(--redis-primary);
             background:rgba(255, 68, 56, 0.12);
@@ -492,6 +551,10 @@ XREVRANGE uc17:stream:events + - COUNT 10</code></pre>
         [data-theme="dark"] .status-badge.uc17-status-done {
             color:#4ade80;
             background:rgba(74, 222, 128, 0.15);
+        }
+        [data-theme="dark"] .ai-badge.error {
+            color:#f87171;
+            background:rgba(248, 113, 113, 0.16);
         }
         .uc17-command-strip {
             min-height:32px;
@@ -572,6 +635,30 @@ XREVRANGE uc17:stream:events + - COUNT 10</code></pre>
             color:var(--text-secondary);
             min-height:52px;
         }
+        .uc17-progress {
+            display:grid;
+            grid-template-columns:repeat(6, minmax(0, 1fr));
+            gap:6px;
+            margin-top:12px;
+        }
+        .uc17-progress-step {
+            height:6px;
+            border-radius:999px;
+            background:var(--bg-tertiary);
+            transition:background var(--transition), box-shadow var(--transition), transform var(--transition);
+        }
+        .uc17-progress-step.is-current,
+        .uc17-progress-step.is-complete {
+            background:var(--redis-primary);
+        }
+        .uc17-progress-step.is-current {
+            box-shadow:0 0 0 1px rgba(255, 68, 56, 0.16);
+            transform:scaleY(1.15);
+        }
+        .uc17-progress-step.is-error {
+            background:rgba(255, 68, 56, 0.45);
+            box-shadow:0 0 0 1px rgba(255, 68, 56, 0.2);
+        }
         .uc17-spinner-row {
             display:inline-flex;
             align-items:center;
@@ -615,8 +702,32 @@ XREVRANGE uc17:stream:events + - COUNT 10</code></pre>
             color:var(--text-muted);
             margin-left:4px;
         }
+        .uc17-card.is-thinking .uc17-agent-state::before,
+        .uc17-card.is-searching .uc17-agent-state::before,
+        .uc17-card.is-reasoning .uc17-agent-state::before {
+            display:inline-block;
+            margin-right:6px;
+            font-weight:700;
+        }
+        .uc17-card.is-thinking .uc17-agent-state::before {
+            content:'◌';
+        }
+        .uc17-card.is-searching .uc17-agent-state::before {
+            content:'⌕';
+        }
+        .uc17-card.is-reasoning .uc17-agent-state::before {
+            content:'🧠';
+        }
         @keyframes uc17-spin {
             to { transform:rotate(360deg); }
+        }
+        @keyframes uc17-thinking-pulse {
+            0%, 100% { box-shadow:0 0 0 1px rgba(255, 68, 56, 0.10); }
+            50% { box-shadow:0 0 0 2px rgba(255, 68, 56, 0.18); }
+        }
+        @keyframes uc17-search-scan {
+            0% { background-position:200% 0; }
+            100% { background-position:-40% 0; }
         }
         @keyframes uc17-flow-out {
             0% { transform:translateX(0); opacity:0; }
