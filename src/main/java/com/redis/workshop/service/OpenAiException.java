@@ -9,23 +9,38 @@ public class OpenAiException extends RuntimeException {
 
     private final int statusCode;
     private final String responseBody;
+    private final boolean retryable;
 
     public OpenAiException(String message) {
         super(message);
         this.statusCode = 0;
         this.responseBody = null;
+        this.retryable = false;
     }
 
     public OpenAiException(String message, Throwable cause) {
         super(message, cause);
         this.statusCode = 0;
         this.responseBody = null;
+        this.retryable = false;
+    }
+
+    public OpenAiException(String message, Throwable cause, boolean retryable) {
+        super(message, cause);
+        this.statusCode = 0;
+        this.responseBody = null;
+        this.retryable = retryable;
     }
 
     public OpenAiException(int statusCode, String responseBody, String message) {
+        this(statusCode, responseBody, message, false);
+    }
+
+    public OpenAiException(int statusCode, String responseBody, String message, boolean retryable) {
         super(message);
         this.statusCode = statusCode;
         this.responseBody = responseBody;
+        this.retryable = retryable;
     }
 
     public int getStatusCode() {
@@ -34,5 +49,9 @@ public class OpenAiException extends RuntimeException {
 
     public String getResponseBody() {
         return responseBody;
+    }
+
+    public boolean isRetryable() {
+        return retryable;
     }
 }
