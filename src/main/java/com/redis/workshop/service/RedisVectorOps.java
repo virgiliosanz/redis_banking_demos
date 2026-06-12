@@ -111,7 +111,7 @@ final class RedisVectorOps {
         for (var doc : parsed) {
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("redisKey", doc.get("_key"));
-            entry.put("score", doc.getOrDefault("__vector_score", "0"));
+            entry.put("score", distanceToSimilarity(doc.getOrDefault("__vector_score", "1.0")));
             for (var e : doc.entrySet()) {
                 if (!e.getKey().equals("_key") && !e.getKey().equals("vector") && !e.getKey().equals("__vector_score")) {
                     entry.put(e.getKey(), e.getValue());
@@ -119,7 +119,40 @@ final class RedisVectorOps {
             }
             results.add(entry);
         }
+        sortByScoreDescending(results);
         return results;
+    }
+
+    static double distanceToSimilarity(String rawDistance) {
+        try {
+            return distanceToSimilarity(Double.parseDouble(rawDistance));
+        } catch (Exception ignored) {
+            return 0.0d;
+        }
+    }
+
+    static double distanceToSimilarity(double distance) {
+        double similarity = 1.0d - distance;
+        double clamped = Math.max(0.0d, Math.min(1.0d, similarity));
+        return Math.round(clamped * 1000.0d) / 1000.0d;
+    }
+
+    static void sortByScoreDescending(List<Map<String, Object>> results) {
+        results.sort((left, right) -> Double.compare(scoreValue(right.get("score")), scoreValue(left.get("score"))));
+    }
+
+    private static double scoreValue(Object rawScore) {
+        if (rawScore instanceof Number number) {
+            return number.doubleValue();
+        }
+        if (rawScore instanceof String text) {
+            try {
+                return Double.parseDouble(text);
+            } catch (NumberFormatException ignored) {
+                return 0.0d;
+            }
+        }
+        return 0.0d;
     }
 
     /** Simple keyword scoring: +3 per matched tag, +1 per document hit, ignoring short tokens. */
