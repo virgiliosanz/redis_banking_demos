@@ -31,8 +31,11 @@ public class OpenAiService {
     @Value("${openai.model:gpt-4o-mini}")
     private String model;
 
-    @Value("${openai.embedding-model:text-embedding-3-small}")
+    @Value("${openai.embedding-model:text-embedding-3-large}")
     private String embeddingModel;
+
+    @Value("${openai.embedding-dimension:3072}")
+    private int embeddingDimension;
 
     private HttpClient httpClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -43,7 +46,8 @@ public class OpenAiService {
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
         if (isConfigured()) {
-            log.info("OpenAI integration enabled (model={}, embeddingModel={})", model, embeddingModel);
+            log.info("OpenAI integration enabled (model={}, embeddingModel={}, embeddingDimension={})",
+                    model, embeddingModel, embeddingDimension);
         } else {
             log.info("OpenAI integration disabled — no API key configured. Using mock fallback.");
         }
@@ -62,6 +66,7 @@ public class OpenAiService {
         try {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("model", embeddingModel);
+            body.put("dimensions", embeddingDimension);
             body.put("input", texts);
             String json = objectMapper.writeValueAsString(body);
 
@@ -96,6 +101,10 @@ public class OpenAiService {
         } catch (Exception e) {
             throw new OpenAiException("Failed to get embeddings from OpenAI", e);
         }
+    }
+
+    public int getEmbeddingDimension() {
+        return embeddingDimension;
     }
 
     /**

@@ -28,9 +28,12 @@ server:
 openai:
   api-key: ${OPENAI_API_KEY:}
   model: gpt-4o-mini
-  embedding-model: text-embedding-3-small
+  embedding-model: text-embedding-3-large
+  embedding-dimension: 3072
 
 workshop:
+  startup:
+    force-reload: false
   ams:
     base-url: ${WORKSHOP_AMS_BASE_URL:http://localhost:8000}
     mcp-url: ${WORKSHOP_AMS_MCP_URL:http://localhost:9000}
