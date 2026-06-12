@@ -3,9 +3,11 @@ package com.redis.workshop.service;
 import com.redis.workshop.config.DocumentDataLoader;
 import com.redis.workshop.config.RedisScanHelper;
 import com.redis.workshop.config.RedisSearchHelper;
+import com.redis.workshop.config.RedisStartupHelper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -28,10 +30,14 @@ public class KnowledgeBaseService {
     private static final String DOC_INDEX = "idx:uc8:documents";
     private static final String DOC_PREFIX = "uc8:doc:";
     private static final int VECTOR_DIM = 1536;
+    private static final int KB_SEED_COUNT = 10;
 
     private final StringRedisTemplate redis;
     private final OpenAiService openAiService;
     private final RedisSearchHelper redisSearchHelper;
+
+    @Value("${workshop.startup.force-reload:false}")
+    private boolean forceReload;
 
     private final List<Map<String, String>> kbArticles = new ArrayList<>();
 
@@ -44,13 +50,26 @@ public class KnowledgeBaseService {
 
     @PostConstruct
     public void init() {
-        loadKnowledgeBase();
+        List<Map<String, String>> articles = buildKnowledgeBaseArticles();
+        kbArticles.clear();
+        kbArticles.addAll(articles);
+
+        if (forceReload) {
+            log.info("UC9: force reload enabled for KB index, rebuilding {} articles", articles.size());
+        } else {
+            long existingDocs = existingKbDocCount();
+            if (existingDocs >= KB_SEED_COUNT) {
+                log.info("UC9: KB index already present ({} docs), skipping reload", existingDocs);
+                return;
+            }
+        }
+
+        loadKnowledgeBase(articles);
         createIndex();
     }
 
-    private void loadKnowledgeBase() {
-        kbArticles.clear();
-        var articles = List.of(
+    private List<Map<String, String>> buildKnowledgeBaseArticles() {
+        return List.of(
             Map.of("id", "kb-001", "title", "Account Types & Features",
                     "content", "We offer Personal Current, Savings, Business Current, and Premium accounts. Personal Current has no monthly fee, free debit card, and mobile banking. Savings offers 2.1% AER on balances over €1,000. Business Current includes invoicing tools and multi-user access. Premium includes concierge service, travel insurance, and priority support.",
                     "tags", "account,types,savings,business,premium,current",
@@ -92,8 +111,9 @@ public class KnowledgeBaseService {
                     "tags", "compliance,mifid,gdpr,aml,kyc,regulation",
                     "source", "Compliance Manual v5.1")
         );
-        kbArticles.addAll(articles);
+    }
 
+    private void loadKnowledgeBase(List<Map<String, String>> articles) {
         List<float[]> vectors;
         if (openAiService.isConfigured()) {
             log.info("UC9: Generating real embeddings for {} KB articles via OpenAI...", articles.size());
@@ -125,6 +145,17 @@ public class KnowledgeBaseService {
             hash.put("source", art.get("source"));
             redis.opsForHash().putAll(key, hash);
             RedisVectorOps.storeVectorField(redis, key, vectors.get(i));
+        }
+    }
+
+    private long existingKbDocCount() {
+        try {
+            return Math.max(
+                    RedisStartupHelper.indexDocCount(redis, KB_INDEX),
+                    RedisStartupHelper.countKeys(redis, KB_PREFIX + "*")
+            );
+        } catch (Exception e) {
+            return RedisStartupHelper.countKeys(redis, KB_PREFIX + "*");
         }
     }
 
@@ -226,7 +257,7 @@ public class KnowledgeBaseService {
                 } else {
                     entry.put("id", key != null ? key : "");
                 }
-                entry.put("score", doc.getOrDefault("__vector_score", "0"));
+                entry.put("score", RedisVectorOps.distanceToSimilarity(doc.getOrDefault("__vector_score", "1.0")));
                 entry.put("title", doc.getOrDefault("title", ""));
                 entry.put("content", doc.getOrDefault("content", ""));
                 if (doc.containsKey("summary")) entry.put("summary", doc.get("summary"));
@@ -237,6 +268,7 @@ public class KnowledgeBaseService {
                 entry.put("docType", "regulation");
                 results.add(entry);
             }
+            RedisVectorOps.sortByScoreDescending(results);
             return results;
         } catch (Exception e) {
             log.warn("UC9: Regulation doc search failed: {}", e.getMessage());

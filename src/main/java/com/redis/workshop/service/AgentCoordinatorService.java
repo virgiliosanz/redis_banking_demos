@@ -2,9 +2,11 @@ package com.redis.workshop.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.redis.workshop.config.RedisScanHelper;
+import com.redis.workshop.config.RedisStartupHelper;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.Limit;
 import org.springframework.data.redis.connection.stream.Consumer;
@@ -70,6 +72,9 @@ public class AgentCoordinatorService {
     private final ExecutorService agentExecutor = Executors.newFixedThreadPool(AGENTS.size());
     private final Semaphore coordinationGate = new Semaphore(1);
 
+    @Value("${workshop.startup.force-reload:false}")
+    private boolean forceReload;
+
     public AgentCoordinatorService(StringRedisTemplate redis,
                                    KnowledgeBaseService knowledgeBaseService,
                                    OpenAiService openAiService,
@@ -81,10 +86,32 @@ public class AgentCoordinatorService {
     }
 
     public void init() {
+        if (shouldSkipReload()) {
+            return;
+        }
         createConsumerGroup(TASK_STREAM, TASK_GROUP);
         createConsumerGroup(RESULT_STREAM, RESULT_GROUP);
         ensureStream(EVENT_STREAM);
         seedAgentHashes();
+    }
+
+    private boolean shouldSkipReload() {
+        if (forceReload) {
+            log.info("UC17: force reload enabled for coordinator streams/groups, rebuilding runtime state");
+            return false;
+        }
+        try {
+            long agentHashes = RedisStartupHelper.countKeys(redis, AGENT_HASH_PREFIX + "*");
+            if (RedisStartupHelper.streamGroupExists(redis, TASK_STREAM, TASK_GROUP)
+                    && RedisStartupHelper.streamGroupExists(redis, RESULT_STREAM, RESULT_GROUP)
+                    && agentHashes >= AGENTS.size()) {
+                log.info("UC17: coordinator streams/groups already present (agentHashes={}), skipping reload", agentHashes);
+                return true;
+            }
+        } catch (Exception e) {
+            return false;
+        }
+        return false;
     }
 
     public void coordinate(String query, String userId, SseEmitter emitter) {
@@ -637,11 +664,19 @@ public class AgentCoordinatorService {
                     bytes("MKSTREAM")
             ));
         } catch (Exception e) {
-            String message = e.getMessage() == null ? "" : e.getMessage().toUpperCase(Locale.ROOT);
+            String message = rootCauseMessage(e).toUpperCase(Locale.ROOT);
             if (!message.contains("BUSYGROUP")) {
                 throw e;
             }
         }
+    }
+
+    private String rootCauseMessage(Throwable error) {
+        Throwable current = error;
+        while (current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        return current.getMessage() == null ? "" : current.getMessage();
     }
 
     private void ensureStream(String streamKey) {

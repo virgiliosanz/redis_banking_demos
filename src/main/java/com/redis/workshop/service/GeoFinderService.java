@@ -2,9 +2,11 @@ package com.redis.workshop.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.redis.workshop.config.RedisStartupHelper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.geo.*;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -27,6 +29,9 @@ public class GeoFinderService {
     private final ObjectMapper objectMapper;
     private final RedisSearchHelper redisSearchHelper;
 
+    @Value("${workshop.startup.force-reload:false}")
+    private boolean forceReload;
+
     private static final String GEO_KEY = "uc12:geo:atms";
     private static final String META_PREFIX = "uc12:meta:";
     private static final String BRANCH_PREFIX = "uc12:branch:";
@@ -41,8 +46,30 @@ public class GeoFinderService {
 
     @PostConstruct
     public void init() {
+        if (forceReload) {
+            log.info("UC12: force reload enabled for geo data, rebuilding GEO/JSON structures");
+        } else {
+            Long geoEntries = redis.opsForZSet().size(GEO_KEY);
+            long branchDocs = existingBranchDocCount();
+            if (geoEntries != null && geoEntries > 0 && branchDocs >= 1) {
+                log.info("UC12: geo key already present ({} entries), skipping reload", geoEntries);
+                return;
+            }
+        }
+
         loadBranches();
         createIndex();
+    }
+
+    private long existingBranchDocCount() {
+        try {
+            return Math.max(
+                    RedisStartupHelper.indexDocCount(redis, INDEX_NAME),
+                    RedisStartupHelper.countKeys(redis, BRANCH_PREFIX + "*")
+            );
+        } catch (Exception e) {
+            return RedisStartupHelper.countKeys(redis, BRANCH_PREFIX + "*");
+        }
     }
 
     @SuppressWarnings("unchecked")

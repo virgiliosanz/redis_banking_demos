@@ -2,8 +2,10 @@ package com.redis.workshop.service;
 
 import com.redis.workshop.config.RedisScanHelper;
 import com.redis.workshop.config.RedisSearchHelper;
+import com.redis.workshop.config.RedisStartupHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.Limit;
 import org.springframework.data.redis.connection.stream.MapRecord;
@@ -86,12 +88,18 @@ public class AiGatewayService {
     private final StringRedisTemplate redis;
     private final RedisSearchHelper redisSearchHelper;
 
+    @Value("${workshop.startup.force-reload:false}")
+    private boolean forceReload;
+
     public AiGatewayService(StringRedisTemplate redis, RedisSearchHelper redisSearchHelper) {
         this.redis = redis;
         this.redisSearchHelper = redisSearchHelper;
     }
 
     public void init() {
+        if (shouldSkipReload()) {
+            return;
+        }
         RedisVectorOps.dropIndex(redis, ROUTE_INDEX);
         RedisVectorOps.dropIndex(redis, CACHE_INDEX);
         RedisVectorOps.createVectorIndex(redis, ROUTE_INDEX, ROUTE_PREFIX,
@@ -101,6 +109,9 @@ public class AiGatewayService {
     }
 
     public void seedDemoData() {
+        if (shouldSkipReload()) {
+            return;
+        }
         for (ModelConfig config : MODEL_CONFIGS) {
             String key = ROUTE_PREFIX + config.tag();
             Map<String, String> hash = new LinkedHashMap<>();
@@ -119,6 +130,28 @@ public class AiGatewayService {
                 "PSD2 is the EU Payments Services Directive that opened banking APIs to regulated third parties and introduced Strong Customer Authentication for many electronic payments.");
         seedCacheEntry(getModel("internalnumeric"), "Show capital ratio by quarter for 2024",
                 "Quarterly capital ratios (demo): Q1 13.2%, Q2 13.4%, Q3 13.7%, Q4 14.0%. Trend: +0.8 percentage points over the year.");
+    }
+
+    private boolean shouldSkipReload() {
+        if (forceReload) {
+            log.info("UC16: force reload enabled for gateway indices and routes, rebuilding demo data");
+            return false;
+        }
+        try {
+            long routeDocs = RedisStartupHelper.indexDocCount(redis, ROUTE_INDEX);
+            long cacheDocs = RedisStartupHelper.indexDocCount(redis, CACHE_INDEX);
+            long routeKeys = RedisStartupHelper.countKeys(redis, ROUTE_PREFIX + "*");
+            long cacheKeys = RedisStartupHelper.countKeys(redis, CACHE_PREFIX + "*");
+            if ((routeDocs >= MODEL_CONFIGS.size() || routeKeys >= MODEL_CONFIGS.size())
+                    && (cacheDocs >= 1 || cacheKeys >= 1)
+                    && routeKeys >= MODEL_CONFIGS.size()) {
+                log.info("UC16: gateway data already present (routes={}, cacheDocs={}), skipping reload", routeDocs, cacheDocs);
+                return true;
+            }
+        } catch (Exception e) {
+            return false;
+        }
+        return false;
     }
 
     public Map<String, Object> handleQuery(String query, String userId, String sessionId) {
