@@ -47,10 +47,14 @@ seed: ## Force-reload workshop data, wait for startup completion, then stop the 
 	@echo "\033[1;36m>>> seed\033[0m"
 	@log_file="$$(mktemp -t workshop-seed.XXXXXX.log)"; \
 	printf "$(YELLOW)Starting application with workshop.startup.force-reload=true...$(RESET)\n"; \
-	./mvnw spring-boot:run -Dspring-boot.run.arguments="--workshop.startup.force-reload=true" > "$$log_file" 2>&1 & \
+	./mvnw spring-boot:run -Dspring-boot.run.fork=false -Dspring-boot.run.arguments="--workshop.startup.force-reload=true" > "$$log_file" 2>&1 & \
 	pid=$$!; \
 	cleanup() { \
-		if kill -0 "$$pid" >/dev/null 2>&1; then kill "$$pid" >/dev/null 2>&1 || true; fi; \
+		if kill -0 "$$pid" >/dev/null 2>&1; then \
+			kill "$$pid" 2>/dev/null || true; \
+			sleep 3; \
+			kill -0 "$$pid" 2>/dev/null && kill -9 "$$pid" 2>/dev/null || true; \
+		fi; \
 		wait "$$pid" >/dev/null 2>&1 || true; \
 		rm -f "$$log_file"; \
 	}; \
@@ -90,7 +94,7 @@ embeddings: ## Flush Redis, delete cached embedding JSONs, and regenerate them
 
 dev: ## Run the Spring Boot app in the foreground
 	@echo "\033[1;36m>>> dev\033[0m"
-	@./mvnw spring-boot:run
+	@exec ./mvnw spring-boot:run -Dspring-boot.run.fork=false
 
 compile: ## Compile the Spring Boot project
 	@echo "\033[1;36m>>> compile\033[0m"
