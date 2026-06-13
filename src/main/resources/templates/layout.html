@@ -52,12 +52,17 @@
             </select>
             <a th:href="@{/monitor}" class="nav-link nav-link-monitor">Monitor</a>
             <a href="http://localhost:5540" target="_blank" class="nav-link">Redis Insight</a>
-            <button class="nav-reset-btn" id="resetAllBtn" type="button" aria-label="Reset all demo data">
+            <button th:if="${useCaseId != null}"
+                    class="nav-reset-btn"
+                    id="resetAllBtn"
+                    type="button"
+                    aria-label="Reset all demo data"
+                    th:attr="data-reset-all-url=@{/api/reset-all}">
                 <svg class="reset-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="1 4 1 10 7 10"/>
                     <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
                 </svg>
-                <span class="reset-label">Reset All</span>
+                <span class="reset-label">Reset All Data</span>
             </button>
             <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
                 <svg class="theme-icon-light" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -85,6 +90,25 @@
                th:href="@{|/guide#uc${useCaseId}|}">Workshop guide →</a>
         </div>
     </main>
+
+    <div th:if="${useCaseId != null}"
+         id="resetAllModal"
+         class="confirm-modal"
+         hidden
+         aria-hidden="true">
+        <div class="confirm-modal-dialog"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="resetAllModalTitle"
+             aria-describedby="resetAllModalMessage">
+            <h2 id="resetAllModalTitle" class="confirm-modal-title">Reset All Data</h2>
+            <p id="resetAllModalMessage" class="confirm-modal-message">This will reset all demo data. Continue?</p>
+            <div class="confirm-modal-actions">
+                <button type="button" class="btn btn-secondary" data-reset-modal-cancel>Cancel</button>
+                <button type="button" class="btn" data-reset-modal-confirm>Reset</button>
+            </div>
+        </div>
+    </div>
 
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="false"></div>
 

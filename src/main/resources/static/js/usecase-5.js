@@ -71,6 +71,12 @@
             return workshopFetch('/api/dedup/submit', data)
                 .then(function (result) {
                     showResult(result);
+                    window.showToast(
+                        result.status === 'ACCEPTED'
+                            ? 'Payment accepted and deduplication key stored.'
+                            : 'Duplicate payment blocked by Redis.',
+                        result.status === 'ACCEPTED' ? 'success' : 'warning'
+                    );
                     return refreshLog();
                 })
                 .catch(function (err) {
@@ -79,6 +85,7 @@
                     resultIcon.textContent = '\u2717';
                     resultStatus.textContent = 'Error';
                     resultDetails.textContent = err.message;
+                    window.showToast(err.message || 'Payment submission failed.', 'error');
                 })
                 .finally(function () {
                     payBtn.disabled = false;
@@ -114,7 +121,10 @@
         resetBtn.addEventListener('click', function () {
             workshopFetch('/api/dedup/reset', {}).then(function () {
                 resultBox.style.display = 'none';
-                refreshLog();
+                window.showToast('Deduplication demo reset.', 'success');
+                return refreshLog();
+            }).catch(function (err) {
+                window.showToast((err && err.message) || 'Could not reset the deduplication demo.', 'error');
             });
         });
 

@@ -7,6 +7,9 @@
     --redis-primary: #FF4438;
     --redis-primary-hover: #EB352A;
     --redis-primary-dark: #8A221C;
+    --toast-success: #16B978;
+    --toast-warning: #F5A623;
+    --toast-info: #091A23;
 
     --text-primary: #091A23;
     --text-secondary: #163341;
@@ -211,19 +214,20 @@ a:hover {
     font-family: var(--font-body);
     font-size: 0.8rem;
     font-weight: 600;
-    color: var(--text-secondary);
-    background: transparent;
-    border: 1px solid var(--border-color);
+    color: var(--redis-primary);
+    background: rgba(255, 68, 56, 0.04);
+    border: 1px solid rgba(255, 68, 56, 0.28);
     border-radius: var(--border-radius);
     padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
     cursor: pointer;
-    transition: color var(--transition), background var(--transition), border-color var(--transition);
+    transition: color var(--transition), background var(--transition), border-color var(--transition), box-shadow var(--transition);
 }
 
 .nav-reset-btn:hover:not(:disabled) {
     color: var(--redis-primary);
     border-color: var(--redis-primary);
-    background: rgba(255, 68, 56, 0.08);
+    background: rgba(255, 68, 56, 0.12);
+    box-shadow: 0 0 0 2px rgba(255, 68, 56, 0.08);
 }
 
 .nav-reset-btn:disabled {
@@ -244,7 +248,160 @@ a:hover {
     to { transform: rotate(360deg); }
 }
 
+body.modal-open {
+    overflow: hidden;
+}
 
+.confirm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1450;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: calc(var(--spacing-unit) * 3);
+    background: rgba(9, 26, 35, 0.54);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+.confirm-modal[hidden] {
+    display: none;
+}
+
+.confirm-modal.is-visible {
+    opacity: 1;
+}
+
+.confirm-modal-dialog {
+    width: min(440px, 100%);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: calc(var(--border-radius) * 2);
+    box-shadow: var(--shadow-lg);
+    padding: calc(var(--spacing-unit) * 3);
+}
+
+.confirm-modal-title {
+    margin: 0 0 calc(var(--spacing-unit) * 1.5);
+    font-size: 1.2rem;
+    color: var(--text-primary);
+}
+
+.confirm-modal-message {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.confirm-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-unit);
+    margin-top: calc(var(--spacing-unit) * 3);
+}
+
+
+
+/* --- Global Toast Notifications --- */
+.toast-container {
+    position: fixed;
+    top: 72px;
+    right: calc(var(--spacing-unit) * 3);
+    z-index: 1400;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-unit);
+    width: min(360px, calc(100vw - 32px));
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: calc(var(--spacing-unit) * 1.5);
+    padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
+    border-radius: var(--border-radius);
+    color: #fff;
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    transform: translate3d(24px, -8px, 0);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.toast.is-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+}
+
+.toast.is-hiding {
+    opacity: 0;
+    transform: translate3d(24px, -8px, 0);
+}
+
+.toast-success { background: var(--toast-success); }
+.toast-error { background: var(--redis-primary); }
+.toast-warning { background: var(--toast-warning); color: var(--text-primary); }
+.toast-info { background: var(--toast-info); }
+
+.toast-body {
+    min-width: 0;
+}
+
+.toast-title {
+    margin-bottom: 4px;
+    font-family: var(--font-code);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.9;
+}
+
+.toast-message {
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+
+.toast-close {
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.78;
+    transition: opacity var(--transition), transform var(--transition);
+}
+
+.toast-close:hover {
+    opacity: 1;
+    transform: scale(1.06);
+}
+
+@media (max-width: 640px) {
+    .confirm-modal {
+        padding: calc(var(--spacing-unit) * 2);
+    }
+
+    .confirm-modal-actions {
+        flex-direction: column-reverse;
+    }
+
+    .confirm-modal-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .toast-container {
+        top: 64px;
+        right: 16px;
+        left: 16px;
+        width: auto;
+    }
+}
 
 /* --- Main Content --- */
 .main-content {
