@@ -7,6 +7,7 @@
 
     // --- Dark Mode Toggle ---
     const THEME_KEY = 'redis-workshop-theme';
+    const PRESENTER_MODE_KEY = 'redis-workshop-presenter-mode';
 
     function getPreferredTheme() {
         const stored = localStorage.getItem(THEME_KEY);
@@ -18,6 +19,77 @@
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem(THEME_KEY, theme);
     }
+
+    function hasPresenterToggle() {
+        return !!document.querySelector('.btn-presenter-fullscreen');
+    }
+
+    function isPresenterModeEnabled() {
+        return !!(document.body && document.body.classList.contains('presenter-fullscreen'));
+    }
+
+    function readPresenterModePreference() {
+        try {
+            return sessionStorage.getItem(PRESENTER_MODE_KEY) === 'true';
+        } catch (err) {
+            return false;
+        }
+    }
+
+    function writePresenterModePreference(enabled) {
+        try {
+            if (enabled) {
+                sessionStorage.setItem(PRESENTER_MODE_KEY, 'true');
+            } else {
+                sessionStorage.removeItem(PRESENTER_MODE_KEY);
+            }
+        } catch (err) {
+        }
+    }
+
+    function syncPresenterModeButtons() {
+        var active = isPresenterModeEnabled();
+        var label = active ? 'Exit fullscreen presenter mode' : 'Enter fullscreen presenter mode';
+
+        document.querySelectorAll('.btn-presenter-fullscreen').forEach(function (button) {
+            button.textContent = active ? '⤢ Exit Fullscreen' : '⛶ Fullscreen';
+            button.setAttribute('aria-label', label);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+            button.title = label;
+        });
+    }
+
+    function setPresenterMode(enabled, persist) {
+        var active = !!enabled && hasPresenterToggle();
+        if (document.body) {
+            document.body.classList.toggle('presenter-fullscreen', active);
+        }
+        syncPresenterModeButtons();
+
+        if (persist !== false) {
+            writePresenterModePreference(active);
+        }
+    }
+
+    function initPresenterMode() {
+        if (!hasPresenterToggle()) {
+            if (document.body) document.body.classList.remove('presenter-fullscreen');
+            return;
+        }
+
+        if (readPresenterModePreference()) {
+            setPresenterMode(true, false);
+            return;
+        }
+
+        setPresenterMode(false, false);
+    }
+
+    window.togglePresenterMode = function (force) {
+        var shouldEnable = typeof force === 'boolean' ? force : !isPresenterModeEnabled();
+        setPresenterMode(shouldEnable);
+        return isPresenterModeEnabled();
+    };
 
     // Apply stored/preferred theme immediately
     applyTheme(getPreferredTheme());
@@ -145,7 +217,16 @@
             }
         }
 
+        initPresenterMode();
         initResetAll();
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.defaultPrevented) return;
+        if (event.key === 'Escape' && isPresenterModeEnabled()) {
+            event.preventDefault();
+            window.togglePresenterMode(false);
+        }
     });
 
     // --- Reset All (navbar) ---
@@ -276,6 +357,8 @@
 
     function findLatencyHeader(panel) {
         if (!panel) return null;
+        var panelHeader = panel.querySelector('.demo-panel-header');
+        if (panelHeader) return panelHeader;
         for (var i = 0; i < panel.children.length; i++) {
             var child = panel.children[i];
             if (/^H[1-4]$/.test(child.tagName)) return child;
@@ -306,10 +389,16 @@
         if (!header) return;
 
         var badge = header.querySelector('.redis-latency-badge');
+        var presenterButton = header.querySelector('.btn-presenter-fullscreen');
         if (!badge) {
             badge = document.createElement('span');
             badge.className = 'redis-latency-badge';
             badge.title = 'Server-side Redis latency from X-Redis-Latency-Ms';
+        }
+
+        if (presenterButton && presenterButton.parentNode === header) {
+            header.insertBefore(badge, presenterButton);
+        } else if (badge.parentNode !== header) {
             header.appendChild(badge);
         }
 
