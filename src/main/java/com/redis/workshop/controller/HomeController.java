@@ -85,6 +85,8 @@ public class HomeController {
     @GetMapping("/")
     public String home(Model model) {
         model.addAttribute("useCaseGroups", USE_CASE_GROUPS);
+        model.addAttribute("pageTitle", "Banking Workshop Demo");
+        model.addAttribute("pageDescription", "Interactive Redis banking workshop demo with 17 live use cases covering sessions, caching, AI, vector search, streams, and observability.");
         return "index";
     }
 }
