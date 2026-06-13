@@ -14,36 +14,50 @@
 
         <details class="how-it-works" open>
             <summary><h2>How it works</h2></summary>
-            <div class="how-it-works-dual">
-                <!-- Panel 1: Agent Memory -->
-                <div class="how-it-works-panel">
-                    <h3>Agent Memory</h3>
-                    <div class="how-it-works-steps">
+            <div class="how-it-works-steps">
+                <div class="uc9-flow-grid">
+                    <section class="uc9-flow-card">
+                        <h3>1. Agent memory</h3>
                         <ol>
-                            <li>User makes a request to an agent.</li>
-                            <li>The agent generates a plan.</li>
-                            <li>The agent calls tools or an LLM for information.</li>
-                            <li>The agent stores information in short-term memory.</li>
-                            <li>Some information will be stored for long-term, while other info will only be saved temporarily.</li>
+                            <li>User asks a banking question and the assistant builds a response plan.</li>
+                            <li>Redis keeps the live conversation in short-term memory with TTL.</li>
+                            <li>Relevant facts can be promoted into long-term memory for future retrieval.</li>
                         </ol>
-                    </div>
-                    <div class="how-it-works-diagram">
+                    </section>
+                    <section class="uc9-flow-card">
+                        <h3>2. Retrieval + RAG</h3>
+                        <ol>
+                            <li>The assistant queries Redis vector indexes for banking articles and regulation chunks.</li>
+                            <li>Retrieved context is combined with the user question before the LLM call.</li>
+                            <li>The answer is grounded in the retrieved material instead of model memory alone.</li>
+                        </ol>
+                    </section>
+                    <section class="uc9-flow-card">
+                        <h3>3. Shared Redis context</h3>
+                        <ul>
+                            <li>Short-term memory, long-term memory, knowledge base, and regulation search stay visible in one Redis-backed context panel.</li>
+                            <li>Semantic cache avoids repeated LLM calls for similar questions.</li>
+                            <li>The loaded banking corpus and regulation PDFs remain explorable from inside the demo panel.</li>
+                        </ul>
+                    </section>
+                </div>
+            </div>
+            <div class="how-it-works-diagram">
+                <div class="uc9-diagram-grid">
+                    <figure class="uc9-diagram-card">
+                        <figcaption>Agent memory flow</figcaption>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 220" width="700" height="220">
                             <defs>
                                 <marker id="uc9a-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
                                     <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
                                 </marker>
                             </defs>
-                            <!-- User -->
                             <rect x="20" y="70" width="90" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
                             <text x="65" y="95" text-anchor="middle" font-size="12" font-weight="600">User</text>
                             <text x="65" y="115" text-anchor="middle" font-size="10" class="svg-label">Request</text>
-                            <!-- Arrow User ↔ Agent -->
                             <line x1="110" y1="100" x2="170" y2="100" class="svg-arrow" stroke-width="2" marker-end="url(#uc9a-arrow)"/>
-                            <!-- AI Agent -->
                             <rect x="180" y="70" width="110" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
                             <text x="235" y="97" text-anchor="middle" font-size="13" font-weight="600">AI Agent</text>
-                            <!-- Tools above agent -->
                             <rect x="140" y="10" width="55" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
                             <text x="167" y="30" text-anchor="middle" font-size="10">Tool 1</text>
                             <rect x="205" y="10" width="55" height="30" rx="5" ry="5" class="svg-box" stroke-width="1"/>
@@ -53,226 +67,50 @@
                             <line x1="210" y1="70" x2="180" y2="42" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9a-arrow)"/>
                             <line x1="235" y1="70" x2="235" y2="42" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9a-arrow)"/>
                             <line x1="260" y1="70" x2="290" y2="42" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9a-arrow)"/>
-                            <!-- LLM below agent -->
                             <rect x="195" y="160" width="80" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
                             <text x="235" y="183" text-anchor="middle" font-size="12" font-weight="600">LLM</text>
                             <line x1="235" y1="130" x2="235" y2="158" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9a-arrow)"/>
-                            <!-- Arrow Agent → Short-term memory -->
                             <line x1="290" y1="100" x2="370" y2="100" class="svg-arrow" stroke-width="2" marker-end="url(#uc9a-arrow)"/>
-                            <!-- Short-term memory -->
                             <rect x="380" y="70" width="120" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
                             <text x="440" y="95" text-anchor="middle" font-size="12" font-weight="600">Short-term</text>
                             <text x="440" y="112" text-anchor="middle" font-size="12" font-weight="600">Memory</text>
-                            <!-- Arrow → Long-term memory -->
                             <line x1="500" y1="100" x2="560" y2="100" class="svg-arrow" stroke-width="2" marker-end="url(#uc9a-arrow)"/>
-                            <!-- Long-term memory (Redis) -->
                             <circle cx="625" cy="100" r="50" class="svg-redis-circle"/>
                             <text x="625" y="92" text-anchor="middle" font-size="12" class="svg-redis-text">Long-term</text>
                             <text x="625" y="110" text-anchor="middle" font-size="12" class="svg-redis-text">Memory</text>
                         </svg>
-                    </div>
-                </div>
-                <!-- Panel 2: RAG -->
-                <div class="how-it-works-panel">
-                    <h3>RAG (Retrieval-Augmented Generation)</h3>
-                    <div class="how-it-works-steps">
-                        <ol>
-                            <li>A user asks a question.</li>
-                            <li>The app retrieves the relevant document or chunk from Redis.</li>
-                            <li>The question and relevant document are sent to an LLM.</li>
-                            <li>The LLM generates an answer using its knowledge plus the retrieved information.</li>
-                            <li>The app returns the answer to the user.</li>
-                        </ol>
-                    </div>
-                    <div class="how-it-works-diagram">
+                    </figure>
+                    <figure class="uc9-diagram-card">
+                        <figcaption>Retrieval + RAG flow</figcaption>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 180" width="700" height="180">
                             <defs>
                                 <marker id="uc9b-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
                                     <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
                                 </marker>
                             </defs>
-                            <!-- Question -->
                             <rect x="20" y="50" width="100" height="45" rx="5" ry="5" class="svg-box" stroke-width="1"/>
                             <text x="70" y="68" text-anchor="middle" font-size="12" font-weight="600">Q</text>
                             <text x="70" y="86" text-anchor="middle" font-size="13" font-weight="600">Question</text>
-                            <!-- Arrow → Retrieval -->
                             <line x1="120" y1="72" x2="180" y2="72" class="svg-arrow" stroke-width="2" marker-end="url(#uc9b-arrow)"/>
-                            <!-- Retrieval (Redis) -->
                             <circle cx="250" cy="72" r="50" class="svg-redis-circle"/>
                             <text x="250" y="64" text-anchor="middle" font-size="12" class="svg-redis-text">Redis</text>
                             <text x="250" y="82" text-anchor="middle" font-size="10" class="svg-redis-text">Retrieval</text>
-                            <!-- Documents below -->
                             <rect x="205" y="140" width="90" height="35" rx="5" ry="5" class="svg-box" stroke-width="1"/>
                             <text x="250" y="163" text-anchor="middle" font-size="12" font-weight="600">Docs</text>
                             <line x1="250" y1="140" x2="250" y2="124" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc9b-arrow)"/>
-                            <!-- Arrow → LLM -->
                             <line x1="300" y1="72" x2="380" y2="72" class="svg-arrow" stroke-width="2" marker-end="url(#uc9b-arrow)"/>
-                            <!-- LLM -->
                             <rect x="390" y="45" width="130" height="55" rx="5" ry="5" class="svg-box" stroke-width="1"/>
                             <text x="455" y="68" text-anchor="middle" font-size="12" font-weight="600">LLM</text>
                             <text x="455" y="88" text-anchor="middle" font-size="12" font-weight="600">LLM Generation</text>
-                            <!-- Arrow → Answer -->
                             <line x1="520" y1="72" x2="570" y2="72" class="svg-arrow" stroke-width="2" marker-end="url(#uc9b-arrow)"/>
-                            <!-- Answer -->
                             <rect x="580" y="50" width="100" height="45" rx="5" ry="5" class="svg-box" stroke-width="1"/>
                             <text x="630" y="68" text-anchor="middle" font-size="12" font-weight="600">A</text>
                             <text x="630" y="86" text-anchor="middle" font-size="13" font-weight="600">Answer</text>
                         </svg>
-                    </div>
+                    </figure>
                 </div>
             </div>
         </details>
-
-        <section class="loaded-documents">
-            <details class="kb-section" open>
-                <summary><h3>Banking Knowledge Base <span class="doc-count">(10 articles)</span></h3></summary>
-                <p class="loaded-docs-subtitle">Internal banking articles loaded as vector embeddings for the AI assistant's RAG pipeline:</p>
-                <div class="doc-cards">
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/assistant/kb/kb-001/view" target="_blank" class="doc-title-link">Account Types &amp; Features</a></h4>
-                            <p>Personal, Savings, Business &amp; Premium accounts</p>
-                            <span class="doc-tag">Accounts</span>
-                            <span class="doc-tag">Savings</span>
-                            <div class="doc-source">Product Catalogue 2024</div>
-                        </div>
-                    </div>
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/assistant/kb/kb-002/view" target="_blank" class="doc-title-link">Transfers &amp; Fees</a></h4>
-                            <p>SEPA, SWIFT, instant payments &amp; limits</p>
-                            <span class="doc-tag">SEPA</span>
-                            <span class="doc-tag">SWIFT</span>
-                            <div class="doc-source">SEPA Regulation Guide v3.2</div>
-                        </div>
-                    </div>
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/assistant/kb/kb-003/view" target="_blank" class="doc-title-link">Card Security</a></h4>
-                            <p>3D Secure, fraud prevention &amp; contactless</p>
-                            <span class="doc-tag">Fraud</span>
-                            <span class="doc-tag">3D Secure</span>
-                            <div class="doc-source">Security Policy Handbook</div>
-                        </div>
-                    </div>
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/assistant/kb/kb-004/view" target="_blank" class="doc-title-link">Investments</a></h4>
-                            <p>Portfolios, ETFs &amp; robo-advisor</p>
-                            <span class="doc-tag">ETF</span>
-                            <span class="doc-tag">Portfolio</span>
-                            <div class="doc-source">MiFID II Product Sheet</div>
-                        </div>
-                    </div>
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/assistant/kb/kb-005/view" target="_blank" class="doc-title-link">Loans &amp; Mortgages</a></h4>
-                            <p>Personal loans, fixed &amp; variable mortgage rates</p>
-                            <span class="doc-tag">Mortgage</span>
-                            <span class="doc-tag">Rates</span>
-                            <div class="doc-source">Lending Terms Q1 2025</div>
-                        </div>
-                    </div>
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/assistant/kb/kb-006/view" target="_blank" class="doc-title-link">Insurance</a></h4>
-                            <p>Home, travel, life &amp; payment protection</p>
-                            <span class="doc-tag">Insurance</span>
-                            <span class="doc-tag">Protection</span>
-                            <div class="doc-source">Insurance Partner Brochure</div>
-                        </div>
-                    </div>
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/assistant/kb/kb-007/view" target="_blank" class="doc-title-link">PSD2 &amp; Open Banking</a></h4>
-                            <p>SCA, AIS/PIS APIs &amp; developer portal</p>
-                            <span class="doc-tag">PSD2</span>
-                            <span class="doc-tag">API</span>
-                            <div class="doc-source">PSD2 Technical Standards</div>
-                        </div>
-                    </div>
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/assistant/kb/kb-008/view" target="_blank" class="doc-title-link">SEPA Payments</a></h4>
-                            <p>Cross-border, instant &amp; direct debit</p>
-                            <span class="doc-tag">SEPA</span>
-                            <span class="doc-tag">Payments</span>
-                            <div class="doc-source">EPC SEPA Rulebook 2024</div>
-                        </div>
-                    </div>
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/assistant/kb/kb-009/view" target="_blank" class="doc-title-link">Digital Banking</a></h4>
-                            <p>Mobile app, online banking &amp; API access</p>
-                            <span class="doc-tag">Mobile</span>
-                            <span class="doc-tag">Digital</span>
-                            <div class="doc-source">Digital Strategy Roadmap</div>
-                        </div>
-                    </div>
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/assistant/kb/kb-010/view" target="_blank" class="doc-title-link">Regulatory Compliance</a></h4>
-                            <p>MiFID II, GDPR, AML/KYC</p>
-                            <span class="doc-tag">MiFID</span>
-                            <span class="doc-tag">GDPR</span>
-                            <div class="doc-source">Compliance Manual v5.1</div>
-                        </div>
-                    </div>
-                </div>
-            </details>
-
-            <details class="kb-section">
-                <summary><h3>Regulation Documents <span class="doc-count">(5 PDFs)</span></h3></summary>
-                <p class="loaded-docs-subtitle">Official EU banking regulation PDFs, chunked and embedded for semantic search:</p>
-                <div class="doc-cards">
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/documents/pdf/psd2" target="_blank" class="doc-title-link">PSD2 — Payment Services Directive 2</a></h4>
-                            <p>Open banking, strong customer authentication, third-party provider access</p>
-                            <span class="doc-tag">PSD2</span>
-                            <span class="doc-tag">Open Banking</span>
-                            <div class="doc-source">Official EU Regulation</div>
-                        </div>
-                    </div>
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/documents/pdf/dora" target="_blank" class="doc-title-link">DORA — Digital Operational Resilience Act</a></h4>
-                            <p>ICT risk management, incident reporting, digital resilience testing</p>
-                            <span class="doc-tag">DORA</span>
-                            <span class="doc-tag">Resilience</span>
-                            <div class="doc-source">Official EU Regulation</div>
-                        </div>
-                    </div>
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/documents/pdf/mifid2" target="_blank" class="doc-title-link">MiFID II — Markets in Financial Instruments</a></h4>
-                            <p>Investor protection, market transparency, trading venue rules</p>
-                            <span class="doc-tag">MiFID II</span>
-                            <span class="doc-tag">Markets</span>
-                            <div class="doc-source">Official EU Regulation</div>
-                        </div>
-                    </div>
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/documents/pdf/gdpr" target="_blank" class="doc-title-link">GDPR — General Data Protection Regulation</a></h4>
-                            <p>Personal data protection, consent management, data subject rights</p>
-                            <span class="doc-tag">GDPR</span>
-                            <span class="doc-tag">Privacy</span>
-                            <div class="doc-source">Official EU Regulation</div>
-                        </div>
-                    </div>
-                    <div class="doc-card">
-                        <div class="doc-info">
-                            <h4><a href="/api/documents/pdf/euaiact" target="_blank" class="doc-title-link">EU AI Act — Artificial Intelligence Act</a></h4>
-                            <p>AI risk classification, PII in automated decisions, high-risk AI systems in banking</p>
-                            <span class="doc-tag">AI Act</span>
-                            <span class="doc-tag">PII</span>
-                            <div class="doc-source">Official EU Regulation</div>
-                        </div>
-                    </div>
-                </div>
-            </details>
-        </section>
 
         <div class="usecase-panels">
             <!-- LEFT: Live Demo Panel -->
@@ -381,6 +219,157 @@
                         <div id="latency-display" class="uc9-ctx-latency"></div>
                     </div>
 
+                    <section class="loaded-documents">
+                        <details class="kb-section" open>
+                            <summary><h3>Banking Knowledge Base <span class="doc-count">(10 articles)</span></h3></summary>
+                            <p class="loaded-docs-subtitle">Internal banking articles loaded as vector embeddings for the AI assistant's RAG pipeline:</p>
+                            <div class="doc-cards">
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/assistant/kb/kb-001/view" target="_blank" class="doc-title-link">Account Types &amp; Features</a></h4>
+                                        <p>Personal, Savings, Business &amp; Premium accounts</p>
+                                        <span class="doc-tag">Accounts</span>
+                                        <span class="doc-tag">Savings</span>
+                                        <div class="doc-source">Product Catalogue 2024</div>
+                                    </div>
+                                </div>
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/assistant/kb/kb-002/view" target="_blank" class="doc-title-link">Transfers &amp; Fees</a></h4>
+                                        <p>SEPA, SWIFT, instant payments &amp; limits</p>
+                                        <span class="doc-tag">SEPA</span>
+                                        <span class="doc-tag">SWIFT</span>
+                                        <div class="doc-source">SEPA Regulation Guide v3.2</div>
+                                    </div>
+                                </div>
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/assistant/kb/kb-003/view" target="_blank" class="doc-title-link">Card Security</a></h4>
+                                        <p>3D Secure, fraud prevention &amp; contactless</p>
+                                        <span class="doc-tag">Fraud</span>
+                                        <span class="doc-tag">3D Secure</span>
+                                        <div class="doc-source">Security Policy Handbook</div>
+                                    </div>
+                                </div>
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/assistant/kb/kb-004/view" target="_blank" class="doc-title-link">Investments</a></h4>
+                                        <p>Portfolios, ETFs &amp; robo-advisor</p>
+                                        <span class="doc-tag">ETF</span>
+                                        <span class="doc-tag">Portfolio</span>
+                                        <div class="doc-source">MiFID II Product Sheet</div>
+                                    </div>
+                                </div>
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/assistant/kb/kb-005/view" target="_blank" class="doc-title-link">Loans &amp; Mortgages</a></h4>
+                                        <p>Personal loans, fixed &amp; variable mortgage rates</p>
+                                        <span class="doc-tag">Mortgage</span>
+                                        <span class="doc-tag">Rates</span>
+                                        <div class="doc-source">Lending Terms Q1 2025</div>
+                                    </div>
+                                </div>
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/assistant/kb/kb-006/view" target="_blank" class="doc-title-link">Insurance</a></h4>
+                                        <p>Home, travel, life &amp; payment protection</p>
+                                        <span class="doc-tag">Insurance</span>
+                                        <span class="doc-tag">Protection</span>
+                                        <div class="doc-source">Insurance Partner Brochure</div>
+                                    </div>
+                                </div>
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/assistant/kb/kb-007/view" target="_blank" class="doc-title-link">PSD2 &amp; Open Banking</a></h4>
+                                        <p>SCA, AIS/PIS APIs &amp; developer portal</p>
+                                        <span class="doc-tag">PSD2</span>
+                                        <span class="doc-tag">API</span>
+                                        <div class="doc-source">PSD2 Technical Standards</div>
+                                    </div>
+                                </div>
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/assistant/kb/kb-008/view" target="_blank" class="doc-title-link">SEPA Payments</a></h4>
+                                        <p>Cross-border, instant &amp; direct debit</p>
+                                        <span class="doc-tag">SEPA</span>
+                                        <span class="doc-tag">Payments</span>
+                                        <div class="doc-source">EPC SEPA Rulebook 2024</div>
+                                    </div>
+                                </div>
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/assistant/kb/kb-009/view" target="_blank" class="doc-title-link">Digital Banking</a></h4>
+                                        <p>Mobile app, online banking &amp; API access</p>
+                                        <span class="doc-tag">Mobile</span>
+                                        <span class="doc-tag">Digital</span>
+                                        <div class="doc-source">Digital Strategy Roadmap</div>
+                                    </div>
+                                </div>
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/assistant/kb/kb-010/view" target="_blank" class="doc-title-link">Regulatory Compliance</a></h4>
+                                        <p>MiFID II, GDPR, AML/KYC</p>
+                                        <span class="doc-tag">MiFID</span>
+                                        <span class="doc-tag">GDPR</span>
+                                        <div class="doc-source">Compliance Manual v5.1</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
+
+                        <details class="kb-section">
+                            <summary><h3>Regulation Documents <span class="doc-count">(5 PDFs)</span></h3></summary>
+                            <p class="loaded-docs-subtitle">Official EU banking regulation PDFs, chunked and embedded for semantic search:</p>
+                            <div class="doc-cards">
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/documents/pdf/psd2" target="_blank" class="doc-title-link">PSD2 — Payment Services Directive 2</a></h4>
+                                        <p>Open banking, strong customer authentication, third-party provider access</p>
+                                        <span class="doc-tag">PSD2</span>
+                                        <span class="doc-tag">Open Banking</span>
+                                        <div class="doc-source">Official EU Regulation</div>
+                                    </div>
+                                </div>
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/documents/pdf/dora" target="_blank" class="doc-title-link">DORA — Digital Operational Resilience Act</a></h4>
+                                        <p>ICT risk management, incident reporting, digital resilience testing</p>
+                                        <span class="doc-tag">DORA</span>
+                                        <span class="doc-tag">Resilience</span>
+                                        <div class="doc-source">Official EU Regulation</div>
+                                    </div>
+                                </div>
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/documents/pdf/mifid2" target="_blank" class="doc-title-link">MiFID II — Markets in Financial Instruments</a></h4>
+                                        <p>Investor protection, market transparency, trading venue rules</p>
+                                        <span class="doc-tag">MiFID II</span>
+                                        <span class="doc-tag">Markets</span>
+                                        <div class="doc-source">Official EU Regulation</div>
+                                    </div>
+                                </div>
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/documents/pdf/gdpr" target="_blank" class="doc-title-link">GDPR — General Data Protection Regulation</a></h4>
+                                        <p>Personal data protection, consent management, data subject rights</p>
+                                        <span class="doc-tag">GDPR</span>
+                                        <span class="doc-tag">Privacy</span>
+                                        <div class="doc-source">Official EU Regulation</div>
+                                    </div>
+                                </div>
+                                <div class="doc-card">
+                                    <div class="doc-info">
+                                        <h4><a href="/api/documents/pdf/euaiact" target="_blank" class="doc-title-link">EU AI Act — Artificial Intelligence Act</a></h4>
+                                        <p>AI risk classification, PII in automated decisions, high-risk AI systems in banking</p>
+                                        <span class="doc-tag">AI Act</span>
+                                        <span class="doc-tag">PII</span>
+                                        <div class="doc-source">Official EU Regulation</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
+                    </section>
+
                     <!-- Reset button -->
                     <div style="margin-top:16px; text-align:right;">
                         <button id="resetBtn" class="btn btn-outline btn-sm">Reset Demo</button>
@@ -389,8 +378,32 @@
 
                 <!-- Redis Commands Executed (auto-populated after each request) -->
                 <div class="data-card redis-commands-card" id="redis-commands-card" style="display:none;">
-                    <h3>Redis Commands Executed</h3>
-                    <div class="commands-list" id="commands-output"></div>
+                    <div class="redis-commands-header">
+                        <div class="redis-commands-title-wrap">
+                            <h3>Redis Commands Executed</h3>
+                            <span class="redis-commands-counter" id="commands-counter" aria-live="polite">0 commands</span>
+                        </div>
+                        <div class="redis-commands-actions">
+                            <button type="button" class="cmd-copy-btn cmd-header-btn" id="copy-all-commands-btn" title="Copy all commands" aria-label="Copy all commands">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                            </button>
+                            <button type="button" class="cmd-copy-btn cmd-header-btn" id="clear-commands-btn" title="Clear commands" aria-label="Clear commands">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 6h18"></path>
+                                    <path d="M8 6V4h8v2"></path>
+                                    <path d="M19 6l-1 14H6L5 6"></path>
+                                    <path d="M10 11v6"></path>
+                                    <path d="M14 11v6"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="commands-list" id="commands-output">
+                        <div class="commands-empty">No Redis commands captured yet.</div>
+                    </div>
                 </div>
             </section>
 
@@ -588,11 +601,62 @@ EXPIRE uc9:cache:cache-abc123 600
         </div>
     </div>
 
+    <div class="presenter-notes" hidden data-target-minutes="4">
+        <section data-presenter-section="what-to-say"><p>UC9 is where Redis becomes the memory and retrieval layer around an AI assistant: short-term conversation state, long-term memories, banking knowledge, regulation search, and semantic cache all live in Redis. Make the audience notice that the LLM is only one component in a wider Redis-backed system.</p></section>
+        <section data-presenter-section="demo-steps"><ol><li>Ask a banking question and show the assistant retrieving prior context and relevant documents.</li><li>Walk the audience through the Redis Context panel so they can see what the LLM actually received.</li><li>Repeat or ask a similar question to surface the semantic cache hit path.</li></ol></section>
+        <section data-presenter-section="key-talking-points"><ul><li>Conversation state uses hashes plus TTL because recency matters.</li><li>Long-term memory and RAG both use vector search, but against different corpora.</li><li>Semantic cache is the practical optimization that turns repeated prompts into low-cost responses.</li></ul></section>
+        <section data-presenter-section="redis-highlight"><p><code>HSET</code> + <code>EXPIRE</code> for short-term memory, and <code>FT.SEARCH</code> KNN for memories, RAG, and semantic cache.</p></section>
+    </div>
+
     <div layout:fragment="scripts">
         <style>
             @keyframes uc9-pulse {
                 0%, 100% { opacity: 1; }
                 50% { opacity: 0.3; }
+            }
+            .uc9-flow-grid {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 16px;
+            }
+            .uc9-flow-card {
+                border: 1px solid var(--border-color);
+                border-radius: var(--border-radius);
+                background: var(--bg-secondary);
+                padding: 16px;
+            }
+            .uc9-flow-card h3 {
+                margin: 0 0 8px;
+                font-size: 1rem;
+                color: var(--text-primary);
+            }
+            .uc9-flow-card ol,
+            .uc9-flow-card ul {
+                margin: 0;
+                padding-left: 20px;
+                color: var(--text-secondary);
+            }
+            .uc9-flow-card li + li {
+                margin-top: 8px;
+            }
+            .uc9-diagram-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 24px;
+            }
+            .uc9-diagram-card {
+                margin: 0;
+                border: 1px solid var(--border-color);
+                border-radius: var(--border-radius);
+                background: var(--bg-secondary);
+                padding: 16px;
+            }
+            .uc9-diagram-card figcaption {
+                margin-bottom: 12px;
+                font-size: 0.9rem;
+                font-weight: 700;
+                color: var(--text-primary);
+                text-align: left;
             }
             /* Redis Context panel */
             .uc9-ctx-subtitle {
@@ -643,6 +707,12 @@ EXPIRE uc9:cache:cache-abc123 600
             .uc9-score-high { background: rgba(5, 150, 105, 0.15); color: #059669; }
             .uc9-score-med  { background: rgba(217, 119, 6, 0.15); color: #d97706; }
             .uc9-score-low  { background: rgba(107, 114, 128, 0.15); color: var(--text-muted); }
+            @media (max-width: 960px) {
+                .uc9-flow-grid,
+                .uc9-diagram-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
         </style>
         <script th:src="@{/js/usecase-9.js}"></script>
     </div>
