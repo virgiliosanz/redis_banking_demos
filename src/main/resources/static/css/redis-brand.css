@@ -189,6 +189,20 @@ a:hover {
     background: var(--bg-tertiary);
 }
 
+.nav-link-monitor {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgba(255, 68, 56, 0.28);
+    background: rgba(255, 68, 56, 0.08);
+    color: var(--redis-primary);
+    font-weight: 600;
+}
+
+.nav-link-monitor:hover {
+    color: var(--redis-primary);
+    background: rgba(255, 68, 56, 0.14);
+}
+
 /* --- Reset All button (navbar) --- */
 .nav-reset-btn {
     display: inline-flex;
@@ -2880,6 +2894,133 @@ details.command-entry[open] summary::before {
     background: linear-gradient(180deg, rgba(255, 68, 56, 0.08), rgba(255, 68, 56, 0.03)), #091A23;
 }
 
+.monitor-command-panel {
+    margin-top: calc(var(--spacing-unit) * 3);
+    padding: calc(var(--spacing-unit) * 3);
+    border: 1px solid rgba(255, 68, 56, 0.2);
+    border-radius: var(--border-radius);
+    background: linear-gradient(180deg, rgba(255, 68, 56, 0.08), rgba(9, 26, 35, 0.04)), #132631;
+    box-shadow: var(--shadow-sm);
+}
+
+.monitor-command-panel .redis-commands-header {
+    margin-bottom: calc(var(--spacing-unit) * 2);
+}
+
+.monitor-command-panel .commands-list {
+    max-height: 420px;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 68, 56, 0.14);
+    border-radius: var(--border-radius);
+    background: rgba(9, 26, 35, 0.78);
+}
+
+.monitor-command-live {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-unit);
+    padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 1.25);
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: rgba(9, 26, 35, 0.72);
+    color: #B0BEC5;
+    font-family: var(--font-code);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.monitor-command-live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #94A3B8;
+}
+
+.monitor-command-live.is-live {
+    color: #4ADE80;
+    border-color: rgba(74, 222, 128, 0.28);
+    background: rgba(10, 126, 62, 0.12);
+}
+
+.monitor-command-live.is-live .monitor-command-live-dot {
+    background: #36B37E;
+    animation: monitorLivePulse 1.8s infinite;
+}
+
+.monitor-command-live.is-reconnecting {
+    color: #FBBF24;
+    border-color: rgba(251, 191, 36, 0.28);
+    background: rgba(217, 119, 6, 0.12);
+}
+
+.monitor-command-live.is-reconnecting .monitor-command-live-dot {
+    background: #FBBF24;
+}
+
+.monitor-command-live.is-down {
+    color: var(--redis-primary);
+    border-color: rgba(255, 68, 56, 0.28);
+    background: rgba(255, 68, 56, 0.12);
+}
+
+.monitor-command-live.is-down .monitor-command-live-dot {
+    background: var(--redis-primary);
+}
+
+@keyframes monitorLivePulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(54, 179, 126, 0.45);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(54, 179, 126, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(54, 179, 126, 0);
+    }
+}
+
+.monitor-command-panel details.command-entry summary {
+    padding: calc(var(--spacing-unit)) calc(var(--spacing-unit) * 1.5);
+}
+
+.monitor-command-panel .cmd-time {
+    min-width: 88px;
+    color: #B0BEC5;
+    font-size: 0.72rem;
+}
+
+.monitor-command-panel .cmd-uc {
+    min-width: auto;
+    padding: 2px 8px;
+}
+
+.monitor-command-panel .cmd-summary {
+    min-width: 0;
+}
+
+.monitor-command-panel .cmd-expanded {
+    background: rgba(9, 26, 35, 0.72);
+}
+
+.monitor-commands-toggle {
+    width: auto;
+    padding: 4px 10px;
+    opacity: 1;
+    font-family: var(--font-code);
+    font-size: 0.72rem;
+}
+
+.monitor-commands-toggle[aria-pressed="false"] {
+    color: #FBBF24;
+    border-color: rgba(251, 191, 36, 0.28);
+}
+
+[data-theme="dark"] .monitor-command-panel {
+    background: linear-gradient(180deg, rgba(255, 68, 56, 0.08), rgba(255, 68, 56, 0.03)), #091A23;
+}
+
 @media (max-width: 1024px) {
     .monitor-metrics-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2901,6 +3042,10 @@ details.command-entry[open] summary::before {
 @media (max-width: 640px) {
     .monitor-metrics-grid {
         grid-template-columns: 1fr;
+    }
+
+    .monitor-command-panel {
+        padding: calc(var(--spacing-unit) * 2);
     }
 }
 

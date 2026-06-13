@@ -1,5 +1,6 @@
 package com.redis.workshop.controller;
 
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -9,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -36,7 +38,11 @@ class UseCaseEndpointTests {
 
     @Test
     void monitorPage() throws Exception {
-        mockMvc.perform(get("/monitor")).andExpect(status().isOk());
+        mockMvc.perform(get("/monitor"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(Matchers.containsString("Live Redis Commands")))
+                .andExpect(content().string(Matchers.containsString("monitorCommandsOutput")))
+                .andExpect(content().string(Matchers.containsString("href=\"/monitor\"")));
     }
 
     @ParameterizedTest
