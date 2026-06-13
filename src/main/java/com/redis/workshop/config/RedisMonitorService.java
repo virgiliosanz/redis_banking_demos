@@ -21,6 +21,7 @@ import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Consumer;
@@ -41,6 +42,11 @@ public class RedisMonitorService {
 
     private static final Logger log = LoggerFactory.getLogger(RedisMonitorService.class);
     private static final int MAX_ENTRIES = 100;
+    private static final Set<String> FILTERED_COMMANDS = Set.of(
+            "INFO", "DBSIZE", "PING", "PONG", "CLIENT", "COMMAND", "CONFIG", "MONITOR",
+            "SELECT", "AUTH", "CLUSTER", "SLOWLOG", "DEBUG", "SUBSCRIBE", "UNSUBSCRIBE",
+            "PSUBSCRIBE", "PUNSUBSCRIBE", "HELLO", "RESET", "WAIT", "REPLCONF", "PSYNC",
+            "MODULE");
 
     // +<timestamp> [<db> <addr>] "<cmd>" "<arg1>" "<arg2>" ...
     private static final Pattern MONITOR_LINE = Pattern.compile(
@@ -159,6 +165,8 @@ public class RedisMonitorService {
         if (args.isEmpty()) return;
 
         String command = args.get(0).toUpperCase();
+        if (isFilteredCommand(command)) return;
+
         String key = args.size() > 1 ? args.get(1) : "";
         String useCase = inferUseCase(key, command);
         String argsStr = renderArgs(args);
@@ -237,6 +245,10 @@ public class RedisMonitorService {
             }
         }
         return sb.toString();
+    }
+
+    static boolean isFilteredCommand(String command) {
+        return command != null && FILTERED_COMMANDS.contains(command.toUpperCase());
     }
 
     static String inferUseCase(String key, String command) {
