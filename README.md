@@ -187,10 +187,7 @@ docker compose up -d
 # Redis Insight available at http://localhost:8001
 ```
 
-On first launch, add a connection:
-- **Host**: `redis` (Docker network) or `localhost` (if accessing from host)
-- **Port**: `6379`
-- **Name**: Workshop
+The workshop Redis connection is pre-configured. Open `http://localhost:8001` and the database is already there as `Workshop Redis`.
 
 ## Redis Connection
 
