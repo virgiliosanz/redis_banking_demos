@@ -51,6 +51,7 @@ services:
     container_name: workshop-ams-mcp
     profiles:
       - ams-mcp
+      - workshop
     ports:
       - "9000:9000"
     environment:
@@ -61,13 +62,19 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     # Keep parity with the REST service: ensure the long-term memory index
     # exists before the MCP server starts serving tool calls.
-    command: ["sh", "-c", "agent-memory rebuild-index && exec agent-memory mcp --mode streamable-http --host 0.0.0.0 --port 9000 --task-backend asyncio"]
+    command: ["sh", "-c", "agent-memory rebuild-index && exec agent-memory mcp --mode streamable-http --port 9000 --task-backend asyncio"]
     depends_on:
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s = socket.create_connection(('localhost', 9000), 2); s.close()\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
-  app:
+  workshop-app:
     build: .
     container_name: workshop-app
     profiles:
@@ -75,6 +82,7 @@ services:
     ports:
       - "8080:8080"
     environment:
+      - REDIS_HOST=redis
       - SPRING_DATA_REDIS_HOST=redis
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - WORKSHOP_AMS_BASE_URL=http://agent-memory-server:8000
@@ -82,13 +90,23 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      agent-memory-server:
+        condition: service_healthy
+      agent-memory-server-mcp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     restart: unless-stopped
 
   redis-insight:
     image: redis/redisinsight:latest
     container_name: workshop-redis-insight
     ports:
-      - "5540:5540"
+      - "8001:5540"
     depends_on:
       redis:
         condition: service_healthy
