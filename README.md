@@ -87,11 +87,11 @@ docker compose --profile workshop down
 
 | Service | Image | Port | Description |
 |---------|-------|------|-------------|
-| `redis` | `redis:8.0-M02` | 6379 | Redis 8 with RQE, JSON, Search, Vector support |
-| `agent-memory-server` | `redislabs/agent-memory-server:0.15.2` | 8000 | Redis Agent Memory Server — REST API, single-process (`asyncio` backend), auth disabled for local workshop |
-| `agent-memory-server-mcp` | `redislabs/agent-memory-server:0.15.2` | 9000 | Agent Memory Server MCP endpoint (streamable HTTP) — only started with `--profile ams-mcp` |
+| `redis` | `redis:latest` | 6379 | Redis 8 with RQE, JSON, Search, Vector support |
+| `agent-memory-server` | `redislabs/agent-memory-server:latest` | 8000 | Redis Agent Memory Server — REST API, single-process (`asyncio` backend), auth disabled for local workshop |
+| `agent-memory-server-mcp` | `redislabs/agent-memory-server:latest` | 9000 | Agent Memory Server MCP endpoint (streamable HTTP) — only started with `--profile ams-mcp` |
 | `app` | Built from `Dockerfile` | 8080 | Spring Boot application (workshop profile only) |
-| `redis-insight` | `redis/redisinsight:latest` | 5540 | Visual Redis browser (starts by default on port 5540) |
+| `redis-insight` | `redis/redisinsight:latest` | 8001 | Visual Redis browser (starts by default on port 8001) |
 
 ### Agent Memory Server (local workshop)
 
@@ -161,7 +161,7 @@ It now starts by default with Docker Compose:
 
 ```bash
 docker compose up -d
-# Redis Insight available at http://localhost:5540
+# Redis Insight available at http://localhost:8001
 ```
 
 On first launch, add a connection:
