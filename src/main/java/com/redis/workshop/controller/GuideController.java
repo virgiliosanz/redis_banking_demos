@@ -10,4 +10,9 @@ public class GuideController {
     public String guide() {
         return "guide";
     }
+
+    @GetMapping("/monitor")
+    public String monitor() {
+        return "monitor";
+    }
 }
