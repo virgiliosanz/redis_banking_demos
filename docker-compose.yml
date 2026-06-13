@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   agent-memory-server:
-    image: redislabs/agent-memory-server:0.15.2
+    image: redislabs/agent-memory-server:latest
     container_name: workshop-ams
     ports:
       - "8000:8000"
@@ -26,14 +26,12 @@ services:
       - ENABLE_DISCRETE_MEMORY_EXTRACTION=true
       - PORT=8000
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-    # AMS 0.15.2 does not auto-create the long-term memory `memory_records`
-    # index at startup: it only gets created via `agent-memory rebuild-index`.
-    # Without it, /v1/long-term-memory/search and /v1/memory/prompt fail with
-    # "No such index memory_records" and UC14 seed traces surface as
-    # AMS unreachable. `rebuild-index` is non-destructive for stored memory
-    # hashes (FT.CREATE auto-indexes matching `memory_idx:*` keys), so we run
-    # it on every container start to guarantee the index is present before
-    # the API accepts requests.
+    # Ensure the long-term memory `memory_records` index exists before the API
+    # starts serving requests. Without it, /v1/long-term-memory/search and
+    # /v1/memory/prompt can fail with "No such index memory_records" and UC14
+    # seed traces surface as AMS unreachable. `rebuild-index` is
+    # non-destructive for stored memory hashes (FT.CREATE auto-indexes matching
+    # `memory_idx:*` keys), so we run it on every container start.
     command: ["sh", "-c", "agent-memory rebuild-index && exec agent-memory api --host 0.0.0.0 --port 8000 --task-backend asyncio"]
     depends_on:
       redis:
@@ -47,7 +45,7 @@ services:
     restart: unless-stopped
 
   agent-memory-server-mcp:
-    image: redislabs/agent-memory-server:0.15.2
+    image: redislabs/agent-memory-server:latest
     container_name: workshop-ams-mcp
     profiles:
       - ams-mcp
@@ -105,8 +103,10 @@ services:
   redis-insight:
     image: redis/redisinsight:latest
     container_name: workshop-redis-insight
+    environment:
+      - RI_APP_PORT=8001
     ports:
-      - "8001:5540"
+      - "8001:8001"
     depends_on:
       redis:
         condition: service_healthy
