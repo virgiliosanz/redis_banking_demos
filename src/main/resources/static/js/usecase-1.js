@@ -118,14 +118,21 @@
             .then(function (data) {
                 loginBtn.disabled = false;
                 loginBtn.textContent = 'Login & Generate Token';
-                if (data.error) { loginError.textContent = data.error; loginError.style.display = ''; }
-                else { showToken(data); }
+                if (data.error) {
+                    loginError.textContent = data.error;
+                    loginError.style.display = '';
+                    window.showToast(data.error, 'error');
+                } else {
+                    showToken(data);
+                    window.showToast('Authentication token generated for ' + username + '.', 'success');
+                }
             })
             .catch(function () {
                 loginBtn.disabled = false;
                 loginBtn.textContent = 'Login & Generate Token';
                 loginError.textContent = 'Network error — is the server running?';
                 loginError.style.display = '';
+                window.showToast('Network error — is the server running?', 'error');
             });
     });
 
@@ -141,9 +148,11 @@
                 if (data.valid) {
                     validateResult.className = 'alert alert-success';
                     validateResult.innerHTML = '&#10003; Token is <strong>valid</strong>. TTL: ' + data.ttl + 's remaining.';
+                    window.showToast('Token is valid. TTL: ' + data.ttl + 's remaining.', 'success', 3000);
                 } else {
                     validateResult.className = 'alert alert-error';
                     validateResult.innerHTML = '&#10007; Token is <strong>invalid</strong> or expired.';
+                    window.showToast('Token is invalid or expired.', 'warning');
                 }
             });
     });
@@ -152,6 +161,11 @@
     logoutBtn.addEventListener('click', function () {
         if (!currentToken) return;
         window.workshopFetch('/api/auth/logout', { token: currentToken })
-            .then(function () { stopTtlCountdown(); currentToken = null; showLogin(); });
+            .then(function () {
+                stopTtlCountdown();
+                currentToken = null;
+                showLogin();
+                window.showToast('Token invalidated and session closed.', 'info');
+            });
     });
 })();

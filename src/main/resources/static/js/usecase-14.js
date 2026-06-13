@@ -151,7 +151,9 @@
     function refreshTraces() {
         return fetchJson('/api/ams/traces?limit=20')
             .then(function (data) { renderTraces(data.traces || []); })
-            .catch(function () { /* non-fatal on refresh */ });
+            .catch(function (e) {
+                window.showToast((e && e.message) || 'Could not refresh AMS traces.', 'warning');
+            });
     }
 
     function loadStatus() {
@@ -165,7 +167,7 @@
             setBadge(aiBadge, data.openaiConfigured ? 'AI: live' : 'AI: unavailable', data.openaiConfigured ? 'ok' : 'mock');
         }).catch(function (e) {
             setBadge(amsBadge, 'AMS: error', 'fail');
-            console.error('UC14 status failed', e);
+            window.showToast((e && e.message) || 'Could not load AMS status.', 'error');
         });
     }
 
@@ -177,9 +179,11 @@
         }).then(function (data) {
             if (amsSeedCount) amsSeedCount.textContent = (data.seededMemoryIds || []).length;
             addMessage('assistant', 'Demo memories seeded. Ask a question about the customer.');
+            window.showToast('Demo memories seeded for AMS.', 'success');
             return refreshTraces();
         }).catch(function (e) {
             addMessage('assistant', '⚠ Seed failed: ' + (e.message || e));
+            window.showToast((e && e.message) || 'AMS seed failed.', 'error');
         }).finally(function () { btnSeed.disabled = false; });
     }
 
@@ -194,9 +198,11 @@
             renderLongTerm(null);
             renderAssembled(null);
             latencyDisplay.textContent = '';
+            window.showToast('AMS demo reset.', 'success');
             return refreshTraces();
         }).catch(function (e) {
             addMessage('assistant', '⚠ Reset failed: ' + (e.message || e));
+            window.showToast((e && e.message) || 'AMS reset failed.', 'error');
         }).finally(function () { btnReset.disabled = false; });
     }
 
@@ -220,9 +226,14 @@
             latencyDisplay.textContent = llmUnavailable
                 ? 'Context assembly completed, but the LLM is unavailable. Set OPENAI_API_KEY.'
                 : ('Context assembly + LLM latency: ' + data.latencyMs + 'ms · OpenAI live');
+            window.showToast(
+                llmUnavailable ? 'Context assembly completed but the LLM is unavailable.' : 'AMS chat response assembled successfully.',
+                llmUnavailable ? 'warning' : 'success'
+            );
             return refreshTraces();
         }).catch(function (e) {
             addMessage('assistant', '⚠ Chat failed: ' + (e.message || e));
+            window.showToast((e && e.message) || 'AMS chat failed.', 'error');
         }).finally(function () { sendBtn.disabled = false; chatInput.focus(); });
     }
 

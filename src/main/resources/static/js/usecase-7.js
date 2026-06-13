@@ -153,12 +153,17 @@
             if (clients.length > 0) {
                 loadFeatures(clients[0].clientId, getSelectedFeatureSet());
             }
+        }).catch(function (err) {
+            window.showToast((err && err.message) || 'Could not load feature-store clients.', 'error');
         });
     }
 
     function loadFeatures(clientId, featureSet) {
         window.workshopGet('/api/features/client/' + clientId + '?version=' + encodeURIComponent(featureSet)).then(function (data) {
-            if (data.error) return;
+            if (data.error) {
+                window.showToast(data.error, 'error');
+                return;
+            }
 
             featureCard.style.display = '';
             riskBadgeContainer.style.display = '';
@@ -169,6 +174,8 @@
             riskBadge.textContent = risk.label;
             riskBadge.style.background = risk.bg;
             riskBadge.style.color = risk.color;
+        }).catch(function (err) {
+            window.showToast((err && err.message) || 'Could not load the selected feature set.', 'error');
         });
     }
 
@@ -276,6 +283,7 @@
             if (data.error) {
                 inferenceBtn.disabled = false;
                 inferenceBtn.textContent = 'Run ML Inference';
+                window.showToast(data.error, 'error');
                 return;
             }
 
@@ -293,6 +301,10 @@
                         renderInferenceLatency(data.latency || {});
                         renderComparison(data.comparison || {});
                         renderInferenceResult(data);
+                        window.showToast(
+                            'Inference complete: ' + data.decision + ' (' + formatScore(data.probabilityScore) + ').',
+                            data.decision === 'DENY' ? 'warning' : 'success'
+                        );
                     }, 180);
                 }, 180);
             }, 120);
@@ -304,6 +316,7 @@
             inferenceBtn.textContent = 'Run ML Inference';
             resetInferenceView();
             setPipelineStep('decision', 'active', 'Inference request failed');
+            window.showToast('ML inference request failed.', 'error');
         });
     }
 
@@ -324,6 +337,7 @@
 
         if (!amount || amount <= 0) {
             txAmount.style.borderColor = 'var(--redis-primary)';
+            window.showToast('Enter a transaction amount greater than 0.', 'warning');
             return;
         }
         txAmount.style.borderColor = '';
@@ -340,9 +354,11 @@
             simulateBtn.textContent = 'Simulate Transaction';
             loadFeatures(clientId, getSelectedFeatureSet());
             resetInferenceView();
+            window.showToast('Transaction features updated for ' + clientId + '.', 'success');
         }, function () {
             simulateBtn.disabled = false;
             simulateBtn.textContent = 'Simulate Transaction';
+            window.showToast('Could not simulate the transaction.', 'error');
         });
     });
 

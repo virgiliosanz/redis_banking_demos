@@ -68,6 +68,7 @@
                     cacheStatus.textContent = data.error;
                     resultData.innerHTML = '';
                     resultBox.style.display = 'block';
+                    window.showToast(data.error, 'error');
                     return;
                 }
                 var isHit = data.cacheHit;
@@ -86,10 +87,15 @@
 
                 addLogEntry(data);
                 refreshStats();
+                window.showToast(
+                    isHit ? ('Cache hit for product ' + selectedProductId + '.') : 'Cache miss served from the backing store and cached.',
+                    isHit ? 'info' : 'success'
+                );
             })
             .catch(function (err) {
                 cacheStatus.className = 'cache-status-badge cache-miss';
                 cacheStatus.textContent = 'Error: ' + err.message;
+                window.showToast(err.message || 'Could not fetch the selected product.', 'error');
             })
             .finally(function () { btnFetch.disabled = false; });
     }
@@ -102,6 +108,9 @@
             .then(function (data) {
                 addLogEntry({ cacheHit: null, latencyMs: 0, source: 'EVICT', product: { id: data.productId } });
                 refreshStats();
+                window.showToast('Evicted product ' + data.productId + ' from cache.', 'info');
+            }).catch(function (err) {
+                window.showToast(err.message || 'Could not evict the selected product.', 'error');
             });
     }
 
@@ -111,6 +120,9 @@
             .then(function (data) {
                 addLogEntry({ cacheHit: null, latencyMs: 0, source: 'EVICT_ALL', product: { id: data.count + ' keys' } });
                 refreshStats();
+                window.showToast('Evicted ' + data.count + ' cached products.', 'success');
+            }).catch(function (err) {
+                window.showToast(err.message || 'Could not evict cached products.', 'error');
             });
     }
 

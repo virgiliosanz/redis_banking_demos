@@ -36,6 +36,7 @@
             badge.classList.remove('on');
             badge.classList.add('mock');
             badge.textContent = 'AI: Mock';
+            window.showToast('Could not verify AI status for document search.', 'warning');
         });
     })();
 
@@ -76,15 +77,18 @@
             var container = document.getElementById('read-result');
             if (data.status === 'NOT_FOUND') {
                 container.innerHTML = '<div class="data-card"><p style="color:var(--text-muted);">Document not found.</p></div>';
+                window.showToast('Document not found.', 'warning');
                 return;
             }
             var doc = data.document;
             try { doc = JSON.parse(doc); if (Array.isArray(doc)) doc = doc[0]; } catch(e) {}
             container.innerHTML = '<div class="data-card"><pre style="font-size:0.78rem; margin:0; white-space:pre-wrap; color:var(--text-secondary); font-family:var(--font-code); max-height:300px; overflow:auto;">' + escapeHtml(JSON.stringify(doc, null, 2)) + '</pre></div>';
+            window.showToast('Document loaded from Redis JSON.', 'success');
         }).catch(function () {
             readDocBtn.disabled = false;
             readDocBtn.textContent = 'Read';
             document.getElementById('read-result').innerHTML = '<p style="color:var(--redis-primary);">Failed to read document.</p>';
+            window.showToast('Failed to read the document.', 'error');
         });
     });
 
@@ -103,15 +107,18 @@
             var container = document.getElementById('field-result');
             if (data.status === 'NOT_FOUND') {
                 container.innerHTML = '<div class="data-card"><p style="color:var(--text-muted);">Field not found.</p></div>';
+                window.showToast('Field not found in the selected document.', 'warning');
                 return;
             }
             var val = data.value;
             try { val = JSON.parse(val); } catch(e) {}
             container.innerHTML = '<div class="data-card"><div style="font-family:var(--font-code); font-size:0.85rem; color:var(--text-secondary); word-break:break-word;">' + escapeHtml(typeof val === 'string' ? val : JSON.stringify(val, null, 2)) + '</div></div>';
+            window.showToast('Field loaded successfully.', 'success');
         }).catch(function () {
             readFieldBtn.disabled = false;
             readFieldBtn.textContent = 'Read Field';
             document.getElementById('field-result').innerHTML = '<p style="color:var(--redis-primary);">Failed to read field.</p>';
+            window.showToast('Failed to read the requested field.', 'error');
         });
     });
 
@@ -147,10 +154,12 @@
             document.getElementById('createTitle').value = '';
             document.getElementById('createSummary').value = '';
             document.getElementById('createTags').value = '';
+            window.showToast('Document created successfully.', 'success');
         }).catch(function () {
             createDocBtn.disabled = false;
             createDocBtn.textContent = 'Create Document';
             document.getElementById('create-result').innerHTML = '<p style="color:var(--redis-primary);">Failed to create document.</p>';
+            window.showToast('Failed to create the document.', 'error');
         });
     });
 
@@ -185,13 +194,16 @@
             var results = data.results || [];
             if (results.length === 0) {
                 container.innerHTML = '<div class="data-card" style="text-align:center; padding:16px;"><p style="color:var(--text-muted);">No documents found for ' + escapeHtml(data.query || '') + '</p></div>';
+                window.showToast('No documents matched the field query.', 'warning');
                 return;
             }
             container.innerHTML = '<div style="font-family:var(--font-code); font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">Found ' + results.length + ' document(s)</div>' + renderDocCards(results);
+            window.showToast('Field query returned ' + results.length + ' document(s).', 'success');
         }).catch(function () {
             queryBtn.disabled = false;
             queryBtn.textContent = 'Query';
             document.getElementById('query-result').innerHTML = '<p style="color:var(--redis-primary);">Query failed.</p>';
+            window.showToast('Field query failed.', 'error');
         });
     }
 
@@ -272,10 +284,12 @@
             searchBtn.disabled = false;
             searchBtn.textContent = 'Search';
             renderSearchResults(data);
+            window.showToast('Document search completed in ' + currentMode + ' mode.', 'info');
         }).catch(function () {
             searchBtn.disabled = false;
             searchBtn.textContent = 'Search';
             resultsContainer.innerHTML = '<p style="color:var(--redis-primary);">Search failed. Is Redis running?</p>';
+            window.showToast('Document search failed. Is Redis running?', 'error');
         });
     }
 
