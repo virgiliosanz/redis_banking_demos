@@ -17,35 +17,10 @@ public class UserProfileService {
     private static final long PROFILE_TTL_SECONDS = 600; // 10 minutes
     private static final String PROFILE_PREFIX = "uc3:user:";
 
-    // Mock "Accounts DB"
-    private static final Map<String, Map<String, String>> ACCOUNTS_DB = Map.of(
-            "U1001", Map.of("accountNumber", "ES76-0128-0001-23-0100012345",
-                    "balance", "12450.75", "accountType", "Premium Savings"),
-            "U1002", Map.of("accountNumber", "ES91-0128-0002-45-0200067890",
-                    "balance", "85200.00", "accountType", "Business Current"),
-            "U1003", Map.of("accountNumber", "ES44-0128-0003-67-0300011111",
-                    "balance", "3200.50", "accountType", "Standard Current")
-    );
-
-    // Mock "Activity DB"
-    private static final Map<String, Map<String, String>> ACTIVITY_DB = Map.of(
-            "U1001", Map.of("lastLogin", "2024-04-12T09:15:00Z",
-                    "recentTxCount", "14", "loginCount30d", "22"),
-            "U1002", Map.of("lastLogin", "2024-04-13T16:42:00Z",
-                    "recentTxCount", "47", "loginCount30d", "35"),
-            "U1003", Map.of("lastLogin", "2024-04-10T11:30:00Z",
-                    "recentTxCount", "5", "loginCount30d", "8")
-    );
-
-    // Mock "Preferences DB"
-    private static final Map<String, Map<String, String>> PREFERENCES_DB = Map.of(
-            "U1001", Map.of("language", "es", "notifications", "email",
-                    "theme", "light", "fullName", "Ana García López"),
-            "U1002", Map.of("language", "en", "notifications", "sms,email",
-                    "theme", "dark", "fullName", "Carlos Ruiz Fernández"),
-            "U1003", Map.of("language", "es", "notifications", "push",
-                    "theme", "light", "fullName", "María López Torres")
-    );
+    // Mock demo datasets for the selector and hash aggregation flow.
+    private static final Map<String, Map<String, String>> ACCOUNTS_DB = buildAccountsDb();
+    private static final Map<String, Map<String, String>> ACTIVITY_DB = buildActivityDb();
+    private static final Map<String, Map<String, String>> PREFERENCES_DB = buildPreferencesDb();
 
     private final StringRedisTemplate redis;
 
@@ -142,10 +117,109 @@ public class UserProfileService {
 
     /** List available users for the demo selector. */
     public List<Map<String, String>> listUsers() {
-        return List.of(
-                Map.of("userId", "U1001", "name", "Ana García López", "segment", "Premium"),
-                Map.of("userId", "U1002", "name", "Carlos Ruiz Fernández", "segment", "Business"),
-                Map.of("userId", "U1003", "name", "María López Torres", "segment", "Standard")
-        );
+        List<Map<String, String>> users = new ArrayList<>();
+        ACCOUNTS_DB.forEach((userId, account) -> {
+            Map<String, String> prefs = PREFERENCES_DB.getOrDefault(userId, Map.of());
+            Map<String, String> user = new LinkedHashMap<>();
+            user.put("userId", userId);
+            user.put("name", prefs.getOrDefault("fullName", userId));
+            user.put("segment", account.getOrDefault("segment", "Basic"));
+            user.put("country", account.getOrDefault("country", "ES"));
+            user.put("accountType", account.getOrDefault("accountType", "Checking"));
+            users.add(user);
+        });
+        return users;
+    }
+
+    private static Map<String, Map<String, String>> buildAccountsDb() {
+        Map<String, Map<String, String>> db = new LinkedHashMap<>();
+        db.put("U1001", account("DEMO-ES-1001-001", "12450.75", "Premium Savings", "Premium", "ES"));
+        db.put("U1002", account("DEMO-UK-1002-002", "85200.00", "Business Current", "Business", "UK"));
+        db.put("U1003", account("DEMO-PT-1003-003", "3200.50", "Everyday Checking", "Basic", "PT"));
+        db.put("U1004", account("DEMO-FR-1004-004", "245000.00", "Private Wealth Reserve", "Private Banking", "FR"));
+        db.put("U1005", account("DEMO-DE-1005-005", "48650.90", "Mortgage Offset", "Premium", "DE"));
+        db.put("U1006", account("DEMO-PT-1006-006", "1450.25", "Student Account", "Student", "PT"));
+        db.put("U1007", account("DEMO-IT-1007-007", "17890.40", "Multi-Currency Account", "Premium", "IT"));
+        db.put("U1008", account("DEMO-IE-1008-008", "5380.10", "Family Current", "Basic", "IE"));
+        db.put("U1009", account("DEMO-NL-1009-009", "132500.00", "Merchant Settlement", "Business", "NL"));
+        db.put("U1010", account("DEMO-ES-1010-010", "27440.80", "Green Savings", "Premium", "ES"));
+        db.put("U1011", account("DEMO-FR-1011-011", "6980.35", "Salary Account", "Basic", "FR"));
+        db.put("U1012", account("DEMO-CH-1012-012", "412000.00", "Global Private Portfolio", "Private Banking", "CH"));
+        db.put("U1013", account("DEMO-SE-1013-013", "23110.55", "Wealth Builder Checking", "Premium", "SE"));
+        db.put("U1014", account("DEMO-PT-1014-014", "90550.60", "SME Working Capital", "Business", "PT"));
+        db.put("U1015", account("DEMO-IT-1015-015", "8940.45", "Joint Current", "Basic", "IT"));
+        db.put("U1016", account("DEMO-DK-1016-016", "22110.00", "Travel Rewards Account", "Premium", "DK"));
+        return Collections.unmodifiableMap(db);
+    }
+
+    private static Map<String, Map<String, String>> buildActivityDb() {
+        Map<String, Map<String, String>> db = new LinkedHashMap<>();
+        db.put("U1001", activity("2026-05-12T09:15:00Z", "14", "22"));
+        db.put("U1002", activity("2026-05-13T16:42:00Z", "47", "35"));
+        db.put("U1003", activity("2026-05-10T11:30:00Z", "5", "8"));
+        db.put("U1004", activity("2026-05-15T07:45:00Z", "28", "19"));
+        db.put("U1005", activity("2026-05-14T18:05:00Z", "21", "27"));
+        db.put("U1006", activity("2026-05-11T21:10:00Z", "9", "41"));
+        db.put("U1007", activity("2026-05-15T06:18:00Z", "32", "24"));
+        db.put("U1008", activity("2026-05-09T14:28:00Z", "11", "16"));
+        db.put("U1009", activity("2026-05-13T05:55:00Z", "58", "44"));
+        db.put("U1010", activity("2026-05-15T08:12:00Z", "19", "29"));
+        db.put("U1011", activity("2026-05-08T19:33:00Z", "7", "12"));
+        db.put("U1012", activity("2026-05-14T12:47:00Z", "36", "18"));
+        db.put("U1013", activity("2026-05-12T22:14:00Z", "24", "31"));
+        db.put("U1014", activity("2026-05-15T04:40:00Z", "41", "37"));
+        db.put("U1015", activity("2026-05-11T10:05:00Z", "13", "15"));
+        db.put("U1016", activity("2026-05-13T20:52:00Z", "26", "21"));
+        return Collections.unmodifiableMap(db);
+    }
+
+    private static Map<String, Map<String, String>> buildPreferencesDb() {
+        Map<String, Map<String, String>> db = new LinkedHashMap<>();
+        db.put("U1001", preferences("es", "email", "light", "Lucía Navarro Vega"));
+        db.put("U1002", preferences("en", "sms,email", "dark", "Owen Hartwell"));
+        db.put("U1003", preferences("pt", "push", "light", "Sofia Marin Costa"));
+        db.put("U1004", preferences("fr", "email,advisor", "dark", "Élise Moreau"));
+        db.put("U1005", preferences("de", "sms,push", "dark", "Nico Weber"));
+        db.put("U1006", preferences("pt", "push,email", "light", "Inês Duarte"));
+        db.put("U1007", preferences("it", "email", "dark", "Matteo Rinaldi"));
+        db.put("U1008", preferences("en", "email", "light", "Aoife Brennan"));
+        db.put("U1009", preferences("nl", "sms,email", "dark", "Hugo van Dijk"));
+        db.put("U1010", preferences("es", "push,email", "light", "Clara Vidal Serra"));
+        db.put("U1011", preferences("fr", "email", "light", "Léa Mercier"));
+        db.put("U1012", preferences("de", "advisor,email", "dark", "Tobias Keller"));
+        db.put("U1013", preferences("sv", "push", "light", "Freja Nordholm"));
+        db.put("U1014", preferences("pt", "sms,email", "dark", "Diogo Matos"));
+        db.put("U1015", preferences("it", "email,push", "light", "Giulia Ferraro"));
+        db.put("U1016", preferences("en", "sms", "dark", "Soren Nygaard"));
+        return Collections.unmodifiableMap(db);
+    }
+
+    private static Map<String, String> account(String accountNumber, String balance, String accountType,
+                                               String segment, String country) {
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put("accountNumber", accountNumber);
+        map.put("balance", balance);
+        map.put("accountType", accountType);
+        map.put("segment", segment);
+        map.put("country", country);
+        return Collections.unmodifiableMap(map);
+    }
+
+    private static Map<String, String> activity(String lastLogin, String recentTxCount, String loginCount30d) {
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put("lastLogin", lastLogin);
+        map.put("recentTxCount", recentTxCount);
+        map.put("loginCount30d", loginCount30d);
+        return Collections.unmodifiableMap(map);
+    }
+
+    private static Map<String, String> preferences(String language, String notifications, String theme,
+                                                   String fullName) {
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put("language", language);
+        map.put("notifications", notifications);
+        map.put("theme", theme);
+        map.put("fullName", fullName);
+        return Collections.unmodifiableMap(map);
     }
 }

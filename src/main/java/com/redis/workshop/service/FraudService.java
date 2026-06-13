@@ -37,6 +37,20 @@ public class FraudService {
             "4000-4567-8901-2345", "DE"
     );
 
+    private static final Map<String, List<Long>> BASELINE_RECENT_OFFSETS_MS = Map.of(
+            "4000-1234-5678-9010", List.of(280_000L),
+            "4000-2345-6789-0123", List.of(260_000L, 110_000L),
+            "4000-3456-7890-1234", List.of(295_000L, 210_000L, 90_000L),
+            "4000-4567-8901-2345", List.of(240_000L, 180_000L, 75_000L, 30_000L)
+    );
+
+    private static final Map<String, List<Long>> BASELINE_ARCHIVE_OFFSETS_MS = Map.of(
+            "4000-1234-5678-9010", List.of(420_000L, 900_000L),
+            "4000-2345-6789-0123", List.of(360_000L, 660_000L),
+            "4000-3456-7890-1234", List.of(480_000L, 840_000L),
+            "4000-4567-8901-2345", List.of(420_000L, 780_000L)
+    );
+
     private final StringRedisTemplate redis;
 
     @Value("${workshop.startup.load-data:true}")
@@ -55,23 +69,21 @@ public class FraudService {
     @PostConstruct
     public void loadBaselineData() {
         if (!loadData) return;
+        long expectedBaselineEvents = expectedBaselineEventCount();
         if (forceReload) {
             log.info("UC6: force reload enabled for fraud baseline, rebuilding velocity keys");
         } else {
             long existingVelocityKeys = RedisStartupHelper.countKeys(redis, VELOCITY_KEY_PREFIX + "*");
-            if (existingVelocityKeys >= CARD_HOME_COUNTRY.size()) {
-                log.info("UC6: fraud velocity keys already present ({} keys), skipping reload", existingVelocityKeys);
+            long existingBaselineEvents = existingBaselineEventCount();
+            if (existingVelocityKeys >= CARD_HOME_COUNTRY.size() && existingBaselineEvents >= expectedBaselineEvents) {
+                log.info("UC6: fraud velocity keys already present ({} keys, {} events), skipping reload",
+                        existingVelocityKeys, existingBaselineEvents);
                 return;
             }
         }
 
         long now = Instant.now().toEpochMilli();
-        // Add 2 "normal" past transactions per card (spread over last 4 minutes)
-        CARD_HOME_COUNTRY.forEach((card, country) -> {
-            String key = VELOCITY_KEY_PREFIX + card;
-            redis.opsForZSet().add(key, "baseline-1-" + card, now - 240_000);
-            redis.opsForZSet().add(key, "baseline-2-" + card, now - 120_000);
-        });
+        CARD_HOME_COUNTRY.forEach((card, country) -> seedBaselineHistory(card, now));
     }
 
     /**
@@ -214,5 +226,32 @@ public class FraudService {
         if (score >= 45) return "HIGH";
         if (score >= 25) return "MEDIUM";
         return "LOW";
+    }
+
+    private void seedBaselineHistory(String card, long now) {
+        String key = VELOCITY_KEY_PREFIX + card;
+        addHistoryEntries(key, card, now, BASELINE_ARCHIVE_OFFSETS_MS.getOrDefault(card, List.of()), "archive");
+        addHistoryEntries(key, card, now, BASELINE_RECENT_OFFSETS_MS.getOrDefault(card, List.of()), "baseline");
+    }
+
+    private void addHistoryEntries(String key, String card, long now, List<Long> offsets, String prefix) {
+        for (int i = 0; i < offsets.size(); i++) {
+            redis.opsForZSet().add(key, prefix + "-" + (i + 1) + "-" + card, now - offsets.get(i));
+        }
+    }
+
+    private long existingBaselineEventCount() {
+        long total = 0;
+        for (String card : CARD_HOME_COUNTRY.keySet()) {
+            Long size = redis.opsForZSet().size(VELOCITY_KEY_PREFIX + card);
+            total += size != null ? size : 0;
+        }
+        return total;
+    }
+
+    private long expectedBaselineEventCount() {
+        long recent = BASELINE_RECENT_OFFSETS_MS.values().stream().mapToLong(List::size).sum();
+        long archive = BASELINE_ARCHIVE_OFFSETS_MS.values().stream().mapToLong(List::size).sum();
+        return recent + archive;
     }
 }

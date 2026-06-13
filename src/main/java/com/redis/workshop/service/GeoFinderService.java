@@ -50,18 +50,20 @@ public class GeoFinderService {
     @PostConstruct
     public void init() {
         if (!loadData) return;
+        List<Map<String, Object>> branches = getBranchData();
+        int expectedCount = branches.size();
         if (forceReload) {
             log.info("UC12: force reload enabled for geo data, rebuilding GEO/JSON structures");
         } else {
             Long geoEntries = redis.opsForZSet().size(GEO_KEY);
             long branchDocs = existingBranchDocCount();
-            if (geoEntries != null && geoEntries > 0 && branchDocs >= 1) {
+            if (geoEntries != null && geoEntries >= expectedCount && branchDocs >= expectedCount) {
                 log.info("UC12: geo key already present ({} entries), skipping reload", geoEntries);
                 return;
             }
         }
 
-        loadBranches();
+        loadBranches(branches);
         createIndex();
     }
 
@@ -77,9 +79,7 @@ public class GeoFinderService {
     }
 
     @SuppressWarnings("unchecked")
-    private void loadBranches() {
-        List<Map<String, Object>> branches = getBranchData();
-
+    private void loadBranches(List<Map<String, Object>> branches) {
         for (var branch : branches) {
             double lng = ((Number) branch.get("lng")).doubleValue();
             double lat = ((Number) branch.get("lat")).doubleValue();
@@ -341,63 +341,53 @@ public class GeoFinderService {
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    /** Static branch data — 18 ATMs and branches in Madrid */
+    private static Map<String, Object> branch(String id, String name, String type, String address,
+                                              double lat, double lng, String hours, String... services) {
+        return Map.of(
+                "id", id,
+                "name", name,
+                "type", type,
+                "address", address,
+                "lat", lat,
+                "lng", lng,
+                "services", List.of(services),
+                "hours", hours
+        );
+    }
+
+    /** Static branch data — 30 ATMs and branches across Madrid, Barcelona, Valencia and Lisbon. */
     private static List<Map<String, Object>> getBranchData() {
         return List.of(
-            Map.of("id", "atm-001", "name", "Cajero Sol", "type", "atm",
-                   "address", "Puerta del Sol 1, Madrid", "lat", 40.4168, "lng", -3.7038,
-                   "services", List.of("withdrawal", "deposit", "balance"), "hours", "24h"),
-            Map.of("id", "atm-002", "name", "Cajero Gran Vía", "type", "atm",
-                   "address", "Gran Vía 32, Madrid", "lat", 40.4200, "lng", -3.7056,
-                   "services", List.of("withdrawal", "balance"), "hours", "24h"),
-            Map.of("id", "branch-001", "name", "Sucursal Cibeles", "type", "branch",
-                   "address", "Plaza de Cibeles 4, Madrid", "lat", 40.4194, "lng", -3.6931,
-                   "services", List.of("withdrawal", "deposit", "advisor", "mortgage", "business"), "hours", "9:00-14:00"),
-            Map.of("id", "atm-003", "name", "Cajero Atocha", "type", "atm",
-                   "address", "Estación de Atocha, Madrid", "lat", 40.4065, "lng", -3.6895,
-                   "services", List.of("withdrawal", "deposit"), "hours", "24h"),
-            Map.of("id", "branch-002", "name", "Sucursal Castellana", "type", "branch",
-                   "address", "Paseo de la Castellana 79, Madrid", "lat", 40.4372, "lng", -3.6920,
-                   "services", List.of("withdrawal", "deposit", "advisor", "insurance"), "hours", "8:30-14:30"),
-            Map.of("id", "atm-004", "name", "Cajero Retiro", "type", "atm",
-                   "address", "C/ Alcalá 102, Madrid", "lat", 40.4225, "lng", -3.6832,
-                   "services", List.of("withdrawal"), "hours", "24h"),
-            Map.of("id", "branch-003", "name", "Sucursal Chamberí", "type", "branch",
-                   "address", "C/ Santa Engracia 45, Madrid", "lat", 40.4340, "lng", -3.7015,
-                   "services", List.of("withdrawal", "deposit", "advisor"), "hours", "9:00-14:00"),
-            Map.of("id", "atm-005", "name", "Cajero Malasaña", "type", "atm",
-                   "address", "C/ Fuencarral 78, Madrid", "lat", 40.4266, "lng", -3.7032,
-                   "services", List.of("withdrawal", "deposit", "balance"), "hours", "24h"),
-            Map.of("id", "atm-006", "name", "Cajero Lavapiés", "type", "atm",
-                   "address", "C/ Argumosa 3, Madrid", "lat", 40.4089, "lng", -3.7006,
-                   "services", List.of("withdrawal"), "hours", "24h"),
-            Map.of("id", "branch-004", "name", "Sucursal Salamanca", "type", "branch",
-                   "address", "C/ Serrano 25, Madrid", "lat", 40.4270, "lng", -3.6860,
-                   "services", List.of("withdrawal", "deposit", "advisor", "private_banking"), "hours", "9:00-14:30"),
-            Map.of("id", "atm-007", "name", "Cajero Moncloa", "type", "atm",
-                   "address", "C/ Princesa 40, Madrid", "lat", 40.4310, "lng", -3.7180,
-                   "services", List.of("withdrawal", "deposit"), "hours", "24h"),
-            Map.of("id", "branch-005", "name", "Sucursal Tetuán", "type", "branch",
-                   "address", "C/ Bravo Murillo 120, Madrid", "lat", 40.4505, "lng", -3.7040,
-                   "services", List.of("withdrawal", "deposit", "advisor", "business"), "hours", "8:30-14:00"),
-            Map.of("id", "atm-008", "name", "Cajero Bernabéu", "type", "atm",
-                   "address", "Paseo de la Castellana 104, Madrid", "lat", 40.4530, "lng", -3.6883,
-                   "services", List.of("withdrawal", "deposit", "balance"), "hours", "24h"),
-            Map.of("id", "atm-009", "name", "Cajero Callao", "type", "atm",
-                   "address", "Plaza del Callao 2, Madrid", "lat", 40.4198, "lng", -3.7065,
-                   "services", List.of("withdrawal", "deposit"), "hours", "24h"),
-            Map.of("id", "branch-006", "name", "Sucursal Argüelles", "type", "branch",
-                   "address", "C/ Alberto Aguilera 16, Madrid", "lat", 40.4295, "lng", -3.7120,
-                   "services", List.of("withdrawal", "deposit", "advisor"), "hours", "9:00-14:00"),
-            Map.of("id", "atm-010", "name", "Cajero Tribunal", "type", "atm",
-                   "address", "C/ Hortaleza 25, Madrid", "lat", 40.4243, "lng", -3.6988,
-                   "services", List.of("withdrawal", "balance"), "hours", "24h"),
-            Map.of("id", "atm-011", "name", "Cajero Ópera", "type", "atm",
-                   "address", "Plaza de Ópera 6, Madrid", "lat", 40.4180, "lng", -3.7098,
-                   "services", List.of("withdrawal", "deposit"), "hours", "24h"),
-            Map.of("id", "branch-007", "name", "Sucursal Centro", "type", "branch",
-                   "address", "C/ Mayor 18, Madrid", "lat", 40.4155, "lng", -3.7078,
-                   "services", List.of("withdrawal", "deposit", "advisor", "mortgage", "insurance"), "hours", "9:00-15:00")
+            branch("atm-001", "RedisBank Sol Hub ATM", "atm", "Plaza Demo Sol 1, Madrid", 40.4168, -3.7038, "24h", "withdrawal", "deposit", "balance"),
+            branch("atm-002", "RedisBank Gran Vía Express ATM", "atm", "Avenida Escaparate 32, Madrid", 40.4200, -3.7056, "24h", "withdrawal", "balance"),
+            branch("branch-001", "RedisBank Cibeles Advisory Branch", "branch", "Plaza Foro 4, Madrid", 40.4194, -3.6931, "9:00-14:00", "withdrawal", "deposit", "advisor", "mortgage", "business"),
+            branch("atm-003", "RedisBank Atocha Transit ATM", "atm", "Paseo Andén 7, Madrid", 40.4065, -3.6895, "24h", "withdrawal", "deposit"),
+            branch("branch-002", "RedisBank Castellana Wealth Desk", "branch", "Paseo Norte 79, Madrid", 40.4372, -3.6920, "8:30-14:30", "withdrawal", "deposit", "advisor", "insurance", "private_banking"),
+            branch("atm-004", "RedisBank Retiro Park ATM", "atm", "Bulevar Jardín 12, Madrid", 40.4225, -3.6832, "24h", "withdrawal"),
+            branch("branch-003", "RedisBank Chamberí Family Branch", "branch", "Calle Mercado 45, Madrid", 40.4340, -3.7015, "9:00-14:00", "withdrawal", "deposit", "advisor"),
+            branch("atm-005", "RedisBank Malasaña Smart ATM", "atm", "Calle Creativa 78, Madrid", 40.4266, -3.7032, "24h", "withdrawal", "deposit", "balance"),
+            branch("atm-006", "RedisBank Lavapiés Corner ATM", "atm", "Plaza Atelier 3, Madrid", 40.4089, -3.7006, "24h", "withdrawal"),
+            branch("branch-004", "RedisBank Salamanca Private Lounge", "branch", "Calle Boutique 25, Madrid", 40.4270, -3.6860, "9:00-14:30", "withdrawal", "deposit", "advisor", "private_banking"),
+            branch("atm-007", "RedisBank Moncloa Campus ATM", "atm", "Avenida Universidad 40, Madrid", 40.4310, -3.7180, "24h", "withdrawal", "deposit"),
+            branch("branch-005", "RedisBank Tetuán Business Point", "branch", "Calle Mercado Norte 120, Madrid", 40.4505, -3.7040, "8:30-14:00", "withdrawal", "deposit", "advisor", "business"),
+            branch("atm-008", "RedisBank Bernabéu Matchday ATM", "atm", "Paseo Estadio 104, Madrid", 40.4530, -3.6883, "24h", "withdrawal", "deposit", "balance"),
+            branch("atm-009", "RedisBank Callao Cinema ATM", "atm", "Plaza Pantalla 2, Madrid", 40.4198, -3.7065, "24h", "withdrawal", "deposit"),
+            branch("branch-006", "RedisBank Argüelles Mortgage Studio", "branch", "Calle Residencial 16, Madrid", 40.4295, -3.7120, "9:00-14:00", "withdrawal", "deposit", "advisor", "mortgage"),
+            branch("atm-010", "RedisBank Tribunal Night ATM", "atm", "Calle Aurora 25, Madrid", 40.4243, -3.6988, "24h", "withdrawal", "balance"),
+            branch("atm-011", "RedisBank Ópera Heritage ATM", "atm", "Plaza Escena 6, Madrid", 40.4180, -3.7098, "24h", "withdrawal", "deposit"),
+            branch("branch-007", "RedisBank Centro Flagship Branch", "branch", "Calle Portal 18, Madrid", 40.4155, -3.7078, "9:00-15:00", "withdrawal", "deposit", "advisor", "mortgage", "insurance"),
+            branch("atm-012", "RedisBank Sants Smart ATM", "atm", "Avinguda Connexió 11, Barcelona", 41.3791, 2.1401, "24h", "withdrawal", "deposit", "balance"),
+            branch("branch-008", "RedisBank Eixample Advisory Branch", "branch", "Carrer Demo Central 58, Barcelona", 41.3917, 2.1649, "8:30-14:30", "withdrawal", "deposit", "advisor", "insurance"),
+            branch("atm-013", "RedisBank Gothic Quarter ATM", "atm", "Plaça Codi 9, Barcelona", 41.3839, 2.1763, "24h", "withdrawal", "balance"),
+            branch("branch-009", "RedisBank Diagonal Wealth Desk", "branch", "Avinguda Futura 220, Barcelona", 41.3953, 2.1619, "9:00-15:00", "withdrawal", "deposit", "advisor", "private_banking", "fx"),
+            branch("atm-015", "RedisBank Colón Plaza ATM", "atm", "Plaça Llum 2, Valencia", 39.4699, -0.3763, "24h", "withdrawal", "deposit", "balance"),
+            branch("branch-011", "RedisBank Ruzafa Lifestyle Branch", "branch", "Carrer Mercat Nou 44, Valencia", 39.4627, -0.3707, "8:30-14:30", "withdrawal", "deposit", "advisor", "insurance"),
+            branch("atm-016", "RedisBank Turia Garden ATM", "atm", "Passeig Verd 6, Valencia", 39.4763, -0.3850, "24h", "withdrawal", "balance"),
+            branch("branch-012", "RedisBank City of Arts Branch", "branch", "Avinguda Innovació 19, Valencia", 39.4549, -0.3507, "9:00-15:00", "withdrawal", "deposit", "advisor", "private_banking", "investment"),
+            branch("atm-018", "RedisBank Baixa Express ATM", "atm", "Rua Demo 5, Lisbon", 38.7107, -9.1395, "24h", "withdrawal", "deposit", "balance"),
+            branch("branch-014", "RedisBank Avenida Advisory Branch", "branch", "Avenida Futuro 88, Lisbon", 38.7223, -9.1393, "8:30-14:30", "withdrawal", "deposit", "advisor", "insurance"),
+            branch("atm-019", "RedisBank Parque Nations ATM", "atm", "Passeio Horizonte 14, Lisbon", 38.7686, -9.0959, "24h", "withdrawal", "balance"),
+            branch("branch-015", "RedisBank Chiado Wealth Studio", "branch", "Rua Mosaic 27, Lisbon", 38.7102, -9.1427, "9:00-15:00", "withdrawal", "deposit", "advisor", "private_banking", "fx")
         );
     }
 }

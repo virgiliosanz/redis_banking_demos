@@ -30,89 +30,42 @@ public class FeatureStoreService {
     private static final Map<String, Map<String, String>> FEATURE_SET_V2_DATA = new LinkedHashMap<>();
 
     static {
-        CLIENTS.put("C1001", Map.of("name", "María García", "segment", "Premium", "country", "ES"));
-        CLIENTS.put("C1002", Map.of("name", "John Smith", "segment", "Business", "country", "UK"));
-        CLIENTS.put("C1003", Map.of("name", "Suspicious User", "segment", "Standard", "country", "RU"));
-
-        FEATURE_SET_V1_DATA.put("C1001", featureMap(
-                "tx_count_1h", "2",
-                "tx_count_24h", "5",
-                "tx_amount_avg_24h", "120.50",
-                "tx_amount_max_24h", "250.00",
-                "distinct_countries_7d", "1",
-                "distinct_devices_30d", "2",
-                "last_tx_timestamp", String.valueOf(Instant.now().minusSeconds(1800).toEpochMilli()),
-                "risk_score", "12"
-        ));
-        FEATURE_SET_V1_DATA.put("C1002", featureMap(
-                "tx_count_1h", "5",
-                "tx_count_24h", "18",
-                "tx_amount_avg_24h", "450.75",
-                "tx_amount_max_24h", "1200.00",
-                "distinct_countries_7d", "3",
-                "distinct_devices_30d", "4",
-                "last_tx_timestamp", String.valueOf(Instant.now().minusSeconds(600).toEpochMilli()),
-                "risk_score", "47"
-        ));
-        FEATURE_SET_V1_DATA.put("C1003", featureMap(
-                "tx_count_1h", "15",
-                "tx_count_24h", "42",
-                "tx_amount_avg_24h", "2300.00",
-                "tx_amount_max_24h", "9500.00",
-                "distinct_countries_7d", "8",
-                "distinct_devices_30d", "12",
-                "last_tx_timestamp", String.valueOf(Instant.now().minusSeconds(120).toEpochMilli()),
-                "risk_score", "89"
-        ));
-
-        FEATURE_SET_V2_DATA.put("C1001", featureMap(
-                "batch_income_monthly", "6200",
-                "batch_dti_ratio", "0.21",
-                "batch_payment_ratio_90d", "0.99",
-                "batch_delinquency_count_12m", "0",
-                "batch_credit_utilization", "0.28",
-                "realtime_tx_count_1h", "2",
-                "realtime_tx_count_24h", "5",
-                "realtime_tx_amount_avg_24h", "120.50",
-                "realtime_tx_amount_max_24h", "250.00",
-                "realtime_distinct_countries_7d", "1",
-                "realtime_distinct_devices_30d", "2",
-                "realtime_seconds_since_last_tx", "1800",
-                "realtime_risk_score", "10",
-                "last_tx_timestamp", String.valueOf(Instant.now().minusSeconds(1800).toEpochMilli())
-        ));
-        FEATURE_SET_V2_DATA.put("C1002", featureMap(
-                "batch_income_monthly", "4100",
-                "batch_dti_ratio", "0.39",
-                "batch_payment_ratio_90d", "0.93",
-                "batch_delinquency_count_12m", "1",
-                "batch_credit_utilization", "0.57",
-                "realtime_tx_count_1h", "5",
-                "realtime_tx_count_24h", "18",
-                "realtime_tx_amount_avg_24h", "450.75",
-                "realtime_tx_amount_max_24h", "1200.00",
-                "realtime_distinct_countries_7d", "3",
-                "realtime_distinct_devices_30d", "4",
-                "realtime_seconds_since_last_tx", "600",
-                "realtime_risk_score", "38",
-                "last_tx_timestamp", String.valueOf(Instant.now().minusSeconds(600).toEpochMilli())
-        ));
-        FEATURE_SET_V2_DATA.put("C1003", featureMap(
-                "batch_income_monthly", "1900",
-                "batch_dti_ratio", "0.68",
-                "batch_payment_ratio_90d", "0.61",
-                "batch_delinquency_count_12m", "4",
-                "batch_credit_utilization", "0.92",
-                "realtime_tx_count_1h", "15",
-                "realtime_tx_count_24h", "42",
-                "realtime_tx_amount_avg_24h", "2300.00",
-                "realtime_tx_amount_max_24h", "9500.00",
-                "realtime_distinct_countries_7d", "8",
-                "realtime_distinct_devices_30d", "12",
-                "realtime_seconds_since_last_tx", "120",
-                "realtime_risk_score", "91",
-                "last_tx_timestamp", String.valueOf(Instant.now().minusSeconds(120).toEpochMilli())
-        ));
+        seedClient("C1001", clientMeta("Elena García", "Premium", "ES"),
+                legacyFeatures(2, 5, 120.50, 250.00, 1, 2, 1800, 12),
+                enhancedFeatures(6200, 0.21, 0.99, 0, 0.28, 2, 5, 120.50, 250.00, 1, 2, 1800, 10));
+        seedClient("C1002", clientMeta("Arthur Cole", "Business", "UK"),
+                legacyFeatures(5, 18, 450.75, 1200.00, 3, 4, 600, 47),
+                enhancedFeatures(4100, 0.39, 0.93, 1, 0.57, 5, 18, 450.75, 1200.00, 3, 4, 600, 38));
+        seedClient("C1003", clientMeta("Milan Petrov", "Standard", "RO"),
+                legacyFeatures(15, 42, 2300.00, 9500.00, 8, 12, 120, 89),
+                enhancedFeatures(1900, 0.68, 0.61, 4, 0.92, 15, 42, 2300.00, 9500.00, 8, 12, 120, 91));
+        seedClient("C1004", clientMeta("Claire Dubois", "Private Banking", "FR"),
+                legacyFeatures(1, 4, 210.00, 640.00, 1, 1, 5400, 8),
+                enhancedFeatures(11800, 0.17, 1.00, 0, 0.12, 1, 4, 210.00, 640.00, 1, 1, 5400, 6));
+        seedClient("C1005", clientMeta("Jonas Keller", "Premium", "DE"),
+                legacyFeatures(4, 12, 980.40, 3200.00, 2, 3, 900, 36),
+                enhancedFeatures(5400, 0.44, 0.95, 1, 0.63, 4, 12, 980.40, 3200.00, 2, 3, 900, 34));
+        seedClient("C1006", clientMeta("Sofia Almeida", "Student", "PT"),
+                legacyFeatures(3, 9, 84.35, 230.00, 1, 2, 2400, 14),
+                enhancedFeatures(1450, 0.08, 0.97, 0, 0.18, 3, 9, 84.35, 230.00, 1, 2, 2400, 12));
+        seedClient("C1007", clientMeta("Luca Bianchi", "Standard", "IT"),
+                legacyFeatures(7, 24, 760.80, 2800.00, 4, 5, 300, 58),
+                enhancedFeatures(3200, 0.52, 0.82, 2, 0.74, 7, 24, 760.80, 2800.00, 4, 5, 300, 57));
+        seedClient("C1008", clientMeta("Maeve O'Connell", "Premium", "IE"),
+                legacyFeatures(2, 6, 190.20, 420.00, 1, 2, 1500, 11),
+                enhancedFeatures(7300, 0.24, 0.98, 0, 0.22, 2, 6, 190.20, 420.00, 1, 2, 1500, 9));
+        seedClient("C1009", clientMeta("Jasper van Dijk", "Business", "NL"),
+                legacyFeatures(8, 27, 1320.45, 6400.00, 5, 6, 240, 63),
+                enhancedFeatures(9600, 0.48, 0.89, 2, 0.69, 8, 27, 1320.45, 6400.00, 5, 6, 240, 68));
+        seedClient("C1010", clientMeta("Greta Nyholm", "Private Banking", "SE"),
+                legacyFeatures(1, 3, 350.00, 900.00, 1, 1, 7200, 7),
+                enhancedFeatures(14200, 0.11, 1.00, 0, 0.09, 1, 3, 350.00, 900.00, 1, 1, 7200, 5));
+        seedClient("C1011", clientMeta("Tomas Novak", "Basic", "CZ"),
+                legacyFeatures(6, 16, 540.10, 1800.00, 3, 5, 420, 41),
+                enhancedFeatures(2600, 0.46, 0.88, 1, 0.58, 6, 16, 540.10, 1800.00, 3, 5, 420, 43));
+        seedClient("C1012", clientMeta("Nora Weiss", "Premium", "AT"),
+                legacyFeatures(3, 11, 420.55, 1350.00, 2, 3, 1100, 24),
+                enhancedFeatures(6700, 0.28, 0.96, 0, 0.31, 3, 11, 420.55, 1350.00, 2, 3, 1100, 21));
     }
 
     private final StringRedisTemplate redis;
@@ -454,6 +407,76 @@ public class FeatureStoreService {
     private String clientBaseCountry(String clientId) {
         Map<String, String> meta = CLIENTS.get(clientId);
         return meta != null ? meta.getOrDefault("country", "ES") : "ES";
+    }
+
+    private static void seedClient(String clientId, Map<String, String> meta,
+                                   Map<String, String> featureSetV1,
+                                   Map<String, String> featureSetV2) {
+        CLIENTS.put(clientId, meta);
+        FEATURE_SET_V1_DATA.put(clientId, featureSetV1);
+        FEATURE_SET_V2_DATA.put(clientId, featureSetV2);
+    }
+
+    private static Map<String, String> clientMeta(String name, String segment, String country) {
+        return Map.of("name", name, "segment", segment, "country", country);
+    }
+
+    private static Map<String, String> legacyFeatures(int txCount1h, int txCount24h,
+                                                      double txAmountAvg24h, double txAmountMax24h,
+                                                      int distinctCountries7d, int distinctDevices30d,
+                                                      long secondsSinceLastTx, int riskScore) {
+        return featureMap(
+                "tx_count_1h", String.valueOf(txCount1h),
+                "tx_count_24h", String.valueOf(txCount24h),
+                "tx_amount_avg_24h", formatSeedDecimal(txAmountAvg24h),
+                "tx_amount_max_24h", formatSeedDecimal(txAmountMax24h),
+                "distinct_countries_7d", String.valueOf(distinctCountries7d),
+                "distinct_devices_30d", String.valueOf(distinctDevices30d),
+                "last_tx_timestamp", String.valueOf(epochMillisMinusSeconds(secondsSinceLastTx)),
+                "risk_score", String.valueOf(riskScore)
+        );
+    }
+
+    private static Map<String, String> enhancedFeatures(double incomeMonthly, double dtiRatio,
+                                                        double paymentRatio90d, int delinquencyCount12m,
+                                                        double creditUtilization, int realtimeTxCount1h,
+                                                        int realtimeTxCount24h, double realtimeTxAmountAvg24h,
+                                                        double realtimeTxAmountMax24h,
+                                                        int realtimeDistinctCountries7d,
+                                                        int realtimeDistinctDevices30d,
+                                                        long secondsSinceLastTx, int realtimeRiskScore) {
+        return featureMap(
+                "batch_income_monthly", formatWholeNumber(incomeMonthly),
+                "batch_dti_ratio", formatRatio(dtiRatio),
+                "batch_payment_ratio_90d", formatRatio(paymentRatio90d),
+                "batch_delinquency_count_12m", String.valueOf(delinquencyCount12m),
+                "batch_credit_utilization", formatRatio(creditUtilization),
+                "realtime_tx_count_1h", String.valueOf(realtimeTxCount1h),
+                "realtime_tx_count_24h", String.valueOf(realtimeTxCount24h),
+                "realtime_tx_amount_avg_24h", formatSeedDecimal(realtimeTxAmountAvg24h),
+                "realtime_tx_amount_max_24h", formatSeedDecimal(realtimeTxAmountMax24h),
+                "realtime_distinct_countries_7d", String.valueOf(realtimeDistinctCountries7d),
+                "realtime_distinct_devices_30d", String.valueOf(realtimeDistinctDevices30d),
+                "realtime_seconds_since_last_tx", String.valueOf(secondsSinceLastTx),
+                "realtime_risk_score", String.valueOf(realtimeRiskScore),
+                "last_tx_timestamp", String.valueOf(epochMillisMinusSeconds(secondsSinceLastTx))
+        );
+    }
+
+    private static long epochMillisMinusSeconds(long secondsSinceLastTx) {
+        return Instant.now().minusSeconds(secondsSinceLastTx).toEpochMilli();
+    }
+
+    private static String formatWholeNumber(double value) {
+        return String.format(Locale.US, "%.0f", value);
+    }
+
+    private static String formatRatio(double value) {
+        return String.format(Locale.US, "%.2f", value);
+    }
+
+    private static String formatSeedDecimal(double value) {
+        return String.format(Locale.US, "%.2f", value);
     }
 
     private static Map<String, String> featureMap(String... values) {

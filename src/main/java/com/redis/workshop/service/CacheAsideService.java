@@ -66,19 +66,40 @@ public class CacheAsideService {
         List<Map<String, Object>> products = List.of(
                 buildProduct("mortgage-fixed",
                 "Fixed Rate Mortgage", "Mortgage", "3.25%", "25 years",
-                "€50,000", "€500,000", "Fixed rate mortgage with stable monthly payments", "2024-01-15"),
+                "€50,000", "€500,000", "Stable owner-occupier mortgage for predictable monthly payments", "2024-01-15"),
                 buildProduct("mortgage-variable",
                 "Variable Rate Mortgage", "Mortgage", "Euribor + 1.5%", "30 years",
                 "€50,000", "€750,000", "Variable rate mortgage linked to Euribor", "2024-01-15"),
                 buildProduct("savings-premium",
                 "Premium Savings Account", "Savings", "2.10%", null,
                 "€10,000", null, "High-yield savings for premium clients", "2024-02-01"),
+                buildProduct("savings-goal",
+                "Goal Saver Pocket", "Savings", "1.85%", null,
+                "€500", null, "Digital savings pocket for travel, tuition, or emergency goals", "2024-02-14"),
+                buildProduct("checking-everyday",
+                "Everyday Checking", "Checking", null, null,
+                "€0", null, "Simple current account for salary deposits and daily payments", "2024-01-05"),
+                buildProduct("checking-premium",
+                "Premier Current Account", "Checking", null, null,
+                "€5,000", null, "Premium checking with concierge support and travel perks", "2024-03-10"),
                 buildProduct("credit-gold",
                 "Gold Credit Card", "Credit Card", null, null,
                 null, null, "Premium credit card with travel insurance and cashback", "2024-01-20"),
+                buildProduct("credit-platinum",
+                "Platinum Travel Card", "Credit Card", null, null,
+                null, null, "High-limit travel card with lounge access and concierge services", "2024-03-18"),
                 buildProduct("business-loan",
                 "Business Growth Loan", "Business", "4.50%", "10 years",
-                "€25,000", "€1,000,000", "Flexible business loan for growth and expansion", "2024-03-01")
+                "€25,000", "€1,000,000", "Flexible business loan for growth and expansion", "2024-03-01"),
+                buildProduct("business-treasury",
+                "Corporate Treasury Line", "Business", "3.95%", "3 years",
+                "€100,000", "€2,500,000", "Liquidity line for payroll peaks, FX settlements, and working capital", "2024-04-02"),
+                buildProduct("investment-income",
+                "Income Portfolio Plus", "Investment", "5.20% target", "Open-ended",
+                "€5,000", null, "Diversified income portfolio combining bonds, dividend equities, and short-duration funds", "2024-02-28"),
+                buildProduct("investment-esg",
+                "ESG Future Portfolio", "Investment", "6.10% target", "Open-ended",
+                "€2,500", null, "Sustainability-focused model portfolio for long-term wealth accumulation", "2024-04-08")
         );
 
         for (Map<String, Object> product : products) {
@@ -128,6 +149,39 @@ public class CacheAsideService {
         if ("Savings".equals(type)) {
             product.put("minBalance", "€10,000");
             product.put("features", "No maintenance fees, online banking");
+        }
+        if ("Checking".equals(type)) {
+            product.put("monthlyFee", "€0");
+            product.put("debitCard", "Included");
+            product.put("instantTransfers", "Included");
+        }
+        if ("Investment".equals(type)) {
+            product.put("riskLevel", "Moderate");
+            product.put("managementStyle", "Model portfolio");
+            product.put("currency", "EUR");
+        }
+        if ("Mortgage".equals(type)) {
+            product.put("maxLtv", "80%");
+            product.put("repaymentType", "Monthly amortizing");
+        }
+        if ("Business".equals(type)) {
+            product.put("collateral", "Case-by-case");
+            product.put("repaymentFlexibility", "Early repayment allowed");
+        }
+        if ("credit-platinum".equals(id)) {
+            product.put("annualFee", "€160");
+            product.put("creditLimit", "€35,000");
+            product.put("cashback", "2.0%");
+            product.put("airportLoungeVisits", "12 per year");
+        }
+        if ("checking-premium".equals(id)) {
+            product.put("monthlyFee", "€18");
+            product.put("advisorTier", "Premium desk");
+            product.put("travelInsurance", "Included");
+        }
+        if ("investment-esg".equals(id)) {
+            product.put("riskLevel", "Moderate-High");
+            product.put("theme", "Climate transition and clean infrastructure");
         }
         return product;
     }
