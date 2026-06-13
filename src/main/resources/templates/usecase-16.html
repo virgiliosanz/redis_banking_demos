@@ -154,8 +154,32 @@
                 </div>
 
                 <div class="data-card redis-commands-card" id="redis-commands-card" style="display:none;">
-                    <h3>Redis Commands Executed</h3>
-                    <div class="commands-list" id="commands-output"></div>
+                    <div class="redis-commands-header">
+                        <div class="redis-commands-title-wrap">
+                            <h3>Redis Commands Executed</h3>
+                            <span class="redis-commands-counter" id="commands-counter" aria-live="polite">0 commands</span>
+                        </div>
+                        <div class="redis-commands-actions">
+                            <button type="button" class="cmd-copy-btn cmd-header-btn" id="copy-all-commands-btn" title="Copy all commands" aria-label="Copy all commands">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                            </button>
+                            <button type="button" class="cmd-copy-btn cmd-header-btn" id="clear-commands-btn" title="Clear commands" aria-label="Clear commands">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 6h18"></path>
+                                    <path d="M8 6V4h8v2"></path>
+                                    <path d="M19 6l-1 14H6L5 6"></path>
+                                    <path d="M10 11v6"></path>
+                                    <path d="M14 11v6"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="commands-list" id="commands-output">
+                        <div class="commands-empty">No Redis commands captured yet.</div>
+                    </div>
                 </div>
             </section>
 
@@ -231,6 +255,13 @@ XREVRANGE uc16:stream:gateway + - COUNT 10</code></pre>
                 </div>
             </section>
         </div>
+    </div>
+
+    <div class="presenter-notes" hidden data-target-minutes="4">
+        <section data-presenter-section="what-to-say"><p>UC16 presents Redis as the control plane for an AI gateway: route the query, check semantic cache, enforce limits, and apply guardrails before the model response returns. This is the architecture demo for teams thinking beyond a single chat endpoint.</p></section>
+        <section data-presenter-section="demo-steps"><ol><li>Submit a normal request and show which model path the gateway chooses.</li><li>Repeat or vary the request to surface semantic cache and rate-limit behavior.</li><li>Use a blocked or risky prompt to show the guardrail stages short-circuiting the flow.</li></ol></section>
+        <section data-presenter-section="key-talking-points"><ul><li>Routing, caching, safety, and cost control are all first-class stages.</li><li>Redis is fast enough to sit in the decision loop for every request.</li><li>The pipeline view matters because platform teams need to explain why a request was handled a certain way.</li></ul></section>
+        <section data-presenter-section="redis-highlight"><p>Semantic routing and cache lookups via <code>FT.SEARCH</code>, with <code>INCR</code>/<code>EXPIRE</code> for per-model throttling.</p></section>
     </div>
 
     <div layout:fragment="scripts">

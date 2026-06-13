@@ -1,6 +1,7 @@
 package com.redis.workshop.controller;
 
 import com.redis.workshop.config.RedisMonitorService;
+import com.redis.workshop.service.LocalEmbeddingService;
 import com.redis.workshop.service.OpenAiService;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,12 +27,15 @@ public class HealthController {
 
     private final StringRedisTemplate redis;
     private final OpenAiService openAiService;
+    private final LocalEmbeddingService localEmbeddingService;
     private final RedisMonitorService redisMonitor;
 
     public HealthController(StringRedisTemplate redis, OpenAiService openAiService,
+                            LocalEmbeddingService localEmbeddingService,
                             RedisMonitorService redisMonitor) {
         this.redis = redis;
         this.openAiService = openAiService;
+        this.localEmbeddingService = localEmbeddingService;
         this.redisMonitor = redisMonitor;
     }
 
@@ -102,9 +107,9 @@ public class HealthController {
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> health() {
         Map<String, Object> status = new LinkedHashMap<>();
-        status.put("status", "UP");
 
         Map<String, Object> redisStatus = new LinkedHashMap<>();
+        boolean redisUp = false;
         try {
             var connectionFactory = redis.getConnectionFactory();
             if (connectionFactory == null) {
@@ -114,6 +119,7 @@ public class HealthController {
             String pong = connection.ping();
             redisStatus.put("status", "UP");
             redisStatus.put("ping", pong);
+            redisUp = true;
 
             Properties info = connection.serverCommands().info("memory");
             if (info != null) {
@@ -126,20 +132,43 @@ public class HealthController {
         } catch (Exception e) {
             redisStatus.put("status", "DOWN");
             redisStatus.put("error", e.getMessage());
-            status.put("status", "DEGRADED");
         }
         status.put("redis", redisStatus);
 
+        OpenAiService.OpenAiHealth openAiHealth = openAiService.ping();
         Map<String, Object> openAiStatus = new LinkedHashMap<>();
-        if (openAiService.isConfigured()) {
-            openAiStatus.put("status", "UP");
-            openAiStatus.put("configured", true);
-        } else {
-            openAiStatus.put("status", "DISABLED");
-            openAiStatus.put("configured", false);
-            openAiStatus.put("note", "Set OPENAI_API_KEY to enable AI features (UC8 vector search, UC9 assistant)");
+        openAiStatus.put("status", openAiHealth.status());
+        openAiStatus.put("configured", openAiHealth.configured());
+        openAiStatus.put("reachable", openAiHealth.reachable());
+        openAiStatus.put("model", openAiHealth.model());
+        if (openAiHealth.latencyMs() != null) {
+            openAiStatus.put("latencyMs", openAiHealth.latencyMs());
+        }
+        if (openAiHealth.error() != null) {
+            openAiStatus.put("error", openAiHealth.error());
         }
         status.put("openai", openAiStatus);
+
+        LocalEmbeddingService.EmbeddingHealth embeddingHealth = localEmbeddingService.isReady();
+        Map<String, Object> embeddingStatus = new LinkedHashMap<>();
+        embeddingStatus.put("status", embeddingHealth.status());
+        embeddingStatus.put("loaded", embeddingHealth.loaded());
+        embeddingStatus.put("model", embeddingHealth.model());
+        embeddingStatus.put("dimensions", embeddingHealth.dimensions());
+        embeddingStatus.put("latencyMs", embeddingHealth.latencyMs());
+        if (embeddingHealth.error() != null) {
+            embeddingStatus.put("error", embeddingHealth.error());
+        }
+        status.put("embeddings", embeddingStatus);
+
+        if (!redisUp) {
+            status.put("status", "DOWN");
+        } else if (!openAiHealth.reachable() || !embeddingHealth.loaded()) {
+            status.put("status", "DEGRADED");
+        } else {
+            status.put("status", "UP");
+        }
+        status.put("timestamp", Instant.now().toString());
 
         return ResponseEntity.ok(status);
     }

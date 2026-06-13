@@ -108,8 +108,32 @@
 
                 <!-- Redis Commands Executed (auto-populated after each request) -->
                 <div class="data-card redis-commands-card" id="redis-commands-card" style="display:none;">
-                    <h3>Redis Commands Executed</h3>
-                    <div class="commands-list" id="commands-output"></div>
+                    <div class="redis-commands-header">
+                        <div class="redis-commands-title-wrap">
+                            <h3>Redis Commands Executed</h3>
+                            <span class="redis-commands-counter" id="commands-counter" aria-live="polite">0 commands</span>
+                        </div>
+                        <div class="redis-commands-actions">
+                            <button type="button" class="cmd-copy-btn cmd-header-btn" id="copy-all-commands-btn" title="Copy all commands" aria-label="Copy all commands">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                            </button>
+                            <button type="button" class="cmd-copy-btn cmd-header-btn" id="clear-commands-btn" title="Clear commands" aria-label="Clear commands">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 6h18"></path>
+                                    <path d="M8 6V4h8v2"></path>
+                                    <path d="M19 6l-1 14H6L5 6"></path>
+                                    <path d="M10 11v6"></path>
+                                    <path d="M14 11v6"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="commands-list" id="commands-output">
+                        <div class="commands-empty">No Redis commands captured yet.</div>
+                    </div>
                 </div>
             </section>
 
@@ -203,6 +227,13 @@ if (added != null &amp;&amp; added == 1L) {
                 </div>
             </section>
         </div>
+    </div>
+
+    <div class="presenter-notes" hidden data-target-minutes="3">
+        <section data-presenter-section="what-to-say"><p>This use case turns Redis into an idempotency guardrail for payments: the first transaction wins, and duplicates inside the protection window are rejected immediately. Position it as a cheap, understandable way to prevent double charging during retries.</p></section>
+        <section data-presenter-section="demo-steps"><ol><li>Submit the first payment and show it is accepted because the key did not exist yet.</li><li>Replay the same request to demonstrate how the duplicate is blocked.</li><li>Explain why the TTL window matters for balancing protection and memory footprint.</li></ol></section>
+        <section data-presenter-section="key-talking-points"><ul><li>The application generates a deterministic transaction fingerprint.</li><li><code>NX</code> guarantees only the first write succeeds.</li><li><code>EX</code> avoids keeping deduplication keys forever.</li></ul></section>
+        <section data-presenter-section="redis-highlight"><p><code>SET key value NX EX ttl</code> is the core idempotency pattern.</p></section>
     </div>
 
     <div layout:fragment="scripts">

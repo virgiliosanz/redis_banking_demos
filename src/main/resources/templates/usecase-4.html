@@ -113,8 +113,32 @@
 
                 <!-- Redis Commands Executed (auto-populated after each request) -->
                 <div class="data-card redis-commands-card" id="redis-commands-card" style="display:none;">
-                    <h3>Redis Commands Executed</h3>
-                    <div class="commands-list" id="commands-output"></div>
+                    <div class="redis-commands-header">
+                        <div class="redis-commands-title-wrap">
+                            <h3>Redis Commands Executed</h3>
+                            <span class="redis-commands-counter" id="commands-counter" aria-live="polite">0 commands</span>
+                        </div>
+                        <div class="redis-commands-actions">
+                            <button type="button" class="cmd-copy-btn cmd-header-btn" id="copy-all-commands-btn" title="Copy all commands" aria-label="Copy all commands">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                            </button>
+                            <button type="button" class="cmd-copy-btn cmd-header-btn" id="clear-commands-btn" title="Clear commands" aria-label="Clear commands">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 6h18"></path>
+                                    <path d="M8 6V4h8v2"></path>
+                                    <path d="M19 6l-1 14H6L5 6"></path>
+                                    <path d="M10 11v6"></path>
+                                    <path d="M14 11v6"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="commands-list" id="commands-output">
+                        <div class="commands-empty">No Redis commands captured yet.</div>
+                    </div>
                 </div>
             </section>
 
@@ -230,6 +254,13 @@ ZCARD uc4:sliding:fintech-app-001
                 </div>
             </section>
         </div>
+    </div>
+
+    <div class="presenter-notes" hidden data-target-minutes="3">
+        <section data-presenter-section="what-to-say"><p>UC4 is the classic Redis API protection story: a fixed-window rate limiter built with an atomic counter and expiry. Make the contrast clear between the simple production-ready path in the demo and the more precise sorted-set alternative shown beside it.</p></section>
+        <section data-presenter-section="demo-steps"><ol><li>Send requests until the client is still under the limit and show the counter increasing.</li><li>Push past the threshold to trigger the block and highlight the remaining TTL window.</li><li>Use the code panel to compare the implemented <code>INCR</code> pattern with the sliding-window <code>ZSET</code> alternative.</li></ol></section>
+        <section data-presenter-section="key-talking-points"><ul><li><code>INCR</code> is atomic, which keeps the happy path extremely small.</li><li><code>EXPIRE</code> defines when the rate limit window resets.</li><li>Sorted sets solve the boundary-burst edge case, but they cost more per request.</li></ul></section>
+        <section data-presenter-section="redis-highlight"><p><code>INCR</code> + <code>EXPIRE</code> for the live limiter, with <code>ZADD</code>/<code>ZCARD</code> as the comparison pattern.</p></section>
     </div>
 
     <div layout:fragment="scripts">

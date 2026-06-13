@@ -1579,7 +1579,7 @@ details.how-it-works[open] > summary h2::before {
     margin: 24px 0;
     padding: 24px;
     background: var(--bg-secondary);
-    border-radius: 5px;
+    border-radius: var(--border-radius);
 }
 
 .loaded-documents h3 {
@@ -1607,7 +1607,7 @@ details.how-it-works[open] > summary h2::before {
     padding: 16px;
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
-    border-radius: 5px;
+    border-radius: var(--border-radius);
 }
 
 .doc-title-link {
@@ -1650,7 +1650,7 @@ details.how-it-works[open] > summary h2::before {
     padding: 2px 8px;
     background: var(--redis-primary);
     color: white;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
     font-size: 11px;
     margin-right: 4px;
     margin-bottom: 4px;
@@ -1666,7 +1666,7 @@ details.how-it-works[open] > summary h2::before {
 .kb-section {
     margin-top: 16px;
     border: 1px solid var(--border-color);
-    border-radius: 5px;
+    border-radius: var(--border-radius);
     background: var(--bg-primary);
 }
 

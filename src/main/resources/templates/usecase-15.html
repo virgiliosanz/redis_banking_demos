@@ -23,6 +23,54 @@
                 <li><strong>Audit trail</strong> writes every decision to a Redis Stream so the UI can replay the pipeline step-by-step.</li>
             </ol>
         </div>
+        <div class="how-it-works-diagram">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 260" width="920" height="260">
+                <defs>
+                    <marker id="uc15-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                        <polygon points="0 0, 8 3, 0 6" class="svg-arrow-head"/>
+                    </marker>
+                </defs>
+                <rect x="24" y="96" width="120" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                <text x="84" y="120" text-anchor="middle" font-size="12" font-weight="600">User Prompt</text>
+                <text x="84" y="138" text-anchor="middle" font-size="10" class="svg-label">Banking chat input</text>
+
+                <line x1="144" y1="126" x2="224" y2="126" class="svg-arrow" stroke-width="2" marker-end="url(#uc15-arrow)"/>
+                <rect x="224" y="96" width="128" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                <text x="288" y="120" text-anchor="middle" font-size="12" font-weight="600">Rate Limit</text>
+                <text x="288" y="138" text-anchor="middle" font-size="10" class="svg-label">INCR + EXPIRE</text>
+
+                <line x1="352" y1="126" x2="432" y2="126" class="svg-arrow" stroke-width="2" marker-end="url(#uc15-arrow)"/>
+                <rect x="432" y="96" width="136" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                <text x="500" y="120" text-anchor="middle" font-size="12" font-weight="600">Topic Route</text>
+                <text x="500" y="138" text-anchor="middle" font-size="10" class="svg-label">Redis vector KNN</text>
+
+                <line x1="568" y1="126" x2="648" y2="126" class="svg-arrow" stroke-width="2" marker-end="url(#uc15-arrow)"/>
+                <rect x="648" y="96" width="144" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                <text x="720" y="118" text-anchor="middle" font-size="12" font-weight="600">PII + Injection</text>
+                <text x="720" y="136" text-anchor="middle" font-size="10" class="svg-label">Block or flag risky input</text>
+
+                <line x1="720" y1="156" x2="720" y2="204" class="svg-arrow" stroke-width="2" marker-end="url(#uc15-arrow)"/>
+                <rect x="664" y="204" width="112" height="36" class="svg-deny-box"/>
+                <text x="720" y="227" text-anchor="middle" font-size="12" class="svg-deny-text">Block / Flag</text>
+
+                <line x1="792" y1="126" x2="844" y2="126" class="svg-arrow" stroke-width="2" marker-end="url(#uc15-arrow)"/>
+                <rect x="844" y="96" width="52" height="60" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                <text x="870" y="121" text-anchor="middle" font-size="12" font-weight="600">LLM</text>
+                <text x="870" y="139" text-anchor="middle" font-size="10" class="svg-label">Reply</text>
+
+                <line x1="870" y1="96" x2="870" y2="52" class="svg-arrow" stroke-width="2" marker-end="url(#uc15-arrow)"/>
+                <rect x="770" y="16" width="200" height="36" rx="5" ry="5" class="svg-box" stroke-width="1"/>
+                <text x="870" y="38" text-anchor="middle" font-size="11" font-weight="600">Output scrub + compliance disclaimer</text>
+
+                <circle cx="500" cy="222" r="46" class="svg-redis-circle"/>
+                <text x="500" y="214" text-anchor="middle" font-size="12" class="svg-redis-text">Redis</text>
+                <text x="500" y="232" text-anchor="middle" font-size="10" class="svg-redis-text">Counters · Vectors · Stream</text>
+                <line x1="288" y1="156" x2="460" y2="198" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc15-arrow)"/>
+                <line x1="500" y1="156" x2="500" y2="174" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc15-arrow)"/>
+                <line x1="690" y1="156" x2="540" y2="198" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc15-arrow)"/>
+                <line x1="844" y1="156" x2="548" y2="212" class="svg-arrow" stroke-width="1.5" marker-end="url(#uc15-arrow)"/>
+            </svg>
+        </div>
     </details>
 
     <div class="usecase-panels">

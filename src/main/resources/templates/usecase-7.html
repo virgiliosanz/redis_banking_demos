@@ -192,8 +192,32 @@
 
                 <!-- Redis Commands Executed (auto-populated after each request) -->
                 <div class="data-card redis-commands-card" id="redis-commands-card" style="display:none;">
-                    <h3>Redis Commands Executed</h3>
-                    <div class="commands-list" id="commands-output"></div>
+                    <div class="redis-commands-header">
+                        <div class="redis-commands-title-wrap">
+                            <h3>Redis Commands Executed</h3>
+                            <span class="redis-commands-counter" id="commands-counter" aria-live="polite">0 commands</span>
+                        </div>
+                        <div class="redis-commands-actions">
+                            <button type="button" class="cmd-copy-btn cmd-header-btn" id="copy-all-commands-btn" title="Copy all commands" aria-label="Copy all commands">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                            </button>
+                            <button type="button" class="cmd-copy-btn cmd-header-btn" id="clear-commands-btn" title="Clear commands" aria-label="Clear commands">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 6h18"></path>
+                                    <path d="M8 6V4h8v2"></path>
+                                    <path d="M19 6l-1 14H6L5 6"></path>
+                                    <path d="M10 11v6"></path>
+                                    <path d="M14 11v6"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="commands-list" id="commands-output">
+                        <div class="commands-empty">No Redis commands captured yet.</div>
+                    </div>
                 </div>
             </section>
 
@@ -256,6 +280,13 @@ HGETALL uc7:feature_set_v2:client:C1001
                 </div>
             </section>
         </div>
+    </div>
+
+    <div class="presenter-notes" hidden data-target-minutes="3">
+        <section data-presenter-section="what-to-say"><p>This use case frames Redis as an online feature store for instant credit or risk decisions. The important message is that model-serving pipelines care less about fancy storage and more about fetching the exact feature vector in a few milliseconds.</p></section>
+        <section data-presenter-section="demo-steps"><ol><li>Select a client and load the versioned feature set from Redis.</li><li>Run the scoring flow and highlight the latency number.</li><li>Explain why versioned feature keys make experiments and rollback presenter-friendly.</li></ol></section>
+        <section data-presenter-section="key-talking-points"><ul><li>Features are grouped by version so demos can compare snapshots cleanly.</li><li>Hashes keep the structure readable while staying fast to fetch.</li><li>This is a good bridge from core Redis patterns into ML and AI scenarios.</li></ul></section>
+        <section data-presenter-section="redis-highlight"><p><code>HGETALL</code> on a versioned feature-set hash enables sub-millisecond online inference reads.</p></section>
     </div>
 
     <div layout:fragment="scripts">

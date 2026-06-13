@@ -43,9 +43,18 @@ class ApiEndpointTests {
     void healthCheck() throws Exception {
         mockMvc.perform(get("/api/health"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.status").value(Matchers.anyOf(Matchers.is("UP"), Matchers.is("DEGRADED"))))
                 .andExpect(jsonPath("$.redis.status").value("UP"))
-                .andExpect(jsonPath("$.openai").exists());
+                .andExpect(jsonPath("$.openai.status").exists())
+                .andExpect(jsonPath("$.openai.configured").exists())
+                .andExpect(jsonPath("$.openai.reachable").exists())
+                .andExpect(jsonPath("$.openai.model").exists())
+                .andExpect(jsonPath("$.embeddings.status").value("UP"))
+                .andExpect(jsonPath("$.embeddings.loaded").value(true))
+                .andExpect(jsonPath("$.embeddings.model").value("bge-small-en-v1.5"))
+                .andExpect(jsonPath("$.embeddings.dimensions").value(384))
+                .andExpect(jsonPath("$.embeddings.latencyMs").exists())
+                .andExpect(jsonPath("$.timestamp").exists());
     }
 
     // -------- UC1: Authentication Token Store --------
@@ -219,6 +228,16 @@ class ApiEndpointTests {
     @Test
     void uc11_transactionsMetrics() throws Exception {
         mockMvc.perform(get("/api/transactions/metrics")).andExpect(status().isOk());
+    }
+
+    @Test
+    void monitorMetrics() throws Exception {
+        mockMvc.perform(get("/api/monitor"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.instantaneous_ops_per_sec").exists())
+                .andExpect(jsonPath("$.used_memory_human").exists())
+                .andExpect(jsonPath("$.db_size").exists())
+                .andExpect(jsonPath("$.redis_version").exists());
     }
 
     // -------- UC12: Geospatial (ATM & Branch Finder) --------

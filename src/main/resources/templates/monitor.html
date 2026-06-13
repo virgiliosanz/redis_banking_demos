@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Redis Monitor Dashboard</title>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="usecase-header">
+            <span class="usecase-badge">Monitor</span>
+            <h1>Redis Server Monitor</h1>
+        </div>
+        <p class="usecase-subtitle">Live Redis server metrics from <code>/api/monitor</code>, refreshed every 2 seconds for workshop demos.</p>
+
+        <section class="panel monitor-dashboard">
+            <div class="monitor-dashboard-head">
+                <div>
+                    <h2>Live Metrics Dashboard</h2>
+                    <p class="monitor-dashboard-copy">Instant visibility into throughput, memory, clients, keyspace efficiency, and server uptime.</p>
+                </div>
+                <div class="monitor-dashboard-meta">
+                    <div class="monitor-status is-pending" id="monitorStatus" aria-live="polite">
+                        <span class="monitor-status-dot" aria-hidden="true"></span>
+                        <span id="monitorStatusText">Connecting…</span>
+                    </div>
+                    <div class="monitor-last-updated">Last updated: <strong id="monitorLastUpdated">Waiting for data…</strong></div>
+                </div>
+            </div>
+
+            <div class="monitor-sparkline-card">
+                <div class="monitor-sparkline-head">
+                    <div>
+                        <h3>Ops/sec trend</h3>
+                        <p>Last 60 seconds · 30 samples retained in memory</p>
+                    </div>
+                    <div class="monitor-sparkline-stat" id="monitorSparklineStat">Waiting for data…</div>
+                </div>
+                <svg id="monitorOpsSparkline" class="monitor-sparkline" viewBox="0 0 360 120" preserveAspectRatio="none" role="img" aria-label="Redis ops per second trend"></svg>
+            </div>
+
+            <div class="monitor-metrics-grid">
+                <article class="monitor-metric-card">
+                    <div class="monitor-metric-label">Ops/sec</div>
+                    <div class="monitor-metric-value" id="monitorOpsPerSec">--</div>
+                </article>
+                <article class="monitor-metric-card">
+                    <div class="monitor-metric-label">Memory used</div>
+                    <div class="monitor-metric-value" id="monitorMemoryUsed">--</div>
+                </article>
+                <article class="monitor-metric-card">
+                    <div class="monitor-metric-label">Total keys</div>
+                    <div class="monitor-metric-value" id="monitorTotalKeys">--</div>
+                </article>
+                <article class="monitor-metric-card">
+                    <div class="monitor-metric-label">Hit rate</div>
+                    <div class="monitor-metric-value" id="monitorHitRate">--</div>
+                </article>
+                <article class="monitor-metric-card">
+                    <div class="monitor-metric-label">Connected clients</div>
+                    <div class="monitor-metric-value" id="monitorConnectedClients">--</div>
+                </article>
+                <article class="monitor-metric-card">
+                    <div class="monitor-metric-label">Uptime</div>
+                    <div class="monitor-metric-value" id="monitorUptime">--</div>
+                </article>
+                <article class="monitor-metric-card">
+                    <div class="monitor-metric-label">Total commands</div>
+                    <div class="monitor-metric-value" id="monitorTotalCommands">--</div>
+                </article>
+                <article class="monitor-metric-card">
+                    <div class="monitor-metric-label">Redis version</div>
+                    <div class="monitor-metric-value" id="monitorRedisVersion">--</div>
+                </article>
+            </div>
+        </section>
+    </div>
+
+    <div layout:fragment="scripts">
+        <script th:src="@{/js/monitor.js}"></script>
+    </div>
+</body>
+</html>
