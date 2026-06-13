@@ -11,7 +11,7 @@ APP_URL := http://localhost:8080
 APP_HEALTH_URL := $(APP_URL)/api/health
 REDIS_INSIGHT_URL := http://localhost:8001
 
-.PHONY: help up dev demo flush down demo-down demo-logs clean
+.PHONY: help up dev demo flush down demo-down demo-logs clean test-e2e
 
 help: ## Show all available workshop commands
 	@echo "\033[1;36m>>> help\033[0m"
@@ -79,3 +79,7 @@ clean: ## Clean Docker containers/volumes and Java build outputs
 	@printf "$(YELLOW)→ Removing Maven build outputs...$(RESET)\n"
 	@./mvnw clean
 	@printf "$(GREEN)Cleanup complete.$(RESET)\n"
+
+test-e2e: ## Run the JSON smoke suite against a live workshop app
+	@echo "\033[1;36m>>> test-e2e\033[0m"
+	@APP_URL=$(APP_URL) bash scripts/smoke-test.sh
