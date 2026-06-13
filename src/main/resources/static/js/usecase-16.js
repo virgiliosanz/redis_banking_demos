@@ -125,7 +125,7 @@
     function renderPipeline(pipeline) {
         if (!pipelineEl) return;
         if (!Array.isArray(pipeline) || !pipeline.length) {
-            pipelineEl.innerHTML = '<div class="uc16-empty">No pipeline data.</div>';
+            window.renderAnimatedHtml(pipelineEl, '<div class="uc16-empty">No pipeline data.</div>', { containerClasses: 'fade-in' });
             return;
         }
 
@@ -141,11 +141,16 @@
                 + '</div>';
         });
 
-        pipelineEl.innerHTML = stagesHtml
+        window.renderAnimatedHtml(pipelineEl, stagesHtml
             + '<details class="uc16-pipeline-detail" open>'
             + '<summary>Step details</summary>'
             + '<div class="uc16-pipeline-detail-list">' + detailHtml + '</div>'
-            + '</details>';
+            + '</details>', {
+            containerClasses: 'fade-in',
+            childSelector: '.uc16-stage',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 25
+        });
     }
 
     function resetView() {
@@ -170,7 +175,7 @@
     function renderStats(data) {
         var models = (data && data.models) || [];
         if (!models.length) {
-            statsGrid.innerHTML = '<div class="uc16-empty">No stats yet. Send a query to populate the dashboard.</div>';
+            window.renderAnimatedHtml(statsGrid, '<div class="uc16-empty">No stats yet. Send a query to populate the dashboard.</div>', { containerClasses: 'fade-in' });
             return;
         }
 
@@ -187,13 +192,18 @@
             html += '<div class="data-row"><span class="data-label">Cached entries</span><span class="data-value">' + escapeHtml(model.cachedEntries) + '</span></div>';
             html += '</div>';
         });
-        statsGrid.innerHTML = html;
+        window.renderAnimatedHtml(statsGrid, html, {
+            containerClasses: 'fade-in',
+            childSelector: '.uc16-stat-card',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 25
+        });
     }
 
     function renderLog(data) {
         var entries = (data && data.entries) || [];
         if (!entries.length) {
-            logList.innerHTML = '<div class="uc16-empty">No gateway requests yet.</div>';
+            window.renderAnimatedHtml(logList, '<div class="uc16-empty">No gateway requests yet.</div>', { containerClasses: 'fade-in' });
             return;
         }
 
@@ -220,15 +230,20 @@
             }
             html += '</div>';
         });
-        logList.innerHTML = html;
+        window.renderAnimatedHtml(logList, html, {
+            containerClasses: 'fade-in',
+            childSelector: '.uc16-log-item',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 20
+        });
     }
 
     function refreshStatsPanel() {
-        return window.workshopGet('/api/gateway/stats').then(renderStats);
+        return window.workshopGet('/api/gateway/stats', 'sendBtn').then(renderStats);
     }
 
     function refreshLogPanel() {
-        return window.workshopGet('/api/gateway/log?limit=10').then(renderLog);
+        return window.workshopGet('/api/gateway/log?limit=10', 'sendBtn').then(renderLog);
     }
 
     function refreshDashboard() {
@@ -266,20 +281,24 @@
             setResultBadge('LLM unavailable', 'expired');
             resultMeta.textContent = 'Gateway completed the Redis pipeline but could not call OpenAI.';
             showGatewayError(data.message || 'LLM not configured — set OPENAI_API_KEY');
+            window.showToast(data.message || 'LLM not configured — set OPENAI_API_KEY', 'warning');
         } else if (blocked) {
             setResultBadge('Blocked', 'expired');
             resultMeta.textContent = rateLimited
                 ? (data.model || 'Provider') + ' budget exhausted before model execution.'
                 : 'Gateway stopped at the ' + stageLabel((data.pipeline && data.pipeline[data.pipeline.length - 1] && data.pipeline[data.pipeline.length - 1].stage) || 'topic').toLowerCase() + ' step.';
             hideGatewayError();
+            window.showToast('Gateway blocked the request before model execution.', 'warning');
         } else if (cacheHit) {
             setResultBadge('Cache hit', 'active');
             resultMeta.textContent = 'Response served from semantic cache for the selected model.';
             hideGatewayError();
+            window.showToast('Gateway served the response from semantic cache.', 'info');
         } else {
             setResultBadge('Routed live', 'active');
             resultMeta.textContent = 'Gateway called ' + (data.model || 'the selected model') + ' and cached the result.';
             hideGatewayError();
+            window.showToast('Gateway routed the request live and cached the result.', 'success');
         }
 
         responseOutput.textContent = llmUnavailable
@@ -303,6 +322,8 @@
         } else {
             setGatewayBadge('AI: OpenAI live', 'on');
         }
+        window.animateResult(responseOutput, 'fade-in slide-up');
+        window.animateResult(resultBadge, blocked || llmUnavailable ? 'highlight-new' : 'fade-in');
     }
 
     function runQuery(prompt) {
@@ -321,16 +342,17 @@
             query: query,
             userId: userId,
             sessionId: sessionId
-        }).then(function (data) {
+        }, 'sendBtn').then(function (data) {
             data = data || {};
             renderResult(data);
             return data.blocked ? refreshLogPanel() : refreshDashboard();
-        }).catch(function () {
+        }).catch(function (err) {
             setResultBadge('Error', 'expired');
             resultMeta.textContent = 'Gateway request failed.';
             responseOutput.textContent = 'Could not reach /api/gateway/query. Verify the app and Redis are running.';
             setGatewayBadge('AI: unavailable', 'mock');
             showGatewayError('LLM request failed. Check OPENAI_API_KEY and server connectivity.');
+            window.showToast((err && err.message) || 'Gateway request failed.', 'error');
         }).finally(function () {
             sendBtn.disabled = false;
             sendBtn.textContent = 'Send through gateway';
@@ -341,13 +363,16 @@
     function resetGateway() {
         resetBtn.disabled = true;
         resetBtn.textContent = 'Resetting…';
-        window.workshopFetch('/api/gateway/reset', {}).then(function () {
+        window.workshopFetch('/api/gateway/reset', {}, 'sendBtn').then(function () {
             sessionId = 'gw-' + Math.random().toString(36).substring(2, 10);
             if (sessionIdValue) sessionIdValue.textContent = sessionId;
             if (queryInput) queryInput.value = '';
             setGatewayBadge('AI: checking…', 'mock');
             resetView();
+            window.showToast('Gateway demo reset.', 'success');
             return refreshDashboard();
+        }).catch(function (err) {
+            window.showToast((err && err.message) || 'Could not reset the gateway demo.', 'error');
         }).finally(function () {
             resetBtn.disabled = false;
             resetBtn.textContent = 'Reset demo';
@@ -374,5 +399,6 @@
     refreshDashboard().catch(function () {
         statsGrid.innerHTML = '<div class="uc16-empty">Could not load gateway stats.</div>';
         logList.innerHTML = '<div class="uc16-empty">Could not load the gateway request log.</div>';
+        window.showToast('Could not load gateway dashboard panels.', 'warning');
     });
 })();

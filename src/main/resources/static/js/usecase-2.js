@@ -64,6 +64,9 @@
         tokenRows += buildRow('Key', data.tokenKey);
         tokenRows += buildRow('Token', data.token);
         tokenData.innerHTML = tokenRows;
+        window.animateResult(sessionSection, 'fade-in');
+        window.animateChildren(sessionData, '.data-row', 'slide-up highlight-new', 35);
+        window.animateChildren(tokenData, '.data-row', 'slide-up highlight-new', 35);
 
         currentUser = data.username;
         currentToken = data.token;
@@ -122,15 +125,17 @@
         loginBtn.textContent = 'Authenticating...';
         loginError.style.display = 'none';
 
-        window.workshopFetch('/api/session/login', { username: username, password: password })
+        window.workshopFetch('/api/session/login', { username: username, password: password }, 'loginBtn')
             .then(function (data) {
                 loginBtn.disabled = false;
                 loginBtn.textContent = 'Login';
                 if (data.error) {
                     loginError.textContent = data.error;
                     loginError.style.display = '';
+                    window.showToast(data.error, 'error');
                 } else {
                     showSession(data);
+                    window.showToast('Session created for ' + username + '.', 'success');
                 }
             })
             .catch(function () {
@@ -138,6 +143,7 @@
                 loginBtn.textContent = 'Login';
                 loginError.textContent = 'Network error — is the server running?';
                 loginError.style.display = '';
+                window.showToast('Network error — is the server running?', 'error');
             });
     });
 
@@ -153,12 +159,13 @@
     logoutBtn.addEventListener('click', function () {
         if (!currentUser) return;
 
-        window.workshopFetch('/api/session/logout', { username: currentUser })
+        window.workshopFetch('/api/session/logout', { username: currentUser }, 'loginBtn')
             .then(function () {
                 stopTtlCountdown();
                 currentUser = null;
                 currentToken = null;
                 showLogin();
+                window.showToast('Session cleared from Redis.', 'info');
             });
     });
 })();

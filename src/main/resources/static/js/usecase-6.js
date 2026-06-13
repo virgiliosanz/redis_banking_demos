@@ -54,11 +54,8 @@
                 });
             }
             riskFactorsEl.innerHTML = factorsHtml;
-
-            // Animate
-            riskDisplay.classList.remove('result-animate');
-            void riskDisplay.offsetWidth;
-            riskDisplay.classList.add('result-animate');
+            window.animateResult(riskDisplay, 'fade-in slide-up');
+            window.animateChildren(riskFactorsEl, '.fraud-factor', 'slide-up highlight-new', 30);
         }
 
         function escapeHtml(str) {
@@ -70,6 +67,7 @@
         function renderStream(entries) {
             if (!entries || entries.length === 0) {
                 txStream.innerHTML = '<p class="placeholder-text">No evaluations yet. Submit a transaction above.</p>';
+                window.animateResult(txStream, 'fade-in');
                 return;
             }
             var html = '<table class="log-table"><thead><tr>' +
@@ -91,14 +89,25 @@
                     '<td>' + ts + '</td></tr>';
             });
             html += '</tbody></table>';
-            txStream.innerHTML = html;
+            window.renderAnimatedHtml(txStream, html, {
+                containerClasses: 'fade-in',
+                childSelector: 'tbody tr',
+                childClasses: 'slide-up highlight-new',
+                staggerMs: 30
+            });
         }
 
         function submitEvaluation(data) {
             evaluateBtn.disabled = true;
-            return workshopFetch('/api/fraud/evaluate', data)
+            return workshopFetch('/api/fraud/evaluate', data, 'evaluateBtn')
                 .then(function (result) {
                     showRisk(result);
+                    window.showToast(
+                        (result.riskLevel === 'HIGH' || result.riskLevel === 'CRITICAL')
+                            ? ('Risk evaluation flagged ' + result.riskLevel + ' activity.')
+                            : ('Risk evaluation completed: ' + result.riskLevel + ' risk.'),
+                        (result.riskLevel === 'HIGH' || result.riskLevel === 'CRITICAL') ? 'warning' : 'success'
+                    );
                     return refreshStream();
                 })
                 .catch(function (err) {
@@ -106,6 +115,7 @@
                     riskScoreEl.textContent = '?';
                     riskLevelEl.textContent = 'ERROR';
                     riskFactorsEl.textContent = err.message;
+                    window.showToast(err.message || 'Fraud evaluation failed.', 'error');
                 })
                 .finally(function () {
                     evaluateBtn.disabled = false;
@@ -113,7 +123,7 @@
         }
 
         function refreshStream() {
-            return workshopGet('/api/fraud/stream?count=20').then(renderStream);
+            return workshopGet('/api/fraud/stream?count=20', 'evaluateBtn').then(renderStream);
         }
 
         // Evaluate button
@@ -138,14 +148,18 @@
             chain.finally(function () {
                 burstBtn.disabled = false;
                 burstBtn.textContent = 'Rapid-fire (5 txs)';
+                window.showToast('Rapid-fire fraud simulation completed.', 'info');
             });
         });
 
         // Reset
         resetBtn.addEventListener('click', function () {
-            workshopFetch('/api/fraud/reset', {}).then(function () {
+            workshopFetch('/api/fraud/reset', {}, 'evaluateBtn').then(function () {
                 riskDisplay.style.display = 'none';
-                refreshStream();
+                window.showToast('Fraud demo reset.', 'success');
+                return refreshStream();
+            }).catch(function (err) {
+                window.showToast((err && err.message) || 'Could not reset the fraud demo.', 'error');
             });
         });
 

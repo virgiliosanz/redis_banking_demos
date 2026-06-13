@@ -157,11 +157,22 @@
         btnSearch.textContent = 'Searching...';
 
         fetch(url)
-            .then(function (r) { return r.json(); })
+            .then(function (response) {
+                window.showLatencyBadge('btnSearch', window.extractLatency(response));
+                return window.parseJsonResponse(response);
+            })
             .then(function (data) {
                 renderResults(data);
+                window.showToast(
+                    (data.results || []).length
+                        ? ('Found ' + (data.results || []).length + ' location(s) within ' + radius + ' km.')
+                        : 'No locations matched the current geo filters.',
+                    (data.results || []).length ? 'success' : 'warning'
+                );
             })
-            .catch(function (err) { console.error(err); })
+            .catch(function (err) {
+                window.showToast((err && err.message) || 'Geo search failed.', 'error');
+            })
             .finally(function () {
                 btnSearch.disabled = false;
                 btnSearch.textContent = 'Search';
@@ -176,10 +187,12 @@
         // Show command
         commandBox.style.display = 'block';
         commandText.textContent = data.command || '';
+        window.animateResult(commandBox, 'fade-in');
 
         // Show latency
         latencyBadge.style.display = 'inline';
         latencyBadge.textContent = data.latencyMs + ' ms';
+        window.animateResult(latencyBadge, 'fade-in');
 
         var items = data.results || [];
         resultsCount.textContent = items.length;
@@ -222,7 +235,12 @@
                 '</div>';
         });
 
-        resultsList.innerHTML = html || '<div class="geo-no-results">No results found. Try increasing the radius.</div>';
+        window.renderAnimatedHtml(resultsList, html || '<div class="geo-no-results">No results found. Try increasing the radius.</div>', {
+            containerClasses: 'fade-in',
+            childSelector: '.geo-result-item',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 35
+        });
 
         // Fit map bounds
         if (items.length > 0) {

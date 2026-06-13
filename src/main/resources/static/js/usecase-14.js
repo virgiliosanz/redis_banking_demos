@@ -36,6 +36,7 @@
     var assembledBody = document.getElementById('assembled-body');
     var latencyDisplay = document.getElementById('latency-display');
     var tracesBody = document.getElementById('traces-body');
+    var LATENCY_CONTAINER_ID = 'sendBtn';
 
     if (amsSession) amsSession.textContent = SESSION_ID;
 
@@ -55,14 +56,12 @@
         el.classList.add(state);
     }
 
-    function fetchJson(url, opts) {
+    function fetchJson(url, opts, containerId) {
         opts = opts || {};
         opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
-        return fetch(url, opts).then(function (r) {
-            return r.json().then(function (body) {
-                if (!r.ok) throw Object.assign(new Error(body.error || r.statusText), { body: body, status: r.status });
-                return body;
-            });
+        return fetch(url, opts).then(function (response) {
+            window.showLatencyBadge(containerId || LATENCY_CONTAINER_ID, window.extractLatency(response));
+            return window.parseJsonResponse(response);
         });
     }
 
@@ -73,6 +72,7 @@
         div.className = 'uc14-msg uc14-msg-' + role;
         div.innerHTML = escapeHtml(content).replace(/\n/g, '<br/>');
         chatMessages.appendChild(div);
+        window.animateResult(div, 'fade-in slide-up');
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
@@ -80,6 +80,7 @@
     function renderWorkingMemory(wm) {
         if (!wm || !wm.messages || !wm.messages.length) {
             wmBody.textContent = 'No chat turns yet.';
+            window.animateResult(wmBody, 'fade-in');
             return;
         }
         var html = '';
@@ -87,13 +88,19 @@
             html += '<div class="uc14-wm-item"><span class="uc14-role-pill uc14-role-' + escapeHtml(m.role) + '">'
                 + escapeHtml(m.role) + '</span>' + escapeHtml(m.content) + '</div>';
         });
-        wmBody.innerHTML = html;
+        window.renderAnimatedHtml(wmBody, html, {
+            containerClasses: 'fade-in',
+            childSelector: '.uc14-wm-item',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 25
+        });
     }
 
     function renderLongTerm(ctx) {
         var memories = (ctx && ctx.long_term_memories) || [];
         if (!memories.length) {
             ltBody.textContent = 'No long-term memories retrieved for this query.';
+            window.animateResult(ltBody, 'fade-in');
             return;
         }
         var html = '';
@@ -108,12 +115,18 @@
                 + (topics ? '<div style="font-size:0.7rem; color:var(--text-muted); margin-top:4px;">' + escapeHtml(topics) + '</div>' : '')
                 + '</div>';
         });
-        ltBody.innerHTML = html;
+        window.renderAnimatedHtml(ltBody, html, {
+            containerClasses: 'fade-in',
+            childSelector: '.uc14-lt-item',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 25
+        });
     }
 
     function renderAssembled(messages) {
         if (!messages || !messages.length) {
             assembledBody.textContent = 'No prompt assembled yet.';
+            window.animateResult(assembledBody, 'fade-in');
             return;
         }
         var html = '';
@@ -121,12 +134,18 @@
             html += '<div class="uc14-assembled-item"><span class="uc14-role-pill uc14-role-' + escapeHtml(m.role) + '">'
                 + escapeHtml(m.role) + '</span>' + escapeHtml(m.content) + '</div>';
         });
-        assembledBody.innerHTML = html;
+        window.renderAnimatedHtml(assembledBody, html, {
+            containerClasses: 'fade-in',
+            childSelector: '.uc14-assembled-item',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 25
+        });
     }
 
     function renderTraces(entries) {
         if (!entries || !entries.length) {
             tracesBody.textContent = 'No traces yet. Run Seed or send a chat message.';
+            window.animateResult(tracesBody, 'fade-in');
             return;
         }
         var html = '';
@@ -144,12 +163,17 @@
                 + '<pre>' + escapeHtml(JSON.stringify(body, null, 2)) + '</pre>'
                 + '</details>';
         });
-        tracesBody.innerHTML = html;
+        window.renderAnimatedHtml(tracesBody, html, {
+            containerClasses: 'fade-in',
+            childSelector: '.uc14-trace',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 20
+        });
     }
 
     // --- API actions ---
     function refreshTraces() {
-        return fetchJson('/api/ams/traces?limit=20')
+        return fetchJson('/api/ams/traces?limit=20', null, LATENCY_CONTAINER_ID)
             .then(function (data) { renderTraces(data.traces || []); })
             .catch(function (e) {
                 window.showToast((e && e.message) || 'Could not refresh AMS traces.', 'warning');
@@ -157,7 +181,7 @@
     }
 
     function loadStatus() {
-        return fetchJson('/api/ams/status').then(function (data) {
+        return fetchJson('/api/ams/status', null, LATENCY_CONTAINER_ID).then(function (data) {
             if (amsBaseUrl) amsBaseUrl.textContent = data.baseUrl || '—';
             if (amsMcpUrl) amsMcpUrl.textContent = data.mcpUrl || '—';
             if (amsNamespace) amsNamespace.textContent = data.namespace || '—';
@@ -176,7 +200,7 @@
         return fetchJson('/api/ams/seed', {
             method: 'POST',
             body: JSON.stringify({ sessionId: SESSION_ID, userId: USER_ID })
-        }).then(function (data) {
+        }, 'sendBtn').then(function (data) {
             if (amsSeedCount) amsSeedCount.textContent = (data.seededMemoryIds || []).length;
             addMessage('assistant', 'Demo memories seeded. Ask a question about the customer.');
             window.showToast('Demo memories seeded for AMS.', 'success');
@@ -192,7 +216,7 @@
         return fetchJson('/api/ams/reset', {
             method: 'POST',
             body: JSON.stringify({ sessionId: SESSION_ID, userId: USER_ID })
-        }).then(function () {
+        }, 'sendBtn').then(function () {
             chatMessages.innerHTML = '<div class="chat-welcome">Session reset. Seed again to start fresh.</div>';
             renderWorkingMemory(null);
             renderLongTerm(null);
@@ -214,7 +238,7 @@
         return fetchJson('/api/ams/chat', {
             method: 'POST',
             body: JSON.stringify({ sessionId: SESSION_ID, userId: USER_ID, message: message })
-        }).then(function (data) {
+        }, 'sendBtn').then(function (data) {
             var llmUnavailable = data.error === 'LLM not configured' || data.openaiConfigured === false;
             addMessage('assistant', llmUnavailable
                 ? (data.message || 'LLM not configured — set OPENAI_API_KEY')

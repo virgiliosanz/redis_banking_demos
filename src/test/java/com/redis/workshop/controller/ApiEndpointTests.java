@@ -393,6 +393,7 @@ class ApiEndpointTests {
                 .andExpect(content().string(Matchers.containsString("UC17")))
                 .andExpect(content().string(Matchers.containsString("AI Agent Coordination")))
                 .andExpect(content().string(Matchers.containsString("/usecase/17")))
+                .andExpect(content().string(Matchers.not(Matchers.containsString("id=\"resetAllBtn\""))))
                 .andReturn();
 
         String homeHtml = homeResult.getResponse().getContentAsString();
@@ -402,7 +403,10 @@ class ApiEndpointTests {
         for (int id = 1; id <= 17; id++) {
             mockMvc.perform(get("/usecase/" + id))
                     .andExpect(status().isOk())
-                    .andExpect(content().string(Matchers.containsString("/guide#uc" + id)));
+                    .andExpect(content().string(Matchers.containsString("/guide#uc" + id)))
+                    .andExpect(content().string(Matchers.containsString("id=\"resetAllBtn\"")))
+                    .andExpect(content().string(Matchers.containsString("id=\"resetAllModal\"")))
+                    .andExpect(content().string(Matchers.containsString("This will reset all demo data. Continue?")));
         }
 
         MvcResult guideResult = mockMvc.perform(get("/guide"))

@@ -20,6 +20,7 @@
 
     var pollInterval = null;
     var simulating = false;
+    var metricsWarningShown = false;
 
     // --- Code tabs ---
     window.initCodeTabs();
@@ -132,12 +133,21 @@
     }
 
     // --- Metrics update ---
+    function updateMetric(el, nextValue) {
+        if (!el) return;
+        var next = String(nextValue);
+        if (el.textContent !== next) {
+            el.textContent = next;
+            window.animateResult(el.parentElement || el, 'highlight-new');
+        }
+    }
+
     function updateMetrics(data) {
-        metricTps.textContent = (data.tps || 0).toFixed(1);
-        metricTotal.textContent = data.totalCount || 0;
-        metricAvgAmt.textContent = '€' + (data.avgAmount || 0).toFixed(0);
-        metricMaxAmt.textContent = '€' + (data.maxAmount || 0).toFixed(0);
-        metricRisk.textContent = (data.highRiskPct || 0).toFixed(1) + '%';
+        updateMetric(metricTps, (data.tps || 0).toFixed(1));
+        updateMetric(metricTotal, data.totalCount || 0);
+        updateMetric(metricAvgAmt, '€' + (data.avgAmount || 0).toFixed(0));
+        updateMetric(metricMaxAmt, '€' + (data.maxAmount || 0).toFixed(0));
+        updateMetric(metricRisk, (data.highRiskPct || 0).toFixed(1) + '%');
     }
 
     // --- Highlight risk card on anomaly ---
@@ -146,6 +156,7 @@
         if (pct > 30) {
             card.style.borderColor = '#FF4438';
             card.style.background = 'rgba(255, 68, 56, 0.08)';
+            window.animateResult(card, 'highlight-new');
         } else {
             card.style.borderColor = '';
             card.style.background = '';
@@ -154,9 +165,12 @@
 
     // --- Poll metrics ---
     function fetchMetrics() {
-        fetch('/api/transactions/metrics')
-            .then(function (r) { return r.json(); })
+        window.workshopGet('/api/transactions/metrics', 'btnStart')
             .then(function (data) {
+                if (metricsWarningShown) {
+                    metricsWarningShown = false;
+                    window.showToast('Transaction metrics stream reconnected.', 'success', 2500);
+                }
                 updateMetrics(data);
                 highlightRisk(data.highRiskPct || 0);
                 drawChart(chartCount, data.countSeries || [], 'TPS', '#FF4438', '');
@@ -167,7 +181,12 @@
                     updateButtons();
                 }
             })
-            .catch(function () { /* ignore fetch errors */ });
+            .catch(function () {
+                if (!metricsWarningShown) {
+                    metricsWarningShown = true;
+                    window.showToast('Could not refresh transaction metrics. Retrying…', 'warning');
+                }
+            });
     }
 
     function startPolling() {
@@ -191,43 +210,51 @@
 
     // --- Event handlers ---
     btnStart.addEventListener('click', function () {
-        fetch('/api/transactions/simulate/start', { method: 'POST' })
-            .then(function (r) { return r.json(); })
+        window.workshopFetch('/api/transactions/simulate/start', {}, 'btnStart')
             .then(function () {
                 simulating = true;
                 updateButtons();
                 startPolling();
+                window.showToast('Transaction simulator started.', 'success');
+            }).catch(function (err) {
+                window.showToast((err && err.message) || 'Could not start the transaction simulator.', 'error');
             });
     });
 
     btnStop.addEventListener('click', function () {
-        fetch('/api/transactions/simulate/stop', { method: 'POST' })
-            .then(function (r) { return r.json(); })
+        window.workshopFetch('/api/transactions/simulate/stop', {}, 'btnStart')
             .then(function () {
                 simulating = false;
                 updateButtons();
                 // Keep polling briefly to show final state
                 setTimeout(stopPolling, 3000);
+                window.showToast('Transaction simulator stopped.', 'info');
+            }).catch(function (err) {
+                window.showToast((err && err.message) || 'Could not stop the simulator.', 'error');
             });
     });
 
     btnAnomaly.addEventListener('click', function () {
-        fetch('/api/transactions/simulate/anomaly', { method: 'POST' })
-            .then(function (r) { return r.json(); })
+        window.workshopFetch('/api/transactions/simulate/anomaly', {}, 'btnStart')
             .then(function () {
                 // Ensure polling is active to see the spike
                 if (!pollInterval) startPolling();
+                window.showToast('Injected an anomaly into the live stream.', 'warning');
+            }).catch(function (err) {
+                window.showToast((err && err.message) || 'Could not inject an anomaly.', 'error');
             });
     });
 
     btnReset.addEventListener('click', function () {
-        fetch('/api/transactions/reset', { method: 'POST' })
-            .then(function (r) { return r.json(); })
+        window.workshopFetch('/api/transactions/reset', {}, 'btnStart')
             .then(function () {
                 simulating = false;
                 updateButtons();
                 stopPolling();
                 fetchMetrics();
+                window.showToast('Transaction monitoring demo reset.', 'success');
+            }).catch(function (err) {
+                window.showToast((err && err.message) || 'Could not reset transaction monitoring.', 'error');
             });
     });
 
@@ -241,8 +268,7 @@
     // --- Initial state ---
     fetchMetrics();
     // Check if simulation is already running
-    fetch('/api/transactions/metrics')
-        .then(function (r) { return r.json(); })
+    window.workshopGet('/api/transactions/metrics', 'btnStart')
         .then(function (data) {
             if (data.simulating) {
                 simulating = true;

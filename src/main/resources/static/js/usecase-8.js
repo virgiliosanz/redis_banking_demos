@@ -20,7 +20,7 @@
     (function updateAiBadge() {
         var badge = document.getElementById('ai-badge');
         if (!badge) return;
-        window.workshopGet('/api/health').then(function (data) {
+        window.workshopGet('/api/health', 'tab-crud-btn').then(function (data) {
             var configured = !!(data && data.openai && data.openai.configured);
             badge.classList.remove('on', 'mock');
             if (configured) {
@@ -70,24 +70,24 @@
         readDocBtn.disabled = true;
         readDocBtn.textContent = 'Reading...';
 
-        window.workshopGet('/api/docs/' + encodeURIComponent(id)).then(function (data) {
+        window.workshopGet('/api/docs/' + encodeURIComponent(id), 'tab-crud-btn').then(function (data) {
             readDocBtn.disabled = false;
             readDocBtn.textContent = 'Read';
             showCmd('read-cmd', 'read-cmd-output', data.redisCommand);
             var container = document.getElementById('read-result');
             if (data.status === 'NOT_FOUND') {
-                container.innerHTML = '<div class="data-card"><p style="color:var(--text-muted);">Document not found.</p></div>';
+                renderAnimatedCards(container, '<div class="data-card"><p style="color:var(--text-muted);">Document not found.</p></div>');
                 window.showToast('Document not found.', 'warning');
                 return;
             }
             var doc = data.document;
             try { doc = JSON.parse(doc); if (Array.isArray(doc)) doc = doc[0]; } catch(e) {}
-            container.innerHTML = '<div class="data-card"><pre style="font-size:0.78rem; margin:0; white-space:pre-wrap; color:var(--text-secondary); font-family:var(--font-code); max-height:300px; overflow:auto;">' + escapeHtml(JSON.stringify(doc, null, 2)) + '</pre></div>';
+            renderAnimatedCards(container, '<div class="data-card"><pre style="font-size:0.78rem; margin:0; white-space:pre-wrap; color:var(--text-secondary); font-family:var(--font-code); max-height:300px; overflow:auto;">' + escapeHtml(JSON.stringify(doc, null, 2)) + '</pre></div>');
             window.showToast('Document loaded from Redis JSON.', 'success');
         }).catch(function () {
             readDocBtn.disabled = false;
             readDocBtn.textContent = 'Read';
-            document.getElementById('read-result').innerHTML = '<p style="color:var(--redis-primary);">Failed to read document.</p>';
+            window.renderAnimatedHtml(document.getElementById('read-result'), '<p style="color:var(--redis-primary);">Failed to read document.</p>', { containerClasses: 'fade-in highlight-new' });
             window.showToast('Failed to read the document.', 'error');
         });
     });
@@ -100,24 +100,24 @@
         readFieldBtn.disabled = true;
         readFieldBtn.textContent = 'Reading...';
 
-        window.workshopGet('/api/docs/' + encodeURIComponent(id) + '/' + encodeURIComponent(path)).then(function (data) {
+        window.workshopGet('/api/docs/' + encodeURIComponent(id) + '/' + encodeURIComponent(path), 'tab-crud-btn').then(function (data) {
             readFieldBtn.disabled = false;
             readFieldBtn.textContent = 'Read Field';
             showCmd('field-cmd', 'field-cmd-output', data.redisCommand);
             var container = document.getElementById('field-result');
             if (data.status === 'NOT_FOUND') {
-                container.innerHTML = '<div class="data-card"><p style="color:var(--text-muted);">Field not found.</p></div>';
+                renderAnimatedCards(container, '<div class="data-card"><p style="color:var(--text-muted);">Field not found.</p></div>');
                 window.showToast('Field not found in the selected document.', 'warning');
                 return;
             }
             var val = data.value;
             try { val = JSON.parse(val); } catch(e) {}
-            container.innerHTML = '<div class="data-card"><div style="font-family:var(--font-code); font-size:0.85rem; color:var(--text-secondary); word-break:break-word;">' + escapeHtml(typeof val === 'string' ? val : JSON.stringify(val, null, 2)) + '</div></div>';
+            renderAnimatedCards(container, '<div class="data-card"><div style="font-family:var(--font-code); font-size:0.85rem; color:var(--text-secondary); word-break:break-word;">' + escapeHtml(typeof val === 'string' ? val : JSON.stringify(val, null, 2)) + '</div></div>');
             window.showToast('Field loaded successfully.', 'success');
         }).catch(function () {
             readFieldBtn.disabled = false;
             readFieldBtn.textContent = 'Read Field';
-            document.getElementById('field-result').innerHTML = '<p style="color:var(--redis-primary);">Failed to read field.</p>';
+            window.renderAnimatedHtml(document.getElementById('field-result'), '<p style="color:var(--redis-primary);">Failed to read field.</p>', { containerClasses: 'fade-in highlight-new' });
             window.showToast('Failed to read the requested field.', 'error');
         });
     });
@@ -139,17 +139,17 @@
             content: document.getElementById('createSummary').value.trim()
         };
 
-        window.workshopFetch('/api/docs', body).then(function (data) {
+        window.workshopFetch('/api/docs', body, 'tab-crud-btn').then(function (data) {
             createDocBtn.disabled = false;
             createDocBtn.textContent = 'Create Document';
             showCmd('create-cmd', 'create-cmd-output', data.redisCommand);
             var container = document.getElementById('create-result');
             var doc = data.document || {};
-            container.innerHTML = '<div class="data-card" style="border-left:3px solid #0a7e3e;">' +
+            renderAnimatedCards(container, '<div class="data-card" style="border-left:3px solid #0a7e3e;">' +
                 '<div style="color:#0a7e3e; font-weight:700; margin-bottom:8px;">Document Created</div>' +
                 '<div style="font-family:var(--font-code); font-size:0.78rem; color:var(--text-muted); margin-bottom:4px;">Key: ' + escapeHtml(data.key || '') + '</div>' +
                 '<div style="font-family:var(--font-code); font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">ID: ' + escapeHtml(data.id || '') + '</div>' +
-                '<pre style="font-size:0.75rem; margin:0; white-space:pre-wrap; color:var(--text-secondary); font-family:var(--font-code);">' + escapeHtml(JSON.stringify(doc, null, 2)) + '</pre></div>';
+                '<pre style="font-size:0.75rem; margin:0; white-space:pre-wrap; color:var(--text-secondary); font-family:var(--font-code);">' + escapeHtml(JSON.stringify(doc, null, 2)) + '</pre></div>');
             // Clear form
             document.getElementById('createTitle').value = '';
             document.getElementById('createSummary').value = '';
@@ -158,7 +158,7 @@
         }).catch(function () {
             createDocBtn.disabled = false;
             createDocBtn.textContent = 'Create Document';
-            document.getElementById('create-result').innerHTML = '<p style="color:var(--redis-primary);">Failed to create document.</p>';
+            window.renderAnimatedHtml(document.getElementById('create-result'), '<p style="color:var(--redis-primary);">Failed to create document.</p>', { containerClasses: 'fade-in highlight-new' });
             window.showToast('Failed to create the document.', 'error');
         });
     });
@@ -186,23 +186,23 @@
     function doQuery(field, value) {
         queryBtn.disabled = true;
         queryBtn.textContent = 'Querying...';
-        window.workshopGet('/api/docs/query?field=' + encodeURIComponent(field) + '&value=' + encodeURIComponent(value)).then(function (data) {
+        window.workshopGet('/api/docs/query?field=' + encodeURIComponent(field) + '&value=' + encodeURIComponent(value), 'tab-crud-btn').then(function (data) {
             queryBtn.disabled = false;
             queryBtn.textContent = 'Query';
             showCmd('query-cmd', 'query-cmd-output', data.redisCommand);
             var container = document.getElementById('query-result');
             var results = data.results || [];
             if (results.length === 0) {
-                container.innerHTML = '<div class="data-card" style="text-align:center; padding:16px;"><p style="color:var(--text-muted);">No documents found for ' + escapeHtml(data.query || '') + '</p></div>';
+                renderAnimatedCards(container, '<div class="data-card" style="text-align:center; padding:16px;"><p style="color:var(--text-muted);">No documents found for ' + escapeHtml(data.query || '') + '</p></div>');
                 window.showToast('No documents matched the field query.', 'warning');
                 return;
             }
-            container.innerHTML = '<div style="font-family:var(--font-code); font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">Found ' + results.length + ' document(s)</div>' + renderDocCards(results);
+            renderAnimatedCards(container, '<div style="font-family:var(--font-code); font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;">Found ' + results.length + ' document(s)</div>' + renderDocCards(results));
             window.showToast('Field query returned ' + results.length + ' document(s).', 'success');
         }).catch(function () {
             queryBtn.disabled = false;
             queryBtn.textContent = 'Query';
-            document.getElementById('query-result').innerHTML = '<p style="color:var(--redis-primary);">Query failed.</p>';
+            window.renderAnimatedHtml(document.getElementById('query-result'), '<p style="color:var(--redis-primary);">Query failed.</p>', { containerClasses: 'fade-in highlight-new' });
             window.showToast('Field query failed.', 'error');
         });
     }
@@ -213,12 +213,22 @@
         var card = document.getElementById(cardId);
         card.style.display = '';
         document.getElementById(outputId).textContent = cmd;
+        window.animateResult(card, 'fade-in');
+    }
+
+    function renderAnimatedCards(container, html, childSelector) {
+        return window.renderAnimatedHtml(container, html, {
+            containerClasses: 'fade-in',
+            childSelector: childSelector || '.data-card',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 35
+        });
     }
 
     function renderDocCards(results) {
         var html = '';
-        results.forEach(function (doc, idx) {
-            html += '<div class="data-card" style="margin-bottom:8px; animation: resultPop 0.3s ease ' + (idx * 0.05) + 's both;">';
+        results.forEach(function (doc) {
+            html += '<div class="data-card" style="margin-bottom:8px;">';
             html += '<div style="font-weight:700; font-size:0.9rem; color:var(--text-primary); margin-bottom:4px;">' + escapeHtml(doc.title || '') + '</div>';
             html += '<div style="display:flex; gap:8px; align-items:center; margin-bottom:4px;">';
             html += '<span class="status-badge" style="font-size:0.7rem;">' + escapeHtml(doc.category || '') + '</span>';
@@ -280,7 +290,7 @@
 
         var url = '/api/docs/search?q=' + encodeURIComponent(query) + '&mode=' + encodeURIComponent(currentMode);
 
-        window.workshopGet(url).then(function (data) {
+        window.workshopGet(url, 'tab-crud-btn').then(function (data) {
             searchBtn.disabled = false;
             searchBtn.textContent = 'Search';
             renderSearchResults(data);
@@ -310,18 +320,19 @@
             warning.style.cssText = 'background:var(--bg-tertiary); border-left:3px solid var(--redis-primary); padding:8px 12px; margin-bottom:12px; font-size:0.8rem; color:var(--text-muted); border-radius:0 5px 5px 0;';
             warning.innerHTML = 'Using mock vectors (no OpenAI API key). Similarity scores are not meaningful — configure <code>OPENAI_API_KEY</code> for real embeddings.';
             resultsContainer.parentNode.insertBefore(warning, resultsContainer);
+            window.animateResult(warning, 'fade-in highlight-new');
         }
 
         var results = data.results || [];
         if (results.length === 0) {
-            resultsContainer.innerHTML = '<div class="data-card" style="text-align:center; padding:32px;"><p style="color:var(--text-muted);">No documents found. Try a different query or search mode.</p></div>';
+            renderAnimatedCards(resultsContainer, '<div class="data-card" style="text-align:center; padding:32px;"><p style="color:var(--text-muted);">No documents found. Try a different query or search mode.</p></div>');
             return;
         }
 
         var html = '';
-        results.forEach(function (doc, idx) {
+        results.forEach(function (doc) {
             var scoreDisplay = formatScore(doc.score, data.mode);
-            html += '<div class="data-card" style="margin-bottom:12px; animation: resultPop 0.3s ease ' + (idx * 0.05) + 's both;">';
+            html += '<div class="data-card" style="margin-bottom:12px;">';
             html += '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">';
             html += '<div style="flex:1;">';
             html += '<div style="font-weight:700; font-size:0.95rem; color:var(--text-primary); margin-bottom:4px;">' + escapeHtml(doc.title || '') + '</div>';
@@ -338,7 +349,7 @@
             html += '<div style="font-size:0.82rem; color:var(--text-secondary); line-height:1.5;">' + escapeHtml(doc.summary || '') + '</div>';
             html += '</div>';
         });
-        resultsContainer.innerHTML = html;
+        renderAnimatedCards(resultsContainer, html);
     }
 
     function getModeLabel(mode) {

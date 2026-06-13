@@ -22,6 +22,103 @@
     // Apply stored/preferred theme immediately
     applyTheme(getPreferredTheme());
 
+    function normalizeToastType(type) {
+        return ['success', 'error', 'warning', 'info'].indexOf(type) !== -1 ? type : 'info';
+    }
+
+    function extractApiMessage(body, fallbackStatusText, status) {
+        if (body && typeof body === 'object') {
+            return body.message || body.error || body.detail || body.details
+                || ('Request failed with HTTP ' + status + '.');
+        }
+        if (typeof body === 'string' && body.trim()) return body.trim();
+        if (fallbackStatusText) return fallbackStatusText;
+        return 'Request failed with HTTP ' + status + '.';
+    }
+
+    function parseJsonResponse(res) {
+        return res.text().then(function (text) {
+            var body = {};
+            if (text) {
+                try {
+                    body = JSON.parse(text);
+                } catch (err) {
+                    body = text;
+                }
+            }
+
+            if (!res.ok) {
+                throw Object.assign(new Error(extractApiMessage(body, res.statusText, res.status)), {
+                    status: res.status,
+                    body: body
+                });
+            }
+
+            return body;
+        });
+    }
+
+    window.parseJsonResponse = parseJsonResponse;
+
+    function dismissToast(toast) {
+        if (!toast || toast.dataset.closing === 'true') return;
+        toast.dataset.closing = 'true';
+        if (toast._toastTimer) {
+            clearTimeout(toast._toastTimer);
+            toast._toastTimer = null;
+        }
+        toast.classList.remove('is-visible');
+        toast.classList.add('is-hiding');
+        setTimeout(function () {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 220);
+    }
+
+    window.showToast = function (message, type, duration) {
+        var container = document.getElementById('toastContainer');
+        if (!container || !message) return;
+
+        var normalizedType = normalizeToastType(type);
+        var toast = document.createElement('div');
+        toast.className = 'toast toast-' + normalizedType;
+        toast.setAttribute('role', normalizedType === 'error' ? 'alert' : 'status');
+
+        var body = document.createElement('div');
+        body.className = 'toast-body';
+
+        var title = document.createElement('div');
+        title.className = 'toast-title';
+        title.textContent = normalizedType;
+
+        var text = document.createElement('div');
+        text.className = 'toast-message';
+        text.textContent = String(message);
+
+        var closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'toast-close';
+        closeBtn.setAttribute('aria-label', 'Dismiss notification');
+        closeBtn.textContent = '×';
+        closeBtn.addEventListener('click', function () { dismissToast(toast); });
+
+        body.appendChild(title);
+        body.appendChild(text);
+        toast.appendChild(body);
+        toast.appendChild(closeBtn);
+        container.appendChild(toast);
+
+        requestAnimationFrame(function () {
+            toast.classList.add('is-visible');
+        });
+
+        var timeoutMs = typeof duration === 'number'
+            ? duration
+            : (normalizedType === 'error' ? 5500 : 4000);
+        if (timeoutMs > 0) {
+            toast._toastTimer = setTimeout(function () { dismissToast(toast); }, timeoutMs);
+        }
+    };
+
     document.addEventListener('DOMContentLoaded', function () {
         const toggle = document.getElementById('themeToggle');
         if (toggle) {
@@ -54,105 +151,190 @@
     // --- Reset All (navbar) ---
     function initResetAll() {
         var btn = document.getElementById('resetAllBtn');
-        if (!btn) return;
+        var modal = document.getElementById('resetAllModal');
+        if (!btn || !modal) return;
         var label = btn.querySelector('.reset-label');
-        var originalLabel = label ? label.textContent : 'Reset All';
+        var originalLabel = label ? label.textContent : 'Reset All Data';
+        var cancelBtn = modal.querySelector('[data-reset-modal-cancel]');
+        var confirmBtn = modal.querySelector('[data-reset-modal-confirm]');
+        var endpoint = btn.getAttribute('data-reset-all-url') || '/api/reset-all';
+        var isOpen = false;
+        var isSubmitting = false;
+        var lastFocused = null;
+
+        function setButtonState(loading) {
+            btn.disabled = loading;
+            btn.classList.toggle('is-loading', loading);
+            if (label) label.textContent = loading ? 'Resetting…' : originalLabel;
+        }
+
+        function closeModal(options) {
+            var config = options || {};
+            if (!isOpen) return;
+
+            modal.classList.remove('is-visible');
+            modal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('modal-open');
+            isOpen = false;
+
+            window.setTimeout(function () {
+                if (!isOpen) modal.hidden = true;
+            }, 180);
+
+            if (config.restoreFocus !== false && lastFocused && typeof lastFocused.focus === 'function') {
+                lastFocused.focus();
+            }
+        }
+
+        function openModal() {
+            if (isSubmitting || isOpen) return;
+
+            lastFocused = document.activeElement;
+            modal.hidden = false;
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('modal-open');
+            isOpen = true;
+
+            window.requestAnimationFrame(function () {
+                modal.classList.add('is-visible');
+                if (confirmBtn) confirmBtn.focus();
+            });
+        }
 
         btn.addEventListener('click', function () {
             if (btn.disabled) return;
-            if (!window.confirm('This will reset all demo data. Continue?')) return;
-
-            btn.disabled = true;
-            btn.classList.add('is-loading');
-            if (label) label.textContent = 'Resetting…';
-
-            fetch('/api/reset-all', {
-                method: 'POST',
-                headers: { 'Accept': 'application/json' }
-            })
-                .then(function (res) {
-                    return res.json().then(function (body) { return { ok: res.ok, body: body }; });
-                })
-                .then(function (result) {
-                    var totalMs = (result.body && result.body.totalMs) || 0;
-                    if (result.ok) {
-                        if (label) label.textContent = 'Reset ✓ ' + totalMs + 'ms';
-                    } else {
-                        if (label) label.textContent = 'Reset failed';
-                        console.error('Reset-all partial/failed', result.body);
-                    }
-                })
-                .catch(function (err) {
-                    if (label) label.textContent = 'Reset failed';
-                    console.error('Reset-all error', err);
-                })
-                .finally(function () {
-                    btn.classList.remove('is-loading');
-                    setTimeout(function () {
-                        btn.disabled = false;
-                        if (label) label.textContent = originalLabel;
-                    }, 2500);
-                });
+            openModal();
         });
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function () {
+                closeModal();
+            });
+        }
+
+        modal.addEventListener('click', function (event) {
+            if (event.target === modal) closeModal();
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && isOpen) {
+                event.preventDefault();
+                closeModal();
+            }
+        });
+
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', function () {
+                var shouldReload = false;
+                if (isSubmitting) return;
+
+                isSubmitting = true;
+                closeModal({ restoreFocus: false });
+                setButtonState(true);
+
+                fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json' }
+                })
+                    .then(parseJsonResponse)
+                    .then(function (body) {
+                        var totalMs = (body && body.totalMs) || 0;
+                        shouldReload = true;
+                        window.showToast('All demo data reset in ' + totalMs + 'ms.', 'success');
+                        window.setTimeout(function () {
+                            window.location.reload();
+                        }, 900);
+                    })
+                    .catch(function (err) {
+                        window.showToast((err && err.message) || 'Could not reset all demo data.', 'error', 6000);
+                    })
+                    .finally(function () {
+                        isSubmitting = false;
+                        if (!shouldReload) {
+                            setButtonState(false);
+                            btn.focus();
+                        }
+                    });
+            });
+        }
     }
 
 
     // --- Redis latency badge ---
-    // Renders a pill in the demo panel header. Green <1ms, yellow 1-10ms, red >10ms.
-    window.renderRedisLatency = function (latencyMs) {
-        if (latencyMs === null || latencyMs === undefined) return;
-        var n = Number(latencyMs);
-        if (!isFinite(n) || n < 0) return;
+    function latencyTone(latencyMs) {
+        if (latencyMs < 1) return 'latency-green';
+        if (latencyMs < 10) return 'latency-yellow';
+        if (latencyMs < 100) return 'latency-orange';
+        return 'latency-red';
+    }
 
-        var panel = document.querySelector('.usecase-panels .demo-panel');
-        if (!panel) return;
+    function formatLatency(latencyMs) {
+        if (latencyMs < 1) return latencyMs.toFixed(2) + 'ms';
+        if (latencyMs < 10) return latencyMs.toFixed(1) + 'ms';
+        return Math.round(latencyMs) + 'ms';
+    }
 
-        var badge = document.getElementById('redis-latency-badge');
-        if (!badge) {
-            badge = document.createElement('span');
-            badge.id = 'redis-latency-badge';
-            badge.className = 'redis-latency-badge';
-            badge.title = 'Server-side Redis operation latency';
-            var h2 = panel.querySelector(':scope > h2');
-            if (h2) h2.appendChild(badge);
-            else panel.insertBefore(badge, panel.firstChild);
+    function findLatencyHeader(panel) {
+        if (!panel) return null;
+        for (var i = 0; i < panel.children.length; i++) {
+            var child = panel.children[i];
+            if (/^H[1-4]$/.test(child.tagName)) return child;
         }
+        return panel.querySelector('h1, h2, h3, h4');
+    }
 
-        var state = n < 1 ? 'ok' : (n <= 10 ? 'warn' : 'slow');
-        badge.className = 'redis-latency-badge ' + state;
-        var display = n < 10 ? n.toFixed(2) : n.toFixed(1);
-        badge.textContent = 'Redis: ' + display + ' ms';
+    window.extractLatency = function (response) {
+        if (!response || !response.headers || !response.headers.get) return null;
+        var raw = response.headers.get('X-Redis-Latency-Ms');
+        if (raw == null || raw === '') return null;
+        var parsed = Number(raw);
+        return isFinite(parsed) && parsed >= 0 ? parsed : null;
     };
 
-    // Auto-tap every /api/** response: the X-Redis-Latency-Ms header is set by
-    // RedisLatencyAdvice on the server, so we can render the pill for any fetch
-    // (raw fetch, workshopFetch, workshopGet) without per-UC changes.
-    var _origFetch = window.fetch.bind(window);
-    window.fetch = function (input, init) {
-        return _origFetch(input, init).then(function (res) {
-            try {
-                var url = typeof input === 'string' ? input : (input && input.url) || '';
-                if (url.indexOf('/api/') !== -1) {
-                    var header = res.headers.get('X-Redis-Latency-Ms');
-                    if (header != null) window.renderRedisLatency(parseFloat(header));
-                }
-            } catch (e) { /* non-fatal */ }
-            return res;
-        });
+    window.showLatencyBadge = function (containerId, latencyMs) {
+        if (latencyMs === null || latencyMs === undefined) return;
+
+        var parsed = Number(latencyMs);
+        if (!isFinite(parsed) || parsed < 0) return;
+
+        var anchor = containerId ? document.getElementById(containerId) : null;
+        var panel = anchor && anchor.closest ? anchor.closest('.demo-panel') : null;
+        if (!panel) panel = document.querySelector('.usecase-panels .demo-panel, .demo-panel');
+        if (!panel) return;
+
+        var header = findLatencyHeader(panel);
+        if (!header) return;
+
+        var badge = header.querySelector('.redis-latency-badge');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'redis-latency-badge';
+            badge.title = 'Server-side Redis latency from X-Redis-Latency-Ms';
+            header.appendChild(badge);
+        }
+
+        badge.className = 'redis-latency-badge ' + latencyTone(parsed);
+        badge.textContent = '⚡ ' + formatLatency(parsed);
     };
 
     // --- Utility: POST JSON ---
-    window.workshopFetch = function (url, data) {
+    window.workshopFetch = function (url, data, containerId) {
         return fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: data ? JSON.stringify(data) : undefined
-        }).then(function (res) { return res.json(); });
+        }).then(function (response) {
+            window.showLatencyBadge(containerId, window.extractLatency(response));
+            return parseJsonResponse(response);
+        });
     };
 
     // --- Utility: GET JSON ---
-    window.workshopGet = function (url) {
-        return fetch(url).then(function (res) { return res.json(); });
+    window.workshopGet = function (url, containerId) {
+        return fetch(url).then(function (response) {
+            window.showLatencyBadge(containerId, window.extractLatency(response));
+            return parseJsonResponse(response);
+        });
     };
 
     // --- Utility: Format JSON for display ---
@@ -183,6 +365,77 @@
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
     }
+
+    function normalizeAnimationClasses(classes, fallback) {
+        var value = classes == null ? fallback : classes;
+        if (Array.isArray(value)) return value.filter(Boolean);
+        return String(value || '')
+            .split(/\s+/)
+            .filter(Boolean);
+    }
+
+    function prefersReducedMotion() {
+        return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    }
+
+    window.animateResult = function (el, classes, delayMs) {
+        if (!el || !el.classList) return el;
+
+        var animationClasses = normalizeAnimationClasses(classes, ['fade-in']);
+        animationClasses.forEach(function (className) {
+            el.classList.remove(className);
+        });
+
+        if (typeof delayMs === 'number' && isFinite(delayMs) && delayMs > 0) {
+            el.style.animationDelay = delayMs + 'ms';
+        } else {
+            el.style.removeProperty('animation-delay');
+        }
+
+        if (prefersReducedMotion()) return el;
+
+        void el.offsetWidth;
+        animationClasses.forEach(function (className) {
+            el.classList.add(className);
+        });
+        return el;
+    };
+
+    window.animateChildren = function (root, selector, classes, staggerMs) {
+        if (!root || !selector) return [];
+        var nodes = Array.prototype.slice.call(root.querySelectorAll(selector));
+        var step = typeof staggerMs === 'number' && isFinite(staggerMs) ? staggerMs : 0;
+        nodes.forEach(function (node, index) {
+            window.animateResult(node, classes || 'slide-up', step > 0 ? index * step : null);
+        });
+        return nodes;
+    };
+
+    window.renderAnimatedHtml = function (target, html, options) {
+        if (!target) return null;
+        var config = options || {};
+        target.innerHTML = html || '';
+        if (config.containerClasses !== false) {
+            window.animateResult(target, config.containerClasses || 'fade-in');
+        }
+        if (config.childSelector) {
+            window.animateChildren(target, config.childSelector, config.childClasses || 'slide-up', config.staggerMs || 0);
+        }
+        return target;
+    };
+
+    window.appendAnimatedElement = function (parent, child, classes, prepend) {
+        if (!parent || !child) return child;
+        if (prepend && parent.firstChild) {
+            parent.insertBefore(child, parent.firstChild);
+        } else if (prepend) {
+            parent.insertBefore(child, null);
+        } else {
+            parent.appendChild(child);
+        }
+        window.animateResult(child, classes || 'slide-up');
+        return child;
+    };
 
     // --- Redis Commands Panel (SSE) ---
     // Each UC page sets window.WORKSHOP_UC = 'UCn'. We open an SSE stream
@@ -238,7 +491,7 @@
                 // Backend returns newest-first; insert in reverse so newest ends on top
                 for (var i = commands.length - 1; i >= 0; i--) {
                     var el = createCommandEntry(commands[i]);
-                    output.insertBefore(el, output.firstChild);
+                    window.appendAnimatedElement(output, el, 'slide-up highlight-new', true);
                 }
                 trimCommandEntries(output);
                 updateCommandsToolbar(output, counter, copyAllBtn, clearBtn);
@@ -257,7 +510,7 @@
             removeCommandsPlaceholder(output);
 
             var el = createCommandEntry(cmd);
-            output.insertBefore(el, output.firstChild);
+            window.appendAnimatedElement(output, el, 'slide-up highlight-new', true);
 
             trimCommandEntries(output);
             updateCommandsToolbar(output, counter, copyAllBtn, clearBtn);

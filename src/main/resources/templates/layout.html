@@ -2,10 +2,20 @@
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       data-theme="light">
-<head>
+<head th:with="resolvedPageTitle=${pageTitle != null ? 'Redis Workshop | ' + pageTitle : 'Redis Workshop | Banking Workshop Demo'},
+               resolvedPageDescription=${pageDescription != null ? pageDescription : 'Interactive Redis banking workshop demo with live use cases, curated code showcases, and official Redis branding.'}">
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title layout:title-pattern="$CONTENT_TITLE — Banking Workshop">Banking Workshop</title>
+    <title layout:title-pattern="Redis Workshop | $CONTENT_TITLE">Banking Workshop Demo</title>
+    <meta name="description" th:content="${resolvedPageDescription}"/>
+    <meta name="theme-color" content="#091A23"/>
+    <meta property="og:title" th:content="${resolvedPageTitle}"/>
+    <meta property="og:description" th:content="${resolvedPageDescription}"/>
+    <meta property="og:image" th:content="@{/og-redis-workshop.png}"/>
+    <meta property="og:type" content="website"/>
+    <link rel="icon" type="image/png" sizes="32x32" th:href="@{/favicon-32x32.png}"/>
+    <link rel="icon" type="image/png" sizes="16x16" th:href="@{/favicon-16x16.png}"/>
+    <link rel="apple-touch-icon" sizes="180x180" th:href="@{/apple-touch-icon.png}"/>
     <link rel="icon" type="image/x-icon" th:href="@{/favicon.ico}"/>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>

@@ -18,6 +18,7 @@
     var blockedChatsEl = document.getElementById('uc15-blocked-chats');
     var piiFlagsEl = document.getElementById('uc15-pii-flags');
     var complianceFlagsEl = document.getElementById('uc15-compliance-flags');
+    var LATENCY_CONTAINER_ID = 'uc15-send';
 
     function escapeHtml(text) {
         var div = document.createElement('div');
@@ -52,16 +53,12 @@
         if (userLabelEl) userLabelEl.textContent = currentUserId();
     }
 
-    function fetchJson(url, opts) {
+    function fetchJson(url, opts, containerId) {
         opts = opts || {};
         opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
-        return fetch(url, opts).then(function (res) {
-            return res.json().then(function (body) {
-                if (!res.ok) {
-                    throw Object.assign(new Error(body.message || res.statusText), { body: body, status: res.status });
-                }
-                return body;
-            });
+        return fetch(url, opts).then(function (response) {
+            window.showLatencyBadge(containerId || LATENCY_CONTAINER_ID, window.extractLatency(response));
+            return window.parseJsonResponse(response);
         });
     }
 
@@ -104,6 +101,8 @@
         }
         html += '</div>';
         chatEl.insertAdjacentHTML('beforeend', html);
+        window.animateResult(chatEl.lastElementChild, 'fade-in slide-up');
+        window.animateChildren(chatEl.lastElementChild, '.uc15-stage', 'slide-up highlight-new', 20);
         chatEl.scrollTop = chatEl.scrollHeight;
     }
 
@@ -117,7 +116,11 @@
 
     function renderAudit(entries) {
         if (!entries || !entries.length) {
-            auditBodyEl.innerHTML = '<tr><td colspan="4" class="uc15-empty">No audit events yet.</td></tr>';
+            window.renderAnimatedHtml(auditBodyEl, '<tr><td colspan="4" class="uc15-empty">No audit events yet.</td></tr>', {
+                containerClasses: 'fade-in',
+                childSelector: 'tr',
+                childClasses: 'slide-up'
+            });
             return;
         }
 
@@ -131,15 +134,20 @@
             html += '<td>' + escapeHtml(entry.detail || '') + '</td>';
             html += '</tr>';
         });
-        auditBodyEl.innerHTML = html;
+        window.renderAnimatedHtml(auditBodyEl, html, {
+            containerClasses: 'fade-in',
+            childSelector: 'tr',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 20
+        });
     }
 
     function refreshStats() {
-        return fetchJson('/api/guardrails/stats').then(renderStats);
+        return fetchJson('/api/guardrails/stats', null, LATENCY_CONTAINER_ID).then(renderStats);
     }
 
     function refreshAudit() {
-        return fetchJson('/api/guardrails/audit?limit=20').then(function (data) {
+        return fetchJson('/api/guardrails/audit?limit=20', null, LATENCY_CONTAINER_ID).then(function (data) {
             renderAudit(data.entries || []);
         });
     }
@@ -159,13 +167,15 @@
                 userId: currentUserId(),
                 message: message
             })
-        }).then(function (data) {
+        }, 'uc15-send').then(function (data) {
             var llmUnavailable = data.error === 'LLM not configured' || data.openaiConfigured === false;
             if (llmUnavailable) {
                 setModeBadge('AI: unavailable', 'mock');
                 showErrorBanner(data.message || 'LLM not configured — set OPENAI_API_KEY');
+                window.showToast(data.message || 'LLM not configured — set OPENAI_API_KEY', 'warning');
             } else {
                 setModeBadge('AI: OpenAI live', 'on');
+                window.showToast(data.blocked ? 'Guardrails blocked the request.' : 'Guardrail review completed successfully.', data.blocked ? 'warning' : 'success');
             }
             addMessage('assistant', llmUnavailable ? (data.message || data.error) : (data.response || '(empty response)'), data);
             renderStats(data.stats || null);
@@ -174,6 +184,7 @@
             setModeBadge('AI: unavailable', 'mock');
             showErrorBanner('LLM request failed. Check OPENAI_API_KEY and server connectivity.');
             addMessage('assistant', '⚠ ' + (err.message || err), { blocked: true, route: 'error', pipeline: [] });
+            window.showToast((err && err.message) || 'LLM request failed. Check OPENAI_API_KEY and server connectivity.', 'error');
         }).finally(function () {
             sendEl.disabled = false;
             inputEl.focus();
@@ -182,11 +193,14 @@
 
     function resetDemo() {
         resetEl.disabled = true;
-        return fetchJson('/api/guardrails/reset', { method: 'POST' }).then(function () {
+        return fetchJson('/api/guardrails/reset', { method: 'POST' }, 'uc15-send').then(function () {
             chatEl.innerHTML = '<div class="chat-welcome">Runtime state reset. Send another prompt to rebuild the guardrail trail.</div>';
             hideErrorBanner();
             setModeBadge('AI: checking…', 'mock');
+            window.showToast('Guardrails demo reset.', 'success');
             return Promise.all([refreshStats(), refreshAudit()]);
+        }).catch(function (err) {
+            window.showToast((err && err.message) || 'Could not reset the guardrails demo.', 'error');
         }).finally(function () {
             resetEl.disabled = false;
         });

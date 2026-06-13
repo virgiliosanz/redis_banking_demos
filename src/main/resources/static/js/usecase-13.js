@@ -27,38 +27,14 @@
     // Track the clientId that successfully acquired each resource in this session.
     // Used on release so the UI does not depend on the (mutable) input field value.
     var acquiredHolders = {};
-    var feedbackTimer = null;
-
     function showResult(data) {
         resultLog.style.display = '';
         resultJson.textContent = window.formatJson(data);
+        window.animateResult(resultLog, 'fade-in');
     }
 
     function showFeedback(message, type) {
-        var fb = document.getElementById('lockFeedback');
-        if (!fb) {
-            fb = document.createElement('div');
-            fb.id = 'lockFeedback';
-            fb.style.margin = '12px 0 0';
-            fb.style.padding = '8px 12px';
-            fb.style.borderRadius = '5px';
-            fb.style.fontSize = '0.85rem';
-            fb.style.textAlign = 'center';
-            lockTtl.parentNode.appendChild(fb);
-        }
-        fb.textContent = message;
-        if (type === 'error') {
-            fb.style.background = 'rgba(255, 68, 56, 0.12)';
-            fb.style.color = 'var(--redis-red, #FF4438)';
-            fb.style.border = '1px solid var(--redis-red, #FF4438)';
-        } else {
-            fb.style.background = 'rgba(46, 204, 113, 0.12)';
-            fb.style.color = 'var(--success, #2ECC71)';
-            fb.style.border = '1px solid var(--success, #2ECC71)';
-        }
-        fb.style.display = '';
-        clearTimeout(feedbackTimer);
-        feedbackTimer = setTimeout(function () { fb.style.display = 'none'; }, 5000);
+        window.showToast(message, type === 'error' ? 'error' : 'success');
     }
 
     function updateLockDisplay(info) {
@@ -83,6 +59,7 @@
             var rid = resourceSelect.value;
             if (acquiredHolders[rid]) { delete acquiredHolders[rid]; }
         }
+        window.animateResult(lockBadge, 'highlight-new');
     }
 
     function startTtlCountdown() {
@@ -106,10 +83,13 @@
 
     function refreshStatus() {
         var resourceId = resourceSelect.value;
-        window.workshopGet('/api/lock/info/' + resourceId)
+        window.workshopGet('/api/lock/info/' + resourceId, 'btnAcquire')
             .then(function (data) {
                 updateLockDisplay(data);
                 showResult(data);
+            })
+            .catch(function (err) {
+                showFeedback((err && err.message) || 'Could not load the current lock status.', 'error');
             });
     }
 
@@ -124,7 +104,7 @@
             resourceId: resourceId,
             clientId: clientId,
             ttlSeconds: 30
-        }).then(function (data) {
+        }, 'btnAcquire').then(function (data) {
             btnAcquire.disabled = false;
             btnAcquire.textContent = 'Acquire Lock';
             showResult(data);
@@ -140,6 +120,7 @@
         }).catch(function () {
             btnAcquire.disabled = false;
             btnAcquire.textContent = 'Acquire Lock';
+            showFeedback('Could not acquire the lock. Verify the app and Redis are running.', 'error');
         });
     });
 
@@ -157,7 +138,7 @@
         window.workshopFetch('/api/lock/release', {
             resourceId: resourceId,
             clientId: clientId
-        }).then(function (data) {
+        }, 'btnAcquire').then(function (data) {
             btnRelease.disabled = false;
             btnRelease.textContent = 'Release Lock';
             showResult(data);
@@ -172,6 +153,7 @@
         }).catch(function () {
             btnRelease.disabled = false;
             btnRelease.textContent = 'Release Lock';
+            showFeedback('Could not release the lock. Verify the app and Redis are running.', 'error');
         });
     });
 
@@ -187,7 +169,7 @@
 
         window.workshopFetch('/api/lock/simulate', {
             resourceId: resourceId
-        }).then(function (data) {
+        }, 'btnAcquire').then(function (data) {
             btnSimulate.disabled = false;
             btnSimulate.textContent = 'Simulate 3 Concurrent Clients';
             showResult(data);
@@ -210,9 +192,11 @@
             html += '</div>';
             simulationResult.innerHTML = html;
             simulationResult.style.display = '';
+            window.animateResult(simulationResult, 'fade-in slide-up');
         }).catch(function () {
             btnSimulate.disabled = false;
             btnSimulate.textContent = 'Simulate 3 Concurrent Clients';
+            showFeedback('Could not simulate lock contention.', 'error');
         });
     });
 

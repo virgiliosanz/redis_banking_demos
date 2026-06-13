@@ -23,6 +23,13 @@
     // --- Code tabs ---
     window.initCodeTabs();
 
+    function fetchJson(url, opts) {
+        return fetch(url, opts).then(function (response) {
+            window.showLatencyBadge('btnFetch', window.extractLatency(response));
+            return window.parseJsonResponse(response);
+        });
+    }
+
     // --- Product type icons ---
     var typeLabels = {
         'Mortgage': 'MTG', 'Savings': 'SAV', 'Credit Card': 'CC', 'Business': 'BIZ'
@@ -30,8 +37,7 @@
 
     // --- Load products ---
     function loadProducts() {
-        fetch('/api/cache/products')
-            .then(function (r) { return r.json(); })
+        fetchJson('/api/cache/products')
             .then(function (products) {
                 productCards.innerHTML = '';
                 products.forEach(function (p) {
@@ -42,7 +48,7 @@
                         '<span class="cache-card-name">' + p.name + '</span>' +
                         '<span class="cache-card-type">' + p.type + '</span>';
                     card.addEventListener('click', function () { selectProduct(p.id); });
-                    productCards.appendChild(card);
+                    window.appendAnimatedElement(productCards, card, 'slide-up highlight-new');
                 });
             });
     }
@@ -60,8 +66,7 @@
     function fetchProduct() {
         if (!selectedProductId) return;
         btnFetch.disabled = true;
-        fetch('/api/cache/product/' + selectedProductId)
-            .then(function (r) { return r.json(); })
+        fetchJson('/api/cache/product/' + selectedProductId)
             .then(function (data) {
                 if (data.error) {
                     cacheStatus.className = 'cache-status-badge cache-miss';
@@ -84,6 +89,8 @@
                 });
                 resultData.innerHTML = html;
                 resultBox.style.display = 'block';
+                window.animateResult(resultBox, 'fade-in');
+                window.animateChildren(resultData, '.data-row', 'slide-up highlight-new', 25);
 
                 addLogEntry(data);
                 refreshStats();
@@ -103,8 +110,7 @@
     // --- Evict ---
     function evictProduct() {
         if (!selectedProductId) return;
-        fetch('/api/cache/product/' + selectedProductId, { method: 'DELETE' })
-            .then(function (r) { return r.json(); })
+        fetchJson('/api/cache/product/' + selectedProductId, { method: 'DELETE' })
             .then(function (data) {
                 addLogEntry({ cacheHit: null, latencyMs: 0, source: 'EVICT', product: { id: data.productId } });
                 refreshStats();
@@ -115,8 +121,7 @@
     }
 
     function evictAll() {
-        fetch('/api/cache/products', { method: 'DELETE' })
-            .then(function (r) { return r.json(); })
+        fetchJson('/api/cache/products', { method: 'DELETE' })
             .then(function (data) {
                 addLogEntry({ cacheHit: null, latencyMs: 0, source: 'EVICT_ALL', product: { id: data.count + ' keys' } });
                 refreshStats();
@@ -140,14 +145,13 @@
         entry.innerHTML = '<span class="rl-log-time">' + time + '</span>' +
             '<span class="rl-log-status">' + label + '</span>' +
             '<span class="rl-log-detail">' + productId + (latency ? ' — ' + latency : '') + '</span>';
-        requestLog.insertBefore(entry, requestLog.firstChild);
+        window.appendAnimatedElement(requestLog, entry, 'slide-up highlight-new', true);
         while (requestLog.children.length > 20) requestLog.removeChild(requestLog.lastChild);
     }
 
     // --- Stats ---
     function refreshStats() {
-        fetch('/api/cache/stats')
-            .then(function (r) { return r.json(); })
+        fetchJson('/api/cache/stats')
             .then(function (s) {
                 statHits.textContent = s.hits;
                 statMisses.textContent = s.misses;

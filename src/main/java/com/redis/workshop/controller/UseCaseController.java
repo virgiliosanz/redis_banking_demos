@@ -37,8 +37,11 @@ public class UseCaseController {
         if (!TITLES.containsKey(id)) {
             return "redirect:/";
         }
+        String useCaseTitle = TITLES.get(id);
         model.addAttribute("useCaseId", id);
-        model.addAttribute("useCaseTitle", TITLES.get(id));
+        model.addAttribute("useCaseTitle", useCaseTitle);
+        model.addAttribute("pageTitle", "UC" + id + ": " + useCaseTitle);
+        model.addAttribute("pageDescription", "UC" + id + " in the Redis Banking Workshop: " + useCaseTitle + ". Interactive live demo, curated Redis snippets, and code showcase for banking scenarios.");
         return "usecase-" + id;
     }
 }

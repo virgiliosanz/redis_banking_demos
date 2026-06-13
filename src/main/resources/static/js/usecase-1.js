@@ -61,6 +61,8 @@
         rows += buildRow('Role', data.role);
         rows += buildRow('IP Address', data.ipAddress);
         tokenData.innerHTML = rows;
+        window.animateResult(tokenSection, 'fade-in');
+        window.animateChildren(tokenData, '.data-row', 'slide-up highlight-new', 35);
 
         currentToken = data.tokenId;
         startTtlCountdown(data.ttl);
@@ -114,7 +116,7 @@
         loginBtn.textContent = 'Authenticating...';
         loginError.style.display = 'none';
 
-        window.workshopFetch('/api/auth/login', { username: username, password: password })
+        window.workshopFetch('/api/auth/login', { username: username, password: password }, 'loginBtn')
             .then(function (data) {
                 loginBtn.disabled = false;
                 loginBtn.textContent = 'Login & Generate Token';
@@ -142,16 +144,18 @@
     // --- Validate ---
     validateBtn.addEventListener('click', function () {
         if (!currentToken) return;
-        window.workshopFetch('/api/auth/validate', { token: currentToken })
+        window.workshopFetch('/api/auth/validate', { token: currentToken }, 'loginBtn')
             .then(function (data) {
                 validateResult.style.display = '';
                 if (data.valid) {
                     validateResult.className = 'alert alert-success';
                     validateResult.innerHTML = '&#10003; Token is <strong>valid</strong>. TTL: ' + data.ttl + 's remaining.';
+                    window.animateResult(validateResult, 'fade-in highlight-new');
                     window.showToast('Token is valid. TTL: ' + data.ttl + 's remaining.', 'success', 3000);
                 } else {
                     validateResult.className = 'alert alert-error';
                     validateResult.innerHTML = '&#10007; Token is <strong>invalid</strong> or expired.';
+                    window.animateResult(validateResult, 'fade-in highlight-new');
                     window.showToast('Token is invalid or expired.', 'warning');
                 }
             });
@@ -160,7 +164,7 @@
     // --- Logout (Destroy Token) ---
     logoutBtn.addEventListener('click', function () {
         if (!currentToken) return;
-        window.workshopFetch('/api/auth/logout', { token: currentToken })
+        window.workshopFetch('/api/auth/logout', { token: currentToken }, 'loginBtn')
             .then(function () {
                 stopTtlCountdown();
                 currentToken = null;

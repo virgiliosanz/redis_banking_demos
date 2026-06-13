@@ -35,16 +35,13 @@
                 '<span class="detail-label">Hash:</span> <code>' + data.txHash + '</code><br>' +
                 '<span class="detail-label">Key:</span> <code>' + data.redisKey + '</code><br>' +
                 '<span class="detail-label">TTL:</span> ' + data.ttlSeconds + 's';
-
-            // Animate
-            resultBox.classList.remove('result-animate');
-            void resultBox.offsetWidth; // force reflow
-            resultBox.classList.add('result-animate');
+            window.animateResult(resultBox, 'fade-in slide-up');
         }
 
         function renderLog(entries) {
             if (!entries || entries.length === 0) {
                 txLog.innerHTML = '<p class="placeholder-text">No transactions yet. Submit a payment above.</p>';
+                window.animateResult(txLog, 'fade-in');
                 return;
             }
             var html = '<table class="log-table"><thead><tr>' +
@@ -63,12 +60,17 @@
                     '<td>' + ts + '</td></tr>';
             });
             html += '</tbody></table>';
-            txLog.innerHTML = html;
+            window.renderAnimatedHtml(txLog, html, {
+                containerClasses: 'fade-in',
+                childSelector: 'tbody tr',
+                childClasses: 'slide-up highlight-new',
+                staggerMs: 30
+            });
         }
 
         function submitPayment(data) {
             payBtn.disabled = true;
-            return workshopFetch('/api/dedup/submit', data)
+            return workshopFetch('/api/dedup/submit', data, 'payBtn')
                 .then(function (result) {
                     showResult(result);
                     window.showToast(
@@ -85,6 +87,7 @@
                     resultIcon.textContent = '\u2717';
                     resultStatus.textContent = 'Error';
                     resultDetails.textContent = err.message;
+                    window.animateResult(resultBox, 'fade-in highlight-new');
                     window.showToast(err.message || 'Payment submission failed.', 'error');
                 })
                 .finally(function () {
@@ -93,7 +96,7 @@
         }
 
         function refreshLog() {
-            return workshopGet('/api/dedup/log').then(renderLog);
+            return workshopGet('/api/dedup/log', 'payBtn').then(renderLog);
         }
 
         // Pay button
@@ -119,7 +122,7 @@
 
         // Reset
         resetBtn.addEventListener('click', function () {
-            workshopFetch('/api/dedup/reset', {}).then(function () {
+            workshopFetch('/api/dedup/reset', {}, 'payBtn').then(function () {
                 resultBox.style.display = 'none';
                 window.showToast('Deduplication demo reset.', 'success');
                 return refreshLog();

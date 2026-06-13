@@ -37,7 +37,7 @@
 
     // --- Load users into selector ---
     function loadUsers() {
-        window.workshopGet('/api/profile/users').then(function (users) {
+        window.workshopGet('/api/profile/users', 'loadBtn').then(function (users) {
             userSelect.innerHTML = '';
             users.forEach(function (u) {
                 var opt = document.createElement('option');
@@ -66,6 +66,9 @@
             rows += buildRow(label, data[key], key.startsWith('account_balance'));
         });
         profileData.innerHTML = rows;
+        window.animateResult(profileCard, 'fade-in');
+        window.animateResult(editCard, 'fade-in');
+        window.animateChildren(profileData, '.data-row', 'slide-up highlight-new', 35);
 
         startTtlCountdown(data.ttl || MAX_TTL);
     }
@@ -90,16 +93,21 @@
         loadBtn.textContent = 'Loading from DBs...';
         syncResult.style.display = 'none';
 
-        window.workshopFetch('/api/profile/load/' + userId, {})
+        window.workshopFetch('/api/profile/load/' + userId, {}, 'loadBtn')
             .then(function (data) {
                 loadBtn.disabled = false;
                 loadBtn.textContent = 'Load Profile from DBs';
-                if (data.error) return;
+                if (data.error) {
+                    window.showToast(data.error, 'error');
+                    return;
+                }
                 displayProfile(data);
+                window.showToast('Profile loaded for ' + userId + '.', 'success');
             })
             .catch(function () {
                 loadBtn.disabled = false;
                 loadBtn.textContent = 'Load Profile from DBs';
+                window.showToast('Could not load the selected profile.', 'error');
             });
     });
 
@@ -113,21 +121,34 @@
 
         var body = {};
         body[field] = value;
-        window.workshopFetch('/api/profile/update/' + userId, body)
+        window.workshopFetch('/api/profile/update/' + userId, body, 'loadBtn')
             .then(function (data) {
-                if (data && !data.error) displayProfile(data);
-                editValue.value = '';
+                if (data && !data.error) {
+                    displayProfile(data);
+                    editValue.value = '';
+                    window.showToast('Updated ' + field + ' for ' + userId + '.', 'success');
+                    return;
+                }
+                window.showToast((data && data.error) || 'Profile update failed.', 'error');
+            })
+            .catch(function (err) {
+                window.showToast((err && err.message) || 'Profile update failed.', 'error');
             });
     });
 
     // --- Sync back ---
     syncBtn.addEventListener('click', function () {
         var userId = userSelect.value;
-        window.workshopFetch('/api/profile/sync/' + userId, {})
+        window.workshopFetch('/api/profile/sync/' + userId, {}, 'loadBtn')
             .then(function (data) {
                 syncResult.style.display = '';
                 syncResult.className = 'alert alert-success';
                 syncResult.innerHTML = '&#10003; ' + data.message;
+                window.animateResult(syncResult, 'fade-in highlight-new');
+                window.showToast(data.message || ('Profile synced for ' + userId + '.'), 'success');
+            })
+            .catch(function (err) {
+                window.showToast((err && err.message) || 'Profile sync failed.', 'error');
             });
     });
 

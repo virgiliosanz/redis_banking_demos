@@ -142,7 +142,7 @@
     }
 
     function loadClients() {
-        window.workshopGet('/api/features/clients').then(function (clients) {
+        window.workshopGet('/api/features/clients', 'clientSelect').then(function (clients) {
             clientSelect.innerHTML = '';
             clients.forEach(function (client) {
                 var opt = document.createElement('option');
@@ -159,7 +159,7 @@
     }
 
     function loadFeatures(clientId, featureSet) {
-        window.workshopGet('/api/features/client/' + clientId + '?version=' + encodeURIComponent(featureSet)).then(function (data) {
+        window.workshopGet('/api/features/client/' + clientId + '?version=' + encodeURIComponent(featureSet), 'clientSelect').then(function (data) {
             if (data.error) {
                 window.showToast(data.error, 'error');
                 return;
@@ -169,11 +169,14 @@
             riskBadgeContainer.style.display = '';
             redisKeyDisplay.textContent = data.redisKey + ' • ' + data.featureSetVersion;
             featureTable.innerHTML = buildFeatureRows(data);
+            window.animateResult(featureCard, 'fade-in');
+            window.animateChildren(featureTable, '.data-row', 'slide-up highlight-new', 25);
 
             var risk = getRiskLevel(getRiskScore(data.features, data.featureSetVersion));
             riskBadge.textContent = risk.label;
             riskBadge.style.background = risk.bg;
             riskBadge.style.color = risk.color;
+            window.animateResult(riskBadge, 'highlight-new');
         }).catch(function (err) {
             window.showToast((err && err.message) || 'Could not load the selected feature set.', 'error');
         });
@@ -205,6 +208,9 @@
             statusEl.textContent = text || 'Waiting';
             statusEl.style.color = state === 'default' ? 'var(--text-muted)' : color;
         }
+        if (state !== 'default') {
+            window.animateResult(el, state === 'done' ? 'highlight-new' : 'fade-in');
+        }
     }
 
     function resetInferenceView() {
@@ -228,19 +234,29 @@
 
     function renderInferenceLatency(latency) {
         inferenceLatency.style.display = '';
-        inferenceLatency.innerHTML = buildSectionTitle('Latency Breakdown') +
+        window.renderAnimatedHtml(inferenceLatency, buildSectionTitle('Latency Breakdown') +
             buildRow('Redis feature fetch', formatMs(latency.redisFeatureFetchMs), false) +
             buildRow('Model inference', formatMs(latency.modelInferenceMs), false) +
-            buildRow('Total latency', formatMs(latency.totalMs), true);
+            buildRow('Total latency', formatMs(latency.totalMs), true), {
+            containerClasses: 'fade-in',
+            childSelector: '.data-row',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 30
+        });
     }
 
     function renderComparison(comparison) {
         latencyComparisonEmpty.style.display = 'none';
         latencyComparison.style.display = '';
-        latencyComparison.innerHTML = buildRow('Redis online fetch', formatMs(comparison.redisFeatureFetchMs), true) +
+        window.renderAnimatedHtml(latencyComparison, buildRow('Redis online fetch', formatMs(comparison.redisFeatureFetchMs), true) +
             buildRow('Simulated database fetch', formatMs(comparison.simulatedDatabaseFetchMs), false) +
             buildRow('Latency saved', formatMs(comparison.savedMs), false) +
-            buildRow('Speed-up', Number(comparison.speedupX).toFixed(1) + 'x', false);
+            buildRow('Speed-up', Number(comparison.speedupX).toFixed(1) + 'x', false), {
+            containerClasses: 'fade-in',
+            childSelector: '.data-row',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 30
+        });
     }
 
     function renderInferenceResult(data) {
@@ -268,6 +284,8 @@
                 '<ul style="margin:0; padding-left:18px;">' + signalItems + '</ul>' +
             '</div>';
         inferenceResult.style.display = '';
+        window.animateResult(inferenceResult, 'fade-in slide-up');
+        window.animateChildren(inferenceResult, 'li', 'slide-up highlight-new', 35);
     }
 
     function runInference() {
@@ -279,7 +297,7 @@
         resetInferenceView();
         setPipelineStep('fetch', 'active', 'HGETALL ' + featureSet);
 
-        window.workshopGet('/api/features/inference/' + clientId + '?version=' + encodeURIComponent(featureSet)).then(function (data) {
+        window.workshopGet('/api/features/inference/' + clientId + '?version=' + encodeURIComponent(featureSet), 'clientSelect').then(function (data) {
             if (data.error) {
                 inferenceBtn.disabled = false;
                 inferenceBtn.textContent = 'Run ML Inference';
@@ -349,7 +367,7 @@
             clientId: clientId,
             amount: amount,
             country: txCountry.value
-        }).then(function () {
+        }, 'clientSelect').then(function () {
             simulateBtn.disabled = false;
             simulateBtn.textContent = 'Simulate Transaction';
             loadFeatures(clientId, getSelectedFeatureSet());

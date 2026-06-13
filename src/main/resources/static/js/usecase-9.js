@@ -11,6 +11,8 @@
     var sessionId = 'sess-' + Math.random().toString(36).substring(2, 10);
     var userName = 'Demo User';
     var openaiConfigured = false; // set on load via /api/assistant/status
+    var cacheStatsWarningShown = false;
+    var statusCheckWarningShown = false;
 
     // --- DOM refs ---
     var chatMessages = document.getElementById('chat-messages');
@@ -74,6 +76,7 @@
         }
 
         chatMessages.appendChild(msgDiv);
+        window.animateResult(msgDiv, 'fade-in slide-up');
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
@@ -83,6 +86,7 @@
         ind.style.cssText = 'margin-bottom:12px; padding:10px 14px; border-radius:var(--border-radius); background:var(--bg-tertiary); color:var(--text-muted); font-size:0.85rem; font-style:italic;';
         ind.textContent = 'AI is thinking...';
         chatMessages.appendChild(ind);
+        window.animateResult(ind, 'fade-in');
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
@@ -97,9 +101,10 @@
 
     // --- Update Memory Inspection Panel ---
     function updateShortTermMemory() {
-        window.workshopGet('/api/assistant/conversation/' + sessionId).then(function (data) {
+        window.workshopGet('/api/assistant/conversation/' + sessionId, 'sendBtn').then(function (data) {
             if (!data.exists) {
                 shortTermInfo.innerHTML = '<span style="color:var(--text-muted);">No active conversation yet.</span>';
+                window.animateResult(shortTermInfo, 'fade-in');
                 return;
             }
             var msgs = data.messages || [];
@@ -110,6 +115,8 @@
             html += '<div class="data-row"><span class="data-label">User</span><span class="data-value">' + escapeHtml(data.userName || '') + '</span></div>';
             html += '<div class="data-row"><span class="data-label">Last Active</span><span class="data-value" style="font-size:0.75rem;">' + (data.lastActive || '—') + '</span></div>';
             shortTermInfo.innerHTML = html;
+            window.animateResult(shortTermInfo, 'fade-in');
+            window.animateChildren(shortTermInfo, '.data-row', 'slide-up highlight-new', 25);
         });
     }
 
@@ -139,7 +146,7 @@
 
     function updateMemoryResults(memories) {
         if (!memories || memories.length === 0) {
-            memoryResults.innerHTML = '<span>No memories retrieved for this query.</span>';
+            window.renderAnimatedHtml(memoryResults, '<span>No memories retrieved for this query.</span>', { containerClasses: 'fade-in' });
             return;
         }
         var html = '';
@@ -155,12 +162,17 @@
             if (meta.length) html += '<div class="uc9-source-meta">' + meta.join(' — ') + '</div>';
             html += '</div>';
         });
-        memoryResults.innerHTML = html;
+        window.renderAnimatedHtml(memoryResults, html, {
+            containerClasses: 'fade-in',
+            childSelector: '.uc9-source-item',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 25
+        });
     }
 
     function updateRagResults(docs) {
         if (!docs || docs.length === 0) {
-            ragResults.innerHTML = '<span>No documents retrieved for this query.</span>';
+            window.renderAnimatedHtml(ragResults, '<span>No documents retrieved for this query.</span>', { containerClasses: 'fade-in' });
             return;
         }
         var html = '';
@@ -173,12 +185,17 @@
             if (doc.tags) html += '<div class="uc9-source-meta">Tags: ' + escapeHtml(doc.tags) + '</div>';
             html += '</div>';
         });
-        ragResults.innerHTML = html;
+        window.renderAnimatedHtml(ragResults, html, {
+            containerClasses: 'fade-in',
+            childSelector: '.uc9-source-item',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 25
+        });
     }
 
     function updateRegResults(docs) {
         if (!docs || docs.length === 0) {
-            regResults.innerHTML = '<span>No regulation documents retrieved for this query.</span>';
+            window.renderAnimatedHtml(regResults, '<span>No regulation documents retrieved for this query.</span>', { containerClasses: 'fade-in' });
             return;
         }
         var html = '';
@@ -194,13 +211,19 @@
             if (meta.length) html += '<div class="uc9-source-meta">' + meta.join(' — ') + '</div>';
             html += '</div>';
         });
-        regResults.innerHTML = html;
+        window.renderAnimatedHtml(regResults, html, {
+            containerClasses: 'fade-in',
+            childSelector: '.uc9-source-item',
+            childClasses: 'slide-up highlight-new',
+            staggerMs: 25
+        });
     }
 
     // --- Cache display ---
     function showCacheBadge(isHit, latencyMs, tokensSaved) {
         if (!cacheIndicator || !cacheBadge) return;
         cacheIndicator.style.display = '';
+        window.animateResult(cacheIndicator, isHit ? 'fade-in highlight-new' : 'fade-in');
         if (isHit) {
             cacheBadge.textContent = 'CACHE HIT';
             cacheBadge.style.background = '#059669';
@@ -220,7 +243,8 @@
     }
 
     function updateCacheStats() {
-        window.workshopGet('/api/assistant/cache/stats').then(function (data) {
+        window.workshopGet('/api/assistant/cache/stats', 'sendBtn').then(function (data) {
+            cacheStatsWarningShown = false;
             if (!data) return;
             if (cacheHitsEl) cacheHitsEl.textContent = data.hits || 0;
             if (cacheMissesEl) cacheMissesEl.textContent = data.misses || 0;
@@ -235,7 +259,12 @@
                     : 'Disabled (no OpenAI key)';
                 cacheStatusText.style.color = data.enabled ? '#059669' : '#d97706';
             }
-        }).catch(function () {});
+        }).catch(function () {
+            if (!cacheStatsWarningShown) {
+                cacheStatsWarningShown = true;
+                window.showToast('Could not refresh semantic cache stats.', 'warning');
+            }
+        });
     }
 
     // --- Input control ---
@@ -265,6 +294,7 @@
         var msgDiv = document.createElement('div');
         msgDiv.style.cssText = 'margin-bottom:12px; padding:10px 14px; border-radius:var(--border-radius); max-width:90%; font-size:0.85rem; line-height:1.5; background:var(--bg-tertiary); color:var(--text-primary);';
         chatMessages.appendChild(msgDiv);
+        window.animateResult(msgDiv, 'fade-in slide-up');
 
         setInputEnabled(false);
         showStreamingIndicator();
@@ -292,7 +322,9 @@
                 updateRagResults(sources.kbDocs);
                 updateRegResults(sources.regDocs);
                 updateShortTermMemory();
-            } catch (err) { console.error('UC9 sources handler error:', err); }
+            } catch (err) {
+                window.showToast('Could not parse streamed source metadata.', 'warning', 3000);
+            }
         });
 
         eventSource.addEventListener('token', function (e) {
@@ -302,7 +334,9 @@
                 fullResponse += data.content;
                 msgDiv.innerHTML = formatMarkdown(fullResponse);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
-            } catch (err) { /* ignore parse errors */ }
+            } catch (err) {
+                window.showToast('Received a malformed assistant token chunk.', 'warning', 3000);
+            }
         });
 
         eventSource.addEventListener('done', function (e) {
@@ -321,6 +355,7 @@
                         apiStatusText.innerHTML = 'LLM not configured <span style="font-weight:400;">— set OPENAI_API_KEY</span>';
                         apiStatusText.style.color = 'var(--redis-primary)';
                     }
+                    window.showToast(meta.message || 'LLM not configured — set OPENAI_API_KEY', 'warning');
                     return;
                 }
 
@@ -331,7 +366,9 @@
                 if (meta.semanticCacheHit !== undefined) {
                     showCacheBadge(meta.semanticCacheHit, meta.latencyMs, meta.tokensSaved);
                 }
-            } catch (err) { /* ignore */ }
+            } catch (err) {
+                window.showToast('Could not parse stream completion metadata.', 'warning', 3000);
+            }
         });
 
         eventSource.onerror = function () {
@@ -341,6 +378,7 @@
             if (!fullResponse) {
                 setAiBadge('unavailable');
                 renderAssistantError(msgDiv, 'Error connecting to AI service. Check OPENAI_API_KEY or try again.');
+                window.showToast('Error connecting to AI service. Check OPENAI_API_KEY or try again.', 'error');
             }
             // Update short-term memory even on error (conversation may have been saved server-side)
             updateShortTermMemory();
@@ -364,7 +402,7 @@
     resetBtn.addEventListener('click', function () {
         resetBtn.disabled = true;
         resetBtn.textContent = 'Resetting...';
-        window.workshopFetch('/api/assistant/reset', {}).then(function () {
+        window.workshopFetch('/api/assistant/reset', {}, 'sendBtn').then(function () {
             sessionId = 'sess-' + Math.random().toString(36).substring(2, 10);
             chatMessages.innerHTML = '<div class="chat-welcome" style="color:var(--text-muted); font-style:italic; padding:16px 0; text-align:center;">Ask about banking services — accounts, transfers, investments, loans, cards, or regulations. Try the example prompts below!</div>';
             shortTermInfo.innerHTML = 'No active conversation yet.';
@@ -373,6 +411,10 @@
             regResults.innerHTML = 'No regulation documents retrieved yet.';
             if (cacheIndicator) cacheIndicator.style.display = 'none';
             latencyDisplay.textContent = '';
+            window.showToast('AI memory demo reset.', 'success');
+        }).catch(function (err) {
+            window.showToast((err && err.message) || 'Could not reset the AI memory demo.', 'error');
+        }).finally(function () {
             resetBtn.disabled = false;
             resetBtn.textContent = 'Reset Demo';
             updateCacheStats();
@@ -406,7 +448,8 @@
         }
     }
     setAiBadge('checking');
-    window.workshopGet('/api/assistant/status').then(function (data) {
+    window.workshopGet('/api/assistant/status', 'sendBtn').then(function (data) {
+        statusCheckWarningShown = false;
         openaiConfigured = !!(data && data.openaiConfigured);
         setAiBadge(openaiConfigured ? 'live' : 'unavailable');
         if (openaiConfigured) {
@@ -421,6 +464,10 @@
         setAiBadge('checking');
         apiStatusText.innerHTML = 'Could not verify AI status yet';
         apiStatusText.style.color = '#d97706';
+        if (!statusCheckWarningShown) {
+            statusCheckWarningShown = true;
+            window.showToast('Could not verify AI status yet.', 'warning');
+        }
     });
 
     // Fetch initial cache stats

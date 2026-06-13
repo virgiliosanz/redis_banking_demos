@@ -51,6 +51,7 @@
             statusIcon.textContent = '\u2717';
             statusText.textContent = '429 Too Many Requests — retry after ' + data.retryAfter + 's';
         }
+        window.animateResult(statusBox, allowed ? 'fade-in' : 'fade-in highlight-new');
     }
 
     // --- TTL countdown ---
@@ -82,7 +83,7 @@
             '<span class="rl-log-status">' + statusCode + '</span>' +
             '<span class="rl-log-detail">Request #' + data.currentCount +
             ' — ' + data.remaining + ' remaining</span>';
-        requestLog.insertBefore(entry, requestLog.firstChild);
+        window.appendAnimatedElement(requestLog, entry, 'slide-up highlight-new', true);
 
         // Keep only last 15 entries
         while (requestLog.children.length > 15) {
@@ -93,19 +94,22 @@
     // --- API call ---
     function callApi() {
         btnCallApi.disabled = true;
-        fetch('/api/ratelimit/check', { method: 'POST' })
-            .then(function (res) { return res.json(); })
+        window.workshopFetch('/api/ratelimit/check', {}, 'btnCallApi')
             .then(function (data) {
                 limit = data.limit;
                 updateGauge(data.remaining, data.limit);
                 showStatus(data.allowed, data);
                 addLogEntry(data);
                 if (data.ttl > 0) startTtlCountdown(data.ttl);
+                if (!data.allowed) {
+                    window.showToast('Rate limit exceeded. Retry after ' + data.retryAfter + 's.', 'warning');
+                }
             })
             .catch(function (err) {
                 statusBox.className = 'rl-status rl-status-blocked';
                 statusIcon.textContent = '!';
                 statusText.textContent = 'Error: ' + err.message;
+                window.showToast(err.message || 'Rate-limit check failed.', 'error');
             })
             .finally(function () { btnCallApi.disabled = false; });
     }
@@ -115,21 +119,31 @@
         btnBurst.disabled = true;
         var calls = [];
         for (var i = 0; i < 5; i++) {
-            calls.push(fetch('/api/ratelimit/check', { method: 'POST' }).then(function (r) { return r.json(); }));
+            calls.push(window.workshopFetch('/api/ratelimit/check', {}, 'btnCallApi'));
         }
         Promise.all(calls).then(function (results) {
+            var blockedCount = 0;
             results.forEach(function (data) {
                 updateGauge(data.remaining, data.limit);
                 showStatus(data.allowed, data);
                 addLogEntry(data);
                 if (data.ttl > 0) startTtlCountdown(data.ttl);
+                if (!data.allowed) blockedCount++;
             });
+            window.showToast(
+                blockedCount > 0
+                    ? ('Burst finished — ' + blockedCount + ' requests were rate-limited.')
+                    : 'Burst finished — all 5 requests were allowed.',
+                blockedCount > 0 ? 'warning' : 'success'
+            );
+        }).catch(function (err) {
+            window.showToast((err && err.message) || 'Burst simulation failed.', 'error');
         }).finally(function () { btnBurst.disabled = false; });
     }
 
     // --- Reset ---
     function resetLimit() {
-        fetch('/api/ratelimit/reset', { method: 'POST' })
+        window.workshopFetch('/api/ratelimit/reset', {}, 'btnCallApi')
             .then(function () {
                 updateGauge(limit, limit);
                 statusBox.className = 'rl-status rl-status-ok';
@@ -138,13 +152,16 @@
                 ttlBox.style.display = 'none';
                 clearInterval(ttlInterval);
                 requestLog.innerHTML = '';
+                window.showToast('Rate limit window reset.', 'success');
+            })
+            .catch(function (err) {
+                window.showToast((err && err.message) || 'Could not reset the rate limit window.', 'error');
             });
     }
 
     // --- Refresh status (used after TTL expires) ---
     function refreshStatus() {
-        fetch('/api/ratelimit/status')
-            .then(function (res) { return res.json(); })
+        window.workshopGet('/api/ratelimit/status', 'btnCallApi')
             .then(function (data) {
                 limit = data.limit;
                 updateGauge(data.remaining, data.limit);
@@ -153,6 +170,9 @@
                     statusIcon.textContent = '\u2713';
                     statusText.textContent = 'Window expired — counter reset. Ready for new requests!';
                 }
+            })
+            .catch(function (err) {
+                window.showToast((err && err.message) || 'Could not refresh the rate-limit status.', 'error');
             });
     }
 

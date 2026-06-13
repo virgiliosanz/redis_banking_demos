@@ -3,7 +3,7 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <head>
-    <title>Presenter Guide</title>
+    <title th:text="${pageTitle}">Workshop Guide</title>
     <style>
         .guide-container { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
         .guide-container h1 { font-size: 1.75rem; margin-bottom: 8px; color: var(--text-primary); }

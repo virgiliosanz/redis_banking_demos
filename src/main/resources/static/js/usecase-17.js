@@ -223,12 +223,15 @@
         if (!commands.length) {
             el.className = 'uc17-command-strip is-empty';
             el.textContent = 'No commands recorded yet.';
+            window.animateResult(el, 'fade-in');
             return;
         }
         el.className = 'uc17-command-strip';
         el.innerHTML = commands.map(function (command) {
             return '<span class="uc17-command-chip">' + escapeHtml(command) + '</span>';
         }).join('');
+        window.animateResult(el, 'fade-in');
+        window.animateChildren(el, '.uc17-command-chip', 'slide-up highlight-new', 18);
     }
 
     function renderPlan() {
@@ -236,6 +239,7 @@
         if (!plan.length) {
             coordinatorPlan.className = 'uc17-plan-list is-empty';
             coordinatorPlan.textContent = 'No subtasks dispatched yet.';
+            window.animateResult(coordinatorPlan, 'fade-in');
             return;
         }
         coordinatorPlan.className = 'uc17-plan-list';
@@ -245,12 +249,15 @@
                 + (item.task && item.role ? '<br/>' + escapeHtml(item.task) : '')
                 + '</div>';
         }).join('');
+        window.animateResult(coordinatorPlan, 'fade-in');
+        window.animateChildren(coordinatorPlan, '.uc17-plan-item', 'slide-up highlight-new', 20);
     }
 
     function renderStreamLog() {
         if (!coordinatorState.streamEvents.length) {
             streamLog.className = 'uc17-stream-log is-empty';
             streamLog.textContent = 'No stream activity yet.';
+            window.animateResult(streamLog, 'fade-in');
             return;
         }
         streamLog.className = 'uc17-stream-log';
@@ -258,6 +265,8 @@
             return '<div class="uc17-stream-log-item"><strong>' + escapeHtml(entry.title) + '</strong><br/>'
                 + escapeHtml(entry.detail) + '</div>';
         }).join('');
+        window.animateResult(streamLog, 'fade-in');
+        window.animateChildren(streamLog, '.uc17-stream-log-item', 'slide-up highlight-new', 18);
     }
 
     function renderCoordinator() {
@@ -270,6 +279,9 @@
         renderPlan();
         renderCommandStrip(coordinatorCommands, coordinatorState.commands);
         renderStreamLog();
+        window.animateResult(coordinatorCard, 'fade-in');
+        window.animateResult(coordinatorResponse, 'fade-in slide-up');
+        if (coordinatorDashboardResponse) window.animateResult(coordinatorDashboardResponse, 'fade-in slide-up');
     }
 
     function renderAgent(key) {
@@ -330,6 +342,11 @@
         refs.meta.innerHTML = meta.join('');
 
         renderCommandStrip(refs.commands, state.commands);
+        window.animateResult(refs.card, state.state === 'idle' ? 'fade-in' : 'fade-in slide-up');
+        if (state.tools.length || state.ragResults.length) {
+            window.animateChildren(refs.tools, '.uc17-tool-item, .uc17-rag-item', 'slide-up highlight-new', 18);
+        }
+        window.animateResult(refs.response, 'fade-in');
 
         var laneStatus = document.querySelector('[data-lane-status="' + key + '"]');
         if (laneStatus) laneStatus.textContent = state.laneStatus;
@@ -597,6 +614,12 @@
         }
         addStreamEvent('Final result ready', 'Coordinator returned the assembled response to the UI');
         renderCoordinator();
+        window.showToast(
+            isErrorMode
+                ? 'Agent coordination completed with errors. Review the specialist cards.'
+                : ('Agent coordination completed in ' + formatMs(coordinatorState.totalLatency) + '.'),
+            isErrorMode ? 'warning' : 'success'
+        );
     }
 
     function handleError(payload) {
@@ -620,6 +643,7 @@
         setCoordinatorVisualState('is-error');
         addStreamEvent('Coordination error', payload.message || 'Unknown error');
         renderCoordinator();
+        window.showToast(payload.message || 'Could not complete the coordination request.', 'error');
     }
 
     function handleEvent(eventName, payload, runId) {
@@ -746,6 +770,7 @@
         var query = (prompt || (queryInput && queryInput.value) || '').trim();
         if (!query) {
             if (queryInput) queryInput.style.borderColor = 'var(--redis-primary)';
+            window.showToast('Enter a complex banking query to coordinate the agents.', 'warning');
             return;
         }
         if (queryInput) queryInput.style.borderColor = '';
@@ -777,6 +802,7 @@
             }),
             signal: currentStream.signal
         }).then(function (response) {
+            window.showLatencyBadge('uc17-send', window.extractLatency(response));
             var contentType = response.headers.get('Content-Type') || '';
             if (!response.ok && contentType.indexOf('application/json') !== -1) {
                 return response.json().then(function (body) {
@@ -809,6 +835,7 @@
             method: 'POST',
             headers: { Accept: 'application/json' }
         }).then(function (response) {
+            window.showLatencyBadge('uc17-send', window.extractLatency(response));
             if (!response.ok) throw new Error('Reset failed with HTTP ' + response.status);
             sessionId = 'coord-' + Math.random().toString(36).substring(2, 10);
             if (sessionValue) sessionValue.textContent = sessionId;
@@ -816,6 +843,7 @@
             if (exampleSelect) exampleSelect.value = '';
             resetView();
             setModeBadge('checking');
+            window.showToast('Agent coordination demo reset.', 'success');
         }).catch(function (error) {
             resetView();
             handleError({ message: (error && error.message) || 'Could not reset /api/agents/reset. Verify the backend is available.' });
