@@ -68,6 +68,27 @@ class RedisMonitorServiceTest {
         assertThat(args.get(1)).isEqualTo("unterminated");
     }
 
+    // ── filter commands ──────────────────────────────────────────────────
+
+    @Test
+    void isFilteredCommand_systemCommandsReturnTrue() {
+        assertThat(RedisMonitorService.isFilteredCommand("INFO")).isTrue();
+        assertThat(RedisMonitorService.isFilteredCommand("monitor")).isTrue();
+        assertThat(RedisMonitorService.isFilteredCommand("CLIENT")).isTrue();
+        assertThat(RedisMonitorService.isFilteredCommand("PSYNC")).isTrue();
+        assertThat(RedisMonitorService.isFilteredCommand("MODULE")).isTrue();
+    }
+
+    @Test
+    void isFilteredCommand_applicationCommandsReturnFalse() {
+        assertThat(RedisMonitorService.isFilteredCommand("GET")).isFalse();
+        assertThat(RedisMonitorService.isFilteredCommand("SET")).isFalse();
+        assertThat(RedisMonitorService.isFilteredCommand("HSET")).isFalse();
+        assertThat(RedisMonitorService.isFilteredCommand("FT.SEARCH")).isFalse();
+        assertThat(RedisMonitorService.isFilteredCommand("JSON.SET")).isFalse();
+        assertThat(RedisMonitorService.isFilteredCommand(null)).isFalse();
+    }
+
     // ── inferUseCase ────────────────────────────────────────────────────
 
     @Test

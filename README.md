@@ -69,16 +69,24 @@ docker compose up -d
 Best for presenting the workshop. Everything runs in Docker — no local Java needed.
 
 ```bash
-# Build and start Redis + App together
-docker compose --profile workshop up -d --build
+# 1. Copy the tracked env template
+cp .env.example .env
 
-# Open http://localhost:8080
+# 2. Edit .env and set OPENAI_API_KEY if you want AI responses in UC9/UC14/UC15/UC16/UC17
+
+# 3. Build and start the full demo stack
+make demo
+
+# 4. Open http://localhost:8080
 ```
+
+`make demo` uses Docker Compose, and Docker Compose automatically reads `.env` from the repository root.
+If `OPENAI_API_KEY` is left empty, non-AI use cases still work, but UC9, UC14, UC15, UC16, and UC17 will return a configuration error at the LLM step.
 
 To stop everything:
 
 ```bash
-docker compose --profile workshop down
+make demo-down
 ```
 
 ## Docker Setup
@@ -92,6 +100,21 @@ docker compose --profile workshop down
 | `agent-memory-server-mcp` | `redislabs/agent-memory-server:latest` | 9000 | Agent Memory Server MCP endpoint (streamable HTTP) — only started with `--profile ams-mcp` |
 | `app` | Built from `Dockerfile` | 8080 | Spring Boot application (workshop profile only) |
 | `redis-insight` | `redis/redisinsight:latest` | 8001 | Visual Redis browser (starts by default on port 8001) |
+
+### Environment file (`.env`)
+
+Docker Compose reads `.env` automatically from the repository root, and `make demo` reuses that same Compose configuration.
+
+Setup flow:
+
+```bash
+cp .env.example .env
+# then edit .env and replace the placeholder value
+```
+
+- `.env.example` is committed as the safe template.
+- `.env` is already ignored by Git and is where you put your real `OPENAI_API_KEY`.
+- `OPENAI_API_KEY` is passed to the workshop app and Agent Memory Server containers during Docker runs.
 
 ### Agent Memory Server (local workshop)
 
@@ -222,7 +245,13 @@ Non-AI use cases (**UC1-UC8, UC10-UC13**) work without any API key.
 
 1. Get an API key from [platform.openai.com](https://platform.openai.com/api-keys)
 
-2. Set the environment variable if you want LLM responses in UC9, UC14, UC15, UC16, and UC17:
+2. Preferred setup: copy `.env.example` to `.env`, then replace the placeholder with your real key. `docker compose` and `make demo` will pick it up automatically from the repo root:
+
+```bash
+cp .env.example .env
+```
+
+3. You can also set the environment variable inline if you want LLM responses in UC9, UC14, UC15, UC16, and UC17:
 
 ```bash
 # Development mode
@@ -235,7 +264,7 @@ OPENAI_API_KEY=sk-... make dev
 OPENAI_API_KEY=sk-... docker compose --profile workshop up -d --build
 ```
 
-3. On startup, the app logs whether OpenAI chat is enabled. Local BGE embeddings always run in-process and do not require configuration:
+4. On startup, the app logs whether OpenAI chat is enabled. Local BGE embeddings always run in-process and do not require configuration:
 
 ```
 OpenAI chat integration enabled (model=gpt-4o-mini)
