@@ -662,8 +662,116 @@ body.modal-open {
     letter-spacing: 0.05em;
 }
 
+.demo-panel-header {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing-unit) * 1.5);
+    flex-wrap: wrap;
+    margin-bottom: calc(var(--spacing-unit) * 2);
+}
+
+.demo-panel-header h2 {
+    margin: 0;
+}
+
+.demo-panel-header > .redis-latency-badge {
+    margin-left: 0;
+}
+
+.demo-panel-header .btn-presenter-fullscreen {
+    margin-left: auto;
+    white-space: nowrap;
+}
+
 .demo-container {
     min-height: 200px;
+}
+
+body.presenter-fullscreen {
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(9, 26, 35, 0.96), rgba(9, 26, 35, 1));
+}
+
+body.presenter-fullscreen .top-nav,
+body.presenter-fullscreen .site-footer,
+body.presenter-fullscreen .code-panel,
+body.presenter-fullscreen .usecase-header,
+body.presenter-fullscreen .how-it-works,
+body.presenter-fullscreen #redis-commands-card {
+    display: none !important;
+}
+
+body.presenter-fullscreen .main-content {
+    max-width: none;
+    padding: 0;
+}
+
+body.presenter-fullscreen .usecase-panels {
+    grid-template-columns: 1fr !important;
+    gap: 0;
+}
+
+body.presenter-fullscreen .demo-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 24px;
+    overflow-y: auto;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: radial-gradient(circle at top, rgba(255, 68, 56, 0.08), transparent 30%),
+                linear-gradient(180deg, rgba(9, 26, 35, 0.08), rgba(9, 26, 35, 0.16)),
+                var(--bg-primary);
+}
+
+body.presenter-fullscreen .demo-container {
+    min-height: calc(100vh - 88px);
+    font-size: 1.05rem;
+}
+
+body.presenter-fullscreen .demo-panel h2 {
+    font-size: 1.1rem;
+}
+
+body.presenter-fullscreen .demo-panel h3 {
+    font-size: 1.2rem;
+}
+
+body.presenter-fullscreen .demo-panel label,
+body.presenter-fullscreen .demo-panel .data-label,
+body.presenter-fullscreen .demo-panel .status-badge,
+body.presenter-fullscreen .demo-panel .ai-badge,
+body.presenter-fullscreen .demo-panel .redis-latency-badge {
+    font-size: 0.9rem;
+}
+
+body.presenter-fullscreen .demo-panel .btn {
+    font-size: 0.95rem;
+}
+
+body.presenter-fullscreen .demo-panel .form-input,
+body.presenter-fullscreen .demo-panel select,
+body.presenter-fullscreen .demo-panel textarea {
+    font-size: 1rem;
+}
+
+@media (max-width: 780px) {
+    body.presenter-fullscreen .demo-panel {
+        padding: 16px;
+    }
+
+    body.presenter-fullscreen .demo-container {
+        min-height: calc(100vh - 80px);
+    }
+
+    body.presenter-fullscreen .demo-panel-header .btn-presenter-fullscreen {
+        width: 100%;
+        margin-left: 0;
+    }
 }
 
 .placeholder-text {
