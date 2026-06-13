@@ -266,12 +266,7 @@ EVAL "if redis.call('GET', KEYS[1]) == ARGV[1] \
         </div>
     </div>
 
-    <div class="presenter-notes" hidden data-target-minutes="3">
-        <section data-presenter-section="what-to-say"><p>UC13 shows distributed locking in the context of a wire transfer: only one service instance can hold the account lock at a time. Present it as a coordination primitive that prevents double-processing without introducing a heavyweight lock service.</p></section>
-        <section data-presenter-section="demo-steps"><ol><li>Have the first client acquire the lock and show the key in Redis.</li><li>Attempt the same operation from a competing client and point out the denial.</li><li>Release or let the TTL expire to explain how the lock becomes available again.</li></ol></section>
-        <section data-presenter-section="key-talking-points"><ul><li>The lock acquisition is one Redis command, not a database transaction.</li><li>The TTL is a safety net so abandoned locks do not linger forever.</li><li>Safe release matters: the owner should delete only its own lock token.</li></ul></section>
-        <section data-presenter-section="redis-highlight"><p><code>SET lock value NX EX ttl</code> for acquisition, plus token-aware delete on release.</p></section>
-    </div>
+
 
     <div layout:fragment="scripts">
         <script th:src="@{/js/usecase-13.js}"></script>

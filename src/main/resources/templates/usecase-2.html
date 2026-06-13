@@ -233,12 +233,7 @@ DEL uc2:token:a1b2c3d4-...</code></pre>
         </div>
     </div>
 
-    <div class="presenter-notes" hidden data-target-minutes="3">
-        <section data-presenter-section="what-to-say"><p>UC2 extends the token story into full session management: Redis stores who the user is, which token is active, and when the session should expire. Frame it as a lightweight, centralized state layer for authenticated applications.</p></section>
-        <section data-presenter-section="demo-steps"><ol><li>Create a session to show the user envelope and token metadata landing in Redis together.</li><li>Inspect the stored fields and TTL to explain inactivity-driven expiry.</li><li>Log out or reset the session and point out that cleanup is immediate and deterministic.</li></ol></section>
-        <section data-presenter-section="key-talking-points"><ul><li>Application nodes stay stateless because session state lives in Redis.</li><li>Redis makes cross-service session validation trivial: one key, one lookup.</li><li>Compared with a relational session table, the live demo is faster and easier to inspect.</li></ul></section>
-        <section data-presenter-section="redis-highlight"><p><code>HSET</code>, <code>HGETALL</code>, and <code>TTL</code> power a transparent session store.</p></section>
-    </div>
+
 
     <div layout:fragment="scripts">
         <script th:src="@{/js/usecase-2.js}"></script>

@@ -257,12 +257,7 @@ XREVRANGE uc16:stream:gateway + - COUNT 10</code></pre>
         </div>
     </div>
 
-    <div class="presenter-notes" hidden data-target-minutes="4">
-        <section data-presenter-section="what-to-say"><p>UC16 presents Redis as the control plane for an AI gateway: route the query, check semantic cache, enforce limits, and apply guardrails before the model response returns. This is the architecture demo for teams thinking beyond a single chat endpoint.</p></section>
-        <section data-presenter-section="demo-steps"><ol><li>Submit a normal request and show which model path the gateway chooses.</li><li>Repeat or vary the request to surface semantic cache and rate-limit behavior.</li><li>Use a blocked or risky prompt to show the guardrail stages short-circuiting the flow.</li></ol></section>
-        <section data-presenter-section="key-talking-points"><ul><li>Routing, caching, safety, and cost control are all first-class stages.</li><li>Redis is fast enough to sit in the decision loop for every request.</li><li>The pipeline view matters because platform teams need to explain why a request was handled a certain way.</li></ul></section>
-        <section data-presenter-section="redis-highlight"><p>Semantic routing and cache lookups via <code>FT.SEARCH</code>, with <code>INCR</code>/<code>EXPIRE</code> for per-model throttling.</p></section>
-    </div>
+
 
     <div layout:fragment="scripts">
         <style>

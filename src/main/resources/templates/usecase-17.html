@@ -396,13 +396,6 @@ XREVRANGE uc17:stream:events + - COUNT 10</code></pre>
     </div>
 </div>
 
-<div class="presenter-notes" hidden data-target-minutes="4">
-    <section data-presenter-section="what-to-say"><p>UC17 is the capstone demo: one coordinator decomposes a banking question into specialist tasks, Redis Streams fans the work out, and the UI shows each agent progressing independently. Tell the audience this is Redis as the coordination backbone for multi-agent systems.</p></section>
-    <section data-presenter-section="demo-steps"><ol><li>Submit a complex banking question so all four specialists have work to do.</li><li>Watch the Streams lanes and agent cards update in parallel as events arrive.</li><li>Finish on the assembled response and recap how Redis carried tasks, results, and observability.</li></ol></section>
-    <section data-presenter-section="key-talking-points"><ul><li>Parallelism is visible because each worker advances independently.</li><li>Streams provide both coordination and auditability in the same design.</li><li>This is the best closing demo because it ties together Redis primitives, AI, and system orchestration.</li></ul></section>
-    <section data-presenter-section="redis-highlight"><p><code>XADD</code> dispatches work, <code>XREADGROUP</code> distributes it, and <code>XACK</code> closes the delivery loop.</p></section>
-</div>
-
 <div layout:fragment="scripts">
     <style>
         .uc17-panel-head {

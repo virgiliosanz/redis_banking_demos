@@ -229,12 +229,7 @@ if (added != null &amp;&amp; added == 1L) {
         </div>
     </div>
 
-    <div class="presenter-notes" hidden data-target-minutes="3">
-        <section data-presenter-section="what-to-say"><p>This use case turns Redis into an idempotency guardrail for payments: the first transaction wins, and duplicates inside the protection window are rejected immediately. Position it as a cheap, understandable way to prevent double charging during retries.</p></section>
-        <section data-presenter-section="demo-steps"><ol><li>Submit the first payment and show it is accepted because the key did not exist yet.</li><li>Replay the same request to demonstrate how the duplicate is blocked.</li><li>Explain why the TTL window matters for balancing protection and memory footprint.</li></ol></section>
-        <section data-presenter-section="key-talking-points"><ul><li>The application generates a deterministic transaction fingerprint.</li><li><code>NX</code> guarantees only the first write succeeds.</li><li><code>EX</code> avoids keeping deduplication keys forever.</li></ul></section>
-        <section data-presenter-section="redis-highlight"><p><code>SET key value NX EX ttl</code> is the core idempotency pattern.</p></section>
-    </div>
+
 
     <div layout:fragment="scripts">
         <script th:src="@{/js/usecase-5.js}"></script>

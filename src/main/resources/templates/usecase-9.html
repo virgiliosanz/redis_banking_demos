@@ -601,12 +601,7 @@ EXPIRE uc9:cache:cache-abc123 600
         </div>
     </div>
 
-    <div class="presenter-notes" hidden data-target-minutes="4">
-        <section data-presenter-section="what-to-say"><p>UC9 is where Redis becomes the memory and retrieval layer around an AI assistant: short-term conversation state, long-term memories, banking knowledge, regulation search, and semantic cache all live in Redis. Make the audience notice that the LLM is only one component in a wider Redis-backed system.</p></section>
-        <section data-presenter-section="demo-steps"><ol><li>Ask a banking question and show the assistant retrieving prior context and relevant documents.</li><li>Walk the audience through the Redis Context panel so they can see what the LLM actually received.</li><li>Repeat or ask a similar question to surface the semantic cache hit path.</li></ol></section>
-        <section data-presenter-section="key-talking-points"><ul><li>Conversation state uses hashes plus TTL because recency matters.</li><li>Long-term memory and RAG both use vector search, but against different corpora.</li><li>Semantic cache is the practical optimization that turns repeated prompts into low-cost responses.</li></ul></section>
-        <section data-presenter-section="redis-highlight"><p><code>HSET</code> + <code>EXPIRE</code> for short-term memory, and <code>FT.SEARCH</code> KNN for memories, RAG, and semantic cache.</p></section>
-    </div>
+
 
     <div layout:fragment="scripts">
         <style>

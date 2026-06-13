@@ -242,12 +242,7 @@ HGET uc3:user:U1001 \
         </div>
     </div>
 
-    <div class="presenter-notes" hidden data-target-minutes="3">
-        <section data-presenter-section="what-to-say"><p>This demo shows Redis as a consolidated profile cache: data that originally lives in multiple systems is flattened into one hash for fast reads. The key idea is that Redis becomes the optimized read model the front end actually wants.</p></section>
-        <section data-presenter-section="demo-steps"><ol><li>Load a customer profile and show that accounts, activity, and preferences appear together.</li><li>Point out how the UI reads one Redis object instead of orchestrating several downstream calls.</li><li>Explain that selective field updates stay simple because hashes are field-oriented.</li></ol></section>
-        <section data-presenter-section="key-talking-points"><ul><li>This is a denormalized read pattern, not a source-of-truth replacement.</li><li>Hashes let you update or read profile fields independently.</li><li>The business value is lower latency and simpler application code on the hot path.</li></ul></section>
-        <section data-presenter-section="redis-highlight"><p><code>HSET</code> / <code>HGETALL</code> as a consolidated user profile read model.</p></section>
-    </div>
+
 
     <div layout:fragment="scripts">
         <script th:src="@{/js/usecase-3.js}"></script>

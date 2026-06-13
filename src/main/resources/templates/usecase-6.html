@@ -275,12 +275,7 @@ XTRIM uc6:stream:transactions MAXLEN 50</code></pre>
         </div>
     </div>
 
-    <div class="presenter-notes" hidden data-target-minutes="3">
-        <section data-presenter-section="what-to-say"><p>UC6 shows Redis handling fraud signals in real time: a sorted set tracks transaction velocity, and the UI turns those fast reads into an explainable risk score. The demo feels visual, but the point is that the scoring primitives are simple and low latency.</p></section>
-        <section data-presenter-section="demo-steps"><ol><li>Generate a normal transaction and establish the baseline score.</li><li>Trigger a burst or anomalous event to raise the risk score and explain why.</li><li>Call out the supporting event log and how Redis keeps the scoring window current.</li></ol></section>
-        <section data-presenter-section="key-talking-points"><ul><li>Sorted sets are ideal for sliding time windows because timestamps become scores.</li><li>Old entries can be trimmed cheaply, so the working set stays small.</li><li>The UI only works because Redis can recompute the signal fast enough for live feedback.</li></ul></section>
-        <section data-presenter-section="redis-highlight"><p><code>ZADD</code> + time-window queries, with <code>XADD</code> for the audit/event trail.</p></section>
-    </div>
+
 
     <div layout:fragment="scripts">
         <script th:src="@{/js/usecase-6.js}"></script>

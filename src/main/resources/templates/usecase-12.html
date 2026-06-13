@@ -286,12 +286,7 @@ redis.execute(conn -&gt; conn.execute(
         </div>
     </div>
 
-    <div class="presenter-notes" hidden data-target-minutes="3">
-        <section data-presenter-section="what-to-say"><p>UC12 is the geospatial story: Redis stores ATM and branch coordinates, then answers proximity questions instantly. This lands well with demo audiences because the result is intuitive and visibly location-aware.</p></section>
-        <section data-presenter-section="demo-steps"><ol><li>Choose a customer location or preset and search for nearby ATMs and branches.</li><li>Adjust the radius or filters to show how the result set changes immediately.</li><li>Highlight that the returned distances are computed directly by Redis, not by the front end.</li></ol></section>
-        <section data-presenter-section="key-talking-points"><ul><li>Geospatial indexes are built into Redis, so you do not need a separate mapping database for simple proximity use cases.</li><li>The same pattern works for branches, ATMs, merchants, or service points.</li><li>This demo is all about reducing query complexity while staying interactive.</li></ul></section>
-        <section data-presenter-section="redis-highlight"><p><code>GEOADD</code> to load locations and <code>GEOSEARCH</code> / radius queries to find the closest results.</p></section>
-    </div>
+
 
     <div layout:fragment="scripts">
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

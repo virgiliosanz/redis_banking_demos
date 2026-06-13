@@ -31,25 +31,26 @@
             </a>
             <select class="nav-select" id="useCaseSelect" onchange="if(this.value) window.location.href=this.value">
                 <option value="" disabled>Select Use Case</option>
-                <option th:value="@{/usecase/1}" data-presenter-minutes="3">1. Authentication Token Store</option>
-                <option th:value="@{/usecase/2}" data-presenter-minutes="3">2. Session Storage</option>
-                <option th:value="@{/usecase/3}" data-presenter-minutes="3">3. User Profile Storage</option>
-                <option th:value="@{/usecase/4}" data-presenter-minutes="3">4. Rate Limiting</option>
-                <option th:value="@{/usecase/5}" data-presenter-minutes="3">5. Transaction Deduplication</option>
-                <option th:value="@{/usecase/6}" data-presenter-minutes="3">6. Fraud Detection</option>
-                <option th:value="@{/usecase/7}" data-presenter-minutes="3">7. Feature Store</option>
-                <option th:value="@{/usecase/8}" data-presenter-minutes="3">8. Document Database</option>
-                <option th:value="@{/usecase/9}" data-presenter-minutes="4">9. AI Agent Memory + RAG</option>
-                <option th:value="@{/usecase/10}" data-presenter-minutes="3">10. Cache-Aside</option>
-                <option th:value="@{/usecase/11}" data-presenter-minutes="3">11. Transaction Monitoring</option>
-                <option th:value="@{/usecase/12}" data-presenter-minutes="3">12. ATM &amp; Branch Finder</option>
-                <option th:value="@{/usecase/13}" data-presenter-minutes="3">13. Distributed Locking</option>
-                <option th:value="@{/usecase/14}" data-presenter-minutes="4">14. Agent Memory Server</option>
-                <option th:value="@{/usecase/15}" data-presenter-minutes="4">15. AI Guardrails</option>
-                <option th:value="@{/usecase/16}" data-presenter-minutes="4">16. AI Gateway</option>
-                <option th:value="@{/usecase/17}" data-presenter-minutes="4">17. AI Agent Coordination</option>
+                <option th:value="@{/usecase/1}">1. Authentication Token Store</option>
+                <option th:value="@{/usecase/2}">2. Session Storage</option>
+                <option th:value="@{/usecase/3}">3. User Profile Storage</option>
+                <option th:value="@{/usecase/4}">4. Rate Limiting</option>
+                <option th:value="@{/usecase/5}">5. Transaction Deduplication</option>
+                <option th:value="@{/usecase/6}">6. Fraud Detection</option>
+                <option th:value="@{/usecase/7}">7. Feature Store</option>
+                <option th:value="@{/usecase/8}">8. Document Database</option>
+                <option th:value="@{/usecase/9}">9. AI Agent Memory + RAG</option>
+                <option th:value="@{/usecase/10}">10. Cache-Aside</option>
+                <option th:value="@{/usecase/11}">11. Transaction Monitoring</option>
+                <option th:value="@{/usecase/12}">12. ATM &amp; Branch Finder</option>
+                <option th:value="@{/usecase/13}">13. Distributed Locking</option>
+                <option th:value="@{/usecase/14}">14. Agent Memory Server</option>
+                <option th:value="@{/usecase/15}">15. AI Guardrails</option>
+                <option th:value="@{/usecase/16}">16. AI Gateway</option>
+                <option th:value="@{/usecase/17}">17. AI Agent Coordination</option>
                 <option th:value="@{/monitor}">Monitor Dashboard</option>
             </select>
+            <a th:href="@{/monitor}" class="nav-link nav-link-monitor">Monitor</a>
             <a href="http://localhost:5540" target="_blank" class="nav-link">Redis Insight</a>
             <button class="nav-reset-btn" id="resetAllBtn" type="button" aria-label="Reset all demo data">
                 <svg class="reset-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -57,17 +58,6 @@
                     <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
                 </svg>
                 <span class="reset-label">Reset All</span>
-            </button>
-            <button class="nav-presenter-btn" id="presenterModeToggle" type="button" aria-label="Toggle presenter mode" aria-pressed="false" title="Open presenter mode (P)">
-                <svg class="nav-presenter-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M5 3h14"/>
-                    <path d="M12 3v6"/>
-                    <path d="M7 21h10"/>
-                    <path d="M9 21v-4"/>
-                    <path d="M15 21v-4"/>
-                    <path d="M6 9h12l-2 8H8z"/>
-                </svg>
-                <span class="nav-presenter-label">Presenter</span>
             </button>
             <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
                 <svg class="theme-icon-light" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -92,61 +82,9 @@
         <div layout:fragment="content"></div>
         <div th:if="${useCaseId != null}" class="usecase-guide-row">
             <a class="usecase-guide-link"
-               th:href="@{|/guide#uc${useCaseId}|}">Presenter notes →</a>
+               th:href="@{|/guide#uc${useCaseId}|}">Workshop guide →</a>
         </div>
     </main>
-
-    <div class="presenter-backdrop" id="presenterBackdrop" aria-hidden="true"></div>
-    <aside class="presenter-panel" id="presenterPanel" aria-hidden="true" aria-labelledby="presenterPanelTitle">
-        <div class="presenter-panel-inner">
-            <div class="presenter-panel-head">
-                <div>
-                    <p class="presenter-kicker">Presenter Mode</p>
-                    <h2 id="presenterPanelTitle">Workshop walkthrough</h2>
-                    <p class="presenter-context" id="presenterContextTitle">Workshop overview</p>
-                </div>
-                <button class="presenter-close" id="presenterClose" type="button" aria-label="Close presenter mode">×</button>
-            </div>
-
-            <div class="presenter-toolbar">
-                <button class="presenter-timer" id="presenterTimer" type="button" aria-label="Reset presenter timer">
-                    <span class="presenter-timer-label">00:00</span>
-                    <span class="presenter-timer-meta" id="presenterTimerMeta">Target 03:00 · click to reset</span>
-                </button>
-                <div class="presenter-nav-buttons">
-                    <button class="presenter-nav-btn" id="presenterPrevBtn" type="button">← Prev</button>
-                    <button class="presenter-nav-btn" id="presenterNextBtn" type="button">Next →</button>
-                </div>
-            </div>
-
-            <div class="presenter-overview-card" id="presenterOverviewCard" hidden></div>
-
-            <section class="presenter-section" id="presenterWhatSection">
-                <h3>What to say</h3>
-                <div id="presenterWhatContent"></div>
-            </section>
-
-            <section class="presenter-section" id="presenterStepsSection">
-                <div class="presenter-section-head">
-                    <h3>Demo steps</h3>
-                    <span class="presenter-step-count" id="presenterStepCount">0 / 0</span>
-                </div>
-                <ol class="presenter-steps" id="presenterStepsList"></ol>
-            </section>
-
-            <section class="presenter-section" id="presenterPointsSection">
-                <h3>Key talking points</h3>
-                <div id="presenterPointsContent"></div>
-            </section>
-
-            <section class="presenter-section presenter-highlight" id="presenterRedisSection">
-                <h3>Redis highlight</h3>
-                <div id="presenterRedisContent"></div>
-            </section>
-
-            <p class="presenter-shortcuts">Shortcuts: <kbd>P</kbd> toggle · <kbd>←</kbd>/<kbd>→</kbd> change UC · <kbd>Esc</kbd> close</p>
-        </div>
-    </aside>
 
     <footer class="site-footer">
         <div class="footer-container">

@@ -244,12 +244,7 @@ Redis Stream audit + UI pipeline render</code></pre>
         </section>
     </div>
 
-    <div class="presenter-notes" hidden data-target-minutes="4">
-        <section data-presenter-section="what-to-say"><p>UC15 makes guardrails concrete: every prompt passes through layered checks before the model is allowed to answer. Explain that Redis is not just storing data here — it is acting as a fast policy engine for safe banking chat.</p></section>
-        <section data-presenter-section="demo-steps"><ol><li>Send a valid banking prompt and show the pipeline stages passing.</li><li>Send an unsafe, off-topic, or injection-style prompt and walk through the blocking decision.</li><li>Call out which stages are hard blocks versus advisory flags.</li></ol></section>
-        <section data-presenter-section="key-talking-points"><ul><li>Guardrails combine vector routing, regex checks, and rate limiting instead of relying on one classifier.</li><li>Redis keeps the decision path transparent enough to demo stage by stage.</li><li>The value for a banking audience is governance and explainability, not only model quality.</li></ul></section>
-        <section data-presenter-section="redis-highlight"><p><code>FT.SEARCH</code> KNN for topical and injection checks, backed by fast counters for rate limiting.</p></section>
-    </div>
+
 
     <style>
         .uc15-panel-head {

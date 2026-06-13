@@ -225,12 +225,7 @@ DEL uc1:token:a1b2c3d4-uuid</code></pre>
         </div>
     </div>
 
-    <div class="presenter-notes" hidden data-target-minutes="3">
-        <section data-presenter-section="what-to-say"><p>This use case shows the simplest Redis value proposition: issue an auth token, store it as a hash with TTL, and let every service validate it without touching a database. Emphasize that cleanup is automatic because expiration is part of the write path.</p></section>
-        <section data-presenter-section="demo-steps"><ol><li>Log in to generate a fresh token and expose the Redis hash fields.</li><li>Call validate to show the token can be checked centrally and that TTL is counting down.</li><li>Destroy the token and explain how logout becomes a single Redis delete.</li></ol></section>
-        <section data-presenter-section="key-talking-points"><ul><li>The hash is human-readable, so demo audiences can see exactly what the session carries.</li><li><code>TTL</code> turns security policy into data lifecycle, not a cron job.</li><li>This is a great opener because it is concrete, fast, and easy to reason about live.</li></ul></section>
-        <section data-presenter-section="redis-highlight"><p><code>HSET</code> + <code>EXPIRE</code> for secure token lifecycle management.</p></section>
-    </div>
+
 
     <div layout:fragment="scripts">
         <script th:src="@{/js/usecase-1.js}"></script>

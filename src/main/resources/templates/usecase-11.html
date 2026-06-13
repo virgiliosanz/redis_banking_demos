@@ -227,12 +227,7 @@ for (var r : records) {
         </div>
     </div>
 
-    <div class="presenter-notes" hidden data-target-minutes="3">
-        <section data-presenter-section="what-to-say"><p>This use case shows Redis Streams as a live transaction feed for monitoring dashboards. The punchline is that one append-only event stream can power both operational visibility and anomaly storytelling in the UI.</p></section>
-        <section data-presenter-section="demo-steps"><ol><li>Start the transaction simulation and let the dashboard settle into a normal baseline.</li><li>Inject an anomaly burst so the metrics spike in real time.</li><li>Explain how the stream can be trimmed while keeping the freshest operational history.</li></ol></section>
-        <section data-presenter-section="key-talking-points"><ul><li><code>XADD</code> gives an ordered event log with almost no ceremony.</li><li>The UI aggregates from recent entries, which is why the dashboard feels live.</li><li>Streams are a natural fit when the business wants both replayability and real-time updates.</li></ul></section>
-        <section data-presenter-section="redis-highlight"><p><code>XADD</code>, <code>XTRIM</code>, and range reads over a live transaction stream.</p></section>
-    </div>
+
 
     <div layout:fragment="scripts">
         <script th:src="@{/js/usecase-11.js}"></script>
