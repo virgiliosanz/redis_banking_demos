@@ -230,6 +230,13 @@ DEL uc10:product:mortgage-fixed \
         </div>
     </div>
 
+    <div class="presenter-notes" hidden data-target-minutes="3">
+        <section data-presenter-section="what-to-say"><p>UC10 demonstrates the cache-aside pattern with a banking product catalog: the first read is slow because it falls through to the database, and the second read is fast because Redis now serves it directly. This is a classic demo because the latency difference is instantly visible.</p></section>
+        <section data-presenter-section="demo-steps"><ol><li>Request a product for the first time and call out the cache miss path.</li><li>Repeat the same request to show the immediate cache hit improvement.</li><li>Clear or expire the cache entry and explain how the pattern self-heals on the next miss.</li></ol></section>
+        <section data-presenter-section="key-talking-points"><ul><li>The application controls freshness explicitly instead of hiding it.</li><li>Redis protects the database from repeated hot reads.</li><li>This is often the fastest business win in an existing application because it changes read latency without changing the source system.</li></ul></section>
+        <section data-presenter-section="redis-highlight"><p><code>GET</code> on read, <code>SET ... EX</code> on miss refill.</p></section>
+    </div>
+
     <div layout:fragment="scripts">
         <script th:src="@{/js/usecase-10.js}"></script>
     </div>

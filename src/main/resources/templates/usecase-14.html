@@ -379,6 +379,13 @@ curl -s -X DELETE \
         </div>
     </div>
 
+    <div class="presenter-notes" hidden data-target-minutes="4">
+        <section data-presenter-section="what-to-say"><p>UC14 zooms in on agent memory as a standalone service: Redis stores the memories, indexes them semantically, and lets an agent retrieve the right ones at the right time. The message is that memory is an application capability, not a magic LLM feature.</p></section>
+        <section data-presenter-section="demo-steps"><ol><li>Show the seeded memory records so the audience sees the data model first.</li><li>Run a semantic lookup and explain why the retrieved memory is relevant to the new task.</li><li>Contrast short-term, long-term, and searchable memory in plain language.</li></ol></section>
+        <section data-presenter-section="key-talking-points"><ul><li>Memories are ordinary Redis records, which keeps the system inspectable.</li><li>Vector search determines relevance without exact keyword overlap.</li><li>This demo sets up the memory concepts reused by the richer AI workflows later.</li></ul></section>
+        <section data-presenter-section="redis-highlight"><p><code>HSET</code> for memory records with <code>FT.SEARCH</code> KNN over the vector index.</p></section>
+    </div>
+
     <div layout:fragment="scripts">
         <style>
             .uc14-panel-head {

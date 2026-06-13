@@ -94,6 +94,35 @@
                         </table>
                     </div>
                 </div>
+
+                <div class="data-card redis-commands-card" id="redis-commands-card" style="display:none;">
+                    <div class="redis-commands-header">
+                        <div class="redis-commands-title-wrap">
+                            <h3>Redis Commands Executed</h3>
+                            <span class="redis-commands-counter" id="commands-counter" aria-live="polite">0 commands</span>
+                        </div>
+                        <div class="redis-commands-actions">
+                            <button type="button" class="cmd-copy-btn cmd-header-btn" id="copy-all-commands-btn" title="Copy all commands" aria-label="Copy all commands">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                            </button>
+                            <button type="button" class="cmd-copy-btn cmd-header-btn" id="clear-commands-btn" title="Clear commands" aria-label="Clear commands">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 6h18"></path>
+                                    <path d="M8 6V4h8v2"></path>
+                                    <path d="M19 6l-1 14H6L5 6"></path>
+                                    <path d="M10 11v6"></path>
+                                    <path d="M14 11v6"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="commands-list" id="commands-output">
+                        <div class="commands-empty">No Redis commands captured yet.</div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -165,6 +194,13 @@ Redis Stream audit + UI pipeline render</code></pre>
                 </div>
             </div>
         </section>
+    </div>
+
+    <div class="presenter-notes" hidden data-target-minutes="4">
+        <section data-presenter-section="what-to-say"><p>UC15 makes guardrails concrete: every prompt passes through layered checks before the model is allowed to answer. Explain that Redis is not just storing data here — it is acting as a fast policy engine for safe banking chat.</p></section>
+        <section data-presenter-section="demo-steps"><ol><li>Send a valid banking prompt and show the pipeline stages passing.</li><li>Send an unsafe, off-topic, or injection-style prompt and walk through the blocking decision.</li><li>Call out which stages are hard blocks versus advisory flags.</li></ol></section>
+        <section data-presenter-section="key-talking-points"><ul><li>Guardrails combine vector routing, regex checks, and rate limiting instead of relying on one classifier.</li><li>Redis keeps the decision path transparent enough to demo stage by stage.</li><li>The value for a banking audience is governance and explainability, not only model quality.</li></ul></section>
+        <section data-presenter-section="redis-highlight"><p><code>FT.SEARCH</code> KNN for topical and injection checks, backed by fast counters for rate limiting.</p></section>
     </div>
 
     <style>
