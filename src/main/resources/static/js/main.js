@@ -97,31 +97,330 @@
         });
     }
 
-    // --- Presentation Mode ---
+    // --- Presenter Mode ---
     function initPresentationMode() {
-        // Only on use case pages (two-panel layout)
-        var panels = document.querySelector('.usecase-panels');
-        if (!panels) return;
+        var OPEN_KEY = 'redis-workshop-presenter-open';
+        var DEFAULT_TARGET_MINUTES = 3;
+        var toggle = document.getElementById('presenterModeToggle');
+        var panel = document.getElementById('presenterPanel');
+        var backdrop = document.getElementById('presenterBackdrop');
+        var closeBtn = document.getElementById('presenterClose');
+        var timerBtn = document.getElementById('presenterTimer');
+        var timerMeta = document.getElementById('presenterTimerMeta');
+        var contextTitle = document.getElementById('presenterContextTitle');
+        var prevBtn = document.getElementById('presenterPrevBtn');
+        var nextBtn = document.getElementById('presenterNextBtn');
+        var overviewCard = document.getElementById('presenterOverviewCard');
+        var whatSection = document.getElementById('presenterWhatSection');
+        var whatContent = document.getElementById('presenterWhatContent');
+        var stepsSection = document.getElementById('presenterStepsSection');
+        var stepsList = document.getElementById('presenterStepsList');
+        var stepCount = document.getElementById('presenterStepCount');
+        var pointsSection = document.getElementById('presenterPointsSection');
+        var pointsContent = document.getElementById('presenterPointsContent');
+        var redisSection = document.getElementById('presenterRedisSection');
+        var redisContent = document.getElementById('presenterRedisContent');
 
-        var PM_KEY = 'presentationMode';
-        var toggle = document.createElement('button');
-        toggle.className = 'presentation-toggle';
-        toggle.type = 'button';
-        toggle.setAttribute('aria-label', 'Toggle presentation mode');
+        if (!toggle || !panel || !backdrop) return;
 
-        function updateMode(enabled) {
-            document.body.classList.toggle('presentation-mode', enabled);
-            toggle.textContent = enabled ? 'Exit Presentation' : 'Presentation Mode';
-            toggle.setAttribute('aria-pressed', String(enabled));
-            localStorage.setItem(PM_KEY, String(enabled));
+        var presenterState = {
+            open: false,
+            startedAt: 0,
+            targetSeconds: DEFAULT_TARGET_MINUTES * 60,
+            timerId: null,
+            completedStepsByPath: {}
+        };
+
+        function isEditableTarget(target) {
+            if (!target) return false;
+            var tagName = (target.tagName || '').toLowerCase();
+            return target.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select';
+        }
+
+        function formatSeconds(totalSeconds) {
+            var safe = Math.max(0, totalSeconds || 0);
+            var minutes = Math.floor(safe / 60);
+            var seconds = safe % 60;
+            return String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+        }
+
+        function getCurrentUseCaseId() {
+            var match = window.location.pathname.match(/^\/usecase\/(\d+)$/);
+            return match ? parseInt(match[1], 10) : null;
+        }
+
+        function getUseCaseIds() {
+            var ids = [];
+            var select = document.getElementById('useCaseSelect');
+            if (!select) return ids;
+            Array.prototype.forEach.call(select.options, function (option) {
+                var match = String(option.value || '').match(/^\/usecase\/(\d+)$/);
+                if (match) ids.push(parseInt(match[1], 10));
+            });
+            return ids;
+        }
+
+        function getCurrentPathKey() {
+            return window.location.pathname || 'index';
+        }
+
+        function getPresenterSection(root, sectionName) {
+            return root ? root.querySelector('[data-presenter-section="' + sectionName + '"]') : null;
+        }
+
+        function buildIndexOverview() {
+            var select = document.getElementById('useCaseSelect');
+            var totalCount = 0;
+            var totalMinutes = 0;
+
+            if (select) {
+                Array.prototype.forEach.call(select.options, function (option) {
+                    if (!String(option.value || '').match(/^\/usecase\/(\d+)$/)) return;
+                    totalCount += 1;
+                    totalMinutes += parseInt(option.getAttribute('data-presenter-minutes'), 10) || DEFAULT_TARGET_MINUTES;
+                });
+            }
+
+            return {
+                targetMinutes: totalMinutes || DEFAULT_TARGET_MINUTES,
+                overviewHtml: '<div class="presenter-overview-stats">'
+                    + '<div class="presenter-overview-stat"><span class="presenter-overview-label">Use cases</span><strong>' + totalCount + '</strong></div>'
+                    + '<div class="presenter-overview-stat"><span class="presenter-overview-label">Estimated time</span><strong>~' + totalMinutes + ' min</strong></div>'
+                    + '</div>'
+                    + '<p class="presenter-overview-copy">Open with the landing page to frame the workshop, then move left-to-right from core Redis patterns into AI use cases.</p>',
+                whatHtml: '<p>This page is the opening map for the workshop: explain that the demos progress from state, caching, and search patterns into guarded AI flows and multi-agent coordination.</p>',
+                steps: [
+                    'Introduce the workshop structure and point out the grouped categories.',
+                    'Set expectations: every use case has a live demo and a curated code panel.',
+                    'Open UC1 to begin the story with simple state and TTL patterns.'
+                ],
+                pointsHtml: '<ul><li>Everything is demo-first and designed for live explanation.</li><li>Use the panel timer to keep each use case short and comparable.</li><li>The last block of demos shows Redis supporting AI memory, guardrails, gateways, and orchestration.</li></ul>',
+                highlightHtml: '<p><code>' + totalCount + ' use cases</code> with an estimated <code>~' + totalMinutes + ' min</code> total walkthrough.</p>'
+            };
+        }
+
+        function extractPresenterData() {
+            var noteRoot = document.querySelector('.presenter-notes');
+            var useCaseBadge = document.querySelector('.usecase-badge');
+            var titleEl = document.querySelector('.usecase-header h1');
+            var currentId = getCurrentUseCaseId();
+            var data = {
+                title: titleEl ? titleEl.textContent.trim() : 'Workshop overview',
+                badge: useCaseBadge ? useCaseBadge.textContent.trim() : '',
+                targetMinutes: DEFAULT_TARGET_MINUTES,
+                overviewHtml: '',
+                whatHtml: '',
+                steps: [],
+                pointsHtml: '',
+                highlightHtml: ''
+            };
+
+            if (noteRoot) {
+                data.targetMinutes = parseInt(noteRoot.getAttribute('data-target-minutes'), 10) || DEFAULT_TARGET_MINUTES;
+                var what = getPresenterSection(noteRoot, 'what-to-say');
+                var demoSteps = getPresenterSection(noteRoot, 'demo-steps');
+                var talkingPoints = getPresenterSection(noteRoot, 'key-talking-points');
+                var redisHighlight = getPresenterSection(noteRoot, 'redis-highlight');
+
+                data.whatHtml = what ? what.innerHTML : '';
+                data.pointsHtml = talkingPoints ? talkingPoints.innerHTML : '';
+                data.highlightHtml = redisHighlight ? redisHighlight.innerHTML : '';
+                if (demoSteps) {
+                    Array.prototype.forEach.call(demoSteps.querySelectorAll('li'), function (item) {
+                        data.steps.push(item.innerHTML);
+                    });
+                }
+                return data;
+            }
+
+            if (window.location.pathname === '/' || document.querySelector('.use-case-grid')) {
+                var overview = buildIndexOverview();
+                data.title = 'Workshop overview';
+                data.badge = 'INDEX';
+                data.targetMinutes = overview.targetMinutes;
+                data.overviewHtml = overview.overviewHtml;
+                data.whatHtml = overview.whatHtml;
+                data.steps = overview.steps;
+                data.pointsHtml = overview.pointsHtml;
+                data.highlightHtml = overview.highlightHtml;
+                return data;
+            }
+
+            data.title = currentId ? 'UC' + currentId : 'Presenter notes unavailable';
+            data.whatHtml = '<p>Presenter notes are available on the landing page and each use case page.</p>';
+            data.pointsHtml = '<ul><li>Use <kbd>P</kbd> to reopen the panel after navigation.</li></ul>';
+            data.highlightHtml = '<p><code>sessionStorage</code> keeps the panel open state between pages.</p>';
+            return data;
+        }
+
+        function updateStepCountDisplay(stepValues) {
+            var done = 0;
+            for (var i = 0; i < stepValues.length; i++) {
+                if (stepValues[i]) done += 1;
+            }
+            stepCount.textContent = done + ' / ' + stepValues.length;
+        }
+
+        function renderSteps(stepHtmlList) {
+            stepsList.innerHTML = '';
+            if (!stepHtmlList.length) {
+                stepsSection.hidden = true;
+                return;
+            }
+
+            stepsSection.hidden = false;
+            var pathKey = getCurrentPathKey();
+            if (!presenterState.completedStepsByPath[pathKey] || presenterState.completedStepsByPath[pathKey].length !== stepHtmlList.length) {
+                presenterState.completedStepsByPath[pathKey] = stepHtmlList.map(function () { return false; });
+            }
+
+            var stepValues = presenterState.completedStepsByPath[pathKey];
+            stepHtmlList.forEach(function (stepHtml, index) {
+                var item = document.createElement('li');
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'presenter-step';
+                button.setAttribute('role', 'checkbox');
+                button.setAttribute('aria-checked', stepValues[index] ? 'true' : 'false');
+                if (stepValues[index]) button.classList.add('is-done');
+                button.innerHTML = '<span class="presenter-step-marker">' + (index + 1) + '</span>'
+                    + '<span class="presenter-step-body">' + stepHtml + '</span>';
+                button.addEventListener('click', function () {
+                    stepValues[index] = !stepValues[index];
+                    button.classList.toggle('is-done', stepValues[index]);
+                    button.setAttribute('aria-checked', stepValues[index] ? 'true' : 'false');
+                    updateStepCountDisplay(stepValues);
+                });
+                item.appendChild(button);
+                stepsList.appendChild(item);
+            });
+            updateStepCountDisplay(stepValues);
+        }
+
+        function syncNavButtons() {
+            var ids = getUseCaseIds();
+            var currentId = getCurrentUseCaseId();
+            var index = ids.indexOf(currentId);
+            var hasPrev = index > 0;
+            var hasNext = index !== -1 && index < ids.length - 1;
+
+            prevBtn.disabled = !hasPrev;
+            nextBtn.disabled = !hasNext;
+            prevBtn.setAttribute('aria-disabled', hasPrev ? 'false' : 'true');
+            nextBtn.setAttribute('aria-disabled', hasNext ? 'false' : 'true');
+        }
+
+        function renderPresenterContent() {
+            var data = extractPresenterData();
+            presenterState.targetSeconds = Math.max(1, data.targetMinutes) * 60;
+            contextTitle.textContent = data.badge && data.badge !== 'INDEX'
+                ? data.badge + ' · ' + data.title
+                : data.title;
+
+            overviewCard.hidden = !data.overviewHtml;
+            overviewCard.innerHTML = data.overviewHtml;
+
+            whatSection.hidden = !data.whatHtml;
+            whatContent.innerHTML = data.whatHtml;
+
+            pointsSection.hidden = !data.pointsHtml;
+            pointsContent.innerHTML = data.pointsHtml;
+
+            redisSection.hidden = !data.highlightHtml;
+            redisContent.innerHTML = data.highlightHtml;
+
+            renderSteps(data.steps);
+            syncNavButtons();
+        }
+
+        function stopTimer() {
+            if (presenterState.timerId) {
+                window.clearInterval(presenterState.timerId);
+                presenterState.timerId = null;
+            }
+        }
+
+        function updateTimer() {
+            var elapsed = Math.floor((Date.now() - presenterState.startedAt) / 1000);
+            var valueEl = timerBtn.querySelector('.presenter-timer-label');
+            valueEl.textContent = formatSeconds(elapsed);
+            timerMeta.textContent = 'Target ' + formatSeconds(presenterState.targetSeconds) + ' · click to reset';
+            timerBtn.classList.toggle('is-over', elapsed >= presenterState.targetSeconds);
+        }
+
+        function startTimer() {
+            stopTimer();
+            presenterState.startedAt = Date.now();
+            updateTimer();
+            presenterState.timerId = window.setInterval(updateTimer, 1000);
+        }
+
+        function setPresenterOpen(enabled) {
+            presenterState.open = !!enabled;
+            document.body.classList.toggle('presenter-open', presenterState.open);
+            panel.setAttribute('aria-hidden', presenterState.open ? 'false' : 'true');
+            backdrop.setAttribute('aria-hidden', presenterState.open ? 'false' : 'true');
+            toggle.setAttribute('aria-pressed', presenterState.open ? 'true' : 'false');
+            toggle.setAttribute('title', presenterState.open ? 'Close presenter mode (P)' : 'Open presenter mode (P)');
+            sessionStorage.setItem(OPEN_KEY, presenterState.open ? 'true' : 'false');
+
+            if (presenterState.open) {
+                renderPresenterContent();
+                startTimer();
+                panel.scrollTop = 0;
+            } else {
+                stopTimer();
+            }
+        }
+
+        function navigateRelative(delta) {
+            var ids = getUseCaseIds();
+            var currentId = getCurrentUseCaseId();
+            var index = ids.indexOf(currentId);
+            if (index === -1) return;
+            var targetId = ids[index + delta];
+            if (!targetId) return;
+            window.location.assign('/usecase/' + targetId);
+        }
+
+        function handlePresenterKeydown(event) {
+            if (event.altKey || event.ctrlKey || event.metaKey || event.repeat) return;
+
+            if ((event.key === 'p' || event.key === 'P') && !isEditableTarget(event.target)) {
+                event.preventDefault();
+                setPresenterOpen(!presenterState.open);
+                return;
+            }
+
+            if (event.key === 'Escape' && presenterState.open) {
+                event.preventDefault();
+                setPresenterOpen(false);
+                return;
+            }
+
+            if (!presenterState.open || isEditableTarget(event.target)) return;
+
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                navigateRelative(-1);
+            } else if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                navigateRelative(1);
+            }
         }
 
         toggle.addEventListener('click', function () {
-            updateMode(!document.body.classList.contains('presentation-mode'));
+            setPresenterOpen(!presenterState.open);
         });
+        if (closeBtn) closeBtn.addEventListener('click', function () { setPresenterOpen(false); });
+        if (backdrop) backdrop.addEventListener('click', function () { setPresenterOpen(false); });
+        if (timerBtn) timerBtn.addEventListener('click', function () { startTimer(); });
+        if (prevBtn) prevBtn.addEventListener('click', function () { navigateRelative(-1); });
+        if (nextBtn) nextBtn.addEventListener('click', function () { navigateRelative(1); });
+        document.addEventListener('keydown', handlePresenterKeydown);
 
-        document.body.appendChild(toggle);
-        updateMode(localStorage.getItem(PM_KEY) === 'true');
+        renderPresenterContent();
+        setPresenterOpen(sessionStorage.getItem(OPEN_KEY) === 'true');
     }
 
     // --- Redis latency badge ---
@@ -225,7 +524,30 @@
 
         var card = document.getElementById('redis-commands-card');
         var output = document.getElementById('commands-output');
+        var counter = document.getElementById('commands-counter');
+        var copyAllBtn = document.getElementById('copy-all-commands-btn');
+        var clearBtn = document.getElementById('clear-commands-btn');
         if (!card || !output) return;
+
+        ensureCommandsPlaceholder(output);
+        updateCommandsToolbar(output, counter, copyAllBtn, clearBtn);
+
+        if (copyAllBtn) {
+            copyAllBtn.addEventListener('click', function () {
+                var commands = getVisibleCommands(output);
+                if (!commands.length) return;
+                copyRedisCommand(copyAllBtn, commands.join('\n'), 'Copy all commands');
+            });
+        }
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function () {
+                clearCommandEntries(output);
+                ensureCommandsPlaceholder(output);
+                updateCommandsToolbar(output, counter, copyAllBtn, clearBtn);
+                card.style.display = '';
+            });
+        }
 
         // Backfill recent commands captured before page load
         fetch('/api/redis/commands?uc=' + encodeURIComponent(uc) + '&limit=10',
@@ -237,17 +559,15 @@
                 if (commands.length === 0) return;
 
                 card.style.display = '';
-                var placeholder = output.querySelector('.command-log-empty, .commands-empty');
-                if (placeholder) placeholder.remove();
+                removeCommandsPlaceholder(output);
 
                 // Backend returns newest-first; insert in reverse so newest ends on top
                 for (var i = commands.length - 1; i >= 0; i--) {
                     var el = createCommandEntry(commands[i]);
                     output.insertBefore(el, output.firstChild);
                 }
-                while (output.children.length > MAX_COMMANDS) {
-                    output.removeChild(output.lastChild);
-                }
+                trimCommandEntries(output);
+                updateCommandsToolbar(output, counter, copyAllBtn, clearBtn);
             })
             .catch(function () { /* silent */ });
 
@@ -260,15 +580,13 @@
             try { cmd = JSON.parse(event.data); } catch (e) { return; }
 
             card.style.display = '';
-            var placeholder = output.querySelector('.command-log-empty, .commands-empty');
-            if (placeholder) placeholder.remove();
+            removeCommandsPlaceholder(output);
 
             var el = createCommandEntry(cmd);
             output.insertBefore(el, output.firstChild);
 
-            while (output.children.length > MAX_COMMANDS) {
-                output.removeChild(output.lastChild);
-            }
+            trimCommandEntries(output);
+            updateCommandsToolbar(output, counter, copyAllBtn, clearBtn);
 
             flashCodeShowcase(cmd.command);
         });
@@ -292,6 +610,7 @@
 
         var details = document.createElement('details');
         details.className = 'redis-cmd-entry command-entry';
+        details.setAttribute('data-full-command', fullCmd);
 
         var summary = document.createElement('summary');
         var summaryCode = document.createElement('code');
@@ -328,6 +647,63 @@
         return details;
     }
 
+    function getCommandEntries(output) {
+        return output.querySelectorAll('.redis-cmd-entry.command-entry, .command-entry-simple');
+    }
+
+    function getVisibleCommands(output) {
+        var entries = getCommandEntries(output);
+        var commands = [];
+        for (var i = 0; i < entries.length; i++) {
+            var fullCommand = entries[i].getAttribute('data-full-command');
+            if (fullCommand) commands.push(fullCommand);
+        }
+        return commands;
+    }
+
+    function removeCommandsPlaceholder(output) {
+        var placeholder = output.querySelector('.command-log-empty, .commands-empty');
+        if (placeholder) placeholder.remove();
+    }
+
+    function ensureCommandsPlaceholder(output) {
+        if (getCommandEntries(output).length > 0) {
+            removeCommandsPlaceholder(output);
+            return;
+        }
+
+        if (output.querySelector('.command-log-empty, .commands-empty')) return;
+
+        var placeholder = document.createElement('div');
+        placeholder.className = 'commands-empty';
+        placeholder.textContent = 'No Redis commands captured yet.';
+        output.appendChild(placeholder);
+    }
+
+    function clearCommandEntries(output) {
+        var entries = getCommandEntries(output);
+        for (var i = 0; i < entries.length; i++) {
+            entries[i].remove();
+        }
+    }
+
+    function trimCommandEntries(output) {
+        var entries = getCommandEntries(output);
+        while (entries.length > MAX_COMMANDS) {
+            entries[entries.length - 1].remove();
+            entries = getCommandEntries(output);
+        }
+    }
+
+    function updateCommandsToolbar(output, counter, copyAllBtn, clearBtn) {
+        var count = getCommandEntries(output).length;
+        if (counter) {
+            counter.textContent = count + ' command' + (count === 1 ? '' : 's');
+        }
+        if (copyAllBtn) copyAllBtn.disabled = count === 0;
+        if (clearBtn) clearBtn.disabled = count === 0;
+    }
+
     // Briefly flash the code-showcase snippet that contains the executed command.
     // Matches the command token within the currently visible (active) code block,
     // ignoring substrings of longer commands (e.g. HGET inside HGETALL).
@@ -362,20 +738,7 @@
         }
     }
 
-    function copyRedisCommand(btn, command) {
-        function flash() {
-            btn.classList.add('cmd-copied');
-            btn.title = 'Copied!';
-            setTimeout(function () {
-                btn.classList.remove('cmd-copied');
-                btn.title = 'Copy command to clipboard';
-            }, 1500);
-        }
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(command).then(flash).catch(function () {});
-            return;
-        }
-        // Fallback for older/non-secure contexts
+    function fallbackCopyText(command) {
         try {
             var ta = document.createElement('textarea');
             ta.value = command;
@@ -386,8 +749,34 @@
             ta.select();
             document.execCommand('copy');
             document.body.removeChild(ta);
-            flash();
-        } catch (e) { /* non-fatal */ }
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function copyRedisCommand(btn, command, defaultTitle) {
+        var baseTitle = defaultTitle || 'Copy command to clipboard';
+
+        function flash() {
+            btn.classList.add('cmd-copied');
+            btn.title = 'Copied!';
+            btn.setAttribute('aria-label', 'Copied!');
+            setTimeout(function () {
+                btn.classList.remove('cmd-copied');
+                btn.title = baseTitle;
+                btn.setAttribute('aria-label', baseTitle);
+            }, 1500);
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(command).then(flash).catch(function () {
+                if (fallbackCopyText(command)) flash();
+            });
+            return;
+        }
+
+        if (fallbackCopyText(command)) flash();
     }
 
     document.addEventListener('DOMContentLoaded', function () {
